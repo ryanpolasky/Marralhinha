@@ -8,6 +8,7 @@ const { Accounts } = require('./accounts');
 const { Economy } = require('./economy');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
+const { legalRoutes } = require('./legal');
 
 const PORT = Number(process.env.PORT) || 3001;
 const BUILD_DIR = path.join(__dirname, '..', 'build');
@@ -50,6 +51,7 @@ setInterval(() => rooms.sweep(), 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
 app.use('/api', createApi({ accounts, economy, onProfileChange: pushProfile, isAllowedOrigin }));
+legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
   app.use(express.static(BUILD_DIR));

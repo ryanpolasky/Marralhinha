@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
 import { openExternal } from '../net/auth';
+import { IS_ACTIVITY } from '../net/config';
 
 export const AUTHOR = {
   name: 'Ryan Polasky',
@@ -10,10 +11,8 @@ export const AUTHOR = {
   email: 'ryan@polasky.net',
 };
 
-export const LEGAL = {
-  terms: 'https://github.com/ryanpolasky/Marralhinha/blob/master/TERMS.md',
-  privacy: 'https://github.com/ryanpolasky/Marralhinha/blob/master/PRIVACY.md',
-};
+const SITE = IS_ACTIVITY ? 'https://marralhinha.app' : '';
+export const LEGAL = { terms: `${SITE}/terms`, privacy: `${SITE}/privacy` };
 
 export function ExternalLink({ href, children, className }) {
   return (

@@ -117,8 +117,10 @@ While the app is unverified, only you and members of your developer team can lau
 
 ## Legal
 
-- [Terms of Service](TERMS.md)
-- [Privacy Policy](PRIVACY.md)
+- [Terms of Service](TERMS.md), served at https://marralhinha.app/terms
+- [Privacy Policy](PRIVACY.md), served at https://marralhinha.app/privacy
+
+The server renders these Markdown files into the site's pages (`server/legal.js`), so edit the `.md` files and both stay in sync.
 
 ## Tests
 
