@@ -8,7 +8,8 @@ const SEAT_ORDER = [0, 2, 1, 3];
 const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink', 'Marbo', 'Bolinha'];
 const BOT_DELAY_MS = 450;
 // How long the client shows the "who starts" wheel; bots wait for it (keep in sync with START_WHEEL_MS in src/game/moves.js)
-const START_WHEEL_MS = 3600;
+const START_WHEEL_MS = 8500;
+const START_WINNER_MS = 2200;
 const AWAY_GRACE_MS = 20000;
 const ROOM_TTL_MS = 30 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
@@ -35,7 +36,10 @@ function animationMs(game, now = Date.now()) {
   let ms = 0;
   if (recent(game.lastRoll)) ms = 1300;
   if (recent(game.lastMove)) ms = Math.max(ms, 350 + game.lastMove.path.length * 190 + (game.lastMove.capture ? 700 : 0));
-  if (game.pick && !game.lastRoll && now - game.pick.t < START_WHEEL_MS) ms = Math.max(ms, START_WHEEL_MS - (now - game.pick.t));
+  if (game.pick) {
+    const introMs = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;
+    if (now - game.pick.t < introMs) ms = Math.max(ms, introMs - (now - game.pick.t));
+  }
   return ms;
 }
 
@@ -45,6 +49,8 @@ class Room {
     this.hooks = hooks;
     this.instanceId = instanceId;
     this.seats = [null, null, null, null];
+    this.spectators = new Map();
+    this.swapOffers = [];
     this.hostId = null;
     this.game = null;
     this.teams = false;
@@ -63,6 +69,10 @@ class Room {
   findByUser(userId) {
     const seat = this.seats.findIndex((p) => p && !p.isBot && p.userId === userId);
     return seat === -1 ? null : { seat, player: this.seats[seat] };
+  }
+
+  findViewer(userId) {
+    return this.findByUser(userId)?.player || this.spectators.get(userId);
   }
 
   require(userId) {
@@ -88,41 +98,54 @@ class Room {
       Object.assign(existing.player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return existing.player;
     }
-    if (this.game) throw new UserError('A game is in progress here. Hang tight for the next round!');
-    const seat = SEAT_ORDER.find((s) => !this.seats[s]);
-    if (seat === undefined) throw new UserError('That room is full');
+    const spectator = this.spectators.get(info.userId);
+    if (spectator) {
+      Object.assign(spectator, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+      return spectator;
+    }
+    const seat = this.game ? undefined : SEAT_ORDER.find((s) => !this.seats[s]);
+    if (seat === undefined && this.spectators.size >= 32) throw new UserError('That room is full, including spectators');
     const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set() };
-    this.seats[seat] = player;
-    if (!this.hostId) this.hostId = player.id;
+    if (seat === undefined) this.spectators.set(info.userId, player);
+    else {
+      this.seats[seat] = player;
+      if (!this.hostId) this.hostId = player.id;
+    }
     return player;
   }
 
   updateUser(info) {
-    const found = this.findByUser(info.userId);
-    if (!found) return;
-    Object.assign(found.player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+    const player = this.findViewer(info.userId);
+    if (!player) return;
+    Object.assign(player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
     this.changed();
   }
 
   attach(userId, socketId) {
-    const found = this.findByUser(userId);
-    if (!found) return;
-    found.player.sockets.add(socketId);
-    found.player.connected = true;
+    const player = this.findViewer(userId);
+    if (!player) return;
+    player.sockets.add(socketId);
+    player.connected = true;
     this.touch();
     this.changed();
   }
 
   detach(userId, socketId) {
-    const found = this.findByUser(userId);
-    if (!found) return;
-    found.player.sockets.delete(socketId);
-    found.player.connected = found.player.sockets.size > 0;
+    const player = this.findViewer(userId);
+    if (!player) return;
+    player.sockets.delete(socketId);
+    player.connected = player.sockets.size > 0;
+    if (!player.connected) this.spectators.delete(userId);
     this.changed();
   }
 
   leave(userId) {
+    if (this.spectators.delete(userId)) {
+      this.changed();
+      return;
+    }
     const { seat, player } = this.require(userId);
+    this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id && offer.toId !== player.id);
     if (this.game && this.game.phase !== 'over') {
       this.seats[seat] = { id: player.id, name: `${player.name} (bot)`, isBot: true, connected: true, cosmetics: player.cosmetics, level: player.level, standIn: true };
       rules.addLog(this.game, `${player.name} left, a bot takes over`, seat);
@@ -133,10 +156,57 @@ class Room {
 
   setSeat(userId, seat) {
     this.requireLobby();
-    const found = this.require(userId);
+    const found = this.findByUser(userId);
+    const player = found?.player || this.spectators.get(userId);
+    if (!player) throw new UserError('You are not in this room');
     if (!Number.isInteger(seat) || seat < 0 || seat > 3 || this.seats[seat]) throw new UserError('That seat is taken');
-    this.seats[seat] = found.player;
-    this.seats[found.seat] = null;
+    this.seats[seat] = player;
+    if (found) this.seats[found.seat] = null;
+    else this.spectators.delete(userId);
+    if (!this.hostId) this.hostId = player.id;
+    this.swapOffers = [];
+    this.changed();
+  }
+
+  offerSwap(userId, seat) {
+    this.requireLobby();
+    const { seat: from, player } = this.require(userId);
+    const target = this.seats[seat];
+    if (!Number.isInteger(seat) || seat < 0 || seat > 3 || seat === from || !target || target.isBot) throw new UserError('Choose another player to offer a swap');
+    if (this.swapOffers.some((offer) => offer.fromId === player.id && offer.toId === target.id)) throw new UserError('Swap already offered');
+    this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id);
+    this.swapOffers.push({ fromId: player.id, toId: target.id, from, to: seat });
+    this.changed();
+  }
+
+  respondSwap(userId, fromId, accept) {
+    this.requireLobby();
+    const { seat, player } = this.require(userId);
+    const offer = this.swapOffers.find((o) => o.fromId === fromId && o.toId === player.id);
+    if (!offer) throw new UserError('That offer is no longer available');
+    this.swapOffers = this.swapOffers.filter((o) => o !== offer);
+    if (accept) {
+      if (seat !== offer.to || this.seats[offer.from]?.id !== fromId) throw new UserError('Seats changed, ask for a new swap');
+      [this.seats[seat], this.seats[offer.from]] = [this.seats[offer.from], this.seats[seat]];
+      this.swapOffers = [];
+    }
+    this.changed();
+  }
+
+  cancelSwap(userId) {
+    this.requireLobby();
+    const { player } = this.require(userId);
+    this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id);
+    this.changed();
+  }
+
+  forceSwap(userId, seat, fromSeat) {
+    this.requireLobby();
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const from = fromSeat ?? this.findByUser(userId)?.seat;
+    if (!Number.isInteger(from) || from < 0 || from > 3 || !this.seats[from] || !Number.isInteger(seat) || seat < 0 || seat > 3 || seat === from || !this.seats[seat]) throw new UserError('Choose two occupied seats to swap');
+    [this.seats[from], this.seats[seat]] = [this.seats[seat], this.seats[from]];
+    this.swapOffers = [];
     this.changed();
   }
 
@@ -169,8 +239,10 @@ class Room {
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
-    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter() });
-    this.humansAtStart = this.seats.filter((p) => p && !p.isBot).length;
+    const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
+    this.swapOffers = [];
+    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
+    this.humansAtStart = humans.length;
     this.changed();
   }
 
@@ -288,11 +360,11 @@ class Room {
   }
 
   hasHumans() {
-    return this.seats.some((p) => p && !p.isBot);
+    return this.seats.some((p) => p && !p.isBot) || [...this.spectators.values()].some((p) => p.connected);
   }
 
   isAbandoned(now = Date.now()) {
-    const anyoneHere = this.seats.some((p) => p && !p.isBot && p.connected);
+    const anyoneHere = this.seats.some((p) => p && !p.isBot && p.connected) || [...this.spectators.values()].some((p) => p.connected);
     return !this.hasHumans() || (!anyoneHere && now - this.lastActive > ROOM_TTL_MS);
   }
 
@@ -308,6 +380,8 @@ class Room {
       activity: !!this.instanceId,
       teams: this.teams,
       seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
+      spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+      swapOffers: this.swapOffers,
       game: this.game,
     };
   }
@@ -346,7 +420,7 @@ class RoomManager {
   }
 
   roomsWithUser(userId) {
-    return [...this.rooms.values()].filter((room) => room.findByUser(userId));
+    return [...this.rooms.values()].filter((room) => room.findViewer(userId));
   }
 
   sweep() {

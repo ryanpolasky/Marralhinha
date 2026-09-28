@@ -511,8 +511,11 @@ const MARBLES = {
     const uniforms = { uTime: { value: 0 }, uFlare: { value: 0 }, uRim: { value: new THREE.Color(mix(c.light, '#ff4a5a', 0.35)) } };
     const onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vSingularityPosition;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSingularityPosition = normalize(position);');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uFlare;\nuniform vec3 uRim;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uFlare;\nuniform vec3 uRim;\nvarying vec3 vSingularityPosition;')
         .replace(
           '#include <emissivemap_fragment>',
           `{
@@ -520,10 +523,26 @@ const MARBLES = {
             vec3 cracks = texture2D( emissiveMap, uv ).rgb;
             float p1 = pow( 0.5 + 0.5 * sin( ( uv.x * 3.0 - uv.y * 1.5 ) * 6.2831 - uTime * 2.4 ), 10.0 );
             float p2 = pow( 0.5 + 0.5 * sin( ( uv.x * 2.0 + uv.y * 2.5 ) * 6.2831 + uTime * 1.7 ), 12.0 );
-            float pulse = 0.45 + 1.9 * max( p1, p2 ) + uFlare * 2.5;
-            vec3 deep = texture2D( emissiveMap, vec2( uv.x + uTime * 0.025, uv.y + sin( uTime * 0.4 ) * 0.02 ) ).rgb;
-            float rim = pow( 1.0 - max( dot( normalize( normal ), normalize( vViewPosition ) ), 0.0 ), 3.2 );
-            totalEmissiveRadiance = totalEmissiveRadiance * ( cracks * pulse + deep * 0.4 ) + uRim * rim * ( 1.1 + 0.35 * sin( uTime * 3.0 ) + uFlare );
+            float pulse = 0.2 + 0.6 * max( p1, p2 );
+            vec3 deep = texture2D( emissiveMap, vec2( uv.x + uTime * 0.08, uv.y + sin( uTime * 0.4 ) * 0.02 ) ).rgb;
+            vec3 p = normalize(vSingularityPosition);
+            float spin = uTime * 0.85;
+            p.xz = mat2(cos(spin), -sin(spin), sin(spin), cos(spin)) * p.xz;
+            p.xy = mat2(0.8, -0.6, 0.6, 0.8) * p.xy;
+            float angle = atan(p.z, p.x);
+            float orbit = abs(p.y + 0.22 * sin(angle * 3.0 - uTime * 1.6));
+            float band = 1.0 - smoothstep(0.035, 0.19, orbit);
+            float core = 1.0 - smoothstep(0.008, 0.035, orbit);
+            float crossOrbit = abs(p.x + 0.3 * sin(p.z * 4.0 + uTime * 1.3));
+            float crossBand = 1.0 - smoothstep(0.025, 0.1, crossOrbit);
+            float stream = 0.55 + 0.45 * sin(angle * 5.0 + uTime * 4.0);
+            float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 3.2);
+            vec3 energy = mix(uRim, vec3(1.0, 0.12, 0.025), 0.3 + 0.2 * sin(angle + uTime));
+            diffuseColor.rgb = mix(vec3(0.008, 0.003, 0.015), energy * 0.12, band);
+            totalEmissiveRadiance = cracks * pulse + deep * 0.12
+              + energy * band * (0.9 + stream * 1.5)
+              + vec3(1.0, 0.72, 0.3) * (core * 0.9 + crossBand * 0.65)
+              + uRim * rim * (0.8 + uFlare * 0.45);
           }`
         );
     };
@@ -536,7 +555,7 @@ const MARBLES = {
       clearcoat: 1,
       clearcoatRoughness: 0.02,
       onBeforeCompile,
-      customProgramCacheKey: () => 'marble-dev',
+      customProgramCacheKey: () => 'marble-dev-orbits',
       animate: (m, t) => {
         uniforms.uTime.value = t + seat * 1.9;
         // A flare every few seconds, sharp attack and slow decay
@@ -592,7 +611,7 @@ export function marbleSkin(itemId, seat) {
   return cached(`marble:${key}:${seat}`, () => {
     const { animate, ...params } = MARBLES[key](SEAT_COLORS[seat], seat);
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
-    return { material, animate: animate ? (t) => animate(material, t) : null };
+    return { material, animate: animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null };
   });
 }
 
@@ -622,7 +641,7 @@ const DICE = {
   copper: { bg: 'copper', pip: '#2b1a10', one: '#2b1a10', roughness: 0.3, metalness: 0.9 },
   lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
   candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
-  holo: { bg: '#f2f2ff', pip: '#2d1a5e', one: '#ff4fd8', roughness: 0.05, clearcoat: 1, extra: { metalness: 0.5, iridescence: 1, iridescenceIOR: 2, iridescenceThicknessRange: [100, 900], envMapIntensity: 1.6 } },
+  holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
 };
@@ -741,6 +760,7 @@ export function diceSkin(itemId) {
   const key = DICE[skinKey(itemId)] ? skinKey(itemId) : 'ivory';
   return cached(`dice:${key}`, () => {
     const spec = DICE[key];
+    const time = { value: 0 };
     return DIE_FACE_ORDER.map((value) => {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
@@ -758,9 +778,73 @@ export function diceSkin(itemId) {
         Object.assign(params, { emissiveMap: new THREE.CanvasTexture(glow), emissive: '#ffffff', emissiveIntensity: spec.glow });
         params.emissiveMap.colorSpace = THREE.SRGBColorSpace;
       }
-      return new THREE.MeshPhysicalMaterial(params);
+      if (key === 'dev' || key === 'holo') {
+        const [mask, mctx] = makeCanvas(size, size);
+        mctx.fillStyle = '#000';
+        mctx.fillRect(0, 0, size, size);
+        mctx.fillStyle = '#fff';
+        PIPS[value].forEach(([x, y]) => {
+          mctx.beginPath();
+          mctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
+          mctx.fill();
+        });
+        params.emissiveMap?.dispose();
+        params.emissiveMap = new THREE.CanvasTexture(mask);
+        params.emissive = '#ffffff';
+        params.emissiveIntensity = 1;
+      }
+      const material = new THREE.MeshPhysicalMaterial(params);
+      if (key === 'dev' || key === 'holo') {
+        material.userData.skinTime = time;
+        material.customProgramCacheKey = () => `dice-${key}-animated`;
+        material.onBeforeCompile = (shader) => {
+          shader.uniforms.uSkinTime = time;
+          shader.uniforms.uFacePhase = { value: value * 0.73 };
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;')
+            .replace('#include <emissivemap_fragment>', key === 'dev' ? `{
+              vec2 uv = vEmissiveMapUv;
+              vec2 p = uv - 0.5;
+              float pip = texture2D(emissiveMap, uv).r;
+              float edge = max(abs(p.x), abs(p.y));
+              float rail = 1.0 - smoothstep(0.006, 0.022, abs(edge - 0.423));
+              float angle = atan(p.y, p.x);
+              float runner = pow(0.5 + 0.5 * sin(angle * 2.0 - uSkinTime * 3.0 + uFacePhase), 6.0);
+              float scan = pow(0.5 + 0.5 * sin(uv.y * 6.283185 - uSkinTime * 2.0 + uFacePhase), 18.0);
+              vec2 cell = abs(fract(uv * 8.0) - 0.5);
+              float circuit = (1.0 - smoothstep(0.025, 0.075, min(cell.x, cell.y))) * smoothstep(0.18, 0.32, edge);
+              vec3 red = vec3(1.0, 0.028, 0.065);
+              vec3 gold = vec3(1.0, 0.55, 0.13);
+              diffuseColor.rgb = vec3(0.014, 0.004, 0.01);
+              totalEmissiveRadiance = (1.0 - pip) * (red * rail * (0.4 + runner * 2.8)
+                + gold * rail * runner * 1.5 + red * circuit * (0.07 + scan * 0.7))
+                + pip * vec3(1.0, 0.72, 0.38) * 1.25;
+            }` : `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              vec2 grid = uv * 3.0;
+              vec2 cell = floor(grid);
+              vec2 local = fract(grid);
+              float triangle = step(local.x, local.y);
+              float viewRim = 1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+              float hue = dot(cell, vec2(0.13, 0.19)) + triangle * 0.09 + uFacePhase * 0.11 + uSkinTime * 0.055 + viewRim * 0.2;
+              vec3 spectrum = 0.5 + 0.5 * cos(6.283185 * (hue + vec3(0.0, 0.333333, 0.666667)));
+              float facet = 0.55 + 0.3 * triangle + 0.15 * sin(uSkinTime + dot(cell, vec2(1.7, 2.3)));
+              float seam = 1.0 - smoothstep(0.012, 0.04, abs(local.x - local.y));
+              vec3 crystal = mix(spectrum, vec3(0.85, 0.92, 1.0), 0.12) * facet;
+              diffuseColor.rgb = mix(crystal, vec3(0.006, 0.009, 0.018), pip);
+              totalEmissiveRadiance = (1.0 - pip) * (crystal * 0.3 + spectrum * seam * 0.16);
+            }`);
+        };
+      }
+      return material;
     });
   });
+}
+
+export function animateDiceSkin(materials) {
+  const time = materials[0]?.userData.skinTime;
+  if (time) time.value = performance.now() / 1000;
 }
 
 const WOODS = {

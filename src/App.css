@@ -3802,11 +3802,16 @@ button.pronounce:hover {
   animation: plate-flow 3s linear infinite;
 }
 
-.tag-badge.tag-dev::before {
-  content: '</>';
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 0.85em;
-  letter-spacing: -0.05em;
+.tag-code-icon {
+  display: block;
+  flex: none;
+  width: 1.5em;
+  height: 1em;
+  transform: translateY(-0.5px);
+}
+
+.tag-badge.small .tag-code-icon {
+  transform: translateY(-0.25px);
 }
 
 .tag-badge.tag-beta {
@@ -3847,10 +3852,10 @@ button.pronounce:hover {
 }
 
 .plate-waves {
-  --plate-ink: #10202a;
-  background: radial-gradient(circle at 100% 50%, transparent 0 9px, #1f2a30 9px 11px, transparent 11px) 0 0 / 22px 22px,
-    radial-gradient(circle at 0 50%, transparent 0 9px, #1f2a30 9px 11px, transparent 11px) 11px 11px / 22px 22px, #f2ece0 !important;
-  border-color: #fff !important;
+  --plate-ink: #fff8ea;
+  background: radial-gradient(circle at 100% 50%, transparent 0 9px, rgba(96, 196, 219, 0.2) 9px 11px, transparent 11px) 0 0 / 22px 22px,
+    radial-gradient(circle at 0 50%, transparent 0 9px, rgba(96, 196, 219, 0.2) 9px 11px, transparent 11px) 11px 11px / 22px 22px, linear-gradient(120deg, #112b3a, #19465a) !important;
+  border-color: #67c8dc !important;
 }
 
 .plate-galaxy {
@@ -3924,23 +3929,44 @@ button.pronounce:hover {
 .plate-honey .seat-name-text,
 .plate-diamond .account-name,
 .plate-diamond .chip-name,
-.plate-diamond .seat-name-text,
+.plate-diamond .seat-name-text {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
 .plate-waves .account-name,
 .plate-waves .chip-name,
 .plate-waves .seat-name-text {
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 3px #061721, 0 0 6px #061721;
 }
 
 .plate-dev {
   --plate-ink: #fff1ec;
-  background-image: linear-gradient(120deg, #120a0d, #1c0c10 60%, #120a0d), linear-gradient(90deg, #ff4a5a, #ff8a3d, #ffd166, #ff4a5a) !important;
-  background-clip: padding-box, border-box !important;
-  background-origin: padding-box, border-box !important;
-  background-size: 100% 100%, 300% 100% !important;
-  --flow-to: 0 0, 150% 0;
+  background-image: linear-gradient(110deg, transparent 20%, rgba(255, 55, 85, 0.22) 43%, rgba(255, 196, 102, 0.18) 50%, transparent 72%),
+    linear-gradient(120deg, #120a0d, #32101c 60%, #120a0d), linear-gradient(90deg, #ff4a5a, #ff8a3d, #ffd166, #ff4a5a) !important;
+  background-clip: padding-box, padding-box, border-box !important;
+  background-origin: padding-box, padding-box, border-box !important;
+  background-size: 180px 100%, 100% 100%, 300% 100% !important;
   border: 2px solid transparent !important;
   box-shadow: 0 0 18px rgba(255, 74, 90, 0.45), inset 0 0 20px rgba(255, 74, 90, 0.12);
-  animation: plate-flow 3s linear infinite;
+  animation: dev-current 2.8s linear infinite, dev-aura 3.6s ease-in-out infinite;
+}
+
+.chip.turn.plate.plate-dev {
+  border-color: transparent !important;
+  outline: 2px solid var(--seat-light);
+  outline-offset: 2px;
+}
+
+@keyframes dev-current {
+  to {
+    background-position: 180px 0, 0 0, 150% 0;
+  }
+}
+
+@keyframes dev-aura {
+  50% {
+    box-shadow: 0 0 26px rgba(255, 74, 90, 0.65), inset 0 0 18px rgba(255, 138, 61, 0.22);
+  }
 }
 
 .plate-dev .account-name,
@@ -3959,6 +3985,7 @@ button.pronounce:hover {
 }
 
 .plate-dev .account-name::after,
+.plate-dev .chip-name::after,
 .plate-dev .seat-name-text::after {
   content: '▮';
   margin-left: 2px;
@@ -3994,7 +4021,6 @@ button.pronounce:hover {
 
 .plate-mint .badge,
 .plate-honey .badge,
-.plate-waves .badge,
 .plate-diamond .badge {
   background: rgba(20, 30, 40, 0.72);
   color: #fff6e8;
@@ -4303,6 +4329,7 @@ button.pronounce:hover {
 .admin-row-name {
   display: flex;
   align-items: center;
+  gap: 6px;
   font-weight: 700;
   font-size: 15px;
 }
@@ -4338,6 +4365,7 @@ button.pronounce:hover {
 .admin-user-name {
   display: flex;
   align-items: center;
+  gap: 8px;
   font-size: 22px;
   font-weight: 700;
 }
@@ -4719,6 +4747,24 @@ select.admin-input optgroup {
   }
 }
 
+.lobby-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: rgba(8, 20, 24, 0.7);
+  color: var(--ink);
+}
+
+.lobby-spectators {
+  color: var(--ink-dim);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Game intro: who starts ---------- */
 
 .start-intro {
@@ -4756,25 +4802,6 @@ select.admin-input optgroup {
   border: 6px solid #fff6e8;
   box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.35);
   will-change: transform;
-}
-
-.start-wheel-label {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  display: grid;
-  place-items: center;
-}
-
-.start-wheel-label b {
-  display: block;
-  white-space: nowrap;
-  font-size: 14px;
-  color: #fff6e8;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 8px rgba(0, 0, 0, 0.5);
-  letter-spacing: 0.01em;
 }
 
 .start-wheel-hub {
@@ -4871,15 +4898,15 @@ select.admin-input optgroup {
   font-size: 14px;
 }
 
+.start-continue {
+  margin-top: 14px;
+  pointer-events: auto;
+}
+
 @media (max-width: 560px), (max-height: 600px) {
   .start-wheel-wrap {
     width: 170px;
     height: 170px;
-  }
-
-  .start-wheel-label b {
-    font-size: 12px;
-    transform: translateY(-66px) !important;
   }
 
   .start-name {
@@ -4917,5 +4944,4 @@ select.admin-input optgroup {
   border: 1.5px dashed var(--ink-dim);
   opacity: 0.7;
   flex-shrink: 0;
-  margin: 0 3px;
 }

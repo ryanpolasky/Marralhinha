@@ -69,13 +69,14 @@ function useRollPending(lastRoll) {
 function useStartPending(game) {
   const remaining = startPendingFor(game);
   const pickT = game?.pick?.t;
+  const [dismissed, setDismissed] = useState(null);
   const [, tick] = useState(0);
   useEffect(() => {
     if (remaining <= 0) return undefined;
     const timer = setTimeout(() => tick((n) => n + 1), remaining + 20);
     return () => clearTimeout(timer);
   }, [remaining, pickT]);
-  return remaining > 0;
+  return [remaining > 0 && dismissed !== pickT, () => setDismissed(pickT)];
 }
 
 const storedRoom = () => {
@@ -254,19 +255,20 @@ const App = () => {
     }
   };
 
+  const inRoom = !!(session && room && room.code === session.code);
+  const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
+
   const leave = () => {
-    if (room?.game && room.game.phase !== 'over' && !window.confirm('Leave this game? A bot will take over your seat and you forfeit the rewards.')) return;
+    if (mySeat >= 0 && room?.game && room.game.phase !== 'over' && !window.confirm('Leave this game? A bot will take over your seat and you forfeit the rewards.')) return;
     request('room:leave').catch(() => {});
     saveSession(null);
     setUrl(null);
   };
 
-  const inRoom = !!(session && room && room.code === session.code);
-  const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
   const game = inRoom ? room.game : null;
   const rollPending = useRollPending(game?.lastRoll);
-  const startPending = useStartPending(game);
-  // The table wears the starter's board once a game is on; before that everyone previews their own
+  const [startPending, dismissStart] = useStartPending(game);
+  // The server chooses one board for everyone once a game starts; before that everyone previews their own
   const tableBoard = game && game.boardSeat !== null ? room.seats[game.boardSeat]?.cosmetics?.board : null;
   const boardSkinId = tableBoard || account?.equipped.board;
 
@@ -376,7 +378,7 @@ const App = () => {
       />
     );
   } else if (!game) {
-    screen = <Lobby room={room} playerId={session.playerId} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} />;
+    screen = <Lobby room={room} playerId={session.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} />;
   } else {
     screen = (
       <Game
@@ -385,6 +387,7 @@ const App = () => {
         reactions={reactions}
         rollPending={rollPending}
         startPending={startPending}
+        onDismissStart={dismissStart}
         onAction={onAction}
         onLeave={IS_ACTIVITY ? null : leave}
         onResetView={() => setResetKey((k) => k + 1)}

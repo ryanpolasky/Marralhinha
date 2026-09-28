@@ -6,7 +6,7 @@ import { DIE_SPOT, DIE_THROW_FROM } from '../game/geometry';
 import { ROLL_REVEAL_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { makeNumberTexture } from './textures';
-import { diceSkin } from './skins';
+import { diceSkin, animateDiceSkin } from './skins';
 import { TABLE_Y } from './Board';
 import { fx } from './fx';
 
@@ -102,6 +102,7 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
     const a = anim.current;
     const now = state.clock.elapsedTime;
     const mesh = ref.current;
+    animateDiceSkin(materials);
 
     const wanted = active || !!a.roll || now - a.landedAt < LAND_HOLD;
     if (wanted) a.gone = false;

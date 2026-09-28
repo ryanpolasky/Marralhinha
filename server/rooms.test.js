@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { Room, UserError } = require('./rooms');
+const { Room, RoomManager, UserError } = require('./rooms');
 
 function startedRoom() {
   const reactions = [];
@@ -74,6 +74,86 @@ test('first game: a random seated player starts on their board; rematch: a winne
   room.addBot('u1', 2);
   room.start('u1');
   assert.strictEqual(room.game.pick.reason, 'wheel');
+});
+
+test('solo human keeps their board even when a bot starts or wins the rematch', (t) => {
+  const room = new Room('SOLO', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana', cosmetics: { board: 'board.dev' } });
+  room.attach('u1', 's1');
+  room.addBot('u1', 2);
+  room.pickStarter = () => ({ seat: 2, reason: 'wheel' });
+  room.start('u1');
+  assert.strictEqual(room.game.turn, 2);
+  assert.strictEqual(room.game.boardSeat, 0);
+  assert.match(room.game.log[0].text, /Ana's board/);
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  room.rematch('u1');
+  room.start('u1');
+  assert.deepStrictEqual({ turn: room.game.turn, board: room.game.boardSeat }, { turn: 2, board: 0 });
+});
+
+test('rooms with only bots are swept after the last human leaves', () => {
+  const manager = new RoomManager({ onChange: () => {} });
+  const room = manager.create();
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.addBot('u1', 2);
+  room.start('u1');
+  room.leave('u1');
+  assert.strictEqual(room.isAbandoned(), true);
+  manager.sweep();
+  assert.strictEqual(manager.rooms.size, 0);
+});
+
+test('seat swaps require acceptance and force swaps work only before the game', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const ana = room.seats[0];
+  const rui = room.seats[2];
+  room.game = null;
+  room.offerSwap('u1', 2);
+  assert.strictEqual(room.seats[0], ana);
+  room.respondSwap('u2', ana.id, false);
+  assert.strictEqual(room.swapOffers.length, 0);
+  room.offerSwap('u1', 2);
+  room.respondSwap('u2', ana.id, true);
+  assert.strictEqual(room.seats[0], rui);
+  assert.strictEqual(room.seats[2], ana);
+  room.forceSwap('u1', 0);
+  assert.strictEqual(room.seats[0], ana);
+  room.offerSwap('u2', 0);
+  room.forceSwap('u1', 2);
+  assert.strictEqual(room.swapOffers.length, 0);
+  room.start('u1');
+  assert.throws(() => room.forceSwap('u1', 2), /already started/);
+});
+
+test('full and active rooms admit spectators; Dev spectators can arrange seats before games', (t) => {
+  const room = new Room('VIEW', { onChange: () => {} });
+  t.after(() => room.dispose());
+  for (let i = 0; i < 4; i++) room.join({ userId: `u${i}`, name: `P${i}` });
+  const viewer = room.join({ userId: 'viewer', name: 'Watcher' });
+  room.attach('viewer', 's5');
+  assert.strictEqual(room.view().spectators[0].id, viewer.id);
+  const before = room.seats[0];
+  room.forceSwap('viewer', 2, 0);
+  assert.strictEqual(room.seats[2], before);
+  room.forceSwap('viewer', 0, 2);
+  assert.throws(() => room.roll('viewer'), /not in this room/);
+  assert.throws(() => room.offerSwap('viewer', 0), /not in this room/);
+  room.start('u0');
+  assert.strictEqual(room.join({ userId: 'late', name: 'Late' }).id, room.view().spectators[1].id);
+  room.attach('late', 's6');
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.rematch('u0');
+  room.leave('u1');
+  room.setSeat('viewer', 2);
+  assert.strictEqual(room.findByUser('viewer').player.id, viewer.id);
+  assert.strictEqual(room.view().spectators.length, 1);
+  room.detach('late', 's6');
+  assert.strictEqual(room.view().spectators.length, 0);
 });
 
 test('chat is rate limited and only for seated players once the game is on', (t) => {

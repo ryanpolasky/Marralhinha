@@ -25,7 +25,7 @@ const cellKey = (seat, pos) => {
 const rollDie = () => randomInt(1, 7);
 
 // `starter` skips the dice roll-off: { seat, reason: 'wheel' | 'winner' }. The starter also lends their board to the table.
-function createGame(seats, { rng = rollDie, teams = false, starter = null } = {}) {
+function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null } = {}) {
   const active = [0, 1, 2, 3].filter((s) => seats[s]);
   if (active.length < 2) throw new Error('Need at least 2 players');
   const state = {
@@ -49,9 +49,11 @@ function createGame(seats, { rng = rollDie, teams = false, starter = null } = {}
     state.turn = starter.seat;
     state.pick = { seat: starter.seat, reason: starter.reason, t: Date.now() };
     const who = state.names[starter.seat];
-    addLog(state, starter.reason === 'winner' ? `${who} won last round, so ${who} starts on their board` : `The wheel lands on ${who}! ${who} starts and we play on their board`, starter.seat);
+    const board = boardSeat !== null && active.includes(boardSeat) ? boardSeat : starter.seat;
+    const boardName = board === starter.seat ? 'their' : `${state.names[board]}'s`;
+    addLog(state, starter.reason === 'winner' ? `${who} won last round, so ${who} starts on ${boardName} board` : `The wheel lands on ${who}! ${who} starts and we play on ${boardName} board`, starter.seat);
   } else state.turn = rollOff(state, rng);
-  state.boardSeat = state.turn;
+  state.boardSeat = boardSeat !== null && active.includes(boardSeat) ? boardSeat : state.turn;
   return state;
 }
 

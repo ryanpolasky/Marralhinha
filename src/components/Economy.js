@@ -69,6 +69,7 @@ export function TagBadge({ tag, small = false, title }) {
   if (!info) return null;
   return (
     <span className={`tag-badge tag-${tag}${small ? ' small' : ''}`} style={{ '--tag': info.color }} title={title ?? info.blurb}>
+      {tag === 'dev' && <svg className="tag-code-icon" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3 1 8l5 5M18 3l5 5-5 5M14 1l-4 14" /></svg>}
       {info.label}
     </span>
   );

@@ -91,7 +91,7 @@ io.on('connection', (socket) => {
     socket.leave(code);
     socket.data.code = null;
     const room = rooms.rooms.get(code);
-    if (!room || !room.findByUser(userId)) return;
+    if (!room || !room.findViewer(userId)) return;
     if (permanently) room.leave(userId);
     else room.detach(userId, socket.id);
   };
@@ -112,6 +112,14 @@ io.on('connection', (socket) => {
   handle('room:joinInstance', ({ instanceId }) => enter(rooms.forInstance(instanceId)));
   handle('room:leave', () => leaveCurrent(true));
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
+  handle('lobby:offerSwap', ({ seat }) => current().offerSwap(userId, seat));
+  handle('lobby:respondSwap', ({ fromId, accept }) => current().respondSwap(userId, fromId, accept === true));
+  handle('lobby:cancelSwap', () => current().cancelSwap(userId));
+  handle('lobby:forceSwap', ({ seat, fromSeat }) => {
+    const user = accounts.getUser(userId);
+    if (!user || !accounts.isAdmin(user)) throw new UserError('Only a Dev can force a swap');
+    current().forceSwap(userId, seat, fromSeat);
+  });
   handle('lobby:addBot', ({ seat }) => current().addBot(userId, seat));
   handle('lobby:removeBot', ({ seat }) => current().removeBot(userId, seat));
   handle('lobby:teams', ({ teams }) => current().setTeams(userId, teams));

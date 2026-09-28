@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Lights } from './Stage';
-import { marbleSkin, diceSkin } from './skins';
+import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
 import Board from './Board';
 import { ITEMS } from '../game/catalog';
 
@@ -29,6 +29,7 @@ function MarblePreview({ itemId, seat }) {
 
 function DicePreview({ itemId }) {
   const materials = diceSkin(itemId);
+  useFrame(() => animateDiceSkin(materials));
   const geometry = useMemo(() => new RoundedBoxGeometry(1.9, 1.9, 1.9, 6, 0.28), []);
   return (
     <Spinner speed={0.8} tilt={0.6}>

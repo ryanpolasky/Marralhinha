@@ -5,10 +5,15 @@ import { Copy } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 
-export default function Lobby({ room, playerId, onAction, onLeave }) {
+export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
   const [copied, setCopied] = useState(false);
+  const [swapFrom, setSwapFrom] = useState(null);
   const isHost = room.hostId === playerId;
+  const mySeat = room.seats.findIndex((p) => p?.id === playerId);
+  const spectator = mySeat === -1;
   const seated = room.seats.filter(Boolean).length;
+  const offered = room.swapOffers?.find((offer) => offer.fromId === playerId);
+  const incoming = room.swapOffers?.filter((offer) => offer.toId === playerId) || [];
   const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${room.code}`;
 
   const copy = async () => {
@@ -43,6 +48,20 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
           </div>
         )}
 
+        {spectator && <p className="lobby-notice">You're spectating. If a seat opens up before the game starts, tap Sit to join.{isAdmin && ' You can also pick two occupied seats to swap as Dev.'}</p>}
+        {offered && (
+          <div className="lobby-notice">
+            Swap offered to {room.seats[offered.to]?.name}. Waiting for their answer.
+            <button className="btn tiny ghost" onClick={() => onAction('lobby:cancelSwap')}>Cancel</button>
+          </div>
+        )}
+        {incoming.map((offer) => (
+          <div key={offer.fromId} className="lobby-notice">
+            {room.seats[offer.from]?.name} wants to trade your {SEAT_COLORS[offer.to].name} seat for {SEAT_COLORS[offer.from].name}.
+            <button className="btn tiny secondary" onClick={() => onAction('lobby:respondSwap', { fromId: offer.fromId, accept: true })}>Accept</button>
+            <button className="btn tiny ghost" onClick={() => onAction('lobby:respondSwap', { fromId: offer.fromId, accept: false })}>Decline</button>
+          </div>
+        ))}
         <div className="seats">
           {SEATS.map((s) => {
             const p = room.seats[s];
@@ -71,6 +90,22 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
                   )}
                 </div>
                 <div className="seat-actions">
+                  {p && isAdmin && spectator && (
+                    <button className="btn tiny secondary" onClick={() => {
+                      if (swapFrom === null || swapFrom === s) setSwapFrom(swapFrom === s ? null : s);
+                      else {
+                        onAction('lobby:forceSwap', { fromSeat: swapFrom, seat: s });
+                        setSwapFrom(null);
+                      }
+                    }}>
+                      {swapFrom === s ? 'Cancel' : swapFrom === null ? 'Select seat' : 'Swap here'}
+                    </button>
+                  )}
+                  {p && !mine && mySeat >= 0 && (isAdmin || !p.isBot) && (
+                    <button className="btn tiny secondary" onClick={() => onAction(isAdmin ? 'lobby:forceSwap' : 'lobby:offerSwap', { seat: s })} disabled={!isAdmin && offered?.to === s}>
+                      {isAdmin ? 'Take seat' : offered?.to === s ? 'Offered' : 'Offer swap'}
+                    </button>
+                  )}
                   {p && isHost && p.isBot && (
                     <button className="btn tiny ghost" onClick={() => onAction('lobby:removeBot', { seat: s })}>
                       Remove
@@ -93,6 +128,8 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
             );
           })}
         </div>
+
+        {!!room.spectators?.length && <p className="lobby-spectators">Spectating: {room.spectators.map((p) => p.name).join(', ')}</p>}
 
         <div className="mode-picker" role="radiogroup" aria-label="Game mode">
           {[
@@ -136,7 +173,7 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
             Start game
           </button>
         ) : (
-          <div className="waiting">Waiting for the host to start…</div>
+          <div className="waiting">{spectator ? 'Watching this table. Waiting for the host to start…' : 'Waiting for the host to start…'}</div>
         )}
 
         <div className="row">
