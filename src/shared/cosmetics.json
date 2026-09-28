@@ -1,0 +1,98 @@
+{
+  "currency": "Marbucks",
+  "rarities": {
+    "default": { "label": "Default", "color": "#8fa3a6", "dupe": 0 },
+    "common": { "label": "Common", "color": "#a9c1c4", "dupe": 20 },
+    "rare": { "label": "Rare", "color": "#3fa9f5", "dupe": 60 },
+    "epic": { "label": "Epic", "color": "#b36bff", "dupe": 150 },
+    "legendary": { "label": "Legendary", "color": "#ffb627", "dupe": 500 }
+  },
+  "slots": {
+    "marble": { "label": "Marbles", "default": "marble.classic" },
+    "board": { "label": "Boards", "default": "board.oak" },
+    "dice": { "label": "Dice", "default": "dice.ivory" },
+    "nameplate": { "label": "Nameplates", "default": "plate.basic" }
+  },
+  "items": [
+    { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
+    { "id": "marble.gloss", "slot": "marble", "name": "Gumball", "rarity": "common", "desc": "Shiny, smooth, suspiciously tasty." },
+    { "id": "marble.clay", "slot": "marble", "name": "Clay", "rarity": "common", "desc": "Hand-rolled with speckles." },
+    { "id": "marble.stripes", "slot": "marble", "name": "Candy Stripe", "rarity": "common", "desc": "Sweet racing stripes." },
+    { "id": "marble.pearl", "slot": "marble", "name": "Pearl", "rarity": "rare", "desc": "Fished straight out of the Atlantic." },
+    { "id": "marble.metal", "slot": "marble", "name": "Chrome", "rarity": "rare", "desc": "Polished to a mirror finish." },
+    { "id": "marble.stone", "slot": "marble", "name": "Mármore", "rarity": "rare", "desc": "Veined like old church steps." },
+    { "id": "marble.galaxy", "slot": "marble", "name": "Galaxy", "rarity": "epic", "desc": "A tiny universe in your hand." },
+    { "id": "marble.lava", "slot": "marble", "name": "Magma", "rarity": "epic", "desc": "Straight from the volcanoes of the Açores." },
+    { "id": "marble.frost", "slot": "marble", "name": "Frostbite", "rarity": "epic", "desc": "Cold enough to crack." },
+    { "id": "marble.gold", "slot": "marble", "name": "Gold Leaf", "rarity": "legendary", "desc": "Flakes of real (fake) gold." },
+    { "id": "marble.holo", "slot": "marble", "name": "Holo", "rarity": "legendary", "desc": "Shifts color as it rolls." },
+    { "id": "marble.storm", "slot": "marble", "name": "Tempest", "rarity": "legendary", "desc": "A storm that never stops spinning." },
+
+    { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
+    { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
+    { "id": "board.walnut", "slot": "board", "name": "Walnut", "rarity": "common", "desc": "Dark, rich and serious." },
+    { "id": "board.cherry", "slot": "board", "name": "Cherry", "rarity": "common", "desc": "Warm reddish grain." },
+    { "id": "board.driftwood", "slot": "board", "name": "Driftwood", "rarity": "rare", "desc": "Washed up on Praia da Vitória." },
+    { "id": "board.bamboo", "slot": "board", "name": "Bamboo", "rarity": "rare", "desc": "Fresh and stripy." },
+    { "id": "board.azulejo", "slot": "board", "name": "Azulejo", "rarity": "epic", "desc": "Hand-painted Portuguese tiles." },
+    { "id": "board.basalt", "slot": "board", "name": "Basalt", "rarity": "epic", "desc": "Carved from volcanic rock." },
+    { "id": "board.stone", "slot": "board", "name": "Carrara", "rarity": "epic", "desc": "White marble, very fancy." },
+    { "id": "board.lacquer", "slot": "board", "name": "Black & Gold", "rarity": "legendary", "desc": "Lacquered ebony with gold trim." },
+    { "id": "board.neon", "slot": "board", "name": "Neon Night", "rarity": "legendary", "desc": "The board after dark." },
+
+    { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
+    { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },
+    { "id": "dice.ruby", "slot": "dice", "name": "Ruby", "rarity": "common", "desc": "Casino red." },
+    { "id": "dice.sky", "slot": "dice", "name": "Sky", "rarity": "common", "desc": "Summer sky over the Açores." },
+    { "id": "dice.wood", "slot": "dice", "name": "Carved Wood", "rarity": "rare", "desc": "Whittled by a fisherman." },
+    { "id": "dice.jade", "slot": "dice", "name": "Jade", "rarity": "rare", "desc": "Smooth green stone." },
+    { "id": "dice.obsidian", "slot": "dice", "name": "Obsidian", "rarity": "epic", "desc": "Volcanic glass with gold pips." },
+    { "id": "dice.glow", "slot": "dice", "name": "Glowstick", "rarity": "epic", "desc": "Pips that light up the table." },
+    { "id": "dice.gold", "slot": "dice", "name": "Solid Gold", "rarity": "legendary", "desc": "Heavy. Shiny. Lucky?" },
+    { "id": "dice.galaxy", "slot": "dice", "name": "Cosmic", "rarity": "legendary", "desc": "Rolled by the stars." },
+
+    { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
+    { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },
+    { "id": "plate.ocean", "slot": "nameplate", "name": "Ocean", "rarity": "common", "desc": "Deep Atlantic blue." },
+    { "id": "plate.forest", "slot": "nameplate", "name": "Laurel", "rarity": "common", "desc": "Green like the island hills." },
+    { "id": "plate.azulejo", "slot": "nameplate", "name": "Azulejo", "rarity": "rare", "desc": "Blue and white tiles." },
+    { "id": "plate.carbon", "slot": "nameplate", "name": "Carbon", "rarity": "rare", "desc": "Stealthy weave." },
+    { "id": "plate.candy", "slot": "nameplate", "name": "Candy", "rarity": "rare", "desc": "Sugar rush." },
+    { "id": "plate.aurora", "slot": "nameplate", "name": "Aurora", "rarity": "epic", "desc": "Northern lights, animated." },
+    { "id": "plate.flames", "slot": "nameplate", "name": "On Fire", "rarity": "epic", "desc": "You're on a hot streak." },
+    { "id": "plate.royal", "slot": "nameplate", "name": "Royal Gold", "rarity": "legendary", "desc": "For marralhinha royalty." },
+    { "id": "plate.holo", "slot": "nameplate", "name": "Prism", "rarity": "legendary", "desc": "Every color at once." }
+  ],
+  "boxes": [
+    {
+      "id": "box.basic",
+      "name": "Wooden Chest",
+      "blurb": "A humble wooden chest. Anything could be inside!",
+      "price": 150,
+      "weights": { "common": 70, "rare": 24, "epic": 5.5, "legendary": 0.5 },
+      "pity": { "epic": 12, "legendary": 60 }
+    },
+    {
+      "id": "box.gold",
+      "name": "Golden Chest",
+      "blurb": "Better odds. Shinier chest. Guaranteed Rare or better.",
+      "price": 450,
+      "weights": { "common": 0, "rare": 70, "epic": 24, "legendary": 6 },
+      "pity": { "epic": 5, "legendary": 25 }
+    }
+  ],
+  "featured": { "count": 4, "prices": { "common": 250, "rare": 600, "epic": 1500, "legendary": 3500 } },
+  "rewards": {
+    "finish": 30,
+    "win": 60,
+    "perCapture": 6,
+    "maxCaptures": 8,
+    "perMarbleHome": 3,
+    "firstWinOfDay": 100,
+    "botGameMultiplier": 0.5,
+    "botGamesPerDay": 6,
+    "daily": { "base": 60, "perStreakDay": 15, "maxStreakBonus": 6 },
+    "levelUpBonus": 150,
+    "starting": 300
+  }
+}

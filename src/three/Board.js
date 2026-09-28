@@ -1,0 +1,220 @@
+import React, { useLayoutEffect, useMemo, useRef, useState, useEffect } from 'react';
+import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import { SEATS, SEAT_COLORS, RING, HOME, BASE, BASE_TRAY, CENTER, INNER_CORNERS, entryIdx } from '../game/geometry';
+import { makeLabelTexture } from './textures';
+import { boardSkin } from './skins';
+
+export const HOLE_R = 0.37;
+const CENTER_R = 0.5;
+const DEPTH = 0.42;
+const BEVEL = 0.12;
+export const TABLE_Y = -(DEPTH + BEVEL * 2);
+const DISH_R = 2.2;
+
+const sx = ([r, c]) => [c, -r];
+
+function roundedPolygon(shape, points, radius) {
+  points.forEach((p, i) => {
+    const prev = points[(i - 1 + points.length) % points.length];
+    const next = points[(i + 1) % points.length];
+    const toward = (a, b) => {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy);
+      return [a[0] + (dx / len) * radius, a[1] + (dy / len) * radius];
+    };
+    const start = toward(p, prev);
+    const end = toward(p, next);
+    if (i === 0) shape.moveTo(...start);
+    else shape.lineTo(...start);
+    shape.quadraticCurveTo(p[0], p[1], ...end);
+  });
+  shape.closePath();
+}
+
+// Holes have to wind counter-clockwise or three.js culls their walls and you can see the table through them
+function holePath([x, y], r) {
+  const path = new THREE.Path();
+  path.absarc(x, y, r, 0, Math.PI * 2, false);
+  return path;
+}
+
+function flatten(geometry) {
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, -(DEPTH + BEVEL), 0);
+  return geometry;
+}
+
+const EXTRUDE = { depth: DEPTH, bevelEnabled: true, bevelThickness: BEVEL, bevelSize: 0.09, bevelSegments: 3, curveSegments: 22 };
+
+function buildBoardGeometry() {
+  const W = 2.75;
+  const L = 8.75;
+  const cross = [[-W, -L], [W, -L], [W, -W], [L, -W], [L, W], [W, W], [W, L], [-W, L], [-W, W], [-L, W], [-L, -W], [-W, -W]];
+  const shape = new THREE.Shape();
+  roundedPolygon(shape, cross.map(([x, y]) => [x, -y]), 0.65);
+  [...RING, ...HOME.flat()].forEach((p) => shape.holes.push(holePath(sx(p), HOLE_R)));
+  shape.holes.push(holePath(sx(CENTER), CENTER_R));
+  return flatten(new THREE.ExtrudeGeometry(shape, EXTRUDE));
+}
+
+function buildDishGeometry(seat) {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, DISH_R, 0, Math.PI * 2, false);
+  const [tr, tc] = BASE_TRAY[seat];
+  BASE[seat].forEach(([r, c]) => shape.holes.push(holePath([c - tc, -(r - tr)], HOLE_R)));
+  return flatten(new THREE.ExtrudeGeometry(shape, { ...EXTRUDE, curveSegments: 40 }));
+}
+
+function buildHomeStripGeometry() {
+  const shape = new THREE.Shape();
+  roundedPolygon(shape, [[-0.52, -2.45], [0.52, -2.45], [0.52, -7.6], [-0.52, -7.6]], 0.4);
+  [3, 4, 5, 6, 7].forEach((r) => shape.holes.push(holePath([0, -r], HOLE_R + 0.03)));
+  return new THREE.ShapeGeometry(shape, 24).rotateX(-Math.PI / 2);
+}
+
+function Cups({ material }) {
+  const ref = useRef();
+  const points = useMemo(() => [...RING, ...HOME.flat(), ...BASE.flat()], []);
+  const geometry = useMemo(() => new THREE.SphereGeometry(HOLE_R - 0.08, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), []);
+  useLayoutEffect(() => {
+    const m = new THREE.Matrix4();
+    points.forEach(([r, c], i) => ref.current.setMatrixAt(i, m.makeTranslation(c, -BEVEL * 0.9, r)));
+    ref.current.instanceMatrix.needsUpdate = true;
+  }, [points]);
+  return (
+    <group>
+      <instancedMesh ref={ref} args={[geometry, null, points.length]} material={material} receiveShadow />
+      <mesh position={[0, -BEVEL * 0.9, 0]} material={material} receiveShadow>
+        <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+      </mesh>
+    </group>
+  );
+}
+
+const Ring = ({ at, inner, outer, color, material, y = 0.004 }) => (
+  <mesh position={[at[1], y, at[0]]} rotation-x={-Math.PI / 2} material={material}>
+    <ringGeometry args={[inner, outer, 40]} />
+    {!material && <meshStandardMaterial color={color} roughness={0.45} polygonOffset polygonOffsetFactor={-2} />}
+  </mesh>
+);
+
+function NameTag({ name, color, position }) {
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    document.fonts?.ready.then(() => alive && setFontsReady(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const texture = useMemo(() => makeLabelTexture(name, color), [name, color, fontsReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => texture.dispose(), [texture]);
+  return (
+    <sprite position={position} scale={[3.2, 0.8, 1]} renderOrder={10}>
+      <spriteMaterial map={texture} transparent depthWrite={false} />
+    </sprite>
+  );
+}
+
+function Dish({ seat, geometry, material, active, isTurn, name }) {
+  const rimRef = useRef();
+  const [r, c] = BASE_TRAY[seat];
+  const color = SEAT_COLORS[seat];
+  useFrame(({ clock }) => {
+    const mat = rimRef.current.material;
+    mat.emissiveIntensity = isTurn ? 0.6 + Math.sin(clock.elapsedTime * 4) * 0.4 : active ? 0.12 : 0;
+  });
+  return (
+    <group>
+      <group position={[c, 0, r]}>
+        <mesh geometry={geometry} material={material} castShadow receiveShadow />
+        <mesh ref={rimRef} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
+          <ringGeometry args={[DISH_R - 0.2, DISH_R - 0.04, 64]} />
+          <meshStandardMaterial color={active ? color.main : '#6d5a48'} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
+        </mesh>
+      </group>
+      {active && name && <NameTag name={name} color={color.main} position={[c, 1.45, r]} />}
+    </group>
+  );
+}
+
+function TurnGem({ turn }) {
+  const ref = useRef();
+  const mat = useRef();
+  const color = useMemo(() => new THREE.Color(), []);
+  useFrame(({ clock }, dt) => {
+    const g = ref.current;
+    if (turn === null || turn === undefined) {
+      g.visible = false;
+      return;
+    }
+    const [r, c] = BASE_TRAY[turn];
+    if (!g.visible) g.position.set(c, 2, r);
+    g.visible = true;
+    const k = 1 - Math.exp(-dt * 5);
+    g.position.x += (c - g.position.x) * k;
+    g.position.z += (r - g.position.z) * k;
+    g.position.y = 2.5 + Math.sin(clock.elapsedTime * 2.5) * 0.2;
+    g.rotation.y += dt * 1.6;
+    mat.current.color.lerp(color.set(SEAT_COLORS[turn].main), k);
+    mat.current.emissive.copy(mat.current.color);
+  });
+  return (
+    <mesh ref={ref} visible={false} scale={[1, 1.7, 1]} castShadow>
+      <octahedronGeometry args={[0.36, 0]} />
+      <meshPhysicalMaterial ref={mat} roughness={0.1} clearcoat={1} emissiveIntensity={0.55} flatShading />
+    </mesh>
+  );
+}
+
+function Table({ texture }) {
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[0, TABLE_Y, 0]} receiveShadow>
+      <circleGeometry args={[60, 64]} />
+      <meshStandardMaterial map={texture} roughness={0.95} />
+    </mesh>
+  );
+}
+
+export default function Board({ active, names, turn, showNames, skin, table = true }) {
+  const materials = boardSkin(skin);
+  const boardGeometry = useMemo(buildBoardGeometry, []);
+  const dishGeometries = useMemo(() => SEATS.map(buildDishGeometry), []);
+  const stripGeometry = useMemo(buildHomeStripGeometry, []);
+
+  return (
+    <group>
+      {table && <Table texture={materials.felt} />}
+      <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
+      <Cups material={materials.cup} />
+
+      {SEATS.map((s) => (
+        <group key={s}>
+          <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
+            <meshStandardMaterial color={SEAT_COLORS[s].main} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
+          </mesh>
+          <Ring at={RING[entryIdx(s)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={SEAT_COLORS[s].main} />
+          <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={active.includes(s)} isTurn={turn === s} name={showNames ? names[s] : null} />
+        </group>
+      ))}
+
+      {INNER_CORNERS.map((i) => {
+        const [r, c] = RING[i];
+        return (
+          <group key={i}>
+            <Ring at={RING[i]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.12} material={materials.brass} />
+            {[0.3, 0.5, 0.7].map((t) => (
+              <mesh key={t} position={[c * t, 0.01, r * t]} rotation-x={-Math.PI / 2} rotation-z={Math.PI / 4} material={materials.brass}>
+                <planeGeometry args={[0.14, 0.14]} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+      <Ring at={CENTER} inner={CENTER_R + 0.03} outer={CENTER_R + 0.16} material={materials.brass} />
+      <TurnGem turn={turn ?? null} />
+    </group>
+  );
+}

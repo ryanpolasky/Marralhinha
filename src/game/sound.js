@@ -1,0 +1,124 @@
+const MUTE_KEY = 'marralhinha:muted';
+
+let ctx = null;
+let master = null;
+let muted = typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_KEY) === '1';
+const listeners = new Set();
+
+function audio() {
+  if (muted) return null;
+  if (!ctx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    ctx = new AudioCtx();
+    master = ctx.createGain();
+    master.gain.value = 0.55;
+    master.connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+export const unlockAudio = () => audio();
+export const isMuted = () => muted;
+export function setMuted(value) {
+  muted = value;
+  localStorage.setItem(MUTE_KEY, value ? '1' : '0');
+  listeners.forEach((fn) => fn(value));
+}
+export function onMuteChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function tone({ freq, to = null, type = 'sine', dur = 0.15, vol = 0.2, delay = 0 }) {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(master);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
+let noiseBuffer = null;
+function noise({ dur = 0.05, vol = 0.2, freq = 2000, to = null, q = 1.2, delay = 0 }) {
+  const ac = audio();
+  if (!ac) return;
+  if (!noiseBuffer) {
+    noiseBuffer = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  const t0 = ac.currentTime + delay;
+  const src = ac.createBufferSource();
+  src.buffer = noiseBuffer;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = q;
+  filter.frequency.setValueAtTime(freq, t0);
+  if (to) filter.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(filter).connect(gain).connect(master);
+  src.start(t0, Math.random() * 0.5);
+  src.stop(t0 + dur + 0.02);
+}
+
+const jitter = (n, amt) => n * (1 + (Math.random() - 0.5) * amt);
+
+export const sfx = {
+  hop: () => {
+    tone({ freq: jitter(2100, 0.2), type: 'triangle', dur: 0.05, vol: 0.07 });
+    noise({ dur: 0.03, vol: 0.08, freq: 3500 });
+  },
+  land: () => {
+    tone({ freq: jitter(2600, 0.1), dur: 0.12, vol: 0.12 });
+    tone({ freq: jitter(3900, 0.1), dur: 0.07, vol: 0.06 });
+    noise({ dur: 0.04, vol: 0.12, freq: 4000 });
+  },
+  dice: () => {
+    const hits = [0, 0.13, 0.3, 0.45, 0.58, 0.68, 0.76, 0.82];
+    hits.forEach((d, i) => {
+      noise({ dur: 0.05, vol: 0.28 * (1 - i / 10), freq: jitter(1600, 0.5), q: 2, delay: d });
+      tone({ freq: jitter(700, 0.4), type: 'triangle', dur: 0.04, vol: 0.06, delay: d });
+    });
+  },
+  capture: () => {
+    noise({ dur: 0.45, vol: 0.25, freq: 600, to: 3000, q: 0.8 });
+    tone({ freq: 180, to: 45, type: 'sine', dur: 0.35, vol: 0.35 });
+    tone({ freq: 880, to: 220, type: 'square', dur: 0.25, vol: 0.04, delay: 0.05 });
+  },
+  pop: () => tone({ freq: 420, to: 980, dur: 0.13, vol: 0.18 }),
+  home: () => [784, 988, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.14, delay: i * 0.08 })),
+  turn: () => [880, 1319].forEach((f, i) => tone({ freq: f, dur: 0.35, vol: 0.13, delay: i * 0.12 })),
+  six: () => [1047, 1319, 1568].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.12, vol: 0.1, delay: i * 0.05 })),
+  win: () => {
+    [523, 659, 784, 1047].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.3, vol: 0.16, delay: i * 0.13 }));
+    [523, 659, 784, 1047].forEach((f) => tone({ freq: f, type: 'sine', dur: 1.2, vol: 0.08, delay: 0.6 }));
+  },
+  lose: () => [392, 330, 262].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.35, vol: 0.13, delay: i * 0.2 })),
+  click: () => tone({ freq: 1200, dur: 0.04, vol: 0.06 }),
+  coins: () => [1568, 2093, 2637].forEach((f, i) => tone({ freq: jitter(f, 0.03), type: 'triangle', dur: 0.09, vol: 0.08, delay: i * 0.05 })),
+  boxShake: () => {
+    for (let i = 0; i < 10; i++) {
+      noise({ dur: 0.06, vol: 0.12 + i * 0.015, freq: jitter(900 + i * 80, 0.2), q: 3, delay: i * 0.12 });
+      tone({ freq: 180 + i * 25, type: 'triangle', dur: 0.05, vol: 0.05, delay: i * 0.12 });
+    }
+    tone({ freq: 220, to: 880, type: 'sawtooth', dur: 1.2, vol: 0.03 });
+  },
+  reveal: (rarity) => {
+    const notes = { common: [523, 659], rare: [523, 659, 784], epic: [523, 659, 784, 1047], legendary: [523, 659, 784, 1047, 1319, 1568] }[rarity] || [523];
+    noise({ dur: 0.35, vol: 0.2, freq: 2500, to: 600, q: 0.7 });
+    notes.forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.4, vol: 0.14, delay: 0.05 + i * 0.09 }));
+    if (rarity === 'legendary' || rarity === 'epic') notes.forEach((f) => tone({ freq: f / 2, type: 'sine', dur: 1.6, vol: 0.06, delay: 0.5 }));
+  },
+};
