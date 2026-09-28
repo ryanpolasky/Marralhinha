@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { SLOTS, SLOT_KEYS, ITEMS, itemsForSlot, catalog } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
 import { ItemCard, PreviewStage, RarityTag } from './Economy';
+import { Close } from './Icons';
 
 export default function Locker({ account, onClose, onEquip, onShop }) {
   const [slot, setSlot] = useState('marble');
@@ -30,7 +31,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
             {collected} / {catalog.items.length} collected
           </span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
-            ×
+            <Close />
           </button>
         </div>
 

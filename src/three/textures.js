@@ -33,9 +33,12 @@ export function makeWoodCanvas({ base = '#c9894a', grain = '96,52,20', seed = 7,
   const rand = seeded(seed);
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, size, size);
+  const wrapped = (draw) => [-size, 0, size].forEach(draw);
   for (let i = 0; i < 50; i++) {
     ctx.fillStyle = `rgba(${grain},${0.02 + rand() * 0.07})`;
-    ctx.fillRect(0, rand() * size, size, 8 + rand() * 70);
+    const y = rand() * size;
+    const h = 8 + rand() * 70;
+    wrapped((dy) => ctx.fillRect(0, y + dy, size, h));
   }
   for (let i = 0; i < 320; i++) {
     const y0 = rand() * size;
@@ -44,16 +47,18 @@ export function makeWoodCanvas({ base = '#c9894a', grain = '96,52,20', seed = 7,
     const k2 = 3 + Math.floor(rand() * 5);
     const p1 = rand() * Math.PI * 2;
     const p2 = rand() * Math.PI * 2;
-    ctx.beginPath();
-    for (let x = 0; x <= size; x += 6) {
-      const a = (x / size) * Math.PI * 2;
-      const y = y0 + Math.sin(a * k1 + p1) * amp + Math.sin(a * k2 + p2) * amp * 0.25;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
     ctx.strokeStyle = `rgba(${grain},${0.04 + rand() * 0.2})`;
     ctx.lineWidth = 0.5 + rand() * 2.4;
-    ctx.stroke();
+    wrapped((dy) => {
+      ctx.beginPath();
+      for (let x = 0; x <= size; x += 6) {
+        const a = (x / size) * Math.PI * 2;
+        const y = y0 + dy + Math.sin(a * k1 + p1) * amp + Math.sin(a * k2 + p2) * amp * 0.25;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
   }
   return canvas;
 }

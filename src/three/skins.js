@@ -168,23 +168,53 @@ const MARBLES = {
   frost: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     const rand = seeded(130 + seat);
-    ctx.fillStyle = mix(c.light, '#ffffff', 0.55);
+    const ice = mix(c.main, '#9fdcff', 0.14);
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, mix(c.dark, '#0a2a44', 0.35));
+    g.addColorStop(0.5, ice);
+    g.addColorStop(1, mix(c.dark, '#0a2a44', 0.35));
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 14; i++) {
       const x = rand() * 512;
-      const y = rand() * 256;
-      const len = 10 + rand() * 30;
-      ctx.strokeStyle = `rgba(255,255,255,${0.4 + rand() * 0.5})`;
-      ctx.lineWidth = 1 + rand() * 1.5;
-      for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * TAU;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
-        ctx.stroke();
-      }
+      const y = 30 + rand() * 196;
+      const r = 30 + rand() * 70;
+      const color = i % 3 ? mix(c.dark, '#06243a', 0.3) : mix(c.main, '#bfe9ff', 0.45);
+      [x - 512, x, x + 512].forEach((px) => {
+        const blob = ctx.createRadialGradient(px, y, 0, px, y, r);
+        blob.addColorStop(0, color);
+        blob.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = blob;
+        ctx.fillRect(px - r, y - r, r * 2, r * 2);
+      });
     }
-    return { map: finishMarble(canvas), roughness: 0.08, clearcoat: 1, iridescence: 0.5, transparent: true, opacity: 0.93 };
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'round';
+    const fern = (x, y, angle, len, depth) => {
+      if (depth === 0 || len < 2) return;
+      const x2 = x + Math.cos(angle) * len;
+      const y2 = y + Math.sin(angle) * len;
+      ctx.lineWidth = 0.6 + depth * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      for (let i = 1; i <= 3; i++) {
+        const bx = x + ((x2 - x) * i) / 4;
+        const by = y + ((y2 - y) * i) / 4;
+        fern(bx, by, angle + 1.05, len * 0.42, depth - 1);
+        fern(bx, by, angle - 1.05, len * 0.42, depth - 1);
+      }
+      fern(x2, y2, angle + (rand() - 0.5) * 0.4, len * 0.62, depth - 1);
+    };
+    for (let i = 0; i < 14; i++) {
+      ctx.strokeStyle = `rgba(232, 248, 255, ${0.35 + rand() * 0.35})`;
+      fern(40 + rand() * 432, 30 + rand() * 196, rand() * TAU, 20 + rand() * 22, 3);
+    }
+    veins(ctx, rand, { count: 6, color: '#e8f8ff', width: 1, alpha: 0.45, w: 512, h: 256, steps: 16 });
+    stars(ctx, rand, { count: 120, w: 512, h: 256, color: '#f2fbff' });
+    return { map: finishMarble(canvas), roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.04, iridescence: 0.2, envMapIntensity: 1.2 };
   },
   gold: (c, seat) => {
     const rand = seeded(150 + seat);
@@ -477,17 +507,20 @@ export function boardSkin(itemId) {
     if (spec.canvas) {
       const map = finish(spec.canvas);
       map.repeat.set(spec.repeat, spec.repeat);
+      map.offset.set(0.5, 0.5);
       boardParams.map = map;
     } else boardParams.color = spec.color;
     if (spec.glowCanvas) {
       const glow = finish(spec.glowCanvas);
       glow.repeat.set(spec.repeat, spec.repeat);
+      glow.offset.set(0.5, 0.5);
       Object.assign(boardParams, { emissiveMap: glow, emissive: '#ffffff', emissiveIntensity: 0.9 });
     }
     const dishParams = { color: spec.dish, roughness: 0.5, clearcoat: spec.clearcoat || 0 };
     if (wood) {
       const dishMap = finish(makeWoodCanvas({ base: spec.dish, grain: '40,25,15', seed: 21 }));
       dishMap.repeat.set(0.2, 0.2);
+      dishMap.offset.set(0.5, 0.5);
       Object.assign(dishParams, { map: dishMap, color: '#ffffff' });
     }
     return {

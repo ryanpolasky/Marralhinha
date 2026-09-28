@@ -31,7 +31,7 @@ export const HOME = SEATS.map((s) => [0, 1, 2, 3, 4].map((slot) => rotate([7 - s
 export const BASE = SEATS.map((s) => BASE_OFFSETS.map(([dr, dc]) => rotate([BASE_CENTER + dr, BASE_CENTER + dc], s)));
 export const BASE_TRAY = SEATS.map((s) => rotate([BASE_CENTER, BASE_CENTER], s));
 export const CENTER = [0, 0];
-export const DIE_SPOT = SEATS.map((s) => rotate([9.9, 5.4], s));
+export const DIE_SPOT = SEATS.map((s) => rotate([8.7, 4.3], s));
 export const DIE_THROW_FROM = SEATS.map((s) => rotate([15, 9], s));
 
 export const entryIdx = (seat) => (seat * 16 + 2) % 64;

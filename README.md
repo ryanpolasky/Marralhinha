@@ -13,14 +13,14 @@ Made by [Ryan Polasky](https://github.com/ryanpolasky).
 | **Victory + rewards** | **Mobile** |
 | ![Win screen](docs/media/win.jpg) | <img src="docs/media/mobile-game.jpg" alt="Mobile" width="220" /> |
 
-More in [`docs/media`](docs/media): home screen, shop, a 1920×1080 cover (`cover.jpg`, handy for the Discord Activity art) and a 1024px app icon.
-2–4 players per room, with optional bots. With 4 players it's 2v2, partners sitting opposite each other.
+More in [`docs/media`](docs/media): home screen, shop, a 4K cover (`cover.jpg`, handy for the Discord Activity art) and the app icon as SVG and 1024px PNG, in rounded (`icon`) and square (`icon-square`) versions.
+2–4 players per room, with optional bots. Games are free-for-all; with 4 players the host can switch on 2v2 teams (partners sit opposite each other).
 
 Players get a guest account automatically, earn **Marbucks** by playing, and spend them on lootboxes and a daily
 shop full of cosmetics (marbles, boards, dice, nameplates). Everything is cosmetic; there is no real money.
 "Login with Discord" saves progress across devices, and the same app runs as a **Discord Activity** inside voice channels.
 
-Requires **Node 22.5+** (uses the built-in `node:sqlite`).
+Requires **Node 22.9+** (uses the built-in `node:sqlite` and `--env-file-if-exists`).
 
 ## Development
 
@@ -42,13 +42,43 @@ npm run server       # serves ./build, the API and Socket.IO on $PORT (default 3
 ```
 
 The server needs a persistent disk for the SQLite file (for example a Fly.io volume, a Render disk or a VPS).
+Everything (site, API, WebSockets) is served from one port, so it works behind a single reverse proxy or tunnel.
+
+### Docker
+
+```yaml
+marralhinha:
+  build: ../Projects/Marralhinha
+  container_name: marralhinha
+  restart: unless-stopped
+  volumes:
+    - ./data/marralhinha:/app/data
+```
+
+The image listens on port 3001 and keeps its SQLite database in `/app/data`. With a Cloudflare Tunnel container on the same compose network, route the hostname to `http://marralhinha:3001`; no published ports needed.
+
+### Self-hosting behind a Cloudflare Tunnel
+
+1. On the machine: `npm ci && npm run build`, then run `NODE_ENV=production HOST=127.0.0.1 npm run server` under a process manager (pm2, systemd, …) so it restarts on crashes and reboots.
+2. Point the tunnel at it, e.g. in `~/.cloudflared/config.yml`:
+   ```yaml
+   ingress:
+     - hostname: marralhinha.app
+       service: http://localhost:3001
+     - service: http_status:404
+   ```
+   WebSockets work through tunnels out of the box.
+3. Back up `data/marralhinha.db` (accounts, coins, cosmetics) now and then.
+
+`HOST=127.0.0.1` keeps the port private so the only way in is through the tunnel. The server trusts one proxy hop for client IPs (used by the guest sign-up rate limit).
+Discord is optional; without its env vars the game runs with guest accounts only.
 
 Environment variables (see `.env.example`):
 
 - `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`: enable Discord login and Activity mode
 - `PUBLIC_URL`: public URL of the server (the OAuth redirect is `<PUBLIC_URL>/api/auth/discord/callback`)
 - `CLIENT_URL`: where to send the browser after login (only needed in dev, e.g. `http://localhost:3000`)
-- `PORT` (default `3001`), `DB_PATH` (default `data/marralhinha.db`)
+- `PORT` (default `3001`), `HOST` (default: all interfaces), `DB_PATH` (default `data/marralhinha.db`)
 - `CLIENT_ORIGIN`: comma-separated allowed origins, only needed if the frontend is hosted on a different domain
 - `REACT_APP_SERVER_URL` (build time): server URL if the frontend isn't served by the game server
 
@@ -84,6 +114,11 @@ Activities load your app inside Discord through Discord's proxy, so the server n
 Everyone in the same voice channel lands at the same table automatically. Inside Discord, players are signed in with their
 Discord account, so their coins and cosmetics are shared with the website.
 While the app is unverified, only you and members of your developer team can launch it.
+
+## Legal
+
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
 
 ## Tests
 

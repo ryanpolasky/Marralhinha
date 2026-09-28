@@ -3,12 +3,12 @@ import { SEAT_COLORS } from '../game/geometry';
 import { randomNickname } from '../game/fun';
 import RulesButton from './Rules';
 import { DieIcon } from './Icons';
-import { Credit } from './About';
+import { Credit, LegalLinks } from './About';
 
 export function Logo() {
   return (
     <h1 className="logo" aria-label="Marralhinha">
-      {'Marralhinha'.split('').map((ch, i) => (
+      {'Marralhinha!'.split('').map((ch, i) => (
         <span key={i} style={{ '--c': SEAT_COLORS[i % 4].main, '--d': `${i * 0.07}s` }}>
           {ch}
         </span>
@@ -135,9 +135,10 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
         {!nameOk && <p className="hint">Pick a name (or roll one) to start playing</p>}
         <div className="home-footer">
           <RulesButton className="btn link" />
-          <Credit />
+          <LegalLinks className="inline" />
         </div>
       </div>
+      <Credit className="corner" />
     </div>
   );
 }

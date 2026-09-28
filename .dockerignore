@@ -1,0 +1,10 @@
+node_modules
+build
+data
+docs
+.git
+.idea
+.env
+.env.*
+*.md
+npm-debug.log*

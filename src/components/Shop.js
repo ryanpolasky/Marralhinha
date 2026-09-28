@@ -3,6 +3,7 @@ import { BOXES, ITEMS, RARITIES, CURRENCY } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, PreviewStage, RarityTag, Coin } from './Economy';
+import { Close } from './Icons';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const SHAKE_MS = 1500;
@@ -24,9 +25,8 @@ export function BoxArt({ box, shaking = false, glow }) {
   return (
     <div className={`box-art ${box.id.replace('.', '-')}${shaking ? ' shaking' : ''}`} style={glow ? { '--glow': glow } : undefined}>
       <div className="box-lid" />
-      <div className="box-body">
-        <div className="box-lock" />
-      </div>
+      <div className="box-body" />
+      <div className="box-lock" />
     </div>
   );
 }
@@ -138,7 +138,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
           <h2>Shop</h2>
           <Coins amount={account.coins} className="coins-pill" />
           <button className="icon-close" onClick={onClose} aria-label="Close">
-            ×
+            <Close />
           </button>
         </div>
 

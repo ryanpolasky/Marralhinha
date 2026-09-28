@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
-import { homeCount, partnerOf } from '../game/moves';
+import { homeCount, partnerOf, ROLL_REVEAL_MS } from '../game/moves';
 import { sfx, isMuted, setMuted, onMuteChange } from '../game/sound';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
@@ -9,7 +9,6 @@ import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, skinKey } from '../game/catalog';
 import { Coins, Coin } from './Economy';
 
-const ROLL_ANIM_MS = 1000;
 const BOX_PRICE = BOXES[0].price;
 
 function useMuted() {
@@ -45,8 +44,8 @@ function useAnnouncements(game, mySeat, nameOf) {
     if (!p) return;
     const roll = game.lastRoll;
     if (roll && roll.t !== p.lastRoll?.t && roll.seat === mySeat) {
-      if (roll.noMoves) push(`No moves`, `with a ${roll.die}${roll.die === 6 ? ', roll again!' : ''}`, 'muted', ROLL_ANIM_MS);
-      else if (roll.die === 6) push('Six!', 'Move, then roll again', 'gold', ROLL_ANIM_MS, sfx.six);
+      if (roll.noMoves) push(`No moves`, `with a ${roll.die}${roll.die === 6 ? ', roll again!' : ''}`, 'muted', ROLL_REVEAL_MS);
+      else if (roll.die === 6) push('Six!', 'Move, then roll again', 'gold', ROLL_REVEAL_MS, sfx.six);
     }
     const mv = game.lastMove;
     if (mv && mv.t !== p.lastMove?.t) {
@@ -61,7 +60,8 @@ function useAnnouncements(game, mySeat, nameOf) {
     }
     if (game.phase === 'roll' && game.turn === mySeat && (p.turn !== mySeat || p.phase === 'over')) {
       const rollKey = game.lastRoll?.t;
-      push('Your turn!', 'Roll the dice', 'turn', mv && mv.t !== p.lastMove?.t ? 600 : 0, sfx.turn, (g) => g.phase === 'roll' && g.turn === mySeat && g.lastRoll?.t === rollKey);
+      const justRolled = roll && roll.t !== p.lastRoll?.t;
+      push('Your turn!', 'Roll the dice', 'turn', justRolled ? ROLL_REVEAL_MS + 150 : mv && mv.t !== p.lastMove?.t ? 600 : 0, sfx.turn, (g) => g.phase === 'roll' && g.turn === mySeat && g.lastRoll?.t === rollKey);
     }
     if (game.phase === 'over' && p.phase !== 'over') setTimeout(game.winners.includes(mySeat) ? sfx.win : sfx.lose, 1200);
   }, [game, mySeat, nameOf, push]);
@@ -69,7 +69,11 @@ function useAnnouncements(game, mySeat, nameOf) {
   return items;
 }
 
-function statusFor(game, seats, mySeat, nameOf) {
+function statusFor(game, seats, mySeat, nameOf, rollPending) {
+  if (rollPending) {
+    const roller = game.lastRoll.seat;
+    return { title: roller === mySeat ? 'Rolling…' : `${nameOf(roller)} is rolling…`, sub: 'Fingers crossed…' };
+  }
   const turn = game.turn;
   const helping = game.mode === 'teams' && homeCount(game.marbles[turn]) === 5;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
@@ -86,19 +90,24 @@ function statusFor(game, seats, mySeat, nameOf) {
     : { title: `${nameOf(turn)} rolled a ${game.die}`, sub: `Thinking…${helpText}` };
 }
 
-function PlayerChip({ seat, player, game, mySeat, reaction }) {
+function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction }) {
   const color = SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
-  const isTurn = game.phase !== 'over' && game.turn === seat;
+  const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
   return (
     <div
       className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${player && !player.isBot && !player.connected ? ' away' : ''}`}
-      style={{ '--seat': color.main, '--seat-light': color.light }}
+      style={{ '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark }}
     >
       {sticker && (
         <div key={reaction.id} className="bubble" style={{ '--sticker': sticker.color, '--tilt': `${sticker.tilt}deg` }}>
           {sticker.label}
+        </div>
+      )}
+      {reaction?.text && (
+        <div key={reaction.id} className="bubble chat" style={{ '--sticker': '#fff6e8', '--tilt': '0deg' }}>
+          {reaction.text}
         </div>
       )}
       <span className="avatar">
@@ -118,6 +127,26 @@ function PlayerChip({ seat, player, game, mySeat, reaction }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ChatInput({ onSend }) {
+  const [text, setText] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    const message = text.trim();
+    if (!message) return;
+    if (await onSend(message)) setText((current) => (current.trim() === message ? '' : current));
+  };
+  return (
+    <form className="chat-form" onSubmit={submit}>
+      <input value={text} onChange={(e) => setText(e.target.value)} maxLength={140} placeholder="Say something…" aria-label="Chat message" />
+      <button className="chat-send" type="submit" disabled={!text.trim()} aria-label="Send message">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 12h15M13 6l6 6-6 6" />
+        </svg>
+      </button>
+    </form>
   );
 }
 
@@ -199,20 +228,22 @@ function Rewards({ reward }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], onAction, onLeave, onResetView, onShop, coins = 0 }) {
+export default function Game({ room, playerId, reactions = [], rollPending = false, onAction, onLeave, onResetView, onShop, coins = 0 }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
   const muted = useMuted();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
   const [showOver, setShowOver] = useState(game.phase === 'over');
 
   const nameOf = useCallback((s) => (s === mySeat ? 'You' : seats[s]?.name || SEAT_COLORS[s].name), [mySeat, seats]);
   const announcements = useAnnouncements(game, mySeat, nameOf);
 
-  const myTurn = game.turn === mySeat && game.phase !== 'over';
-  const canRoll = myTurn && game.phase === 'roll';
+  const activeSeat = rollPending ? game.lastRoll.seat : game.turn;
+  const myTurn = activeSeat === mySeat && game.phase !== 'over';
+  const canRoll = myTurn && game.phase === 'roll' && !rollPending;
   const roll = useCallback(() => canRoll && onAction('game:roll'), [canRoll, onAction]);
 
   useEffect(() => {
@@ -235,10 +266,11 @@ export default function Game({ room, playerId, reactions = [], onAction, onLeave
     return () => window.removeEventListener('keydown', onKey);
   }, [roll]);
 
-  const status = statusFor(game, seats, mySeat, nameOf);
+  const status = statusFor(game, seats, mySeat, nameOf, rollPending);
   const teams = game.mode === 'teams';
-  const chip = (s) => <PlayerChip key={s} seat={s} player={seats[s]} game={game} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} />;
-  const log = [...game.log].reverse();
+  const chip = (s) => <PlayerChip key={s} seat={s} player={seats[s]} game={game} activeSeat={activeSeat} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} />;
+  const log = (rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log).slice().reverse();
+  const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && entry.seat !== mySeat && entry.t > chatSeenAt).length;
   const iWon = game.winners?.includes(mySeat);
 
   return (
@@ -291,20 +323,33 @@ export default function Game({ room, playerId, reactions = [], onAction, onLeave
 
       <div className="hud-bottom">
         <div className={`feed${feedOpen ? ' open' : ''}`}>
-          <button className="feed-toggle" onClick={() => setFeedOpen((o) => !o)}>
-            {feedOpen ? 'Hide log' : 'Game log'}
+          <button
+            className="feed-toggle"
+            onClick={() => {
+              setFeedOpen((o) => !o);
+              setChatSeenAt(Date.now());
+            }}
+          >
+            {feedOpen ? 'Hide' : 'Chat & log'}
+            {unread > 0 && <span className="unread">{unread}</span>}
           </button>
           <div className="feed-list">
             {(feedOpen ? log : log.slice(0, 4)).map((entry, i) => (
-              <div key={`${entry.t}-${i}`} className="feed-entry" style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}>
+              <div
+                key={`${entry.t}-${i}`}
+                className={`feed-entry${entry.chat ? ' chat' : ''}`}
+                style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}
+              >
+                {entry.chat && <b className="chat-name">{entry.seat === mySeat ? 'You' : entry.name}</b>}
                 {entry.text}
               </div>
             ))}
           </div>
+          {mySeat >= 0 && <ChatInput onSend={(text) => onAction('game:chat', { text })} />}
         </div>
 
-        <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[game.turn].main }}>
-          {game.phase === 'move' && (
+        <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
+          {game.phase === 'move' && !rollPending && (
             <span key={game.lastRoll?.t} className={`roll-badge${game.die === 6 ? ' six' : ''}`} style={{ '--seat': SEAT_COLORS[game.turn].main }}>
               {game.die}
             </span>

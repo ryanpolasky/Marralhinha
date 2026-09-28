@@ -6,6 +6,40 @@ const Icon = ({ children, size = 20 }) => (
   </svg>
 );
 
+export const Close = () => (
+  <Icon size={18}>
+    <path d="M6 6l12 12M18 6L6 18" strokeWidth="2.6" />
+  </Icon>
+);
+
+export const Hanger = () => (
+  <Icon>
+    <path d="M9.6 6.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8v.7" />
+    <path d="M12 11.3l8.6 5.3c1 .6.6 2.2-.6 2.2H4c-1.2 0-1.6-1.6-.6-2.2L12 11.3z" />
+  </Icon>
+);
+
+export const GiftIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 7.5C10.6 4.2 7 3.5 6.3 5.6c-.6 1.8 2.6 2.4 5.7 1.9zM12 7.5c1.4-3.3 5-4 5.7-1.9.6 1.8-2.6 2.4-5.7 1.9z" fill="#ffd166" stroke="#b8860b" strokeWidth="1.1" strokeLinejoin="round" />
+    <rect x="4.5" y="11" width="15" height="9.5" rx="1.6" fill="#ff5a6e" />
+    <rect x="3.5" y="7.6" width="17" height="4.4" rx="1.4" fill="#ff7d8c" />
+    <rect x="10.6" y="7.6" width="2.8" height="12.9" fill="#ffd166" />
+    <rect x="4.5" y="12" width="15" height="1.4" fill="#000" opacity="0.14" />
+  </svg>
+);
+
+export const ChestIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3.5 11V9.2C3.5 6.3 5.7 4.5 8.5 4.5h7c2.8 0 5 1.8 5 4.7V11z" fill="#9a5a26" />
+    <path d="M3.5 11h17v8.2c0 .7-.6 1.3-1.3 1.3H4.8c-.7 0-1.3-.6-1.3-1.3z" fill="#c07a3c" />
+    <rect x="3.5" y="10.2" width="17" height="1.9" fill="#ffd166" />
+    <path d="M7.4 4.8v15.7M16.6 4.8v15.7" stroke="#ffd166" strokeWidth="1.5" />
+    <rect x="10.2" y="9.4" width="3.6" height="4.6" rx="1" fill="#ffe8a3" stroke="#b8860b" strokeWidth="0.9" />
+    <circle cx="12" cy="11.4" r="0.8" fill="#6b3f18" />
+  </svg>
+);
+
 export const SoundOn = () => (
   <Icon>
     <path d="M4 9v6h4l5 4V5L8 9H4z" />

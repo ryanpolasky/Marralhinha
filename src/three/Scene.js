@@ -28,9 +28,9 @@ function CameraRig({ mode, resetKey }) {
   useEffect(() => {
     const aspect = size.width / size.height;
     const game = mode === 'game';
-    const elevation = game ? 0.98 : 0.8;
+    const elevation = game ? 0.84 : 0.8;
     const distance = Math.max(28, (game ? 28 : 31) / aspect);
-    const target = new THREE.Vector3(0, 0, game ? 3.4 : 0);
+    const target = new THREE.Vector3(0, 0, game ? 1.8 : 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     controls.minDistance = distance * 0.55;
@@ -105,7 +105,6 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
   }, [moves]);
 
   useWinFireworks(board);
-  const dieSeat = board.phase === 'roll' ? board.turn : board.lastRoll?.seat ?? board.turn ?? viewSeat;
 
   return (
     <Canvas
@@ -131,7 +130,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           setHovered={setHovered}
           onMove={onMove}
         />
-        <Die lastRoll={board.lastRoll} restSeat={dieSeat ?? 0} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
+        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} />
     </Canvas>

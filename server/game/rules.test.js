@@ -12,8 +12,8 @@ const track = (idx) => ({ zone: 'track', idx });
 const home = (slot) => ({ zone: 'home', slot });
 const base = { zone: 'base' };
 
-function setup(n = 2, turn = 0) {
-  const state = rules.createGame(seats(n), { rng: fixed(6, 1, 2, 3) });
+function setup(n = 2, turn = 0, options = {}) {
+  const state = rules.createGame(seats(n), { rng: fixed(6, 1, 2, 3), ...options });
   state.turn = turn;
   return state;
 }
@@ -26,7 +26,37 @@ test('roll-off picks the highest roller and re-rolls ties', () => {
   const state = rules.createGame(seats(3), { rng: fixed(5, 5, 2, 3, 6) });
   assert.equal(state.turn, 1);
   assert.equal(state.mode, 'solo');
-  assert.equal(rules.createGame(seats(4)).mode, 'teams');
+});
+
+test('four players play free-for-all unless teams are switched on', () => {
+  assert.equal(rules.createGame(seats(4)).mode, 'solo');
+  assert.equal(rules.createGame(seats(4), { teams: true }).mode, 'teams');
+  assert.equal(rules.createGame(seats(3), { teams: true }).mode, 'solo', 'teams need all four seats');
+});
+
+test('in free-for-all, the player across the board is fair game', () => {
+  const state = setup(4);
+  state.marbles[0][0] = track(10);
+  state.marbles[2][0] = track(12);
+  rollWith(state, 2);
+  assert.equal(state.legalMoves.find((m) => m.marble === 0).capture.seat, 2);
+});
+
+test('a marble on a shortcut corner can keep going around the track instead', () => {
+  const state = setup();
+  const corner = rules.entryCorners(0)[0];
+  state.marbles[0][0] = track(corner);
+  state.marbles[1][0] = track(corner + 3);
+  rollWith(state, 3);
+  const step = state.legalMoves.find((m) => m.marble === 0 && m.kind === 'step');
+  assert.ok(step, 'stepping off the corner is allowed');
+  assert.equal(step.capture.seat, 1);
+
+  state.phase = 'roll';
+  state.turn = 0;
+  state.marbles[1][0] = base;
+  rollWith(state, 6);
+  assert.deepEqual(state.legalMoves.filter((m) => m.marble === 0).map((m) => m.kind).sort(), ['enterCenter', 'step'], 'a 1 or 6 offers both paths');
 });
 
 test('marbles leave the base only on 1 or 6', () => {
@@ -92,7 +122,7 @@ test('marbles of the same player may not overtake each other, but may pass oppon
 });
 
 test('entering the base is blocked by your partner but captures an opponent', () => {
-  const state = setup(4);
+  const state = setup(4, 0, { teams: true });
   state.marbles[2][0] = track(rules.entryIdx(0));
   rollWith(state, 6);
   assert.equal(state.legalMoves.some((m) => m.kind === 'enter'), false);
@@ -159,7 +189,7 @@ test('an opponent sitting in the center gets captured', () => {
 });
 
 test('teams: a finished player moves their partner\'s marbles; both finished wins', () => {
-  const state = setup(4);
+  const state = setup(4, 0, { teams: true });
   state.marbles[0] = [home(0), home(1), home(2), home(3), home(4)];
   state.marbles[2] = [home(1), home(2), home(3), home(4), track(rules.idxOf(2, rules.LAST_TRACK))];
   assert.equal(rules.controlledSeat(state), 2);
@@ -180,8 +210,8 @@ test('solo: first player with all marbles home wins', () => {
 });
 
 test('bots can play full games to completion', () => {
-  for (const n of [2, 3, 4]) {
-    const state = rules.createGame(seats(n));
+  for (const [n, teams] of [[2, false], [3, false], [4, false], [4, true]]) {
+    const state = rules.createGame(seats(n), { teams });
     let turns = 0;
     while (state.phase !== 'over' && turns++ < 20000) {
       if (state.phase === 'roll') rules.roll(state);

@@ -2,12 +2,15 @@ import { IS_ACTIVITY } from './config';
 import { api, post, setToken, getToken, discordStartUrl, ApiError } from './api';
 import { randomNickname } from '../game/fun';
 
+let discordSdk = null;
+
 async function activityLogin() {
   const { clientId } = await api('/config');
   if (!clientId) throw new Error('This server is not configured for Discord Activities yet');
   const { DiscordSDK } = await import('@discord/embedded-app-sdk');
   const sdk = new DiscordSDK(clientId);
   await sdk.ready();
+  discordSdk = sdk;
   const { code } = await sdk.commands.authorize({ client_id: clientId, response_type: 'code', state: '', prompt: 'none', scope: ['identify'] });
   const { token, accessToken, profile } = await post('/auth/discord/activity', { code });
   setToken(token);
@@ -50,6 +53,12 @@ export function bootstrapAuth(preferredName) {
 export async function startDiscordLogin() {
   const { ticket } = await post('/auth/link-ticket');
   window.location.assign(discordStartUrl(ticket));
+}
+
+// Discord's sandbox blocks normal new-tab links, so Activities have to ask the SDK
+export function openExternal(url) {
+  if (discordSdk) discordSdk.commands.openExternalLink({ url }).catch(() => {});
+  else window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export async function logout() {

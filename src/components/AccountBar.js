@@ -1,7 +1,7 @@
 import React from 'react';
 import { Coins, Nameplate } from './Economy';
-import { SEAT_COLORS } from '../game/geometry';
 import { IS_ACTIVITY } from '../net/config';
+import { ChestIcon, GiftIcon, Hanger } from './Icons';
 
 const DiscordLogo = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -35,16 +35,16 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
       <div className="account-actions">
         {daily && (
           <button className={`bar-btn daily${daily.available ? ' ready' : ''}`} onClick={onDaily} disabled={!daily.available} title={daily.available ? `Claim ${daily.reward} (day ${daily.streak})` : 'Come back tomorrow'}>
-            <span className="bar-btn-icon gift" aria-hidden="true" />
+            <GiftIcon />
             <span>{daily.available ? 'Daily' : `Day ${daily.streak}`}</span>
           </button>
         )}
         <button className="bar-btn shop" onClick={onShop}>
-          <span className="bar-btn-icon chest" aria-hidden="true" />
+          <ChestIcon />
           <span>Shop</span>
         </button>
         <button className="bar-btn locker" onClick={onLocker}>
-          <span className="marble-dot mini" style={{ '--seat': SEAT_COLORS[0].main, '--seat-light': SEAT_COLORS[0].light }} aria-hidden="true" />
+          <Hanger />
           <span>Locker</span>
         </button>
         {!IS_ACTIVITY && discordEnabled && !account.discordLinked && (

@@ -80,6 +80,12 @@ export const sfx = {
     tone({ freq: jitter(2100, 0.2), type: 'triangle', dur: 0.05, vol: 0.07 });
     noise({ dur: 0.03, vol: 0.08, freq: 3500 });
   },
+  clack: () => {
+    tone({ freq: jitter(3300, 0.08), type: 'triangle', dur: 0.06, vol: 0.15 });
+    tone({ freq: jitter(4700, 0.08), dur: 0.08, vol: 0.09, delay: 0.014 });
+    noise({ dur: 0.022, vol: 0.2, freq: 6200, q: 1.6 });
+    noise({ dur: 0.018, vol: 0.1, freq: 5200, q: 2, delay: 0.014 });
+  },
   land: () => {
     tone({ freq: jitter(2600, 0.1), dur: 0.12, vol: 0.12 });
     tone({ freq: jitter(3900, 0.1), dur: 0.07, vol: 0.06 });

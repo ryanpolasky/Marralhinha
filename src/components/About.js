@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
+import { openExternal } from '../net/auth';
 
 export const AUTHOR = {
   name: 'Ryan Polasky',
@@ -7,6 +9,38 @@ export const AUTHOR = {
   github: 'https://github.com/ryanpolasky',
   email: 'ryan@polasky.net',
 };
+
+export const LEGAL = {
+  terms: 'https://github.com/ryanpolasky/Marralhinha/blob/master/TERMS.md',
+  privacy: 'https://github.com/ryanpolasky/Marralhinha/blob/master/PRIVACY.md',
+};
+
+export function ExternalLink({ href, children, className }) {
+  return (
+    <a
+      className={className}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => {
+        e.preventDefault();
+        openExternal(href);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+export function LegalLinks({ className = '' }) {
+  return (
+    <div className={`legal-links ${className}`}>
+      <ExternalLink href={LEGAL.terms}>Terms of Service</ExternalLink>
+      <span aria-hidden="true">·</span>
+      <ExternalLink href={LEGAL.privacy}>Privacy Policy</ExternalLink>
+    </div>
+  );
+}
 
 export const Heart = ({ size = 14 }) => (
   <svg className="heart" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
@@ -46,7 +80,7 @@ export function AboutModal({ onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="panel modal about" role="dialog" aria-label="About this game" onClick={(e) => e.stopPropagation()}>
         <div className="about-marbles" aria-hidden="true">
@@ -55,36 +89,44 @@ export function AboutModal({ onClose }) {
           ))}
         </div>
         <h2>About this game</h2>
-        <p>
-          Hi, I'm <b>{AUTHOR.name}</b>! I played Marralhinha a ton with my mom, who was born in the Açores. It's the kind of game that turns a quiet evening
-          into hours of lucky sixes, groans and marbles getting sent back home.
-        </p>
-        <p>
-          I built Marralhinha Online to eternalize the game we love and share it with everyone, whether you grew up playing it on Terceira or you're
-          discovering it for the very first time.
-        </p>
-        <p className="about-dedication">
-          <Heart /> For my mom.
-        </p>
-        <div className="about-links">
-          <a className="btn ghost" href={AUTHOR.linkedin} target="_blank" rel="noopener noreferrer">
-            <LinkedIn /> LinkedIn
-          </a>
-          <a className="btn ghost" href={AUTHOR.github} target="_blank" rel="noopener noreferrer">
-            <GitHub /> GitHub
-          </a>
-          <a className="btn ghost" href={`mailto:${AUTHOR.email}`}>
-            <Mail /> Email
-          </a>
+        <div className="about-body">
+          <div className="about-story">
+            <p>
+              Hi, I'm <b>{AUTHOR.name}</b>! I played Marralhinha a ton with my mom, who was born in the Açores. It's the kind of game that turns a quiet evening
+              into hours of lucky sixes, groans and marbles getting sent back home.
+            </p>
+            <p>
+              I built Marralhinha Online to eternalize the game we love and share it with everyone, whether you grew up playing it on Terceira or you're
+              discovering it for the very first time.
+            </p>
+            <p className="about-dedication">
+              <Heart /> For my mom.
+            </p>
+          </div>
+          <div className="about-contact">
+            <div className="about-links">
+              <ExternalLink className="btn ghost" href={AUTHOR.linkedin}>
+                <LinkedIn /> LinkedIn
+              </ExternalLink>
+              <ExternalLink className="btn ghost" href={AUTHOR.github}>
+                <GitHub /> GitHub
+              </ExternalLink>
+              <a className="btn ghost" href={`mailto:${AUTHOR.email}`}>
+                <Mail /> Email
+              </a>
+            </div>
+            <p className="muted small-text">
+              Questions, bugs, or a house rule I got wrong? Write to me at <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>.
+            </p>
+          </div>
         </div>
-        <p className="muted small-text">
-          Questions, bugs, or a house rule I got wrong? Write to me at <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>.
-        </p>
         <button className="btn primary" onClick={onClose}>
           Thanks for playing!
         </button>
+        <LegalLinks />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

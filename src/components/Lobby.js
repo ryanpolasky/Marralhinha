@@ -54,7 +54,7 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
                 <div className="seat-info">
                   <div className="seat-color">
                     {color.name}
-                    {seated === 4 && <span className="seat-team"> · Team {s % 2 === 0 ? 'A' : 'B'}</span>}
+                    {room.teams && seated === 4 && <span className="seat-team"> · Team {s % 2 === 0 ? 'A' : 'B'}</span>}
                   </div>
                   {p ? (
                     <Nameplate plate={p.cosmetics?.nameplate} className="seat-name">
@@ -93,12 +93,31 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
           })}
         </div>
 
+        <div className="mode-picker" role="radiogroup" aria-label="Game mode">
+          {[
+            [false, 'Free-for-all'],
+            [true, 'Teams 2v2'],
+          ].map(([value, label]) => (
+            <button
+              key={label}
+              role="radio"
+              aria-checked={room.teams === value}
+              className={`mode-option${room.teams === value ? ' on' : ''}`}
+              disabled={!isHost}
+              onClick={() => room.teams !== value && onAction('lobby:teams', { teams: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <p className="lobby-mode">
-          {seated === 4
-            ? '2v2 teams: Red & Yellow vs Blue & Green'
-            : seated >= 2
-              ? 'Every player for themselves. Fill all 4 seats to play in teams.'
-              : 'You need at least 2 players. Invite a friend or add a bot.'}
+          {seated < 2
+            ? 'You need at least 2 players. Invite a friend or add a bot.'
+            : !room.teams
+              ? 'Every player for themselves.'
+              : seated === 4
+                ? 'Partners sit across from each other: Red & Yellow vs Blue & Green.'
+                : "Teams need all 4 seats filled, otherwise it's free-for-all."}
         </p>
 
         {isHost && seated < 4 && (
@@ -129,8 +148,8 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
           )}
           <RulesButton className="btn link" />
         </div>
-        <Credit className="centered" />
       </div>
+      <Credit className="corner" />
     </div>
   );
 }

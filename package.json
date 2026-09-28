@@ -3,18 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "express": "4.22.2",
+    "socket.io": "4.8.3"
+  },
+  "devDependencies": {
     "@discord/embedded-app-sdk": "2.5.0",
     "@fontsource/fredoka": "5.3.0",
     "@react-three/fiber": "8.18.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "express": "4.22.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.0.1",
     "react-scripts": "5.0.1",
-    "socket.io": "4.8.3",
     "socket.io-client": "4.8.3",
     "three": "0.182.0",
     "web-vitals": "^2.1.4"

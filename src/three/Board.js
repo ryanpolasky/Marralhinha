@@ -6,7 +6,7 @@ import { makeLabelTexture } from './textures';
 import { boardSkin } from './skins';
 
 export const HOLE_R = 0.37;
-const CENTER_R = 0.5;
+const CENTER_R = HOLE_R;
 const DEPTH = 0.42;
 const BEVEL = 0.12;
 export const TABLE_Y = -(DEPTH + BEVEL * 2);

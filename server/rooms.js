@@ -11,6 +11,17 @@ const AWAY_GRACE_MS = 20000;
 const ROOM_TTL_MS = 30 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
+const CHAT_MAX = 140;
+const CHAT_GAP_MS = 600;
+const CHAT_BURST = 5;
+const CHAT_WINDOW_MS = 10000;
+
+const cleanChat = (text) =>
+  String(text ?? '')
+    .replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, CHAT_MAX);
 
 class UserError extends Error {}
 
@@ -33,6 +44,7 @@ class Room {
     this.seats = [null, null, null, null];
     this.hostId = null;
     this.game = null;
+    this.teams = false;
     this.humansAtStart = 0;
     this.timer = null;
     this.banterTimers = new Set();
@@ -142,10 +154,17 @@ class Room {
     this.changed();
   }
 
+  setTeams(userId, teams) {
+    this.requireHost(userId);
+    this.requireLobby();
+    this.teams = !!teams;
+    this.changed();
+  }
+
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
-    this.game = rules.createGame(this.seats);
+    this.game = rules.createGame(this.seats, { teams: this.teams });
     this.humansAtStart = this.seats.filter((p) => p && !p.isBot).length;
     this.changed();
   }
@@ -194,6 +213,20 @@ class Room {
     if (now - (player.lastReaction || 0) < REACTION_COOLDOWN_MS) return;
     player.lastReaction = now;
     this.hooks.onReaction?.(this, { seat, key, t: now });
+  }
+
+  chat(userId, text) {
+    const { seat, player } = this.require(userId);
+    if (!this.game) throw new UserError('Chat opens once the game starts');
+    const clean = cleanChat(text);
+    if (!clean) return;
+    const now = Date.now();
+    player.chatTimes = (player.chatTimes || []).filter((t) => now - t < CHAT_WINDOW_MS);
+    if (player.chatTimes.length >= CHAT_BURST || now - (player.chatTimes.at(-1) || 0) < CHAT_GAP_MS) throw new UserError('Whoa, slow down a little!');
+    player.chatTimes.push(now);
+    rules.pushLog(this.game, { chat: true, seat, name: player.name, text: clean, t: now });
+    this.hooks.onReaction?.(this, { seat, text: clean, t: now });
+    this.changed();
   }
 
   botBanter() {
@@ -260,6 +293,7 @@ class Room {
       code: this.code,
       hostId: this.hostId,
       activity: !!this.instanceId,
+      teams: this.teams,
       seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level }),
       game: this.game,
     };

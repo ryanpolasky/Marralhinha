@@ -24,12 +24,11 @@ const cellKey = (seat, pos) => {
 
 const rollDie = () => randomInt(1, 7);
 
-function createGame(seats, { rng = rollDie } = {}) {
+function createGame(seats, { rng = rollDie, teams = false } = {}) {
   const active = [0, 1, 2, 3].filter((s) => seats[s]);
   if (active.length < 2) throw new Error('Need at least 2 players');
-  const teams = active.length === 4;
   const state = {
-    mode: teams ? 'teams' : 'solo',
+    mode: teams && active.length === 4 ? 'teams' : 'solo',
     active,
     names: seats.map((p) => (p ? p.name : null)),
     marbles: [0, 1, 2, 3].map((s) => (seats[s] ? Array.from({ length: MARBLES }, () => ({ zone: 'base' })) : [])),
@@ -61,9 +60,13 @@ function rollOff(state, rng) {
   }
 }
 
-function addLog(state, text, seat = null) {
-  state.log.push({ text, seat, t: Date.now() });
+function pushLog(state, entry) {
+  state.log.push(entry);
   if (state.log.length > LOG_LIMIT) state.log.splice(0, state.log.length - LOG_LIMIT);
+}
+
+function addLog(state, text, seat = null) {
+  pushLog(state, { text, seat, t: Date.now() });
 }
 
 const isFinished = (state, seat) => state.marbles[seat].length > 0 && state.marbles[seat].every((p) => p.zone === 'home');
@@ -231,4 +234,5 @@ module.exports = {
   roll,
   move,
   addLog,
+  pushLog,
 };

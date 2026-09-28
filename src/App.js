@@ -6,6 +6,7 @@ import { bootstrapAuth, startDiscordLogin } from './net/auth';
 import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
 import { CURRENCY } from './game/catalog';
+import { ROLL_REVEAL_MS } from './game/moves';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -46,6 +47,20 @@ class SceneBoundary extends React.Component {
     if (this.state.failed) return <div className="scene-error">Your browser couldn't start the 3D board. Try enabling hardware acceleration or another browser.</div>;
     return this.props.children;
   }
+}
+
+function useRollPending(lastRoll) {
+  const [pendingT, setPendingT] = useState(null);
+  const seen = useRef(lastRoll?.t);
+  const t = lastRoll?.t;
+  useEffect(() => {
+    if (!t || t === seen.current) return undefined;
+    seen.current = t;
+    setPendingT(t);
+    const timer = setTimeout(() => setPendingT((p) => (p === t ? null : p)), ROLL_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [t]);
+  return pendingT !== null && pendingT === t;
 }
 
 const storedRoom = () => {
@@ -124,7 +139,7 @@ const App = () => {
       const id = `${reaction.t}-${reaction.seat}-${Math.random()}`;
       setReactions((list) => [...list.filter((r) => r.seat !== reaction.seat), { ...reaction, id }]);
       sfx.pop();
-      setTimeout(() => setReactions((list) => list.filter((r) => r.id !== id)), 2600);
+      setTimeout(() => setReactions((list) => list.filter((r) => r.id !== id)), reaction.text ? 4500 : 2600);
     };
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -228,6 +243,7 @@ const App = () => {
   const inRoom = !!(session && room && room.code === session.code);
   const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
   const game = inRoom ? room.game : null;
+  const rollPending = useRollPending(game?.lastRoll);
   const boardSkinId = account?.equipped.board;
 
   const sceneProps = useMemo(() => {
@@ -247,14 +263,14 @@ const App = () => {
     const myTurn = g.turn === mySeat && g.phase !== 'over';
     return {
       mode: 'game',
-      board: g,
+      board: rollPending ? { ...g, turn: g.lastRoll.seat } : g,
       names,
       viewSeat,
       cosmetics,
-      moves: myTurn && g.phase === 'move' ? g.legalMoves : undefined,
-      canRoll: myTurn && g.phase === 'roll',
+      moves: myTurn && g.phase === 'move' && !rollPending ? g.legalMoves : undefined,
+      canRoll: myTurn && g.phase === 'roll' && !rollPending,
     };
-  }, [inRoom, room, mySeat, account?.equipped]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, room, mySeat, account?.equipped, rollPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   const sceneRoll = useCallback(() => onAction('game:roll'), [onAction]);
@@ -336,6 +352,7 @@ const App = () => {
         room={room}
         playerId={session.playerId}
         reactions={reactions}
+        rollPending={rollPending}
         onAction={onAction}
         onLeave={IS_ACTIVITY ? null : leave}
         onResetView={() => setResetKey((k) => k + 1)}

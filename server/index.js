@@ -112,13 +112,15 @@ io.on('connection', (socket) => {
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
   handle('lobby:addBot', ({ seat }) => current().addBot(userId, seat));
   handle('lobby:removeBot', ({ seat }) => current().removeBot(userId, seat));
+  handle('lobby:teams', ({ teams }) => current().setTeams(userId, teams));
   handle('game:start', () => current().start(userId));
   handle('game:roll', () => current().roll(userId));
   handle('game:move', ({ moveId }) => current().move(userId, moveId));
   handle('game:react', ({ key }) => current().react(userId, key));
+  handle('game:chat', ({ text }) => current().chat(userId, text));
   handle('game:rematch', () => current().rematch(userId));
 
   socket.on('disconnect', () => leaveCurrent(false));
 });
 
-server.listen(PORT, () => console.log(`Marralhinha server listening on http://localhost:${PORT}`));
+server.listen(PORT, process.env.HOST, () => console.log(`Marralhinha server listening on http://${process.env.HOST || 'localhost'}:${PORT}`));
