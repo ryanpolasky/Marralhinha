@@ -76,7 +76,10 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
   const turn = game.turn;
   const helping = game.mode === 'teams' && homeCount(game.marbles[turn]) === 5;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
-  if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
+  if (game.phase === 'over') {
+    if (game.loserMode && game.loser !== null && game.loser !== undefined) return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won · ${nameOf(game.loser)} loses` };
+    return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
+  }
   if (turn === mySeat) {
     return game.phase === 'roll'
       ? { title: 'Your turn!', sub: `Roll the dice${helpText}` }
@@ -443,8 +446,21 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
         <div className="win-screen">
           {iWon && <Confetti />}
           <div className={`panel win-card${iWon ? ' won' : ''}`}>
-            <div className="win-kicker">{iWon ? 'Victory!' : 'Game over'}</div>
-            <h2>{iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`}</h2>
+            <div className="win-kicker">{iWon ? 'Victory!' : game.loserMode && game.loser === mySeat ? 'Last place' : 'Game over'}</div>
+            <h2>
+              {(() => {
+                if (iWon) {
+                  if (game.mode === 'teams' && game.winners.length > 1) return 'You and your partner win!';
+                  if (game.loserMode && game.loser !== null && game.loser !== undefined) return `You win! ${nameOf(game.loser)} loses.`;
+                  return 'You win!';
+                }
+                if (game.loserMode && game.loser !== null && game.loser !== undefined) {
+                  if (game.loser === mySeat) return 'You finish last!';
+                  return `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''} · ${nameOf(game.loser)} loses`;
+                }
+                return `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`;
+              })()}
+            </h2>
             <div className="win-marbles">
               {game.winners.map((s) => (
                 <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />

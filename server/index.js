@@ -123,6 +123,7 @@ io.on('connection', (socket) => {
   handle('lobby:addBot', ({ seat }) => current().addBot(userId, seat));
   handle('lobby:removeBot', ({ seat }) => current().removeBot(userId, seat));
   handle('lobby:teams', ({ teams }) => current().setTeams(userId, teams));
+  handle('lobby:loserMode', ({ loserMode }) => current().setLoserMode(userId, loserMode));
   handle('game:start', () => current().start(userId));
   handle('game:roll', () => current().roll(userId));
   handle('game:move', ({ moveId }) => current().move(userId, moveId));
