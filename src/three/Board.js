@@ -118,6 +118,10 @@ function NameTag({ name, color, position }) {
   );
 }
 
+const mixHex = (a, b, t) => `#${[1, 3, 5].map((i) => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('')}`;
+const DIMMED = SEAT_COLORS.map((c) => mixHex(c.main, '#4a3a2c', 0.74));
+const seatColor = (seat, active) => (active ? SEAT_COLORS[seat].main : DIMMED[seat]);
+
 function Dish({ seat, geometry, material, active, isTurn, name }) {
   const rimRef = useRef();
   const [r, c] = BASE_TRAY[seat];
@@ -132,7 +136,7 @@ function Dish({ seat, geometry, material, active, isTurn, name }) {
         <mesh geometry={geometry} material={material} castShadow receiveShadow />
         <mesh ref={rimRef} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
           <ringGeometry args={[DISH_R - 0.2, DISH_R - 0.04, 64]} />
-          <meshStandardMaterial color={active ? color.main : '#6d5a48'} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
+          <meshStandardMaterial color={seatColor(seat, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
         </mesh>
       </group>
       {active && name && <NameTag name={name} color={color.main} position={[c, 1.45, r]} />}
@@ -169,11 +173,20 @@ function TurnGem({ turn }) {
   );
 }
 
+const TABLE_R = 1200;
+
 function Table({ texture }) {
+  const map = useMemo(() => {
+    const t = texture.clone();
+    t.repeat.set(TABLE_R / 6, TABLE_R / 6);
+    t.needsUpdate = true;
+    return t;
+  }, [texture]);
+  useEffect(() => () => map.dispose(), [map]);
   return (
     <mesh rotation-x={-Math.PI / 2} position={[0, TABLE_Y, 0]} receiveShadow>
-      <circleGeometry args={[60, 64]} />
-      <meshStandardMaterial map={texture} roughness={0.95} />
+      <circleGeometry args={[TABLE_R, 96]} />
+      <meshStandardMaterial map={map} roughness={0.95} />
     </mesh>
   );
 }
@@ -190,15 +203,18 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Cups material={materials.cup} />
 
-      {SEATS.map((s) => (
-        <group key={s}>
-          <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
-            <meshStandardMaterial color={SEAT_COLORS[s].main} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
-          </mesh>
-          <Ring at={RING[entryIdx(s)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={SEAT_COLORS[s].main} />
-          <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={active.includes(s)} isTurn={turn === s} name={showNames ? names[s] : null} />
-        </group>
-      ))}
+      {SEATS.map((s) => {
+        const seated = active.includes(s);
+        return (
+          <group key={s}>
+            <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
+              <meshStandardMaterial color={seatColor(s, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
+            </mesh>
+            <Ring at={RING[entryIdx(s)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={seatColor(s, seated)} />
+            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} />
+          </group>
+        );
+      })}
 
       {INNER_CORNERS.map((i) => {
         const [r, c] = RING[i];

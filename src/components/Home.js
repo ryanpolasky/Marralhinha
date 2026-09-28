@@ -66,6 +66,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
   const [code, setCode] = useState(initialCode || '');
   const [spin, setSpin] = useState(0);
   const nameOk = name.trim().length > 0;
+  const invited = /^[A-Z0-9]{4}$/.test(initialCode || '');
 
   return (
     <div className="screen">
@@ -80,6 +81,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
         </div>
         <Pronunciation />
         <p className="tagline">The marble game from Terceira, Açores</p>
+        {invited && <div className="invite-banner">You've been invited to a game! Pick a name, then hop in.</div>}
 
         <label className="field">
           <span>Your name</span>
@@ -101,36 +103,52 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
           </div>
         </label>
 
-        <button className="btn primary big block play-btn" disabled={!nameOk || busy} onClick={onQuickPlay}>
-          Quick play vs bots
-        </button>
-        <button className="btn secondary block" disabled={!nameOk || busy} onClick={onCreate}>
-          Create a room for friends
-        </button>
+        {invited ? (
+          <>
+            <button className="btn primary big block play-btn" disabled={!nameOk || busy} onClick={() => onJoin(initialCode)}>
+              Join room {initialCode}
+            </button>
+            <button className="btn ghost block" disabled={!nameOk || busy} onClick={onCreate}>
+              Create my own room instead
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn primary big block play-btn" disabled={!nameOk || busy} onClick={onCreate}>
+              Create a room for friends
+            </button>
+            <button className="btn secondary block" disabled={!nameOk || busy} onClick={onQuickPlay}>
+              Quick play vs bots
+            </button>
+          </>
+        )}
 
-        <div className="divider">
-          <span>got a code?</span>
-        </div>
-
-        <form
-          className="join-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onJoin(code);
-          }}
-        >
-          <input
-            className="code-input"
-            value={code}
-            maxLength={4}
-            placeholder="CODE"
-            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            aria-label="Room code"
-          />
-          <button className="btn secondary" type="submit" disabled={!nameOk || code.length !== 4 || busy}>
-            Join
-          </button>
-        </form>
+        {!invited && (
+          <>
+            <div className="divider">
+              <span>got a code?</span>
+            </div>
+            <form
+              className="join-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onJoin(code);
+              }}
+            >
+              <input
+                className="code-input"
+                value={code}
+                maxLength={4}
+                placeholder="CODE"
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                aria-label="Room code"
+              />
+              <button className="btn secondary" type="submit" disabled={!nameOk || code.length !== 4 || busy}>
+                Join
+              </button>
+            </form>
+          </>
+        )}
 
         {!nameOk && <p className="hint">Pick a name (or roll one) to start playing</p>}
         <div className="home-footer">

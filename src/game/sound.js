@@ -1,18 +1,25 @@
+import { getSettings, onSettingsChange } from './settings';
+
 const MUTE_KEY = 'marralhinha:muted';
+const BASE_GAIN = 0.55;
 
 let ctx = null;
 let master = null;
 let muted = typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_KEY) === '1';
 const listeners = new Set();
 
+onSettingsChange((s) => {
+  if (master) master.gain.value = BASE_GAIN * s.sound;
+});
+
 function audio() {
-  if (muted) return null;
+  if (muted || getSettings().sound <= 0) return null;
   if (!ctx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return null;
     ctx = new AudioCtx();
     master = ctx.createGain();
-    master.gain.value = 0.55;
+    master.gain.value = BASE_GAIN * getSettings().sound;
     master.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') ctx.resume();

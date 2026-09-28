@@ -15,7 +15,7 @@ const NO_MOVES = [];
 const NO_COSMETICS = [];
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-function CameraRig({ mode, resetKey }) {
+function CameraRig({ mode, resetKey, spinning }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
@@ -28,19 +28,24 @@ function CameraRig({ mode, resetKey }) {
   useEffect(() => {
     const aspect = size.width / size.height;
     const game = mode === 'game';
-    const elevation = game ? 0.84 : 0.8;
-    const distance = Math.max(28, (game ? 28 : 31) / aspect);
-    const target = new THREE.Vector3(0, 0, game ? 1.8 : 0);
+    const elevation = game ? 0.86 : 0.8;
+    const distance = Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect);
+    const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
-    controls.autoRotate = !game;
-    controls.autoRotateSpeed = 0.35;
     controls.enabled = game;
   }, [mode, resetKey, size.width, size.height, camera, controls]);
 
-  useFrame(({ clock }) => {
+  useEffect(() => {
+    controls.autoRotate = mode !== 'game' || spinning;
+    controls.autoRotateSpeed = spinning ? 0.6 : 0.35;
+  }, [mode, spinning, controls]);
+
+  // Lifts the picture above the bottom HUD while the camera still orbits the exact board center
+  const lens = useRef({ shift: 0, w: 0, h: 0 });
+  useFrame(({ clock }, dt) => {
     const tw = tween.current;
     if (tw) {
       if (tw.start === null) tw.start = clock.elapsedTime;
@@ -49,6 +54,15 @@ function CameraRig({ mode, resetKey }) {
       camera.position.lerpVectors(tw.fromPos, tw.position, e);
       controls.target.lerpVectors(tw.fromTarget, tw.target, e);
       if (t >= 1) tween.current = null;
+    }
+    const l = lens.current;
+    const goal = mode === 'game' ? size.height * 0.08 : 0;
+    const next = l.shift + (goal - l.shift) * (1 - Math.exp(-dt * 3));
+    if (Math.abs(next - l.shift) > 0.05 || l.w !== size.width || l.h !== size.height) {
+      l.shift = next;
+      l.w = size.width;
+      l.h = size.height;
+      camera.setViewOffset(size.width, size.height, 0, l.shift, size.width, size.height);
     }
     controls.update();
   });
@@ -132,7 +146,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
         />
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} />
+      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} />
     </Canvas>
   );
 }

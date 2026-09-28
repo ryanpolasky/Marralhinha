@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BOXES, ITEMS, RARITIES, CURRENCY } from '../game/catalog';
+import { BOXES, ITEMS, RARITIES, CURRENCY, catalog } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, PreviewStage, RarityTag, Coin } from './Economy';
@@ -188,6 +188,15 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
           <span className="muted">New items in {refreshIn}</span>
         </div>
         <div className="item-grid featured">
+          {!shop &&
+            Array.from({ length: catalog.featured.count }, (_, i) => (
+              <div key={i} className="item-card skeleton" aria-hidden="true">
+                <span className="thumb" />
+                <span className="item-name">&nbsp;</span>
+                <span className="item-rarity">&nbsp;</span>
+                <span className="item-price">&nbsp;</span>
+              </div>
+            ))}
           {(shop?.featured || []).map((offer) => {
             const owned = account.inventory.includes(offer.id);
             return (

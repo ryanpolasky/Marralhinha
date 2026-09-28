@@ -2,6 +2,7 @@ import React from 'react';
 import { Coins, Nameplate } from './Economy';
 import { IS_ACTIVITY } from '../net/config';
 import { ChestIcon, GiftIcon, Hanger } from './Icons';
+import { SettingsButton } from './Settings';
 
 const DiscordLogo = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -58,6 +59,7 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
             <DiscordLogo />
           </span>
         )}
+        <SettingsButton className="bar-btn settings-btn" />
       </div>
     </div>
   );

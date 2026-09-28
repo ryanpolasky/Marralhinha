@@ -111,8 +111,10 @@ const App = () => {
     const resume = async () => {
       try {
         if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current }));
-        const code = sessionRef.current?.code || urlCode() || storedRoom();
-        if (code && (!urlCode() || code === urlCode())) enter(await request('room:join', { code }));
+        const invite = urlCode();
+        const saved = sessionRef.current?.code || storedRoom();
+        const code = invite ? (saved === invite ? invite : null) : saved;
+        if (code) enter(await request('room:join', { code }));
       } catch (err) {
         if (!IS_ACTIVITY) saveSession(null);
         notify(err.message);

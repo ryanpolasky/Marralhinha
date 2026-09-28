@@ -8,6 +8,8 @@ import { SoundOn, SoundOff, Help, Camera, Exit, DieIcon, Chat } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, skinKey } from '../game/catalog';
 import { Coins, Coin } from './Economy';
+import { AutoRollToggle, SettingsButton } from './Settings';
+import { useSettings } from '../game/settings';
 
 const BOX_PRICE = BOXES[0].price;
 
@@ -156,6 +158,7 @@ function ReactionBar({ onReact }) {
   const send = (key) => {
     if (cooling) return;
     onReact(key);
+    setOpen(false);
     setCooling(true);
     setTimeout(() => setCooling(false), 1200);
   };
@@ -197,16 +200,19 @@ function Awards({ game, nameOf }) {
 
 function Rewards({ reward }) {
   const [shownLines, setShownLines] = useState(0);
+  const payout = reward ? reward.lines.map((l) => `${l.label}:${l.amount}`).join('|') : '';
+  const lineCount = reward?.lines.length || 0;
   useEffect(() => {
-    if (!reward) return undefined;
-    const timers = reward.lines.map((_, i) =>
+    if (!payout) return undefined;
+    setShownLines(0);
+    const timers = Array.from({ length: lineCount }, (_, i) =>
       setTimeout(() => {
         setShownLines(i + 1);
         sfx.coins();
       }, 500 + i * 280)
     );
     return () => timers.forEach(clearTimeout);
-  }, [reward]);
+  }, [payout, lineCount]);
   if (!reward) return null;
   const total = reward.lines.slice(0, shownLines).reduce((sum, l) => sum + l.amount, 0);
   return (
@@ -245,6 +251,13 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
   const myTurn = activeSeat === mySeat && game.phase !== 'over';
   const canRoll = myTurn && game.phase === 'roll' && !rollPending;
   const roll = useCallback(() => canRoll && onAction('game:roll'), [canRoll, onAction]);
+  const { autoRoll } = useSettings();
+
+  useEffect(() => {
+    if (!autoRoll || !canRoll) return undefined;
+    const t = setTimeout(roll, 650);
+    return () => clearTimeout(t);
+  }, [autoRoll, canRoll, roll, game.lastRoll?.t]);
 
   useEffect(() => {
     if (game.phase !== 'over') {
@@ -295,6 +308,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
         </div>
 
         <div className="hud-buttons">
+          <SettingsButton />
           <button className="icon-btn" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
             {muted ? <SoundOff /> : <SoundOn />}
           </button>
@@ -359,10 +373,13 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
             <div className="action-sub">{status.sub}</div>
           </div>
           {mySeat >= 0 && game.phase !== 'over' && (
-            <button className={`roll-btn${canRoll ? ' ready' : ''}`} disabled={!canRoll} onClick={roll} title="Roll (Space)">
-              <DieIcon />
-              <span>Roll</span>
-            </button>
+            <div className="roll-col">
+              <button className={`roll-btn${canRoll ? ' ready' : ''}`} disabled={!canRoll} onClick={roll} title="Roll (Space)">
+                <DieIcon />
+                <span>Roll</span>
+              </button>
+              <AutoRollToggle compact />
+            </div>
           )}
           {game.phase === 'over' && (
             <button className="btn primary" onClick={() => setShowOver(true)}>
@@ -386,27 +403,29 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
             </div>
             <Rewards reward={game.rewards?.[mySeat]} />
             <Awards game={game} nameOf={nameOf} />
-            {coins >= BOX_PRICE && (
-              <button className="btn secondary block open-box-cta" onClick={onShop}>
-                You can afford a box! Open one
-              </button>
-            )}
-            <div className="row center">
+            <div className="win-actions">
               {isHost ? (
-                <button className="btn primary big" onClick={() => onAction('game:rematch')}>
+                <button className="btn primary big block play-btn" onClick={() => onAction('game:rematch')}>
                   Play again
                 </button>
               ) : (
-                <span className="muted">Waiting for the host to start another round…</span>
+                <div className="waiting">Waiting for the host to start another round…</div>
               )}
-              <button className="btn ghost" onClick={() => setShowOver(false)}>
-                View board
-              </button>
-              {onLeave && (
-                <button className="btn ghost" onClick={onLeave}>
-                  Leave
+              {coins >= BOX_PRICE && (
+                <button className="btn secondary block open-box-cta" onClick={onShop}>
+                  You can afford a box! Open one
                 </button>
               )}
+              <div className={`win-minor${onLeave ? '' : ' single'}`}>
+                <button className="btn ghost" onClick={() => setShowOver(false)}>
+                  View board
+                </button>
+                {onLeave && (
+                  <button className="btn ghost" onClick={onLeave}>
+                    Leave
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
