@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
-import { homeCount, partnerOf, ROLL_REVEAL_MS } from '../game/moves';
+import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
-import { BOXES, skinKey } from '../game/catalog';
+import { BOXES, ITEMS, skinKey } from '../game/catalog';
 import { Coins, Coin, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { useSettings } from '../game/settings';
@@ -65,7 +65,10 @@ function useAnnouncements(game, mySeat, nameOf) {
   return items;
 }
 
-function statusFor(game, seats, mySeat, nameOf, rollPending) {
+function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
+  if (startPending) {
+    return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'Spinning the wheel…' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
+  }
   if (rollPending) {
     const roller = game.lastRoll.seat;
     return { title: roller === mySeat ? 'Rolling…' : `${nameOf(roller)} is rolling…`, sub: 'Fingers crossed…' };
@@ -84,6 +87,64 @@ function statusFor(game, seats, mySeat, nameOf, rollPending) {
   return game.phase === 'roll'
     ? { title: `${nameOf(turn)}'s turn`, sub: `Rolling…${helpText}` }
     : { title: `${nameOf(turn)} rolled a ${game.die}`, sub: `Thinking…${helpText}` };
+}
+
+// Intro card for a fresh game: a wheel that lands on the starter, or a "champion starts" card after a rematch
+function StartIntro({ game, seats, mySeat, nameOf }) {
+  const { pick } = game;
+  const wheel = pick.reason === 'wheel';
+  const [spun, setSpun] = useState(false);
+  const [landed, setLanded] = useState(!wheel);
+  const contenders = game.active;
+  const slice = 360 / contenders.length;
+  const index = contenders.indexOf(pick.seat);
+  // The pointer sits at the top; land in the middle of the starter's slice after a few full turns, with a deterministic wobble
+  const wobble = ((pick.t % 1000) / 1000 - 0.5) * slice * 0.6;
+  const target = 360 * 5 - (index * slice + slice / 2) + wobble;
+
+  useEffect(() => {
+    if (!wheel) return undefined;
+    const spin = requestAnimationFrame(() => setSpun(true));
+    const elapsed = Date.now() - pick.t;
+    const land = setTimeout(() => {
+      setLanded(true);
+      sfx.pop();
+    }, Math.max(0, START_WHEEL_SPIN_MS - elapsed));
+    return () => {
+      cancelAnimationFrame(spin);
+      clearTimeout(land);
+    };
+  }, [wheel, pick.t]);
+
+  const stops = contenders.map((s, i) => `${SEAT_COLORS[s].main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
+  const color = SEAT_COLORS[pick.seat];
+  const starter = nameOf(pick.seat);
+  const board = seats[pick.seat]?.cosmetics?.board;
+  return (
+    <div className={`start-intro${landed ? ' landed' : ''}`} aria-live="polite">
+      {wheel && (
+        <div className="start-wheel-wrap">
+          <span className="start-wheel-pointer" />
+          <div className="start-wheel" style={{ background: `conic-gradient(${stops})`, transform: `rotate(${spun ? target : 0}deg)`, transition: spun ? `transform ${START_WHEEL_SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.18, 1)` : 'none' }}>
+            {contenders.map((s, i) => (
+              <span key={s} className="start-wheel-label" style={{ transform: `rotate(${i * slice + slice / 2}deg)` }}>
+                <b style={{ transform: 'translateY(-92px)' }}>{(seats[s]?.name || SEAT_COLORS[s].name).slice(0, 10)}</b>
+              </span>
+            ))}
+          </div>
+          <span className="start-wheel-hub" />
+        </div>
+      )}
+      <div className="start-card" style={{ '--seat': color.main, '--seat-light': color.light }}>
+        <div className="start-kicker">{wheel ? (landed ? 'The wheel says' : 'Who starts?') : 'Champion starts'}</div>
+        <div className="start-name">
+          <span className="marble-dot" />
+          {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : 'Spinning…'}
+        </div>
+        {landed && <div className="start-sub">Playing on {pick.seat === mySeat ? 'your' : `${starter}'s`} board{ITEMS[board] ? ` · ${ITEMS[board].name}` : ''}</div>}
+      </div>
+    </div>
+  );
 }
 
 function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction }) {
@@ -229,7 +290,7 @@ function Rewards({ reward }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], rollPending = false, onAction, onLeave, onResetView, onShop, coins = 0 }) {
+export default function Game({ room, playerId, reactions = [], rollPending = false, startPending = false, onAction, onLeave, onResetView, onShop, coins = 0 }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -243,7 +304,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
 
   const activeSeat = rollPending ? game.lastRoll.seat : game.turn;
   const myTurn = activeSeat === mySeat && game.phase !== 'over';
-  const canRoll = myTurn && game.phase === 'roll' && !rollPending;
+  const canRoll = myTurn && game.phase === 'roll' && !rollPending && !startPending;
   const roll = useCallback(() => canRoll && onAction('game:roll'), [canRoll, onAction]);
   const { autoRoll } = useSettings();
 
@@ -273,7 +334,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
     return () => window.removeEventListener('keydown', onKey);
   }, [roll]);
 
-  const status = statusFor(game, seats, mySeat, nameOf, rollPending);
+  const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';
   const chip = (s) => <PlayerChip key={s} seat={s} player={seats[s]} game={game} activeSeat={activeSeat} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} />;
   const log = (rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log).slice().reverse();
@@ -316,6 +377,8 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
           )}
         </div>
       </div>
+
+      {startPending && <StartIntro game={game} seats={seats} mySeat={mySeat} nameOf={nameOf} />}
 
       <div className="announcements" aria-live="polite">
         {announcements.map((a) => (

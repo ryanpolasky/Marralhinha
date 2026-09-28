@@ -2318,7 +2318,8 @@ button.pronounce:hover {
 }
 
 .plate-aurora {
-  background: linear-gradient(120deg, #1a1446, #2fd2a0, #6a3cff, #2fe6ff, #1a1446) !important;
+  --flow-to: 133.333% 0;
+  background-image: linear-gradient(120deg, #1a1446, #2fd2a0, #6a3cff, #2fe6ff, #1a1446) !important;
   background-size: 400% 100% !important;
   border-color: #b5fff0 !important;
   animation: plate-flow 6s linear infinite;
@@ -2334,7 +2335,8 @@ button.pronounce:hover {
 
 .plate-royal {
   --plate-ink: #3b2400;
-  background: linear-gradient(120deg, #b8860b, #ffe08a 30%, #f3c24f 50%, #fff2c2 65%, #c89418) !important;
+  --flow-to: 166.667% 0;
+  background-image: linear-gradient(120deg, #b8860b, #ffe08a 30%, #f3c24f 50%, #fff2c2 65%, #c89418 85%, #b8860b) !important;
   background-size: 250% 100% !important;
   border-color: #fff2c2 !important;
   box-shadow: 0 0 20px rgba(255, 209, 102, 0.55);
@@ -2343,7 +2345,8 @@ button.pronounce:hover {
 
 .plate-holo {
   --plate-ink: #1b1030;
-  background: linear-gradient(120deg, #ff9ad5, #ffe38a, #9dffb0, #8cc2ff, #d59bff, #ff9ad5) !important;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #ff9ad5, #ffe38a, #9dffb0, #8cc2ff, #d59bff, #ff9ad5) !important;
   background-size: 300% 100% !important;
   border-color: #fff !important;
   box-shadow: 0 0 22px rgba(200, 160, 255, 0.6);
@@ -2364,9 +2367,11 @@ button.pronounce:hover {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
+/* Seamless loop: the image must be periodic and travel exactly one image width, so
+   for a background-size of S% the end position is S / (S - 100) * 100% (300% -> 150%, 250% -> 166.667%, 400% -> 133.333%) */
 @keyframes plate-flow {
   to {
-    background-position: 100% 0;
+    background-position: var(--flow-to, 200% 0);
   }
 }
 
@@ -3016,8 +3021,9 @@ button.pronounce:hover {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.25) 50%, transparent 70%);
-  background-size: 250% 100%;
+  --flow-to: 150% 0;
+  background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.25) 50%, transparent 60%);
+  background-size: 300% 100%;
   animation: plate-flow 3s linear infinite;
   pointer-events: none;
 }
@@ -3788,6 +3794,7 @@ button.pronounce:hover {
 
 .tag-badge.tag-dev {
   color: #fff6e8;
+  --flow-to: 166.667% 0;
   background: linear-gradient(120deg, #c4162a, #ff4a5a 45%, #ff8a3d 70%, #c4162a) 0 0 / 250% 100%;
   border-color: #ffb3b6;
   box-shadow: 0 0 12px rgba(255, 74, 90, 0.6);
@@ -3847,16 +3854,18 @@ button.pronounce:hover {
 }
 
 .plate-galaxy {
-  background: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 2px), radial-gradient(circle at 45% 80%, #fff 0 0.8px, transparent 1.6px),
+  background-image: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 2px), radial-gradient(circle at 45% 80%, #fff 0 0.8px, transparent 1.6px),
     radial-gradient(circle at 85% 20%, #fff 0 0.8px, transparent 1.6px), linear-gradient(120deg, #0b0820, #3a1a7a 35%, #ff4fd8 55%, #2fd2ff 75%, #0b0820) !important;
   background-size: 60px 40px, 90px 50px, 70px 60px, 110px 70px, 400% 100% !important;
+  --flow-to: 0 0, 0 0, 0 0, 0 0, 133.333% 0;
   border-color: #b5a6ff !important;
   box-shadow: 0 0 18px rgba(106, 60, 255, 0.5);
   animation: plate-flow 8s linear infinite;
 }
 
 .plate-lava {
-  background: linear-gradient(120deg, #1b110d, #ff4a1a 30%, #ffb627 50%, #ff4a1a 70%, #1b110d) !important;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #1b110d, #ff4a1a 30%, #ffb627 50%, #ff4a1a 70%, #1b110d) !important;
   background-size: 300% 100% !important;
   border-color: #ffb347 !important;
   box-shadow: 0 0 20px rgba(255, 90, 20, 0.6);
@@ -3865,7 +3874,8 @@ button.pronounce:hover {
 
 .plate-diamond {
   --plate-ink: #1a2a3a;
-  background: linear-gradient(120deg, #dff6ff, #ffffff 25%, #b8e9ff 45%, #ffffff 60%, #e6f7ff 80%, #ffffff) !important;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #dff6ff, #ffffff 25%, #b8e9ff 45%, #ffffff 60%, #e6f7ff 80%, #dff6ff) !important;
   background-size: 300% 100% !important;
   border-color: #fff !important;
   box-shadow: 0 0 22px rgba(184, 233, 255, 0.75), inset 0 0 12px rgba(255, 255, 255, 0.8);
@@ -3922,11 +3932,14 @@ button.pronounce:hover {
 }
 
 .plate-dev {
-  --plate-ink: #5dff9d;
-  background: linear-gradient(#04110b, #04110b) padding-box, linear-gradient(90deg, #5dff9d, #2fe6ff, #ff4fd8, #5dff9d) border-box !important;
+  --plate-ink: #fff1ec;
+  background-image: linear-gradient(120deg, #120a0d, #1c0c10 60%, #120a0d), linear-gradient(90deg, #ff4a5a, #ff8a3d, #ffd166, #ff4a5a) !important;
+  background-clip: padding-box, border-box !important;
+  background-origin: padding-box, border-box !important;
   background-size: 100% 100%, 300% 100% !important;
+  --flow-to: 0 0, 150% 0;
   border: 2px solid transparent !important;
-  box-shadow: 0 0 18px rgba(93, 255, 157, 0.45), inset 0 0 20px rgba(93, 255, 157, 0.08);
+  box-shadow: 0 0 18px rgba(255, 74, 90, 0.45), inset 0 0 20px rgba(255, 74, 90, 0.12);
   animation: plate-flow 3s linear infinite;
 }
 
@@ -3935,13 +3948,14 @@ button.pronounce:hover {
 .plate-dev .seat-name-text {
   font-family: Consolas, 'Courier New', monospace;
   letter-spacing: 0.02em;
-  text-shadow: 0 0 8px rgba(93, 255, 157, 0.8);
+  text-shadow: 0 0 8px rgba(255, 74, 90, 0.8);
 }
 
 .plate-dev .account-name::before,
 .plate-dev .seat-name-text::before {
-  content: '~$ ';
-  opacity: 0.7;
+  content: '~# ';
+  color: #ff4a5a;
+  opacity: 0.9;
 }
 
 .plate-dev .account-name::after,
@@ -3993,8 +4007,9 @@ button.pronounce:hover {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(120deg, transparent 30%, color-mix(in srgb, var(--rarity) 35%, white) 50%, transparent 70%);
-  background-size: 250% 100%;
+  --flow-to: 150% 0;
+  background: linear-gradient(120deg, transparent 40%, color-mix(in srgb, var(--rarity) 35%, white) 50%, transparent 60%);
+  background-size: 300% 100%;
   animation: plate-flow 2.4s linear infinite;
   mix-blend-mode: screen;
   opacity: 0.7;
@@ -4077,32 +4092,23 @@ button.pronounce:hover {
 
 .thumb-marble.skin-eye {
   background: radial-gradient(ellipse 12% 36% at 50% 50%, #05030a 0 98%, transparent 100%), radial-gradient(circle at 50% 50%, transparent 0 34%, #15080a 35% 38%, transparent 39%),
-    radial-gradient(circle at 50% 50%, var(--seat-light) 0, var(--seat) 22%, var(--seat-dark) 36%, #f3efe6 38%);
+    radial-gradient(circle at 50% 50%, var(--seat-light) 0, var(--seat) 22%, var(--seat-dark) 36%, color-mix(in srgb, var(--seat-light) 45%, #f3efe6) 38%);
   box-shadow: 0 0 14px var(--seat), 0 6px 12px rgba(0, 0, 0, 0.45);
 }
 
 .thumb-marble.skin-dev {
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.5) 0 5%, transparent 12%),
-    linear-gradient(90deg, transparent 0 8px, #5dff9d 8px 20px, transparent 20px 26px, #2fe6ff 26px 34px, transparent 34px 40px, #ff4fd8 40px 46px, transparent 46px) 0 10px / 56px 8px no-repeat,
-    linear-gradient(90deg, transparent 0 14px, var(--seat-light) 14px 30px, transparent 30px 36px, #5dff9d 36px 48px, transparent 48px) 0 24px / 56px 8px no-repeat,
-    linear-gradient(90deg, transparent 0 4px, #5dff9d 4px 12px, transparent 12px 18px, #fff6e8 18px 40px, transparent 40px) 0 38px / 56px 8px no-repeat, #03100a;
-  box-shadow: 0 0 16px rgba(93, 255, 157, 0.55), 0 6px 12px rgba(0, 0, 0, 0.45);
-  animation: glitch 2.6s steps(1) infinite;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55) 0 5%, transparent 13%),
+    linear-gradient(28deg, transparent 0 44%, var(--seat-light) 45% 47%, transparent 48%), linear-gradient(-40deg, transparent 0 58%, var(--seat-light) 59% 60.5%, transparent 62%),
+    linear-gradient(75deg, transparent 0 28%, var(--seat-light) 29% 30.5%, transparent 32%), linear-gradient(28deg, transparent 0 41%, rgba(255, 74, 90, 0.5) 42% 50%, transparent 51%),
+    linear-gradient(-40deg, transparent 0 55%, rgba(255, 74, 90, 0.5) 56% 63%, transparent 65%), radial-gradient(circle at 50% 50%, #1a0d11, #0a0709 70%);
+  box-shadow: 0 0 16px rgba(255, 74, 90, 0.55), 0 6px 12px rgba(0, 0, 0, 0.45);
+  animation: singularity 2.6s ease-in-out infinite;
 }
 
-@keyframes glitch {
-  0%,
-  92%,
-  100% {
-    transform: none;
-    filter: none;
-  }
-  94% {
-    transform: translateX(2px);
-    filter: hue-rotate(60deg);
-  }
-  97% {
-    transform: translateX(-2px);
+@keyframes singularity {
+  50% {
+    box-shadow: 0 0 26px rgba(255, 74, 90, 0.9), 0 6px 12px rgba(0, 0, 0, 0.45);
+    filter: brightness(1.25);
   }
 }
 
@@ -4138,9 +4144,11 @@ button.pronounce:hover {
   filter: drop-shadow(0 0 6px #2fd2a0);
 }
 .thumb-board.skin-dev {
-  background: linear-gradient(rgba(93, 255, 157, 0.18) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(93, 255, 157, 0.18) 0 1px, transparent 1px) 0 0 / 8px 8px,
-    linear-gradient(90deg, transparent 0 6px, #5dff9d 6px 18px, transparent 18px) 0 40% / 100% 3px no-repeat, #04110b;
-  filter: drop-shadow(0 0 6px #5dff9d);
+  background: linear-gradient(90deg, transparent 0 22%, rgba(255, 74, 90, 0.75) 22% 60%, transparent 60%) 0 30% / 100% 2px no-repeat,
+    linear-gradient(0deg, transparent 0 30%, rgba(255, 74, 90, 0.75) 30% 72%, transparent 72%) 60% 0 / 2px 100% no-repeat,
+    linear-gradient(90deg, transparent 0 60%, rgba(255, 74, 90, 0.75) 60% 85%, transparent 85%) 0 72% / 100% 2px no-repeat,
+    radial-gradient(circle at 22% 30%, #ffd166 0 2px, transparent 3px), radial-gradient(circle at 85% 72%, #ffd166 0 2px, transparent 3px), linear-gradient(135deg, #14101a, #0b090c 60%);
+  filter: drop-shadow(0 0 6px #ff4a5a);
 }
 .thumb-board.skin-beta {
   background: linear-gradient(rgba(255, 255, 255, 0.25) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(255, 255, 255, 0.25) 0 1px, transparent 1px) 0 0 / 8px 8px, #1b4fa0;
@@ -4179,9 +4187,11 @@ button.pronounce:hover {
   animation: hue 4s linear infinite;
 }
 .thumb-dice.skin-dev {
-  --face: linear-gradient(rgba(93, 255, 157, 0.15) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(93, 255, 157, 0.15) 0 1px, transparent 1px) 0 0 / 8px 8px, #03100a;
-  --pip: #5dff9d;
-  box-shadow: 0 0 14px rgba(93, 255, 157, 0.6), 0 5px 0 rgba(0, 0, 0, 0.3);
+  --face: #0a0709;
+  --pip: #ff4a5a;
+  box-shadow: 0 0 14px rgba(255, 74, 90, 0.6), 0 5px 0 rgba(0, 0, 0, 0.3);
+  outline: 2px solid rgba(255, 74, 90, 0.6);
+  outline-offset: -6px;
 }
 .thumb-dice.skin-beta {
   --face: linear-gradient(rgba(255, 255, 255, 0.2) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0 1px, transparent 1px) 0 0 / 8px 8px, #1b4fa0;
@@ -4707,4 +4717,205 @@ select.admin-input optgroup {
   .hud-right {
     bottom: 96px;
   }
+}
+
+/* ---------- Game intro: who starts ---------- */
+
+.start-intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 90px 16px 140px;
+  pointer-events: none;
+  z-index: 15;
+  animation: start-intro-in 0.35s ease-out both;
+}
+
+@keyframes start-intro-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.start-wheel-wrap {
+  position: relative;
+  width: 230px;
+  height: 230px;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.55));
+}
+
+.start-wheel {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 6px solid #fff6e8;
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.35);
+  will-change: transform;
+}
+
+.start-wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.start-wheel-label b {
+  display: block;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #fff6e8;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 8px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.01em;
+}
+
+.start-wheel-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #fff, #d9cbb5 60%, #8d7a5e);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+.start-wheel-pointer {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 30px solid #ffd166;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5));
+  z-index: 2;
+}
+
+.start-intro.landed .start-wheel-pointer {
+  animation: pointer-bounce 0.5s ease-out;
+}
+
+@keyframes pointer-bounce {
+  30% {
+    transform: translateX(-50%) translateY(6px);
+  }
+}
+
+.start-card {
+  text-align: center;
+  padding: 14px 26px;
+  border-radius: 18px;
+  background: rgba(8, 20, 24, 0.86);
+  border: 2px solid var(--seat, var(--glass-line));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 24px color-mix(in srgb, var(--seat, transparent) 35%, transparent);
+  backdrop-filter: blur(8px);
+  min-width: 240px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.start-intro:not(.landed) .start-card {
+  --seat: transparent;
+}
+
+.start-kicker {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+
+.start-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.start-name .marble-dot {
+  --size: 26px;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.3s, transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.start-intro.landed .start-name .marble-dot {
+  opacity: 1;
+  transform: none;
+}
+
+.start-intro.landed .start-name {
+  animation: reveal-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.start-sub {
+  margin-top: 4px;
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+@media (max-width: 560px), (max-height: 600px) {
+  .start-wheel-wrap {
+    width: 170px;
+    height: 170px;
+  }
+
+  .start-wheel-label b {
+    font-size: 12px;
+    transform: translateY(-66px) !important;
+  }
+
+  .start-name {
+    font-size: 22px;
+  }
+}
+
+/* ---------- Admin: linked vs guest ---------- */
+
+.link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-badge.discord {
+  background: #5865f2;
+  color: #fff;
+}
+
+.link-badge.guest {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink-dim);
+}
+
+.admin-row-discord {
+  color: #8f99ff;
+  flex-shrink: 0;
+}
+
+.admin-row-guest {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--ink-dim);
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin: 0 3px;
 }

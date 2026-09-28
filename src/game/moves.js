@@ -3,6 +3,15 @@ export function movesForMarble(moves, seat, marble, pos) {
 }
 
 export const ROLL_REVEAL_MS = 1050;
+// The "who starts" wheel: spin, then hold on the result (server bots wait this long too, see START_WHEEL_MS in server/rooms.js)
+export const START_WHEEL_MS = 3600;
+export const START_WHEEL_SPIN_MS = 2400;
+export const START_WINNER_MS = 2200;
+export const startPendingFor = (game, now = Date.now()) => {
+  if (!game?.pick || game.lastRoll) return 0;
+  const total = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;
+  return Math.max(0, total - (now - game.pick.t));
+};
 
 export const homeCount = (marbles) => marbles.filter((p) => p.zone === 'home').length;
 export const partnerOf = (seat) => (seat + 2) % 4;

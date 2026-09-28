@@ -55,7 +55,10 @@ test('tag-exclusive cosmetics are owned through the tag, never dropped or sold',
   }
   assert.throws(() => accounts.grantItem(id, 'dice.dev'), /comes with the Dev tag/);
   assert.ok(BOXES.size === 2);
-  for (let seed = 0; seed < 200; seed++) assert.ok(Object.values(botCosmetics(seed)).every((itemId) => !catalog.items.find((i) => i.id === itemId).tag), 'bots never wear exclusives');
+  for (let seed = 0; seed < 200; seed++) {
+    const worn = Object.values(botCosmetics(seed)).map((itemId) => catalog.items.find((i) => i.id === itemId));
+    assert.ok(worn.every((i) => !i.tag && ['common', 'rare'].includes(i.rarity)), 'bots wear common or rare gear, never exclusives');
+  }
 });
 
 test('admin grants: coins, items, names', () => {
@@ -85,9 +88,13 @@ test('search finds by id, discord id and name; merging keeps tags from both acco
   assert.deepEqual(accounts.search('ana').map((u) => u.id), [ana.id]);
   assert.deepEqual(accounts.search(ana.id).map((u) => u.id), [ana.id]);
   assert.equal(accounts.search('').length, 2, 'empty query lists recent players');
+  assert.equal(accounts.search('', 40, { guests: false }).length, 0, 'fresh guests are hidden without the guests flag');
   assert.equal(accounts.search('%').length, 0, 'wildcards are escaped');
+  assert.deepEqual(accounts.userCount(), { total: 2, throwaway: 2 });
   accounts.setTags(ana.id, ['beta']);
   assert.deepEqual(accounts.search('#tagged').map((u) => u.id), [ana.id]);
+  assert.deepEqual(accounts.search('', 40, { guests: false }).map((u) => u.id), [ana.id], 'a tag makes a guest a real player');
+  assert.deepEqual(accounts.search('ana', 40, { guests: false }).map((u) => u.id), [ana.id]);
 
   const linked = accounts.loginDiscord({ id: '777', username: 'ana' }, ana.id);
   assert.deepEqual(accounts.search('777').map((u) => u.id), [linked.id]);

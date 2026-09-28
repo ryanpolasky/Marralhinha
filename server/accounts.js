@@ -20,6 +20,8 @@ const parse = (json, fallback) => {
 // Discord user ids that get the dev tag automatically when they log in (comma-separated env var)
 const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').split(',').map((s) => s.trim()).filter(Boolean));
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
+// Guest accounts every fresh browser creates that never played, linked Discord or got a tag
+const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]')";
 
 function levelInfo(xp) {
   let level = 1;
@@ -64,11 +66,11 @@ class Accounts {
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       addCoins: db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?'),
       search: db.prepare(
-        `SELECT * FROM users WHERE id = ? OR discord_id = ? OR name LIKE ? ESCAPE '\\' COLLATE NOCASE ORDER BY last_seen DESC LIMIT ?`
+        `SELECT * FROM users WHERE (id = ? OR discord_id = ? OR name LIKE ? ESCAPE '\\' COLLATE NOCASE) AND (? OR NOT ${THROWAWAY}) ORDER BY last_seen DESC LIMIT ?`
       ),
-      recent: db.prepare('SELECT * FROM users ORDER BY last_seen DESC LIMIT ?'),
+      recent: db.prepare(`SELECT * FROM users WHERE (? OR NOT ${THROWAWAY}) ORDER BY last_seen DESC LIMIT ?`),
       tagged: db.prepare("SELECT * FROM users WHERE tags != '[]' ORDER BY last_seen DESC LIMIT ?"),
-      count: db.prepare('SELECT COUNT(*) AS n FROM users'),
+      count: db.prepare(`SELECT COUNT(*) AS n, SUM(${THROWAWAY}) AS throwaway FROM users`),
     };
   }
 
@@ -226,16 +228,18 @@ class Accounts {
     this.q.deleteUser.run(guest.id);
   }
 
-  search(query, limit = 40) {
+  search(query, limit = 40, { guests = true } = {}) {
     const q = String(query ?? '').trim().slice(0, 40);
+    const withGuests = guests ? 1 : 0;
     if (q === '#tagged') return this.q.tagged.all(limit);
-    if (!q) return this.q.recent.all(limit);
+    if (!q) return this.q.recent.all(withGuests, limit);
     const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
-    return this.q.search.all(q, q, like, limit);
+    return this.q.search.all(q, q, like, withGuests, limit);
   }
 
   userCount() {
-    return this.q.count.get().n;
+    const row = this.q.count.get();
+    return { total: row.n, throwaway: row.throwaway || 0 };
   }
 
   profile(userOrId, extras = {}) {

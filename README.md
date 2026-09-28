@@ -87,7 +87,7 @@ Environment variables (see `.env.example`):
 
 Players can carry tags, shown next to their name everywhere (account bar, lobby, in-game chips):
 
-- **Dev**: admin. Unlocks the exclusive Dev set (Glitch marble, Terminal board, Debugger dice, Root nameplate) and the **Admin** panel in the account bar: search players, toggle tags, grant Marbucks and items, rename.
+- **Dev**: admin. Unlocks the exclusive Dev set (Singularity marble, Mainframe board, Overclock dice, Root nameplate) and the **Admin** panel in the account bar: search players, toggle tags, grant Marbucks and items, rename.
 - **Beta**: early testers. Unlocks the Blueprint set (Prototype marble, Blueprint board, Test Build dice, Blueprint nameplate).
 
 Exclusive cosmetics never drop from chests or show up in the shop; they come and go with the tag. Tags are defined in `src/shared/cosmetics.json` (`tags`), items opt in with a `"tag"` field.
@@ -164,7 +164,7 @@ CI=true npm test                 # React tests
 - `src/shared/cosmetics.json`: the item catalog, drop rates, prices and reward values (used by server and client)
 - `src/game/geometry.js`: board layout (must match the ring model in `rules.js`)
 - `src/game/sound.js`: synthesized WebAudio sound effects (no audio files)
-- `src/game/music.js`: procedural lo-fi background loop, volume in Settings
+- `src/game/music.js`: looping background track (`public/audio/marralhinha.mp3`), volume in Settings
 - `src/game/fun.js`: reaction stickers, random nicknames, end-of-game awards
 - `src/net/`: API client, socket, sign-in bootstrap (guest, Discord redirect, Discord Activity)
 - `src/three/`: lazy-loaded react-three-fiber scene (`Scene`, `Board`, `Marbles`, `Die`, `Particles`, `Preview`), procedural `skins` and `textures`

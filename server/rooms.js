@@ -5,8 +5,10 @@ const { botCosmetics } = require('./economy');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SEAT_ORDER = [0, 2, 1, 3];
-const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink', 'Lucky Lou', 'Marbo'];
+const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink', 'Marbo', 'Bolinha'];
 const BOT_DELAY_MS = 450;
+// How long the client shows the "who starts" wheel; bots wait for it (keep in sync with START_WHEEL_MS in src/game/moves.js)
+const START_WHEEL_MS = 3600;
 const AWAY_GRACE_MS = 20000;
 const ROOM_TTL_MS = 30 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
@@ -33,6 +35,7 @@ function animationMs(game, now = Date.now()) {
   let ms = 0;
   if (recent(game.lastRoll)) ms = 1300;
   if (recent(game.lastMove)) ms = Math.max(ms, 350 + game.lastMove.path.length * 190 + (game.lastMove.capture ? 700 : 0));
+  if (game.pick && !game.lastRoll && now - game.pick.t < START_WHEEL_MS) ms = Math.max(ms, START_WHEEL_MS - (now - game.pick.t));
   return ms;
 }
 
@@ -46,6 +49,8 @@ class Room {
     this.game = null;
     this.teams = false;
     this.humansAtStart = 0;
+    // Player ids of the last round's winners: one of them starts the rematch on their board
+    this.lastWinners = [];
     this.timer = null;
     this.banterTimers = new Set();
     this.lastActive = Date.now();
@@ -164,14 +169,22 @@ class Room {
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
-    this.game = rules.createGame(this.seats, { teams: this.teams });
+    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter() });
     this.humansAtStart = this.seats.filter((p) => p && !p.isBot).length;
     this.changed();
+  }
+
+  pickStarter() {
+    const champions = [0, 1, 2, 3].filter((s) => this.seats[s] && this.lastWinners.includes(this.seats[s].id));
+    if (champions.length) return { seat: champions[randomInt(champions.length)], reason: 'winner' };
+    const active = [0, 1, 2, 3].filter((s) => this.seats[s]);
+    return { seat: active[randomInt(active.length)], reason: 'wheel' };
   }
 
   rematch(userId) {
     this.requireHost(userId);
     if (!this.game || this.game.phase !== 'over') throw new UserError('The game is not over yet');
+    this.lastWinners = this.game.winners.map((s) => this.seats[s]?.id).filter(Boolean);
     this.game = null;
     this.seats = this.seats.map((p) => (p && p.standIn ? null : p));
     this.changed();
@@ -261,7 +274,7 @@ class Room {
     if (!game || game.phase === 'over') return;
     const player = this.seats[game.turn];
     if (!player || (!player.isBot && player.connected)) return;
-    const delay = player.isBot ? BOT_DELAY_MS + randomInt(0, 400) + animationMs(game) : AWAY_GRACE_MS;
+    const delay = (player.isBot ? BOT_DELAY_MS + randomInt(0, 400) : AWAY_GRACE_MS) + animationMs(game);
     this.timer = setTimeout(() => {
       this.timer = null;
       if (this.game !== game || game.phase === 'over') return;

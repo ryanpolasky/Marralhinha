@@ -40,7 +40,7 @@
     { "id": "marble.storm", "slot": "marble", "name": "Tempest", "rarity": "legendary", "desc": "A storm that never stops spinning." },
     { "id": "marble.eye", "slot": "marble", "name": "Dragon Eye", "rarity": "legendary", "desc": "It's watching your opponents. Always." },
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board." },
-    { "id": "marble.dev", "slot": "marble", "name": "Glitch", "rarity": "exclusive", "tag": "dev", "desc": "Compiled with warnings. Ships anyway." },
+    { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
@@ -61,7 +61,7 @@
     { "id": "board.neon", "slot": "board", "name": "Neon Night", "rarity": "legendary", "desc": "The board after dark." },
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Still on the drafting table." },
-    { "id": "board.dev", "slot": "board", "name": "Terminal", "rarity": "exclusive", "tag": "dev", "desc": "$ npm run marralhinha" },
+    { "id": "board.dev", "slot": "board", "name": "Mainframe", "rarity": "exclusive", "tag": "dev", "desc": "Black glass, molten traces. The table the game runs on." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },
@@ -81,7 +81,7 @@
     { "id": "dice.galaxy", "slot": "dice", "name": "Cosmic", "rarity": "legendary", "desc": "Rolled by the stars." },
     { "id": "dice.holo", "slot": "dice", "name": "Prism", "rarity": "legendary", "desc": "Every roll, a different color." },
     { "id": "dice.beta", "slot": "dice", "name": "Test Build", "rarity": "exclusive", "tag": "beta", "desc": "May contain bugs. Rolls anyway." },
-    { "id": "dice.dev", "slot": "dice", "name": "Debugger", "rarity": "exclusive", "tag": "dev", "desc": "Breakpoints on every face." },
+    { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },

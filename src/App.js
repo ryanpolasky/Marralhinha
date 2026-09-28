@@ -7,7 +7,7 @@ import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
-import { ROLL_REVEAL_MS } from './game/moves';
+import { ROLL_REVEAL_MS, startPendingFor } from './game/moves';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -63,6 +63,19 @@ function useRollPending(lastRoll) {
     return () => clearTimeout(timer);
   }, [t]);
   return pendingT !== null && pendingT === t;
+}
+
+// True while the "who starts" intro plays for a freshly started game
+function useStartPending(game) {
+  const remaining = startPendingFor(game);
+  const pickT = game?.pick?.t;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (remaining <= 0) return undefined;
+    const timer = setTimeout(() => tick((n) => n + 1), remaining + 20);
+    return () => clearTimeout(timer);
+  }, [remaining, pickT]);
+  return remaining > 0;
 }
 
 const storedRoom = () => {
@@ -252,7 +265,10 @@ const App = () => {
   const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
   const game = inRoom ? room.game : null;
   const rollPending = useRollPending(game?.lastRoll);
-  const boardSkinId = account?.equipped.board;
+  const startPending = useStartPending(game);
+  // The table wears the starter's board once a game is on; before that everyone previews their own
+  const tableBoard = game && game.boardSeat !== null ? room.seats[game.boardSeat]?.cosmetics?.board : null;
+  const boardSkinId = tableBoard || account?.equipped.board;
 
   const sceneProps = useMemo(() => {
     if (!inRoom) {
@@ -271,14 +287,14 @@ const App = () => {
     const myTurn = g.turn === mySeat && g.phase !== 'over';
     return {
       mode: 'game',
-      board: rollPending ? { ...g, turn: g.lastRoll.seat } : g,
+      board: rollPending ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
       names,
       viewSeat,
       cosmetics,
       moves: myTurn && g.phase === 'move' && !rollPending ? g.legalMoves : undefined,
-      canRoll: myTurn && g.phase === 'roll' && !rollPending,
+      canRoll: myTurn && g.phase === 'roll' && !rollPending && !startPending,
     };
-  }, [inRoom, room, mySeat, account?.equipped, rollPending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, room, mySeat, account?.equipped, rollPending, startPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   const sceneRoll = useCallback(() => onAction('game:roll'), [onAction]);
@@ -368,6 +384,7 @@ const App = () => {
         playerId={session.playerId}
         reactions={reactions}
         rollPending={rollPending}
+        startPending={startPending}
         onAction={onAction}
         onLeave={IS_ACTIVITY ? null : leave}
         onResetView={() => setResetKey((k) => k + 1)}

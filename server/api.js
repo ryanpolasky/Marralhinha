@@ -208,7 +208,11 @@ function createApi({ accounts, economy, onProfileChange, isAllowedOrigin }) {
     '/admin/users',
     auth,
     admin,
-    handle((req) => ({ users: accounts.search(req.query.q).map((u) => accounts.adminView(u)), total: accounts.userCount() }))
+    handle((req) => {
+      const users = accounts.search(req.query.q, 40, { guests: req.query.guests === '1' }).map((u) => accounts.adminView(u));
+      const { total, throwaway } = accounts.userCount();
+      return { users, total, throwaway };
+    })
   );
 
   router.post(

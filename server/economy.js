@@ -199,7 +199,7 @@ class Economy {
 
 function botCosmetics(seed) {
   const pick = (slot, i) => {
-    const pool = DROPPABLE.filter((item) => item.slot === slot && item.rarity !== 'common');
+    const pool = DROPPABLE.filter((item) => item.slot === slot && ['common', 'rare'].includes(item.rarity));
     return pool[(seed * 7 + i * 13) % pool.length].id;
   };
   return { marble: pick('marble', 1), dice: pick('dice', 2), nameplate: pick('nameplate', 3), board: pick('board', 4) };

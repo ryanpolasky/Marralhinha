@@ -396,55 +396,59 @@ const MARBLES = {
     const [canvas, ctx] = makeCanvas(512, 256);
     const [glow, gctx] = makeCanvas(512, 256);
     const rand = seeded(230 + seat);
-    ctx.fillStyle = '#f3efe6';
+    // Tinted sclera with seat-colored veins: even the "white" of the eye says whose marble it is
+    ctx.fillStyle = mix(c.light, '#f3efe6', 0.55);
     ctx.fillRect(0, 0, 512, 256);
     gctx.fillStyle = '#000';
     gctx.fillRect(0, 0, 512, 256);
-    veins(ctx, rand, { count: 14, color: '#c94a4a', width: 1.2, alpha: 0.35, w: 512, h: 256, steps: 24 });
-    const cx = 256;
+    veins(ctx, rand, { count: 22, color: c.dark, width: 1.6, alpha: 0.5, w: 512, h: 256, steps: 24 });
+    veins(ctx, rand, { count: 10, color: '#c94a4a', width: 1.1, alpha: 0.3, w: 512, h: 256, steps: 20 });
+    // Two eyes, front and back, so the marble never rolls to a blank side
+    const iris = 78;
     const cy = 128;
-    const iris = 92;
-    [ctx, gctx].forEach((x, i) => {
-      const g = x.createRadialGradient(cx, cy, 8, cx, cy, iris);
-      g.addColorStop(0, i ? c.light : mix(c.light, '#ffffff', 0.2));
-      g.addColorStop(0.55, i ? c.main : c.main);
-      g.addColorStop(1, i ? '#000000' : c.dark);
-      x.fillStyle = g;
-      x.beginPath();
-      x.arc(cx, cy, iris, 0, TAU);
-      x.fill();
-    });
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, iris, 0, TAU);
-    ctx.clip();
-    for (let i = 0; i < 90; i++) {
-      const a = rand() * TAU;
-      ctx.strokeStyle = i % 4 ? mix(c.light, '#ffd27a', 0.5) : c.dark;
-      ctx.globalAlpha = 0.25 + rand() * 0.5;
-      ctx.lineWidth = 1 + rand() * 2;
+    [128, 384].forEach((cx) => {
+      [ctx, gctx].forEach((x, i) => {
+        const g = x.createRadialGradient(cx, cy, 8, cx, cy, iris);
+        g.addColorStop(0, i ? c.light : mix(c.light, '#ffffff', 0.2));
+        g.addColorStop(0.55, c.main);
+        g.addColorStop(1, i ? '#000000' : c.dark);
+        x.fillStyle = g;
+        x.beginPath();
+        x.arc(cx, cy, iris, 0, TAU);
+        x.fill();
+      });
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18);
-      ctx.lineTo(cx + Math.cos(a) * (iris - 6), cy + Math.sin(a) * (iris - 6));
+      ctx.arc(cx, cy, iris, 0, TAU);
+      ctx.clip();
+      for (let i = 0; i < 90; i++) {
+        const a = rand() * TAU;
+        ctx.strokeStyle = i % 4 ? mix(c.light, '#ffd27a', 0.5) : c.dark;
+        ctx.globalAlpha = 0.25 + rand() * 0.5;
+        ctx.lineWidth = 1 + rand() * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * 16, cy + Math.sin(a) * 16);
+        ctx.lineTo(cx + Math.cos(a) * (iris - 6), cy + Math.sin(a) * (iris - 6));
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#15080a';
+      ctx.beginPath();
+      ctx.arc(cx, cy, iris - 2, 0, TAU);
       ctx.stroke();
-    }
-    ctx.restore();
-    ctx.globalAlpha = 1;
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#15080a';
-    ctx.beginPath();
-    ctx.arc(cx, cy, iris - 2, 0, TAU);
-    ctx.stroke();
-    [ctx, gctx].forEach((x) => {
-      x.fillStyle = '#05030a';
-      x.beginPath();
-      x.ellipse(cx, cy, 13, 64, 0, 0, TAU);
-      x.fill();
+      [ctx, gctx].forEach((x) => {
+        x.fillStyle = '#05030a';
+        x.beginPath();
+        x.ellipse(cx, cy, 11, 54, 0, 0, TAU);
+        x.fill();
+      });
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.ellipse(cx - 29, cy - 34, 10, 17, -0.5, 0, TAU);
+      ctx.fill();
     });
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath();
-    ctx.ellipse(cx - 34, cy - 40, 12, 20, -0.5, 0, TAU);
-    ctx.fill();
     return {
       map: finishMarble(canvas),
       emissiveMap: finishMarble(glow),
@@ -456,55 +460,88 @@ const MARBLES = {
       animate: (m, t) => (m.emissiveIntensity = 0.45 + Math.max(0, Math.sin(t * 1.3 + seat)) ** 8 * 0.9),
     };
   },
+  // Dev set: black obsidian glass cracked open, seat-colored light leaking out of every fissure (reads from any angle)
   dev: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
+    const [glow, gctx] = makeCanvas(512, 256);
     const rand = seeded(250 + seat);
-    ctx.fillStyle = '#03100a';
+    ctx.fillStyle = '#0a0709';
     ctx.fillRect(0, 0, 512, 256);
-    ctx.strokeStyle = 'rgba(93,255,157,0.08)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 512; i += 16) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, 256);
-      ctx.stroke();
+    for (let i = 0; i < 1400; i++) {
+      ctx.fillStyle = `rgba(255,74,90,${rand() * 0.05})`;
+      ctx.fillRect(rand() * 512, rand() * 256, 1 + rand() * 3, 1 + rand() * 3);
     }
-    for (let i = 0; i <= 256; i += 16) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(512, i);
-      ctx.stroke();
-    }
-    const tokens = ['#5dff9d', '#5dff9d', c.light, '#2fe6ff', '#ff4fd8', '#fff6e8'];
-    for (let row = 0; row < 15; row++) {
-      let x = rand() * 60;
-      const y = 8 + row * 16.5;
-      while (x < 512) {
-        const w = 8 + rand() * 40;
-        ctx.fillStyle = tokens[Math.floor(rand() * tokens.length)];
-        ctx.globalAlpha = 0.55 + rand() * 0.45;
-        ctx.fillRect(x, y, w, 8);
-        x += w + 6 + rand() * 18;
-      }
-    }
-    ctx.globalAlpha = 1;
-    ctx.font = '700 15px Consolas, "Courier New", monospace';
-    ctx.fillStyle = mix(c.light, '#ffffff', 0.4);
-    ['{ }', '</>', '0x' + (seat * 1111 + 4242).toString(16), 'if (six)', ';;', 'roll()', 'npm i', '// TODO'].forEach((s, i) => ctx.fillText(s, (i * 71 + 14) % 470, 22 + ((i * 53) % 220)));
-    const tex = finishMarble(canvas);
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, 512, 256);
+    // Cracks wrap around the seam so the sphere has no bald side
+    const crack = (x, alpha, width, color) => {
+      x.lineCap = 'round';
+      x.lineJoin = 'round';
+      [-512, 0, 512].forEach((dx) => {
+        const r = seeded(250 + seat);
+        for (let i = 0; i < 9; i++) {
+          let px = r() * 512 + dx;
+          let py = 20 + r() * 216;
+          let angle = r() * TAU;
+          x.beginPath();
+          x.moveTo(px, py);
+          for (let s = 0; s < 26; s++) {
+            angle += (r() - 0.5) * 1.1;
+            px += Math.cos(angle) * 12;
+            py += Math.sin(angle) * 7;
+            x.lineTo(px, py);
+          }
+          x.globalAlpha = alpha * (0.6 + r() * 0.4);
+          x.strokeStyle = color;
+          x.lineWidth = width * (0.5 + r());
+          x.stroke();
+        }
+      });
+      x.globalAlpha = 1;
+    };
+    crack(ctx, 0.35, 9, '#ff4a5a');
+    crack(ctx, 0.95, 2.6, c.light);
+    crack(gctx, 0.45, 10, '#ff4a5a');
+    crack(gctx, 1, 2.6, mix(c.light, '#ffffff', 0.35));
+    const map = finishMarble(canvas);
+    const emissiveMap = finishMarble(glow);
+    emissiveMap.wrapT = THREE.RepeatWrapping;
+    // Shader patch: light pulses race along the cracks, a slower layer of light drifts underneath
+    // (fake depth), and an event-horizon rim in the seat color wraps the silhouette from every angle
+    const uniforms = { uTime: { value: 0 }, uFlare: { value: 0 }, uRim: { value: new THREE.Color(mix(c.light, '#ff4a5a', 0.35)) } };
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uFlare;\nuniform vec3 uRim;')
+        .replace(
+          '#include <emissivemap_fragment>',
+          `{
+            vec2 uv = vEmissiveMapUv;
+            vec3 cracks = texture2D( emissiveMap, uv ).rgb;
+            float p1 = pow( 0.5 + 0.5 * sin( ( uv.x * 3.0 - uv.y * 1.5 ) * 6.2831 - uTime * 2.4 ), 10.0 );
+            float p2 = pow( 0.5 + 0.5 * sin( ( uv.x * 2.0 + uv.y * 2.5 ) * 6.2831 + uTime * 1.7 ), 12.0 );
+            float pulse = 0.45 + 1.9 * max( p1, p2 ) + uFlare * 2.5;
+            vec3 deep = texture2D( emissiveMap, vec2( uv.x + uTime * 0.025, uv.y + sin( uTime * 0.4 ) * 0.02 ) ).rgb;
+            float rim = pow( 1.0 - max( dot( normalize( normal ), normalize( vViewPosition ) ), 0.0 ), 3.2 );
+            totalEmissiveRadiance = totalEmissiveRadiance * ( cracks * pulse + deep * 0.4 ) + uRim * rim * ( 1.1 + 0.35 * sin( uTime * 3.0 ) + uFlare );
+          }`
+        );
+    };
     return {
-      map: tex,
-      emissiveMap: tex,
+      map,
+      emissiveMap,
       emissive: '#ffffff',
-      emissiveIntensity: 1.1,
-      roughness: 0.15,
+      emissiveIntensity: 1,
+      roughness: 0.04,
       clearcoat: 1,
-      clearcoatRoughness: 0.05,
+      clearcoatRoughness: 0.02,
+      onBeforeCompile,
+      customProgramCacheKey: () => 'marble-dev',
       animate: (m, t) => {
-        tex.offset.x = (t * 0.09 + seat * 0.25) % 1;
-        const glitch = Math.sin(t * 17 + seat) * Math.sin(t * 3.1) > 0.92;
-        tex.offset.y = glitch ? 0.02 : 0;
-        m.emissiveIntensity = glitch ? 1.9 : 1.0 + Math.sin(t * 2) * 0.12;
+        uniforms.uTime.value = t + seat * 1.9;
+        // A flare every few seconds, sharp attack and slow decay
+        const phase = (t * 0.45 + seat * 0.3) % 1;
+        uniforms.uFlare.value = phase < 0.08 ? phase / 0.08 : Math.max(0, 1 - (phase - 0.08) / 0.3);
       },
     };
   },
@@ -586,7 +623,7 @@ const DICE = {
   lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
   candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
   holo: { bg: '#f2f2ff', pip: '#2d1a5e', one: '#ff4fd8', roughness: 0.05, clearcoat: 1, extra: { metalness: 0.5, iridescence: 1, iridescenceIOR: 2, iridescenceThicknessRange: [100, 900], envMapIntensity: 1.6 } },
-  dev: { bg: 'dev', pip: '#5dff9d', one: '#ff4fd8', roughness: 0.12, clearcoat: 1, glow: 1.7 },
+  dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
 };
 
@@ -644,12 +681,19 @@ function dieBackground(ctx, style, size, value) {
       ctx.fill();
     }
   } else if (style === 'dev') {
-    ctx.fillStyle = '#03100a';
+    // Obsidian with a thin molten frame; the pips do the glowing
+    ctx.fillStyle = '#0a0709';
     ctx.fillRect(0, 0, size, size);
-    grid(ctx, size, 32, 'rgba(93,255,157,0.13)');
-    ctx.font = '700 22px Consolas, "Courier New", monospace';
-    ctx.fillStyle = 'rgba(93,255,157,0.28)';
-    ['0x0' + value, 'roll', '>_', 'ok', 'src', '6==6'].forEach((s, i) => ctx.fillText(s, 14 + ((i * 97) % 200), 30 + ((i * 71 + value * 13) % 220)));
+    for (let i = 0; i < 900; i++) {
+      ctx.fillStyle = `rgba(255,74,90,${rand() * 0.05})`;
+      ctx.fillRect(rand() * size, rand() * size, 1 + rand() * 3, 1 + rand() * 3);
+    }
+    ctx.strokeStyle = 'rgba(255,74,90,0.55)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(16, 16, size - 32, size - 32);
+    ctx.strokeStyle = 'rgba(255,209,102,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(24, 24, size - 48, size - 48);
   } else if (style === 'beta') {
     ctx.fillStyle = '#1b4fa0';
     ctx.fillRect(0, 0, size, size);
@@ -809,31 +853,66 @@ function auroraCanvases() {
   return [base, glow];
 }
 
-function terminalCanvases() {
-  const [base, bctx] = makeCanvas(1024, 1024);
-  const [glow, gctx] = makeCanvas(1024, 1024);
-  bctx.fillStyle = '#04110b';
-  bctx.fillRect(0, 0, 1024, 1024);
+// Dev board: black obsidian glass with sparse molten circuit traces. Dark and calm so holes and marbles stay readable.
+function mainframeCanvases() {
+  const S = 1024;
+  const [base, bctx] = makeCanvas(S, S);
+  const [glow, gctx] = makeCanvas(S, S);
+  const rand = seeded(47);
+  bctx.fillStyle = '#0b090c';
+  bctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 6000; i++) {
+    bctx.fillStyle = rand() > 0.5 ? `rgba(255,255,255,${rand() * 0.035})` : `rgba(255,74,90,${rand() * 0.06})`;
+    bctx.fillRect(rand() * S, rand() * S, 2 + rand() * 6, 1 + rand() * 2);
+  }
   gctx.fillStyle = '#000';
-  gctx.fillRect(0, 0, 1024, 1024);
-  grid(bctx, 1024, 64, 'rgba(93,255,157,0.09)');
-  grid(gctx, 1024, 64, 'rgba(93,255,157,0.22)');
-  const lines = ['$ npm run marralhinha', '> rolling dice...', 'six! roll again', 'capture at ring[42]', 'marble.home += 1', 'if (die === 6) again()', '// TODO: win', 'GET /api/me 200', 'const winner = you', 'npx marralhinha --dev', '[ok] 5/5 marbles home', 'sudo roll'];
-  [bctx, gctx].forEach((ctx, i) => {
-    ctx.font = '600 26px Consolas, "Courier New", monospace';
-    const r = seeded(47);
-    for (let k = 0; k < 60; k++) {
-      const s = lines[Math.floor(r() * lines.length)];
-      ctx.fillStyle = i ? (k % 9 === 0 ? '#2fe6ff' : '#5dff9d') : 'rgba(93,255,157,0.55)';
-      ctx.globalAlpha = i ? 0.35 + r() * 0.6 : 0.5 + r() * 0.5;
-      ctx.fillText(s, r() * 1024, r() * 1024);
+  gctx.fillRect(0, 0, S, S);
+  // Traces on a 64px grid with 45-degree bends; drawn shifted so they tile seamlessly
+  const G = 64;
+  const traces = [];
+  for (let i = 0; i < 26; i++) {
+    const pts = [];
+    let x = Math.round((rand() * S) / G) * G;
+    let y = Math.round((rand() * S) / G) * G;
+    let dir = Math.floor(rand() * 4);
+    pts.push([x, y]);
+    for (let s = 0; s < 4 + Math.floor(rand() * 5); s++) {
+      const len = G * (1 + Math.floor(rand() * 4));
+      if (rand() < 0.4) dir = (dir + (rand() < 0.5 ? 1 : 7)) % 8;
+      const a = (dir * Math.PI) / 4;
+      x += Math.round(Math.cos(a)) * len;
+      y += Math.round(Math.sin(a)) * len;
+      pts.push([x, y]);
     }
+    traces.push(pts);
+  }
+  const draw = (ctx, color, width, alpha, nodeColor) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = alpha;
+    [-S, 0, S].forEach((dx) =>
+      [-S, 0, S].forEach((dy) => {
+        traces.forEach((pts) => {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = width;
+          ctx.beginPath();
+          pts.forEach(([px, py], i) => (i ? ctx.lineTo(px + dx, py + dy) : ctx.moveTo(px + dx, py + dy)));
+          ctx.stroke();
+          const [ex, ey] = pts[pts.length - 1];
+          const [sx0, sy0] = pts[0];
+          ctx.fillStyle = nodeColor;
+          [[ex, ey], [sx0, sy0]].forEach(([nx, ny]) => {
+            ctx.beginPath();
+            ctx.arc(nx + dx, ny + dy, width * 1.6, 0, TAU);
+            ctx.fill();
+          });
+        });
+      })
+    );
     ctx.globalAlpha = 1;
-  });
-  [-1024, 0].forEach((dy) => {
-    bctx.fillStyle = 'rgba(93,255,157,0.05)';
-    for (let y = 0; y < 1024; y += 4) bctx.fillRect(0, y + dy, 1024, 1);
-  });
+  };
+  draw(bctx, 'rgba(255,74,90,0.32)', 5, 1, 'rgba(255,209,102,0.6)');
+  draw(gctx, '#ff4a5a', 5, 0.75, '#ffd166');
   return [base, glow];
 }
 
@@ -983,8 +1062,8 @@ const SPECIAL_BOARDS = {
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
   },
   dev: () => {
-    const [base, glow] = terminalCanvases();
-    return { canvas: base, glowCanvas: glow, glowIntensity: 1.2, repeat: 0.06, roughness: 0.3, clearcoat: 0.6, dish: '#07201a', felt: '#02100a', cup: '#010805', accent: { color: '#5dff9d', emissive: '#5dff9d', emissiveIntensity: 1.6, roughness: 0.3 } };
+    const [base, glow] = mainframeCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: 0.045, roughness: 0.16, clearcoat: 1, dish: '#170d11', felt: '#12090c', cup: '#050305', accent: { color: '#ff4a5a', emissive: '#ff4a5a', emissiveIntensity: 1.5, roughness: 0.25 } };
   },
   beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#16408a', felt: '#0f2c5c', cup: '#0a1f45', accent: { color: '#ffffff', metalness: 0.1, roughness: 0.5 } }),
 };

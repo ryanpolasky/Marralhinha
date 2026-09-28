@@ -3,7 +3,7 @@ import { api, post } from '../net/api';
 import { CURRENCY, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, rarityOf } from '../game/catalog';
 import { sfx } from '../game/sound';
 import { Coin, Coins, TagBadges } from './Economy';
-import { Close, Search } from './Icons';
+import { Close, Search, DiscordMark } from './Icons';
 
 const ago = (t) => {
   const s = Math.max(0, (Date.now() - t) / 1000);
@@ -12,6 +12,17 @@ const ago = (t) => {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 };
+
+const LinkBadge = ({ user }) =>
+  user.discordLinked ? (
+    <span className="badge link-badge discord" title="Signed in with Discord">
+      <DiscordMark size={12} /> Discord
+    </span>
+  ) : (
+    <span className="badge link-badge guest" title="Guest account, lives in one browser">
+      guest
+    </span>
+  );
 
 function UserEditor({ user, me, onChange, notify }) {
   const [busy, setBusy] = useState(false);
@@ -49,10 +60,11 @@ function UserEditor({ user, me, onChange, notify }) {
         <div>
           <div className="admin-user-name">
             {user.name} <TagBadges tags={user.tags} small />
+            <LinkBadge user={user} />
             {isMe && <span className="badge">you</span>}
           </div>
           <div className="muted small-text">
-            id <code>{user.id}</code> · Lv {user.level} · {user.stats.games} games, {user.stats.wins} wins · {user.items} items · {user.discordLinked ? 'Discord' : 'guest'} · seen {ago(user.lastSeen)}
+            id <code>{user.id}</code> · Lv {user.level} · {user.stats.games} games, {user.stats.wins} wins · {user.items} items · seen {ago(user.lastSeen)}
           </div>
         </div>
         <Coins amount={user.coins} className="coins-pill" />
@@ -130,6 +142,7 @@ function UserEditor({ user, me, onChange, notify }) {
 
 export default function Admin({ account, onClose, notify }) {
   const [query, setQuery] = useState('');
+  const [guests, setGuests] = useState(false);
   const [result, setResult] = useState(null);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -144,7 +157,7 @@ export default function Admin({ account, onClose, notify }) {
     let cancelled = false;
     setLoading(true);
     const t = setTimeout(() => {
-      api(`/admin/users?q=${encodeURIComponent(query)}`)
+      api(`/admin/users?q=${encodeURIComponent(query)}&guests=${guests ? 1 : 0}`)
         .then((res) => !cancelled && setResult(res))
         .catch((err) => !cancelled && notify(err.message))
         .finally(() => !cancelled && setLoading(false));
@@ -153,7 +166,7 @@ export default function Admin({ account, onClose, notify }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query, notify]);
+  }, [query, guests, notify]);
 
   const users = result?.users || [];
   const current = selected && (users.find((u) => u.id === selected.id) || selected);
@@ -167,7 +180,7 @@ export default function Admin({ account, onClose, notify }) {
       <div className="panel modal admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Admin">
         <div className="modal-head">
           <h2>Admin</h2>
-          <span className="muted">{result ? `${result.total.toLocaleString()} accounts` : ''}</span>
+          <span className="muted">{result ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
             <Close />
           </button>
@@ -179,14 +192,18 @@ export default function Admin({ account, onClose, notify }) {
           <button type="button" className={`btn tiny ${query === '#tagged' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#tagged' ? '' : '#tagged')}>
             Tagged
           </button>
+          <button type="button" className={`btn tiny ${guests ? 'secondary' : 'ghost'}`} onClick={() => setGuests((g) => !g)} title="Include guest accounts that never played (every fresh browser makes one)">
+            Guests
+          </button>
         </label>
 
         <div className="admin-body">
           <div className={`admin-list${loading ? ' loading' : ''}`}>
-            {users.length === 0 && !loading && <div className="muted center admin-empty">No players match.</div>}
+            {users.length === 0 && !loading && <div className="muted center admin-empty">No players match.{!guests && ' Drive-by guests are hidden; hit Guests to include them.'}</div>}
             {users.map((u) => (
               <button key={u.id} className={`admin-row${current?.id === u.id ? ' active' : ''}`} onClick={() => setSelected(u)}>
                 <span className="admin-row-name">
+                  {u.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />}
                   {u.name}
                   <TagBadges tags={u.tags} small />
                 </span>

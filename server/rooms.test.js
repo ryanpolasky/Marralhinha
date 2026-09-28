@@ -50,6 +50,32 @@ test('four-player rooms default to free-for-all and only the host can switch on 
   assert.throws(() => room.setTeams('u1', false), /already started/);
 });
 
+test('first game: a random seated player starts on their board; rematch: a winner starts on theirs', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const { game } = room;
+  assert.ok(game.active.includes(game.turn));
+  assert.deepStrictEqual({ seat: game.pick.seat, reason: game.pick.reason, board: game.boardSeat }, { seat: game.turn, reason: 'wheel', board: game.turn });
+  assert.match(game.log[0].text, /wheel lands on/i);
+
+  // Second player sits across the table, in seat 2
+  game.phase = 'over';
+  game.winners = [2];
+  room.rematch('u1');
+  room.start('u1');
+  assert.deepStrictEqual({ turn: room.game.turn, reason: room.game.pick.reason, board: room.game.boardSeat }, { turn: 2, reason: 'winner', board: 2 });
+  assert.match(room.game.log[0].text, /won last round/);
+
+  // Winner left before the rematch: back to the wheel
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  room.rematch('u1');
+  room.leave('u2');
+  room.addBot('u1', 2);
+  room.start('u1');
+  assert.strictEqual(room.game.pick.reason, 'wheel');
+});
+
 test('chat is rate limited and only for seated players once the game is on', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
