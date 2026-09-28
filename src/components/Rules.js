@@ -10,7 +10,7 @@ const redPath = [...Array.from({ length: 62 }, (_, i) => RING[i + 2]), RING[0], 
 const SLIDES = [
   {
     title: 'The goal',
-    text: 'Race all 5 of your marbles around the board and into your colored home column. The first player with all 5 home wins.',
+    text: 'Race all 5 of your marbles around the board and into your colored home column. The first player with all 5 home wins — or, if the host switches on “play until one loser is left”, finishers sit out and the last player on the board loses.',
     art: (id) => (
       <BoardArt id={id} baseMarbles={{ 0: 4, 1: 5, 2: 5, 3: 5 }}>
         <Trail points={redPath.filter((_, i) => i % 2 === 0 || i === redPath.length - 1)} color={RED.light} />

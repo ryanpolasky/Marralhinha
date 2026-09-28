@@ -25,7 +25,8 @@ const cellKey = (seat, pos) => {
 const rollDie = () => randomInt(1, 7);
 
 // `starter` skips the dice roll-off: { seat, reason: 'wheel' | 'winner' }. The starter also lends their board to the table.
-function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null } = {}) {
+// `loserMode` (solo only): keep playing after someone finishes until one player is left; the survivors win and the last one loses.
+function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null, loserMode = false } = {}) {
   const active = [0, 1, 2, 3].filter((s) => seats[s]);
   if (active.length < 2) throw new Error('Need at least 2 players');
   const state = {
@@ -40,11 +41,15 @@ function createGame(seats, { rng = rollDie, teams = false, starter = null, board
     lastMove: null,
     legalMoves: [],
     winners: null,
+    loser: null,
+    loserMode: false,
+    finishOrder: [],
     log: [],
     stats: [0, 1, 2, 3].map(() => ({ rolls: 0, pips: 0, sixes: 0, captures: 0, captured: 0, shortcuts: 0 })),
     pick: null,
     boardSeat: null,
   };
+  state.loserMode = !!loserMode && state.mode === 'solo';
   if (starter && active.includes(starter.seat)) {
     state.turn = starter.seat;
     state.pick = { seat: starter.seat, reason: starter.reason, t: Date.now() };
@@ -154,7 +159,9 @@ function computeLegalMoves(state) {
 function nextSeat(state, from) {
   for (let i = 1; i <= 4; i++) {
     const seat = (from + i) % 4;
-    if (state.active.includes(seat)) return seat;
+    if (!state.active.includes(seat)) continue;
+    if (state.loserMode && isFinished(state, seat)) continue;
+    return seat;
   }
   return from;
 }
@@ -162,7 +169,7 @@ function nextSeat(state, from) {
 function endTurn(state, rollAgain) {
   state.phase = 'roll';
   state.legalMoves = [];
-  if (!rollAgain) state.turn = nextSeat(state, state.turn);
+  if (!rollAgain || (state.loserMode && isFinished(state, state.turn))) state.turn = nextSeat(state, state.turn);
 }
 
 function roll(state, rng = rollDie) {
@@ -201,11 +208,26 @@ function move(state, moveId) {
   const verb = { enter: 'brought a marble into play', enterCenter: 'jumped into the center', exitCenter: 'took the shortcut out of the center', step: `moved ${state.die}` }[mv.kind];
   addLog(state, `${who} ${verb}${to.zone === 'home' && mv.from.zone !== 'home' ? ' — reached home!' : ''}${capture ? ` and captured ${state.names[capture.seat]}!` : ''}`, seat);
 
-  if (isFinished(state, seat) && mv.from.zone !== 'home') addLog(state, `${who} has all 5 marbles home!`, seat);
+  if (isFinished(state, seat) && !state.finishOrder.includes(seat)) {
+    state.finishOrder.push(seat);
+    if (mv.from.zone !== 'home') addLog(state, `${who} has all 5 marbles home!`, seat);
+    if (state.loserMode && state.finishOrder.length < state.active.length - 1) {
+      const left = state.active.length - state.finishOrder.length;
+      addLog(state, `${who} is safe! ${left} players still in — last one loses.`, seat);
+    }
+  }
 
   const winners = findWinners(state);
   if (winners) {
     state.winners = winners;
+    if (state.loserMode) {
+      state.loser = state.active.find((s) => !isFinished(state, s)) ?? null;
+      state.phase = 'over';
+      state.legalMoves = [];
+      addLog(state, `${winners.map((s) => state.names[s]).join(' & ')} win${winners.length === 1 ? 's' : ''}!`, winners[0]);
+      if (state.loser !== null) addLog(state, `${state.names[state.loser]} finishes last!`, state.loser);
+      return state;
+    }
     state.phase = 'over';
     state.legalMoves = [];
     addLog(state, `${winners.map((s) => state.names[s]).join(' & ')} win${winners.length === 1 ? 's' : ''}!`, winners[0]);
@@ -220,6 +242,12 @@ function findWinners(state) {
     for (const seat of [0, 1]) {
       if (isFinished(state, seat) && isFinished(state, partnerOf(seat))) return [seat, partnerOf(seat)];
     }
+    return null;
+  }
+  if (state.loserMode) {
+    const order = new Map(state.finishOrder.map((s, i) => [s, i]));
+    const finished = state.active.filter((s) => isFinished(state, s)).sort((a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999));
+    if (finished.length >= state.active.length - 1 && finished.length > 0) return finished;
     return null;
   }
   const done = state.active.find((s) => isFinished(state, s));

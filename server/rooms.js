@@ -54,6 +54,7 @@ class Room {
     this.hostId = null;
     this.game = null;
     this.teams = false;
+    this.loserMode = false;
     this.humansAtStart = 0;
     // Player ids of the last round's winners: one of them starts the rematch on their board
     this.lastWinners = [];
@@ -236,12 +237,19 @@ class Room {
     this.changed();
   }
 
+  setLoserMode(userId, loserMode) {
+    this.requireHost(userId);
+    this.requireLobby();
+    this.loserMode = !!loserMode;
+    this.changed();
+  }
+
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
     this.swapOffers = [];
-    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
+    this.game = rules.createGame(this.seats, { teams: this.teams, loserMode: this.loserMode, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
     this.humansAtStart = humans.length;
     this.changed();
   }
@@ -256,7 +264,8 @@ class Room {
   rematch(userId) {
     this.requireHost(userId);
     if (!this.game || this.game.phase !== 'over') throw new UserError('The game is not over yet');
-    this.lastWinners = this.game.winners.map((s) => this.seats[s]?.id).filter(Boolean);
+    const champions = this.game.loserMode && this.game.finishOrder?.length ? [this.game.finishOrder[0]] : this.game.winners;
+    this.lastWinners = champions.map((s) => this.seats[s]?.id).filter(Boolean);
     this.game = null;
     this.seats = this.seats.map((p) => (p && p.standIn ? null : p));
     this.changed();
@@ -379,6 +388,7 @@ class Room {
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
+      loserMode: this.loserMode,
       seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,

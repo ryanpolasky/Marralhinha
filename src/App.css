@@ -1552,6 +1552,15 @@ button.pronounce:hover {
   background: rgba(255, 255, 255, 0.07);
 }
 
+.switch-row.disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.switch-row.disabled:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .switch-row input {
   position: absolute;
   opacity: 0;

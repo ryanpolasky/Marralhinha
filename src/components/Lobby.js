@@ -158,6 +158,17 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
                 : "Teams need all 4 seats filled, otherwise it's free-for-all."}
         </p>
 
+        {!room.teams && (
+          <label className={`switch-row${!isHost ? ' disabled' : ''}`} title="Keep playing after someone finishes">
+            <input type="checkbox" checked={!!room.loserMode} disabled={!isHost} onChange={(e) => onAction('lobby:loserMode', { loserMode: e.target.checked })} />
+            <span className="switch" aria-hidden="true" />
+            <span className="switch-text">
+              Play until one loser is left
+              <span className="switch-sub">Finishers sit out and are safe. The last player still on the board loses. Off: first to finish wins.</span>
+            </span>
+          </label>
+        )}
+
         {isHost && seated < 4 && (
           <button
             className="btn ghost block"
