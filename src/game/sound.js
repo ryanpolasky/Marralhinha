@@ -1,19 +1,16 @@
 import { getSettings, onSettingsChange } from './settings';
 
-const MUTE_KEY = 'marralhinha:muted';
 const BASE_GAIN = 0.55;
 
 let ctx = null;
 let master = null;
-let muted = typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_KEY) === '1';
-const listeners = new Set();
 
 onSettingsChange((s) => {
   if (master) master.gain.value = BASE_GAIN * s.sound;
 });
 
-function audio() {
-  if (muted || getSettings().sound <= 0) return null;
+// One AudioContext shared by sound effects and music; created lazily on the first user gesture
+export function audioContext() {
   if (!ctx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return null;
@@ -26,17 +23,12 @@ function audio() {
   return ctx;
 }
 
-export const unlockAudio = () => audio();
-export const isMuted = () => muted;
-export function setMuted(value) {
-  muted = value;
-  localStorage.setItem(MUTE_KEY, value ? '1' : '0');
-  listeners.forEach((fn) => fn(value));
+function audio() {
+  if (getSettings().sound <= 0) return null;
+  return audioContext();
 }
-export function onMuteChange(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
+
+export const unlockAudio = () => audioContext();
 
 function tone({ freq, to = null, type = 'sine', dur = 0.15, vol = 0.2, delay = 0 }) {
   const ac = audio();

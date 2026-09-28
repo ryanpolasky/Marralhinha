@@ -61,6 +61,36 @@ export const SoundOff = () => (
   </Icon>
 );
 
+export const MusicNote = () => (
+  <Icon>
+    <path d="M9 18V6l10-2v12" />
+    <circle cx="6.5" cy="18" r="2.5" />
+    <circle cx="16.5" cy="16" r="2.5" />
+  </Icon>
+);
+
+export const MusicOff = () => (
+  <Icon>
+    <path d="M9 18V9l10-2v6" />
+    <circle cx="6.5" cy="18" r="2.5" />
+    <path d="M4 4l16 16" />
+  </Icon>
+);
+
+export const Shield = ({ size = 20 }) => (
+  <Icon size={size}>
+    <path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z" />
+    <path d="M9.5 12l1.8 1.8L15 10" />
+  </Icon>
+);
+
+export const Search = () => (
+  <Icon size={18}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="M16 16l4.5 4.5" />
+  </Icon>
+);
+
 export const Help = () => (
   <Icon>
     <circle cx="12" cy="12" r="9.5" />

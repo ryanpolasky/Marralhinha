@@ -1,32 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { updateSettings, useSettings } from '../game/settings';
-import { isMuted, setMuted, sfx } from '../game/sound';
-import { Close, Gear } from './Icons';
+import { sfx } from '../game/sound';
+import { Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
 
-function VolumeSlider({ label, value, onChange, onRelease, hint }) {
+const STEP = 0.05;
+
+function VolumeSlider({ label, value, onChange, onRelease, icons: [On, Off], hint }) {
   const percent = Math.round(value * 100);
+  const lastOn = useRef(value > 0 ? value : 0.6);
+  if (value > 0) lastOn.current = value;
+  const muted = value <= 0;
+  const set = (next) => onChange(Math.min(1, Math.max(0, Math.round(next / STEP) * STEP)));
+  const toggle = () => {
+    set(muted ? lastOn.current : 0);
+    if (muted) onRelease?.();
+  };
   return (
-    <label className="setting">
-      <span className="setting-label">
-        {label}
-        {hint && <span className="muted small-text"> {hint}</span>}
-      </span>
-      <div className="slider-row">
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={percent}
-          style={{ '--fill': `${percent}%` }}
-          onChange={(e) => onChange(Number(e.target.value) / 100)}
-          onPointerUp={onRelease}
-          onKeyUp={onRelease}
-          aria-label={`${label} volume`}
-        />
-        <span className="slider-value">{percent}%</span>
+    <div className={`setting volume${muted ? ' muted-setting' : ''}`} style={{ '--pct': value }}>
+      <div className="setting-head">
+        <span className="setting-label">{label}</span>
+        {hint && <span className="setting-hint">{hint}</span>}
+        <span className="slider-value">{muted ? 'Off' : `${percent}%`}</span>
       </div>
-    </label>
+      <div className="slider-row">
+        <button type="button" className={`slider-mute${muted ? ' on' : ''}`} onClick={toggle} aria-pressed={muted} aria-label={muted ? `Unmute ${label.toLowerCase()}` : `Mute ${label.toLowerCase()}`} title={muted ? 'Unmute' : 'Mute'}>
+          {muted ? <Off /> : <On />}
+        </button>
+        <div className="slider">
+          <div className="slider-track" aria-hidden="true">
+            <div className="slider-fill" />
+            <div className="slider-ticks" />
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value={percent}
+            onChange={(e) => set(Number(e.target.value) / 100)}
+            onPointerUp={onRelease}
+            onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key) && onRelease?.()}
+            aria-label={`${label} volume`}
+            aria-valuetext={muted ? 'Off' : `${percent}%`}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -49,16 +69,8 @@ export function SettingsModal({ onClose }) {
         </div>
         <div className="settings-group">
           <h3>Audio</h3>
-          <VolumeSlider label="Music" hint="(coming soon)" value={settings.music} onChange={(music) => updateSettings({ music })} />
-          <VolumeSlider
-            label="Sounds"
-            value={settings.sound}
-            onChange={(sound) => {
-              if (sound > 0 && isMuted()) setMuted(false);
-              updateSettings({ sound });
-            }}
-            onRelease={() => sfx.pop()}
-          />
+          <VolumeSlider label="Sounds" value={settings.sound} icons={[SoundOn, SoundOff]} onChange={(sound) => updateSettings({ sound })} onRelease={() => sfx.pop()} />
+          <VolumeSlider label="Music" hint="soft background loop" value={settings.music} icons={[MusicNote, MusicOff]} onChange={(music) => updateSettings({ music })} />
         </div>
         <div className="settings-group">
           <h3>Gameplay</h3>
@@ -70,13 +82,16 @@ export function SettingsModal({ onClose }) {
   );
 }
 
-export function AutoRollToggle({ compact = false }) {
+export function AutoRollToggle() {
   const { autoRoll } = useSettings();
   return (
-    <label className={`switch-row${compact ? ' compact' : ''}`} title="Roll automatically when it's your turn">
+    <label className="switch-row" title="Roll automatically when it's your turn">
       <input type="checkbox" checked={autoRoll} onChange={(e) => updateSettings({ autoRoll: e.target.checked })} />
       <span className="switch" aria-hidden="true" />
-      <span>{compact ? 'Auto-roll' : 'Auto-roll when it becomes my turn'}</span>
+      <span className="switch-text">
+        Auto-roll
+        <span className="switch-sub">Roll the dice automatically when it's your turn. You still pick the marble.</span>
+      </span>
     </label>
   );
 }

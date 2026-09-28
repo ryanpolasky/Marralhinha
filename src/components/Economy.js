@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { ITEMS, RARITIES, CURRENCY, skinKey } from '../game/catalog';
+import { ITEMS, CURRENCY, TAGS, skinKey, rarityOf } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
 
 const ItemPreview = lazy(() => import('../three/Preview'));
@@ -55,14 +55,26 @@ export function Nameplate({ plate, children, className = '', style }) {
   );
 }
 
-export function RarityTag({ rarity }) {
-  const r = RARITIES[rarity];
+export function RarityTag({ rarity, item }) {
+  const r = item ? rarityOf(item) : rarityOf({ rarity });
   return (
-    <span className={`rarity-tag rarity-${rarity}`} style={{ '--rarity': r.color }}>
+    <span className={`rarity-tag rarity-${item?.rarity || rarity}${item?.tag ? ` tag-${item.tag}` : ''}`} style={{ '--rarity': r.color }}>
       {r.label}
     </span>
   );
 }
+
+export function TagBadge({ tag, small = false, title }) {
+  const info = TAGS[tag];
+  if (!info) return null;
+  return (
+    <span className={`tag-badge tag-${tag}${small ? ' small' : ''}`} style={{ '--tag': info.color }} title={title ?? info.blurb}>
+      {info.label}
+    </span>
+  );
+}
+
+export const TagBadges = ({ tags, small }) => (tags || []).map((tag) => <TagBadge key={tag} tag={tag} small={small} />);
 
 export function ItemThumb({ itemId, seat = 0 }) {
   const item = ITEMS[itemId];
@@ -102,19 +114,19 @@ export function PreviewStage({ itemId, seat = 0, playerName }) {
 
 export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, footer, seat = 0 }) {
   const item = ITEMS[itemId];
-  const rarity = RARITIES[item.rarity];
+  const rarity = rarityOf(item);
   return (
     <button
-      className={`item-card rarity-${item.rarity}${owned ? '' : ' locked'}${equipped ? ' equipped' : ''}${selected ? ' selected' : ''}`}
+      className={`item-card rarity-${item.rarity}${item.tag ? ` tag-${item.tag}` : ''}${owned ? '' : ' locked'}${equipped ? ' equipped' : ''}${selected ? ' selected' : ''}`}
       style={{ '--rarity': rarity.color }}
       onClick={onClick}
       title={item.desc}
     >
       <ItemThumb itemId={itemId} seat={seat} />
       <span className="item-name">{item.name}</span>
-      <span className="item-rarity">{rarity.label}</span>
+      <span className="item-rarity">{rarity.short || rarity.label}</span>
       {equipped && <span className="item-badge">Equipped</span>}
-      {!owned && !footer && <span className="item-lock">Locked</span>}
+      {!owned && !footer && <span className="item-lock">{item.tag ? `${rarity.short} only` : 'Locked'}</span>}
       {footer}
     </button>
   );

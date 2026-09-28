@@ -47,11 +47,22 @@ CREATE TABLE IF NOT EXISTS ledger (
 CREATE INDEX IF NOT EXISTS ledger_user ON ledger(user_id);
 `;
 
+// Columns added after the first release; applied to existing databases on startup
+const MIGRATIONS = [['users', 'tags', "TEXT NOT NULL DEFAULT '[]'"]];
+
+function migrate(db) {
+  for (const [table, column, type] of MIGRATIONS) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
+}
+
 function openDb(file = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'marralhinha.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { SLOTS, SLOT_KEYS, ITEMS, itemsForSlot, catalog } from '../game/catalog';
+import { SLOTS, SLOT_KEYS, ITEMS, TAGS, itemsForSlot, canUse, collectible } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
-import { ItemCard, PreviewStage, RarityTag } from './Economy';
+import { ItemCard, PreviewStage, RarityTag, TagBadge } from './Economy';
 import { Close } from './Icons';
 
 export default function Locker({ account, onClose, onEquip, onShop }) {
@@ -17,10 +17,12 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const owns = (id) => ITEMS[id].rarity === 'default' || account.inventory.includes(id);
-  const collected = catalog.items.filter((i) => owns(i.id)).length;
+  const owns = (id) => canUse(account, id);
+  const pool = collectible(account);
+  const collected = pool.filter((i) => owns(i.id)).length;
   const item = ITEMS[selected];
   const isEquipped = account.equipped[slot] === selected;
+  const slotItems = (key) => itemsForSlot(key).filter((i) => pool.includes(i));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -28,7 +30,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
         <div className="modal-head">
           <h2>Locker</h2>
           <span className="muted">
-            {collected} / {catalog.items.length} collected
+            {collected} / {pool.length} collected
           </span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
             <Close />
@@ -40,7 +42,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
             <button key={key} className={`tab${slot === key ? ' active' : ''}`} onClick={() => setSlot(key)}>
               {SLOTS[key].label}
               <span className="tab-count">
-                {itemsForSlot(key).filter((i) => owns(i.id)).length}/{itemsForSlot(key).length}
+                {slotItems(key).filter((i) => owns(i.id)).length}/{slotItems(key).length}
               </span>
             </button>
           ))}
@@ -59,13 +61,17 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
                   </div>
                 )}
                 <div className="locker-item-info">
-                  <RarityTag rarity={item.rarity} />
+                  <RarityTag item={item} />
                   <h3>{item.name}</h3>
                   <p className="muted">{item.desc}</p>
                   {owns(item.id) ? (
                     <button className="btn primary block" disabled={isEquipped} onClick={() => onEquip(slot, item.id)}>
                       {isEquipped ? 'Equipped' : 'Equip'}
                     </button>
+                  ) : item.tag ? (
+                    <div className="exclusive-note">
+                      <TagBadge tag={item.tag} /> Only players with the {TAGS[item.tag].label} tag can wear this.
+                    </div>
                   ) : (
                     <button className="btn secondary block" onClick={onShop}>
                       Find it in the shop

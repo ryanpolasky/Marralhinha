@@ -28,7 +28,8 @@
     "eject": "react-scripts eject",
     "server": "node --experimental-sqlite --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
     "server:dev": "node --experimental-sqlite --disable-warning=ExperimentalWarning --env-file-if-exists=.env --watch server/index.js",
-    "test:server": "node --experimental-sqlite --disable-warning=ExperimentalWarning --test \"server/**/*.test.js\""
+    "test:server": "node --experimental-sqlite --disable-warning=ExperimentalWarning --test \"server/**/*.test.js\"",
+    "tag": "node --experimental-sqlite --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/tools/tag.js"
   },
   "eslintConfig": {
     "extends": [

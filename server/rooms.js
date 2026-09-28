@@ -80,7 +80,7 @@ class Room {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
-      Object.assign(existing.player, { name: info.name, cosmetics: info.cosmetics, level: info.level });
+      Object.assign(existing.player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return existing.player;
     }
     if (this.game) throw new UserError('A game is in progress here. Hang tight for the next round!');
@@ -95,7 +95,7 @@ class Room {
   updateUser(info) {
     const found = this.findByUser(info.userId);
     if (!found) return;
-    Object.assign(found.player, { name: info.name, cosmetics: info.cosmetics, level: info.level });
+    Object.assign(found.player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
     this.changed();
   }
 
@@ -294,7 +294,7 @@ class Room {
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
-      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level }),
+      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
       game: this.game,
     };
   }

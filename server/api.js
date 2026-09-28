@@ -3,6 +3,7 @@ const { randomBytes } = require('crypto');
 const discord = require('./discord');
 const { AccountError } = require('./accounts');
 const { EconomyError } = require('./economy');
+const { TAG_KEYS, ADMIN_TAGS } = require('./catalog');
 
 class ApiError extends Error {}
 
@@ -189,6 +190,71 @@ function createApi({ accounts, economy, onProfileChange, isAllowedOrigin }) {
     handle((req) => {
       economy.buyFeatured(req.user.id, req.body?.item);
       return { profile: changed(req.user.id) };
+    })
+  );
+
+  // Admin: only accounts holding an admin tag (Dev) get past this
+  const admin = (req, res, next) => {
+    if (!accounts.isAdmin(req.user)) return res.status(403).json({ error: 'Admins only' });
+    return next();
+  };
+  const target = (req) => accounts.requireUser(String(req.params.id || ''));
+  const adminResult = (user, extra = {}) => {
+    onProfileChange(user.id);
+    return { user: accounts.adminView(accounts.getUser(user.id)), ...extra };
+  };
+
+  router.get(
+    '/admin/users',
+    auth,
+    admin,
+    handle((req) => ({ users: accounts.search(req.query.q).map((u) => accounts.adminView(u)), total: accounts.userCount() }))
+  );
+
+  router.post(
+    '/admin/users/:id/tags',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      const tags = Array.isArray(req.body?.tags) ? req.body.tags.filter((t) => TAG_KEYS.includes(t)) : null;
+      if (!tags) throw new ApiError('Send a list of tags');
+      if (user.id === req.user.id && !tags.some((t) => ADMIN_TAGS.includes(t))) throw new ApiError("You can't remove your own admin tag");
+      accounts.setTags(user.id, tags);
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/coins',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.grantCoins(user.id, req.body?.delta, `admin:${req.user.id}`);
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/items',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.grantItem(user.id, String(req.body?.item || ''));
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/name',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.rename(user.id, req.body?.name);
+      return adminResult(user);
     })
   );
 

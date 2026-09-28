@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 
 const KEY = 'marralhinha:settings';
-const DEFAULTS = { sound: 0.8, music: 0.6, autoRoll: false };
+const LEGACY_MUTE_KEY = 'marralhinha:muted';
+const DEFAULTS = { sound: 0.8, music: 0.15, autoRoll: false };
 
 function load() {
+  let stored = {};
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-  } catch {
-    return { ...DEFAULTS };
-  }
+    stored = JSON.parse(localStorage.getItem(KEY) || '{}');
+    // The old standalone mute button became "sounds at 0%"
+    if (localStorage.getItem(LEGACY_MUTE_KEY) === '1') stored.sound = 0;
+    localStorage.removeItem(LEGACY_MUTE_KEY);
+  } catch {}
+  return { ...DEFAULTS, ...stored };
 }
 
 let settings = load();

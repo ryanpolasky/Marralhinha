@@ -1,7 +1,7 @@
 import React from 'react';
-import { Coins, Nameplate } from './Economy';
+import { Coins, Nameplate, TagBadges } from './Economy';
 import { IS_ACTIVITY } from '../net/config';
-import { ChestIcon, GiftIcon, Hanger } from './Icons';
+import { ChestIcon, GiftIcon, Hanger, Shield } from './Icons';
 import { SettingsButton } from './Settings';
 
 const DiscordLogo = () => (
@@ -13,7 +13,7 @@ const DiscordLogo = () => (
   </svg>
 );
 
-export default function AccountBar({ account, discordEnabled, onShop, onLocker, onDaily, onDiscord }) {
+export default function AccountBar({ account, discordEnabled, onShop, onLocker, onDaily, onDiscord, onSignOut, onAdmin }) {
   if (!account) return null;
   const daily = account.daily;
   const pct = Math.min(100, (account.into / account.need) * 100);
@@ -24,12 +24,27 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           {account.level}
         </span>
         <span className="account-info">
-          <span className="account-name">{account.name}</span>
+          <span className="account-name-row">
+            <span className="account-name">{account.name}</span>
+            <TagBadges tags={account.tags} small />
+          </span>
           <span className="xp-bar" title={`${account.into} / ${account.need} XP`}>
             <span style={{ width: `${pct}%` }} />
           </span>
         </span>
+        {account.discordLinked && !IS_ACTIVITY && (
+          <button className="discord-linked" onClick={onSignOut} title="Signed in with Discord. Click to sign out.">
+            <DiscordLogo />
+          </button>
+        )}
       </Nameplate>
+
+      {!IS_ACTIVITY && discordEnabled && !account.discordLinked && (
+        <button className="discord-signin" onClick={onDiscord} title="Save your progress to your Discord account">
+          <DiscordLogo />
+          <span>Sign in with Discord</span>
+        </button>
+      )}
 
       <Coins amount={account.coins} className="coins-pill" />
 
@@ -48,16 +63,11 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           <Hanger />
           <span>Locker</span>
         </button>
-        {!IS_ACTIVITY && discordEnabled && !account.discordLinked && (
-          <button className="bar-btn discord" onClick={onDiscord} title="Save your progress with Discord">
-            <DiscordLogo />
-            <span>Log in</span>
+        {account.admin && (
+          <button className="bar-btn admin-btn" onClick={onAdmin} title="Manage players and tags">
+            <Shield />
+            <span>Admin</span>
           </button>
-        )}
-        {account.discordLinked && (
-          <span className="discord-linked" title="Progress saved to your Discord account">
-            <DiscordLogo />
-          </span>
         )}
         <SettingsButton className="bar-btn settings-btn" />
       </div>

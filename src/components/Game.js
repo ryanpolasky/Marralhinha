@@ -1,23 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
 import { homeCount, partnerOf, ROLL_REVEAL_MS } from '../game/moves';
-import { sfx, isMuted, setMuted, onMuteChange } from '../game/sound';
+import { sfx } from '../game/sound';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { SoundOn, SoundOff, Help, Camera, Exit, DieIcon, Chat } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, skinKey } from '../game/catalog';
-import { Coins, Coin } from './Economy';
-import { AutoRollToggle, SettingsButton } from './Settings';
+import { Coins, Coin, TagBadges } from './Economy';
+import { SettingsButton } from './Settings';
 import { useSettings } from '../game/settings';
 
 const BOX_PRICE = BOXES[0].price;
-
-function useMuted() {
-  const [muted, set] = useState(isMuted());
-  useEffect(() => onMuteChange(set), []);
-  return muted;
-}
 
 function useAnnouncements(game, mySeat, nameOf) {
   const [items, setItems] = useState([]);
@@ -119,6 +113,7 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction }) {
       <div className="chip-body">
         <div className="chip-name">
           {seat === mySeat ? 'You' : player?.name}
+          <TagBadges tags={player?.tags} small />
           {player?.isBot && <span className="badge">bot</span>}
           {player && !player.isBot && !player.connected && <span className="badge warn">away</span>}
         </div>
@@ -238,7 +233,6 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
-  const muted = useMuted();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
@@ -309,9 +303,6 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
 
         <div className="hud-buttons">
           <SettingsButton />
-          <button className="icon-btn" onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
-            {muted ? <SoundOff /> : <SoundOn />}
-          </button>
           <button className="icon-btn" onClick={onResetView} aria-label="Reset camera" title="Reset camera">
             <Camera />
           </button>
@@ -373,13 +364,10 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
             <div className="action-sub">{status.sub}</div>
           </div>
           {mySeat >= 0 && game.phase !== 'over' && (
-            <div className="roll-col">
-              <button className={`roll-btn${canRoll ? ' ready' : ''}`} disabled={!canRoll} onClick={roll} title="Roll (Space)">
-                <DieIcon />
-                <span>Roll</span>
-              </button>
-              <AutoRollToggle compact />
-            </div>
+            <button className={`roll-btn${canRoll ? ' ready' : ''}${autoRoll ? ' auto' : ''}`} disabled={!canRoll} onClick={roll} title={autoRoll ? 'Auto-roll is on (change in Settings)' : 'Roll (Space)'}>
+              <DieIcon />
+              <span>{autoRoll && canRoll ? 'Auto' : 'Roll'}</span>
+            </button>
           )}
           {game.phase === 'over' && (
             <button className="btn primary" onClick={() => setShowOver(true)}>

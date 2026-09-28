@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
 import RulesButton from './Rules';
 import { Copy } from './Icons';
-import { Nameplate } from './Economy';
+import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 
 export default function Lobby({ room, playerId, onAction, onLeave }) {
@@ -60,6 +60,7 @@ export default function Lobby({ room, playerId, onAction, onLeave }) {
                     <Nameplate plate={p.cosmetics?.nameplate} className="seat-name">
                       {p.level && <span className="level-badge small">{p.level}</span>}
                       <span className="seat-name-text">{p.name}</span>
+                      <TagBadges tags={p.tags} small />
                       {mine && <span className="badge">you</span>}
                       {p.id === room.hostId && <span className="badge gold">host</span>}
                       {p.isBot && <span className="badge">bot</span>}

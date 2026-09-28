@@ -283,6 +283,271 @@ const MARBLES = {
       animate: (m, t) => (tex.offset.x = (t * 0.07 + seat * 0.25) % 1),
     };
   },
+  dots: (c) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    ctx.fillStyle = c.main;
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.fillStyle = '#fff8ee';
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 8; col++) {
+        ctx.beginPath();
+        ctx.arc(col * 64 + (row % 2) * 32, 22 + row * 42, 13, 0, TAU);
+        ctx.fill();
+      }
+    }
+    return { map: finishMarble(canvas), roughness: 0.1, clearcoat: 1 };
+  },
+  camo: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const rand = seeded(180 + seat);
+    ctx.fillStyle = mix(c.main, '#6b6a3a', 0.35);
+    ctx.fillRect(0, 0, 512, 256);
+    const tones = [c.dark, mix(c.main, '#2d2a1a', 0.5), mix(c.light, '#8a8a5a', 0.4), '#2b2a20'];
+    for (let i = 0; i < 46; i++) {
+      const x = rand() * 512;
+      const y = rand() * 256;
+      ctx.fillStyle = tones[i % tones.length];
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        const r = 18 + rand() * 34;
+        ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.7);
+      }
+      ctx.closePath();
+      [-512, 0, 512].forEach((dx) => {
+        ctx.save();
+        ctx.translate(dx, 0);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+    return { map: finishMarble(canvas), roughness: 0.65, clearcoat: 0.2 };
+  },
+  honey: (c) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const amber = mix(c.main, '#f0a020', 0.45);
+    ctx.fillStyle = amber;
+    ctx.fillRect(0, 0, 512, 256);
+    const R = 22;
+    const w = Math.sqrt(3) * R;
+    ctx.strokeStyle = mix(c.dark, '#7a4a05', 0.5);
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    for (let row = -1; row < 8; row++) {
+      for (let col = -1; col < 14; col++) {
+        const cx = col * w + (row % 2 ? w / 2 : 0);
+        const cy = row * R * 1.5;
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU + Math.PI / 6;
+          ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255,220,120,${((row * 7 + col * 3) % 5) * 0.05})`;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    return { map: finishMarble(canvas), roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08 };
+  },
+  tiger: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const rand = seeded(190 + seat);
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, c.dark);
+    g.addColorStop(0.5, mix(c.main, '#c98a2a', 0.35));
+    g.addColorStop(1, c.dark);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 16; i++) {
+      wavyLine(ctx, { y0: 10 + i * 16 + rand() * 8, amp: 6 + rand() * 12, k: 2 + Math.floor(rand() * 3), phase: rand() * TAU, width: 3 + rand() * 9, color: i % 3 === 0 ? '#1a0f05' : i % 3 === 1 ? mix(c.light, '#ffd27a', 0.6) : c.dark, alpha: 0.55 + rand() * 0.4 });
+    }
+    return { map: finishMarble(canvas), roughness: 0.18, clearcoat: 0.9, sheen: 0.6, sheenColor: new THREE.Color('#ffd27a') };
+  },
+  bubble: (c) => ({
+    color: mix(c.light, '#ffffff', 0.55),
+    transparent: true,
+    opacity: 0.58,
+    roughness: 0,
+    clearcoat: 1,
+    iridescence: 1,
+    iridescenceIOR: 1.35,
+    iridescenceThicknessRange: [120, 720],
+    envMapIntensity: 2,
+    specularIntensity: 1,
+    depthWrite: true,
+  }),
+  aurora: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const rand = seeded(210 + seat);
+    ctx.fillStyle = '#060b1c';
+    ctx.fillRect(0, 0, 512, 256);
+    stars(ctx, rand, { count: 160, w: 512, h: 256 });
+    ctx.globalCompositeOperation = 'lighter';
+    const colors = ['#2fd2a0', c.main, '#6a3cff', '#2fe6ff', c.light];
+    for (let i = 0; i < 12; i++) {
+      wavyLine(ctx, { y0: 40 + rand() * 176, amp: 14 + rand() * 30, k: 1 + Math.floor(rand() * 2), phase: rand() * TAU, width: 22 + rand() * 40, color: colors[i % colors.length], alpha: 0.22 + rand() * 0.2 });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    const tex = finishMarble(canvas);
+    return { map: tex, emissiveMap: tex, emissive: '#ffffff', emissiveIntensity: 0.75, roughness: 0.08, clearcoat: 1, animate: (m, t) => (tex.offset.x = (t * 0.035 + seat * 0.3) % 1) };
+  },
+  eye: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const [glow, gctx] = makeCanvas(512, 256);
+    const rand = seeded(230 + seat);
+    ctx.fillStyle = '#f3efe6';
+    ctx.fillRect(0, 0, 512, 256);
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, 512, 256);
+    veins(ctx, rand, { count: 14, color: '#c94a4a', width: 1.2, alpha: 0.35, w: 512, h: 256, steps: 24 });
+    const cx = 256;
+    const cy = 128;
+    const iris = 92;
+    [ctx, gctx].forEach((x, i) => {
+      const g = x.createRadialGradient(cx, cy, 8, cx, cy, iris);
+      g.addColorStop(0, i ? c.light : mix(c.light, '#ffffff', 0.2));
+      g.addColorStop(0.55, i ? c.main : c.main);
+      g.addColorStop(1, i ? '#000000' : c.dark);
+      x.fillStyle = g;
+      x.beginPath();
+      x.arc(cx, cy, iris, 0, TAU);
+      x.fill();
+    });
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, iris, 0, TAU);
+    ctx.clip();
+    for (let i = 0; i < 90; i++) {
+      const a = rand() * TAU;
+      ctx.strokeStyle = i % 4 ? mix(c.light, '#ffd27a', 0.5) : c.dark;
+      ctx.globalAlpha = 0.25 + rand() * 0.5;
+      ctx.lineWidth = 1 + rand() * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18);
+      ctx.lineTo(cx + Math.cos(a) * (iris - 6), cy + Math.sin(a) * (iris - 6));
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#15080a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, iris - 2, 0, TAU);
+    ctx.stroke();
+    [ctx, gctx].forEach((x) => {
+      x.fillStyle = '#05030a';
+      x.beginPath();
+      x.ellipse(cx, cy, 13, 64, 0, 0, TAU);
+      x.fill();
+    });
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 34, cy - 40, 12, 20, -0.5, 0, TAU);
+    ctx.fill();
+    return {
+      map: finishMarble(canvas),
+      emissiveMap: finishMarble(glow),
+      emissive: '#ffffff',
+      emissiveIntensity: 0.5,
+      roughness: 0.05,
+      clearcoat: 1,
+      clearcoatRoughness: 0.02,
+      animate: (m, t) => (m.emissiveIntensity = 0.45 + Math.max(0, Math.sin(t * 1.3 + seat)) ** 8 * 0.9),
+    };
+  },
+  dev: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const rand = seeded(250 + seat);
+    ctx.fillStyle = '#03100a';
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.strokeStyle = 'rgba(93,255,157,0.08)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 512; i += 16) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 256);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 256; i += 16) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+    const tokens = ['#5dff9d', '#5dff9d', c.light, '#2fe6ff', '#ff4fd8', '#fff6e8'];
+    for (let row = 0; row < 15; row++) {
+      let x = rand() * 60;
+      const y = 8 + row * 16.5;
+      while (x < 512) {
+        const w = 8 + rand() * 40;
+        ctx.fillStyle = tokens[Math.floor(rand() * tokens.length)];
+        ctx.globalAlpha = 0.55 + rand() * 0.45;
+        ctx.fillRect(x, y, w, 8);
+        x += w + 6 + rand() * 18;
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = '700 15px Consolas, "Courier New", monospace';
+    ctx.fillStyle = mix(c.light, '#ffffff', 0.4);
+    ['{ }', '</>', '0x' + (seat * 1111 + 4242).toString(16), 'if (six)', ';;', 'roll()', 'npm i', '// TODO'].forEach((s, i) => ctx.fillText(s, (i * 71 + 14) % 470, 22 + ((i * 53) % 220)));
+    const tex = finishMarble(canvas);
+    return {
+      map: tex,
+      emissiveMap: tex,
+      emissive: '#ffffff',
+      emissiveIntensity: 1.1,
+      roughness: 0.15,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      animate: (m, t) => {
+        tex.offset.x = (t * 0.09 + seat * 0.25) % 1;
+        const glitch = Math.sin(t * 17 + seat) * Math.sin(t * 3.1) > 0.92;
+        tex.offset.y = glitch ? 0.02 : 0;
+        m.emissiveIntensity = glitch ? 1.9 : 1.0 + Math.sin(t * 2) * 0.12;
+      },
+    };
+  },
+  beta: (c) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    ctx.fillStyle = mix(c.main, '#1b4fa0', 0.55);
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 512; i += 16) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 256);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 256; i += 16) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 8]);
+    [[128, 128, 70], [384, 128, 70]].forEach(([x, y, r]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - r - 20, y);
+      ctx.lineTo(x + r + 20, y);
+      ctx.moveTo(x, y - r - 20);
+      ctx.lineTo(x, y + r + 20);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.font = '700 18px Consolas, "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('v0.1-beta', 200, 250);
+    ctx.fillText('Ø 16', 100, 40);
+    ctx.fillText('rev. B', 360, 40);
+    return { map: finishMarble(canvas), roughness: 0.3, clearcoat: 0.7 };
+  },
 };
 
 export function marbleSkin(itemId, seat) {
@@ -314,7 +579,29 @@ const DICE = {
   glow: { bg: '#10141a', pip: '#5dff9d', one: '#ff5dcf', roughness: 0.3, glow: 1.6 },
   gold: { bg: 'gold', pip: '#3b2400', one: '#3b2400', roughness: 0.22, metalness: 0.95 },
   galaxy: { bg: 'galaxy', pip: '#ffffff', one: '#ffd166', roughness: 0.12, clearcoat: 1, glow: 1.1 },
+  mint: { bg: '#8fe3c4', pip: '#0f4d3a', one: '#ff6b8a', roughness: 0.18, clearcoat: 0.8 },
+  lilac: { bg: '#b79cff', pip: '#2d1a5e', one: '#ffffff', roughness: 0.18, clearcoat: 0.8 },
+  marble: { bg: 'marble', pip: '#2a2a30', one: '#b8182a', roughness: 0.1, clearcoat: 1 },
+  copper: { bg: 'copper', pip: '#2b1a10', one: '#2b1a10', roughness: 0.3, metalness: 0.9 },
+  lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
+  candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
+  holo: { bg: '#f2f2ff', pip: '#2d1a5e', one: '#ff4fd8', roughness: 0.05, clearcoat: 1, extra: { metalness: 0.5, iridescence: 1, iridescenceIOR: 2, iridescenceThicknessRange: [100, 900], envMapIntensity: 1.6 } },
+  dev: { bg: 'dev', pip: '#5dff9d', one: '#ff4fd8', roughness: 0.12, clearcoat: 1, glow: 1.7 },
+  beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
 };
+
+function grid(ctx, size, step, color, width = 1) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  for (let i = 0; i <= size; i += step) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, size);
+    ctx.moveTo(0, i);
+    ctx.lineTo(size, i);
+    ctx.stroke();
+  }
+}
 
 function dieBackground(ctx, style, size, value) {
   const rand = seeded(200 + value);
@@ -323,6 +610,56 @@ function dieBackground(ctx, style, size, value) {
     ctx.fillStyle = '#3a9a69';
     ctx.fillRect(0, 0, size, size);
     nebula(ctx, rand, { colors: ['#9fe8bf', '#1f6b45'], count: 14, w: size, h: size, alpha: 0.4 });
+  } else if (style === 'marble') {
+    ctx.fillStyle = '#efece6';
+    ctx.fillRect(0, 0, size, size);
+    veins(ctx, rand, { count: 7, color: '#8d8d95', width: 2.5, alpha: 0.6, w: size, h: size, steps: 30 });
+    veins(ctx, rand, { count: 4, color: '#c8b98a', width: 1.5, alpha: 0.4, w: size, h: size, steps: 30 });
+  } else if (style === 'copper') {
+    const g = ctx.createLinearGradient(0, 0, size, size);
+    g.addColorStop(0, '#f0b48a');
+    g.addColorStop(0.5, '#b8652f');
+    g.addColorStop(1, '#6e3a1a');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    nebula(ctx, rand, { colors: ['#3fa08a', '#1f6b60'], count: 5, w: size, h: size, alpha: 0.18 });
+  } else if (style === 'lava') {
+    ctx.fillStyle = '#1b110d';
+    ctx.fillRect(0, 0, size, size);
+    ctx.shadowColor = '#ff7a1a';
+    ctx.shadowBlur = 10;
+    veins(ctx, rand, { count: 9, color: '#ff8a3d', width: 3, alpha: 1, w: size, h: size, steps: 22 });
+    ctx.shadowBlur = 0;
+  } else if (style === 'candy') {
+    ctx.fillStyle = '#fff6f0';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#e4283c';
+    for (let i = -size; i < size * 2; i += 44) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 22, 0);
+      ctx.lineTo(i + 22 + size, size);
+      ctx.lineTo(i + size, size);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (style === 'dev') {
+    ctx.fillStyle = '#03100a';
+    ctx.fillRect(0, 0, size, size);
+    grid(ctx, size, 32, 'rgba(93,255,157,0.13)');
+    ctx.font = '700 22px Consolas, "Courier New", monospace';
+    ctx.fillStyle = 'rgba(93,255,157,0.28)';
+    ['0x0' + value, 'roll', '>_', 'ok', 'src', '6==6'].forEach((s, i) => ctx.fillText(s, 14 + ((i * 97) % 200), 30 + ((i * 71 + value * 13) % 220)));
+  } else if (style === 'beta') {
+    ctx.fillStyle = '#1b4fa0';
+    ctx.fillRect(0, 0, size, size);
+    grid(ctx, size, 16, 'rgba(255,255,255,0.14)');
+    grid(ctx, size, 64, 'rgba(255,255,255,0.32)');
+    ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(20, 20, size - 40, size - 40);
+    ctx.setLineDash([]);
   } else if (style === 'gold') {
     const g = ctx.createLinearGradient(0, 0, size, size);
     g.addColorStop(0, '#fff0b0');
@@ -368,7 +705,7 @@ export function diceSkin(itemId) {
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
-      const params = { map, roughness: spec.roughness, metalness: spec.metalness || 0, clearcoat: spec.clearcoat || 0 };
+      const params = { map, roughness: spec.roughness, metalness: spec.metalness || 0, clearcoat: spec.clearcoat || 0, ...(spec.extra || {}) };
       if (spec.glow) {
         const [glow, gctx] = makeCanvas(size, size);
         gctx.fillStyle = '#000';
@@ -388,7 +725,146 @@ const WOODS = {
   walnut: { base: '#6e4428', grain: '35,18,8', dish: '#553219', felt: '#1d3f4f' },
   cherry: { base: '#a8522f', grain: '70,25,10', dish: '#8a3f22', felt: '#3f1d2b' },
   driftwood: { base: '#b8b2a6', grain: '85,88,95', dish: '#9d978b', felt: '#1f3b4d' },
+  mahogany: { base: '#7a2e22', grain: '40,12,8', dish: '#5e2018', felt: '#1d3a2e' },
+  ash: { base: '#d9cdb8', grain: '120,105,85', dish: '#bfb39e', felt: '#2b3d4a' },
 };
+
+function corkCanvas() {
+  const [canvas, ctx] = makeCanvas(1024, 1024);
+  const rand = seeded(17);
+  ctx.fillStyle = '#c9a26b';
+  ctx.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 9000; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(120,80,35,${0.1 + rand() * 0.35})` : `rgba(240,215,160,${rand() * 0.3})`;
+    ctx.beginPath();
+    ctx.ellipse(rand() * 1024, rand() * 1024, 2 + rand() * 9, 1.5 + rand() * 5, rand() * TAU, 0, TAU);
+    ctx.fill();
+  }
+  return canvas;
+}
+
+function terrazzoCanvas() {
+  const [canvas, ctx] = makeCanvas(1024, 1024);
+  const rand = seeded(23);
+  ctx.fillStyle = '#efe9df';
+  ctx.fillRect(0, 0, 1024, 1024);
+  const chips = ['#e03a3e', '#2a6fcf', '#f0b428', '#3e9b62', '#2b2b2b', '#b36bff', '#ff8a3d', '#ffffff'];
+  for (let i = 0; i < 700; i++) {
+    const x = rand() * 1024;
+    const y = rand() * 1024;
+    const r = 5 + rand() * 20;
+    ctx.fillStyle = chips[Math.floor(rand() * chips.length)];
+    ctx.globalAlpha = 0.8 + rand() * 0.2;
+    ctx.beginPath();
+    for (let k = 0; k < 5 + Math.floor(rand() * 3); k++) {
+      const a = (k / 7) * TAU + rand() * 0.7;
+      ctx.lineTo(x + Math.cos(a) * r * (0.5 + rand() * 0.6), y + Math.sin(a) * r * (0.5 + rand() * 0.6));
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  return canvas;
+}
+
+function oceanCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  const rand = seeded(31);
+  const g = bctx.createLinearGradient(0, 0, 1024, 1024);
+  g.addColorStop(0, '#0b3d6b');
+  g.addColorStop(0.5, '#0d5c8a');
+  g.addColorStop(1, '#083152');
+  bctx.fillStyle = g;
+  bctx.fillRect(0, 0, 1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 40; i++) {
+    const spec = { y0: rand() * 1024, amp: 20 + rand() * 60, k: 2 + Math.floor(rand() * 4), phase: rand() * TAU, width: 2 + rand() * 6, w: 1024 };
+    wavyLine(bctx, { ...spec, color: '#8fe3ff', alpha: 0.18 + rand() * 0.25 });
+    wavyLine(gctx, { ...spec, color: '#5fd0ff', alpha: 0.35 + rand() * 0.4 });
+  }
+  return [base, glow];
+}
+
+function auroraCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  const rand = seeded(37);
+  bctx.fillStyle = '#070a1e';
+  bctx.fillRect(0, 0, 1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  stars(bctx, rand, { count: 900, w: 1024, h: 1024 });
+  stars(gctx, seeded(37), { count: 900, w: 1024, h: 1024 });
+  const colors = ['#2fd2a0', '#6a3cff', '#2fe6ff', '#b36bff', '#5dff9d'];
+  [bctx, gctx].forEach((ctx, i) => {
+    const r = seeded(41);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 14; k++) {
+      wavyLine(ctx, { y0: r() * 1024, amp: 40 + r() * 120, k: 1 + Math.floor(r() * 2), phase: r() * TAU, width: 60 + r() * 140, color: colors[k % colors.length], alpha: i ? 0.22 : 0.16, w: 1024 });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  });
+  return [base, glow];
+}
+
+function terminalCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  bctx.fillStyle = '#04110b';
+  bctx.fillRect(0, 0, 1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  grid(bctx, 1024, 64, 'rgba(93,255,157,0.09)');
+  grid(gctx, 1024, 64, 'rgba(93,255,157,0.22)');
+  const lines = ['$ npm run marralhinha', '> rolling dice...', 'six! roll again', 'capture at ring[42]', 'marble.home += 1', 'if (die === 6) again()', '// TODO: win', 'GET /api/me 200', 'const winner = you', 'npx marralhinha --dev', '[ok] 5/5 marbles home', 'sudo roll'];
+  [bctx, gctx].forEach((ctx, i) => {
+    ctx.font = '600 26px Consolas, "Courier New", monospace';
+    const r = seeded(47);
+    for (let k = 0; k < 60; k++) {
+      const s = lines[Math.floor(r() * lines.length)];
+      ctx.fillStyle = i ? (k % 9 === 0 ? '#2fe6ff' : '#5dff9d') : 'rgba(93,255,157,0.55)';
+      ctx.globalAlpha = i ? 0.35 + r() * 0.6 : 0.5 + r() * 0.5;
+      ctx.fillText(s, r() * 1024, r() * 1024);
+    }
+    ctx.globalAlpha = 1;
+  });
+  [-1024, 0].forEach((dy) => {
+    bctx.fillStyle = 'rgba(93,255,157,0.05)';
+    for (let y = 0; y < 1024; y += 4) bctx.fillRect(0, y + dy, 1024, 1);
+  });
+  return [base, glow];
+}
+
+function blueprintCanvas() {
+  const [canvas, ctx] = makeCanvas(1024, 1024);
+  ctx.fillStyle = '#1b4fa0';
+  ctx.fillRect(0, 0, 1024, 1024);
+  grid(ctx, 1024, 32, 'rgba(255,255,255,0.12)');
+  grid(ctx, 1024, 128, 'rgba(255,255,255,0.3)', 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 10]);
+  [[256, 256, 150], [768, 768, 150], [768, 256, 90], [256, 768, 90]].forEach(([x, y, r]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - r - 30, y);
+    ctx.lineTo(x + r + 30, y);
+    ctx.moveTo(x, y - r - 30);
+    ctx.lineTo(x, y + r + 30);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.font = '700 30px Consolas, "Courier New", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('MARRALHINHA  rev. B  scale 1:1', 60, 530);
+  ctx.fillText('Ø 0.74  ×  64 holes', 560, 530);
+  ctx.fillText('BETA BUILD', 60, 1000);
+  return canvas;
+}
 
 function bambooCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
@@ -495,6 +971,22 @@ const SPECIAL_BOARDS = {
     const [base, glow] = neonCanvases();
     return { canvas: base, glowCanvas: glow, repeat: 0.06, roughness: 0.35, dish: '#1a0f33', felt: '#07061a', cup: '#05030c', accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 1.4, roughness: 0.3 } };
   },
+  cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
+  slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
+  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.2, clearcoat: 0.6, dish: '#e4ddd0', felt: '#2b3a44', cup: '#6b655c', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
+  ocean: () => {
+    const [base, glow] = oceanCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 0.55, repeat: 0.05, roughness: 0.08, clearcoat: 1, dish: '#0b3d6b', felt: '#061c33', cup: '#031424', accent: { color: '#8fe3ff', emissive: '#3fc1b0', emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.25 } };
+  },
+  aurora: () => {
+    const [base, glow] = auroraCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
+  },
+  dev: () => {
+    const [base, glow] = terminalCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 1.2, repeat: 0.06, roughness: 0.3, clearcoat: 0.6, dish: '#07201a', felt: '#02100a', cup: '#010805', accent: { color: '#5dff9d', emissive: '#5dff9d', emissiveIntensity: 1.6, roughness: 0.3 } };
+  },
+  beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#16408a', felt: '#0f2c5c', cup: '#0a1f45', accent: { color: '#ffffff', metalness: 0.1, roughness: 0.5 } }),
 };
 
 export function boardSkin(itemId) {
@@ -514,7 +1006,7 @@ export function boardSkin(itemId) {
       const glow = finish(spec.glowCanvas);
       glow.repeat.set(spec.repeat, spec.repeat);
       glow.offset.set(0.5, 0.5);
-      Object.assign(boardParams, { emissiveMap: glow, emissive: '#ffffff', emissiveIntensity: 0.9 });
+      Object.assign(boardParams, { emissiveMap: glow, emissive: '#ffffff', emissiveIntensity: spec.glowIntensity ?? 0.9 });
     }
     const dishParams = { color: spec.dish, roughness: 0.5, clearcoat: spec.clearcoat || 0 };
     if (wood) {

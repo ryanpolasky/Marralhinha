@@ -1,8 +1,9 @@
 const { randomBytes, createHash } = require('crypto');
 const { transaction } = require('./db');
-const { ITEMS, SLOTS, DEFAULTS, REWARDS } = require('./catalog');
+const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS } = require('./catalog');
 
 const SESSION_TOUCH_MS = 5 * 60 * 1000;
+const MAX_COIN_GRANT = 1000000;
 
 class AccountError extends Error {}
 
@@ -16,6 +17,9 @@ const parse = (json, fallback) => {
     return fallback;
   }
 };
+// Discord user ids that get the dev tag automatically when they log in (comma-separated env var)
+const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').split(',').map((s) => s.trim()).filter(Boolean));
+const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
 
 function levelInfo(xp) {
   let level = 1;
@@ -47,6 +51,7 @@ class Accounts {
       addItem: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)'),
       rename: db.prepare('UPDATE users SET name = ? WHERE id = ?'),
       setEquipped: db.prepare('UPDATE users SET equipped = ? WHERE id = ?'),
+      setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
@@ -57,6 +62,13 @@ class Accounts {
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
       deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
+      addCoins: db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?'),
+      search: db.prepare(
+        `SELECT * FROM users WHERE id = ? OR discord_id = ? OR name LIKE ? ESCAPE '\\' COLLATE NOCASE ORDER BY last_seen DESC LIMIT ?`
+      ),
+      recent: db.prepare('SELECT * FROM users ORDER BY last_seen DESC LIMIT ?'),
+      tagged: db.prepare("SELECT * FROM users WHERE tags != '[]' ORDER BY last_seen DESC LIMIT ?"),
+      count: db.prepare('SELECT COUNT(*) AS n FROM users'),
     };
   }
 
@@ -72,6 +84,12 @@ class Accounts {
 
   getUser(id) {
     return this.q.user.get(id) || null;
+  }
+
+  requireUser(id) {
+    const user = this.getUser(id);
+    if (!user) throw new AccountError('Account not found');
+    return user;
   }
 
   createSession(userId) {
@@ -102,22 +120,39 @@ class Accounts {
     return this.q.inventory.all(userId).map((row) => row.item_id);
   }
 
-  owns(userId, itemId) {
+  tags(user) {
+    return normalizeTags(parse(user.tags, []));
+  }
+
+  isAdmin(user) {
+    return this.tags(user).some((tag) => ADMIN_TAGS.includes(tag));
+  }
+
+  owns(userOrId, itemId) {
     const item = ITEMS.get(itemId);
     if (!item) return false;
-    return item.rarity === 'default' || this.inventory(userId).includes(itemId);
+    const user = typeof userOrId === 'string' ? this.getUser(userOrId) : userOrId;
+    if (!user) return false;
+    if (item.rarity === 'default') return true;
+    if (item.tag) return this.tags(user).includes(item.tag);
+    return this.inventory(user.id).includes(itemId);
   }
 
   equipped(user) {
     const stored = parse(user.equipped, {});
-    return Object.fromEntries(SLOTS.map((slot) => [slot, ITEMS.get(stored[slot])?.slot === slot ? stored[slot] : DEFAULTS[slot]]));
+    const tags = this.tags(user);
+    const valid = (slot, id) => {
+      const item = ITEMS.get(id);
+      return item && item.slot === slot && (!item.tag || tags.includes(item.tag));
+    };
+    return Object.fromEntries(SLOTS.map((slot) => [slot, valid(slot, stored[slot]) ? stored[slot] : DEFAULTS[slot]]));
   }
 
   equip(userId, slot, itemId) {
-    const user = this.getUser(userId);
+    const user = this.requireUser(userId);
     const item = ITEMS.get(itemId);
-    if (!user || !item || item.slot !== slot || !SLOTS.includes(slot)) throw new AccountError('Unknown item');
-    if (!this.owns(userId, itemId)) throw new AccountError("You don't own that yet");
+    if (!item || item.slot !== slot || !SLOTS.includes(slot)) throw new AccountError('Unknown item');
+    if (!this.owns(user, itemId)) throw new AccountError(item.tag ? `That one is ${TAGS[item.tag].label} only` : "You don't own that yet");
     this.q.setEquipped.run(JSON.stringify({ ...this.equipped(user), [slot]: itemId }), userId);
   }
 
@@ -127,6 +162,36 @@ class Accounts {
     this.q.rename.run(clean, userId);
   }
 
+  setTags(userId, tags) {
+    this.requireUser(userId);
+    const clean = normalizeTags(tags);
+    this.q.setTags.run(JSON.stringify(clean), userId);
+    return clean;
+  }
+
+  addTag(userId, tag) {
+    const user = this.requireUser(userId);
+    return this.setTags(userId, [...this.tags(user), tag]);
+  }
+
+  grantCoins(userId, delta, reason) {
+    const amount = Math.trunc(Number(delta));
+    if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > MAX_COIN_GRANT) throw new AccountError('Pick an amount between 1 and 1,000,000');
+    this.requireUser(userId);
+    transaction(this.db, () => {
+      this.q.addCoins.run(amount, userId);
+      this.q.ledger.run(userId, amount, reason, Date.now());
+    });
+  }
+
+  grantItem(userId, itemId) {
+    const item = ITEMS.get(itemId);
+    if (!item || item.rarity === 'default') throw new AccountError('Unknown item');
+    if (item.tag) throw new AccountError(`${item.name} comes with the ${TAGS[item.tag].label} tag, give them that instead`);
+    this.requireUser(userId);
+    this.q.addItem.run(userId, itemId, Date.now());
+  }
+
   loginDiscord(discordUser, guestId = null) {
     const discordId = String(discordUser.id);
     const avatar = discordUser.avatar || null;
@@ -134,25 +199,43 @@ class Accounts {
     return transaction(this.db, () => {
       const existing = this.q.userByDiscord.get(discordId);
       const guest = guestId ? this.getUser(guestId) : null;
+      let user;
       if (existing) {
         this.q.updateAvatar.run(avatar, existing.id);
         if (guest && guest.id !== existing.id && !guest.discord_id) this.mergeGuest(guest, existing.id);
-        return this.getUser(existing.id);
-      }
-      if (guest && !guest.discord_id) {
+        user = this.getUser(existing.id);
+      } else if (guest && !guest.discord_id) {
         this.q.linkDiscord.run(discordId, avatar, guest.id);
-        return this.getUser(guest.id);
+        user = this.getUser(guest.id);
+      } else user = this.createUser({ name: displayName, discordId, avatar });
+      if (devDiscordIds().has(discordId) && !this.tags(user).includes('dev')) {
+        this.addTag(user.id, 'dev');
+        user = this.getUser(user.id);
       }
-      return this.createUser({ name: displayName, discordId, avatar });
+      return user;
     });
   }
 
   mergeGuest(guest, intoId) {
+    const into = this.getUser(intoId);
     this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, intoId);
     this.q.moveInventory.run(intoId, guest.id);
     this.q.moveSessions.run(intoId, guest.id);
     this.q.moveLedger.run(intoId, guest.id);
+    this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     this.q.deleteUser.run(guest.id);
+  }
+
+  search(query, limit = 40) {
+    const q = String(query ?? '').trim().slice(0, 40);
+    if (q === '#tagged') return this.q.tagged.all(limit);
+    if (!q) return this.q.recent.all(limit);
+    const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    return this.q.search.all(q, q, like, limit);
+  }
+
+  userCount() {
+    return this.q.count.get().n;
   }
 
   profile(userOrId, extras = {}) {
@@ -167,14 +250,33 @@ class Accounts {
       ...levelInfo(user.xp),
       equipped: this.equipped(user),
       inventory: this.inventory(user.id),
+      tags: this.tags(user),
+      admin: this.isAdmin(user),
       pity: parse(user.pity, {}),
       stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened },
       ...extras,
     };
   }
 
+  // What admins see about another player
+  adminView(user) {
+    return {
+      id: user.id,
+      name: user.name,
+      discordLinked: !!user.discord_id,
+      coins: user.coins,
+      level: levelInfo(user.xp).level,
+      tags: this.tags(user),
+      equipped: this.equipped(user),
+      items: this.inventory(user.id).length,
+      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened },
+      createdAt: user.created_at,
+      lastSeen: user.last_seen,
+    };
+  }
+
   publicInfo(user) {
-    return { userId: user.id, name: user.name, cosmetics: this.equipped(user), level: levelInfo(user.xp).level };
+    return { userId: user.id, name: user.name, cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user) };
   }
 }
 

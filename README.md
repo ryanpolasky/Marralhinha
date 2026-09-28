@@ -80,7 +80,29 @@ Environment variables (see `.env.example`):
 - `CLIENT_URL`: where to send the browser after login (only needed in dev, e.g. `http://localhost:3000`)
 - `PORT` (default `3001`), `HOST` (default: all interfaces), `DB_PATH` (default `data/marralhinha.db`)
 - `CLIENT_ORIGIN`: comma-separated allowed origins, only needed if the frontend is hosted on a different domain
+- `DEV_DISCORD_IDS`: comma-separated Discord user ids that get the **Dev** tag (admin) when they log in
 - `REACT_APP_SERVER_URL` (build time): server URL if the frontend isn't served by the game server
+
+## Tags and admin
+
+Players can carry tags, shown next to their name everywhere (account bar, lobby, in-game chips):
+
+- **Dev**: admin. Unlocks the exclusive Dev set (Glitch marble, Terminal board, Debugger dice, Root nameplate) and the **Admin** panel in the account bar: search players, toggle tags, grant Marbucks and items, rename.
+- **Beta**: early testers. Unlocks the Blueprint set (Prototype marble, Blueprint board, Test Build dice, Blueprint nameplate).
+
+Exclusive cosmetics never drop from chests or show up in the shop; they come and go with the tag. Tags are defined in `src/shared/cosmetics.json` (`tags`), items opt in with a `"tag"` field.
+
+Bootstrapping the first Dev:
+
+```bash
+# Discord login: set DEV_DISCORD_IDS in .env, then log in
+# Any account (guest included), from the server machine:
+npm run tag -- "Your Name" dev      # or a user id / Discord id
+npm run tag -- --list               # who has tags
+npm run tag -- SomeUser beta --remove
+```
+
+Devs can't remove their own Dev tag from the panel (so you can't lock yourself out); use the CLI for that.
 
 ## Discord setup
 
@@ -134,14 +156,16 @@ CI=true npm test                 # React tests
 - `server/game/rules.js`: authoritative rules engine (pure functions, no I/O)
 - `server/game/bot.js`: bot move heuristics
 - `server/rooms.js`: rooms, lobby seats, host controls, bots, reconnect, away autoplay, Discord instance rooms
-- `server/db.js`, `server/accounts.js`: SQLite schema, guest/Discord accounts, sessions, merging guests into Discord accounts
+- `server/db.js`, `server/accounts.js`: SQLite schema (+ column migrations), guest/Discord accounts, sessions, tags, admin grants, merging guests into Discord accounts
+- `server/tools/tag.js`: CLI to grant/remove tags (`npm run tag`)
 - `server/economy.js`: match rewards (bot games halved and capped per day), daily streaks, lootboxes with pity, daily featured shop
 - `server/api.js`, `server/discord.js`: REST API and Discord OAuth (website redirect flow and Activity code exchange)
 - `server/index.js`: Express, API and Socket.IO wiring
 - `src/shared/cosmetics.json`: the item catalog, drop rates, prices and reward values (used by server and client)
 - `src/game/geometry.js`: board layout (must match the ring model in `rules.js`)
 - `src/game/sound.js`: synthesized WebAudio sound effects (no audio files)
+- `src/game/music.js`: procedural lo-fi background loop, volume in Settings
 - `src/game/fun.js`: reaction stickers, random nicknames, end-of-game awards
 - `src/net/`: API client, socket, sign-in bootstrap (guest, Discord redirect, Discord Activity)
 - `src/three/`: lazy-loaded react-three-fiber scene (`Scene`, `Board`, `Marbles`, `Die`, `Particles`, `Preview`), procedural `skins` and `textures`
-- `src/components/`: HTML overlay UI: `Home`, `Lobby`, `Game` (HUD), `AccountBar`, `Shop`, `Locker`, `Economy` (shared bits), `Rules`, `Confetti`, `Icons`
+- `src/components/`: HTML overlay UI: `Home`, `Lobby`, `Game` (HUD), `AccountBar`, `Shop`, `Locker`, `Admin`, `Settings`, `Economy` (shared bits), `Rules`, `Confetti`, `Icons`

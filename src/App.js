@@ -2,9 +2,10 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import './App.css';
 import { socket, request } from './net/socket';
 import { api, post, setToken } from './net/api';
-import { bootstrapAuth, startDiscordLogin } from './net/auth';
+import { bootstrapAuth, startDiscordLogin, logout } from './net/auth';
 import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
+import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
 import { ROLL_REVEAL_MS } from './game/moves';
 import Home from './components/Home';
@@ -13,6 +14,7 @@ import Game from './components/Game';
 import AccountBar from './components/AccountBar';
 import Shop from './components/Shop';
 import Locker from './components/Locker';
+import Admin from './components/Admin';
 
 const Scene = lazy(() => import('./three/Scene'));
 
@@ -175,16 +177,20 @@ const App = () => {
   }, [enter, saveSession, notify]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const onDown = (e) => {
+    const unlock = () => {
       unlockAudio();
+      startMusic();
+    };
+    const onDown = (e) => {
+      unlock();
       const button = e.target.closest?.('button');
       if (button && !button.disabled) sfx.click();
     };
     window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
     return () => {
       window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('keydown', unlock);
     };
   }, []);
 
@@ -290,8 +296,15 @@ const App = () => {
       discordEnabled={config.discord}
       onShop={() => setModal('shop')}
       onLocker={() => setModal('locker')}
+      onAdmin={() => setModal('admin')}
       onDaily={claimDaily}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
+      onSignOut={async () => {
+        if (!window.confirm('Sign out of Discord? Your progress stays saved to your Discord account for next time.')) return;
+        await logout();
+        localStorage.removeItem(ROOM_KEY);
+        window.location.assign(window.location.pathname);
+      }}
     />
   );
 
@@ -384,6 +397,7 @@ const App = () => {
       {screen}
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}
       {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onShop={() => setModal('shop')} />}
+      {modal === 'admin' && account?.admin && <Admin account={account} onClose={() => setModal(null)} notify={notify} />}
     </div>
   );
 };
