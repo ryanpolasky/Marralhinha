@@ -121,10 +121,22 @@ const MARBLES = {
   stone: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     const rand = seeded(70 + seat);
-    ctx.fillStyle = mix(c.main, '#ffffff', 0.45);
+    ctx.fillStyle = mix(c.main, '#ffffff', 0.15);
     ctx.fillRect(0, 0, 512, 256);
-    veins(ctx, rand, { count: 14, color: c.dark, width: 3, alpha: 0.7, w: 512, h: 256 });
-    veins(ctx, rand, { count: 10, color: '#ffffff', width: 2, alpha: 0.6, w: 512, h: 256 });
+    for (let i = 0; i < 18; i++) {
+      const x = rand() * 512;
+      const y = rand() * 256;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 40 + rand() * 90);
+      const tone = i % 3 === 0 ? c.dark : i % 3 === 1 ? c.light : c.main;
+      g.addColorStop(0, tone);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 512, 256);
+    }
+    ctx.globalAlpha = 1;
+    veins(ctx, rand, { count: 14, color: c.dark, width: 3, alpha: 0.85, w: 512, h: 256 });
+    veins(ctx, rand, { count: 7, color: '#ffffff', width: 1.4, alpha: 0.45, w: 512, h: 256 });
     return { map: finishMarble(canvas), roughness: 0.25, clearcoat: 0.8 };
   },
   galaxy: (c, seat) => {
