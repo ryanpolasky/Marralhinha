@@ -33,9 +33,17 @@ const pushProfile = (userId) => {
   rooms.roomsWithUser(userId).forEach((room) => room.updateUser(accounts.publicInfo(user)));
 };
 
+// Team-only messages go straight to the partners' sockets, never to the room broadcast
+const emitToSeats = (room, seats, event, payload) => {
+  const ids = room.socketsForSeats(seats);
+  if (ids.length) io.to(ids).emit(event, payload);
+};
+
 const rooms = new RoomManager({
   onChange: (room) => io.to(room.code).emit('room:state', room.view()),
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
+  onTeam: emitToSeats,
+  onPing: (room, ping, seats) => (seats ? emitToSeats(room, seats, 'room:ping', ping) : io.to(room.code).emit('room:ping', ping)),
   onGameOver: (room, { players, botGame }) => {
     try {
       const luckyBefore = accounts.luckyHolder();
@@ -132,6 +140,8 @@ io.on('connection', (socket) => {
     socket.data.code = room.code;
     socket.join(room.code);
     room.attach(userId, socket.id);
+    // Team chat isn't in the shared state, so hand this device its team's history directly
+    socket.emit('room:teamLog', { code: room.code, entries: room.teamLogFor(userId) });
     return { code: room.code, playerId: player.id };
   };
 
@@ -170,7 +180,8 @@ io.on('connection', (socket) => {
   handle('game:roll', () => current().roll(userId));
   handle('game:move', ({ moveId }) => current().move(userId, moveId));
   handle('game:react', ({ key }) => current().react(userId, key));
-  handle('game:chat', ({ text }) => current().chat(userId, text));
+  handle('game:chat', ({ text, channel }) => current().chat(userId, text, channel === 'team' ? 'team' : 'all'));
+  handle('game:ping', (payload) => current().ping(userId, payload, { admin: accounts.isAdmin(accounts.getUser(userId) || {}) }));
   handle('game:rematch', () => current().rematch(userId));
 
   socket.on('disconnect', () => leaveCurrent(false));

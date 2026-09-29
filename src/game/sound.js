@@ -108,6 +108,12 @@ export const sfx = {
       tone({ freq: 247, to: 147, type: 'triangle', dur: 0.5, vol: 0.13, delay: 0.55 });
     }
   },
+  ping: (type = 'look', team = false) => {
+    const vol = team ? 0.08 : 0.11;
+    if (type === 'danger') [880, 660].forEach((f, i) => tone({ freq: f, type: 'square', dur: 0.12, vol: vol * 0.7, delay: i * 0.12 }));
+    else if (type === 'ack') tone({ freq: 1320, type: 'triangle', dur: 0.08, vol: vol * 0.8 });
+    else [1175, 1568].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.1, vol, delay: i * 0.06 }));
+  },
   boardSwap: () => {
     noise({ dur: 0.7, vol: 0.14, freq: 500, to: 4200, q: 0.6 });
     [659, 988, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.35, vol: 0.07, delay: 0.12 + i * 0.07 }));

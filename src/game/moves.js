@@ -9,6 +9,8 @@ export const START_WHEEL_SPIN_MS = 4300;
 export const START_WINNER_MS = 2200;
 // Turn timer choices the host can pick in the lobby; null means no limit (see TURN_SECONDS_OPTIONS in server/rooms.js)
 export const TURN_SECONDS = [15, 20, 25, 30, 35, 40, 45, null];
+// How long a ping arrow stays on the board
+export const PING_LIFE_MS = 3000;
 export const startPendingFor = (game, now = Date.now()) => {
   if (!game?.pick) return 0;
   const total = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;

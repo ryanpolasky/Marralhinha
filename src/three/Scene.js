@@ -6,6 +6,7 @@ import Board from './Board';
 import Marbles from './Marbles';
 import Die from './Die';
 import Particles from './Particles';
+import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
 import { SEAT_COLORS } from '../game/geometry';
@@ -13,6 +14,7 @@ import { SEAT_COLORS } from '../game/geometry';
 const BG = '#0b1f24';
 const NO_MOVES = [];
 const NO_COSMETICS = [];
+const NO_PINGS = [];
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 function CameraRig({ mode, resetKey, spinning }) {
@@ -144,7 +146,76 @@ function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
   return keyMove;
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey }) {
+const LONG_PRESS_MS = 450;
+
+// Invisible sheet over the board that tracks where the pointer is (in board coords) for pings.
+// It has no click handler, so marble and die clicks go through untouched.
+function PingSurface({ pointer, onMenu }) {
+  const ref = useRef();
+  const press = useRef(null);
+  const toLocal = (e) => {
+    const p = ref.current.parent.worldToLocal(e.point.clone());
+    return { x: p.x, z: p.z, screenX: e.nativeEvent.clientX, screenY: e.nativeEvent.clientY };
+  };
+  const cancel = () => {
+    clearTimeout(press.current?.timer);
+    press.current = null;
+  };
+  return (
+    <mesh
+      ref={ref}
+      rotation-x={-Math.PI / 2}
+      position-y={0.02}
+      onPointerMove={(e) => {
+        pointer.current = toLocal(e);
+        if (press.current && Math.hypot(e.nativeEvent.clientX - press.current.x, e.nativeEvent.clientY - press.current.y) > 12) cancel();
+      }}
+      onPointerOut={() => {
+        pointer.current = null;
+        cancel();
+      }}
+      onPointerDown={(e) => {
+        if (e.nativeEvent.pointerType !== 'touch') return;
+        const at = toLocal(e);
+        press.current = { x: at.screenX, y: at.screenY, timer: setTimeout(() => onMenu(at), LONG_PRESS_MS) };
+      }}
+      onPointerUp={cancel}
+      onContextMenu={(e) => {
+        e.nativeEvent.preventDefault();
+        onMenu(toLocal(e));
+      }}
+    >
+      <planeGeometry args={[32, 32]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
+// H pings, G pings danger; in 2v2 they go to your partner unless you hold Shift (everyone)
+function usePingKeys(pointer, canPing, onPing) {
+  useEffect(() => {
+    if (!canPing) return undefined;
+    const onKey = (e) => {
+      const key = e.key.toLowerCase();
+      if ((key !== 'h' && key !== 'g') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const at = pointer.current;
+      if (!at) return;
+      const [x, z] = snapToSpot(at.x, at.z);
+      onPing({ x, z, type: key === 'g' ? 'danger' : 'look', scope: e.shiftKey ? 'all' : 'team' });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pointer, canPing, onPing]);
+}
+
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu }) {
+  const pointer = useRef(null);
+  usePingKeys(pointer, canPing, onPing);
+  const openPingMenu = (at) => {
+    const [x, z] = snapToSpot(at.x, at.z);
+    onPingMenu?.({ ...at, x, z });
+  };
   const [selected, setSelected] = useState(null);
   const [hovered, setHovered] = useState(null);
   // Every room update re-sends legalMoves as a new array; only reset selection when the moves really change
@@ -185,6 +256,8 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           keyMove={keyMove}
           mySeat={mySeat}
         />
+        <Pings pings={pings} teams={teams} />
+        {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} />

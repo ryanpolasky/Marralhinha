@@ -1167,6 +1167,119 @@ button.room-pill.copied {
   transform: scale(0.92);
 }
 
+/* ---------- Team / All chat ---------- */
+
+.chat-channel {
+  flex: none;
+  min-width: 52px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.chat-channel.team {
+  color: #0d2233;
+  border-color: #8cc2ff;
+  background: linear-gradient(120deg, #8cc2ff, #8ee0a8);
+}
+
+.chat-form.team input {
+  border-color: rgba(140, 194, 255, 0.7);
+}
+
+.feed-entry.team {
+  background: rgba(140, 194, 255, 0.16);
+}
+
+.chat-team-tag {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  color: #0d2233;
+  background: #8cc2ff;
+}
+
+.bubble.chat.team {
+  border-style: dashed;
+}
+
+/* ---------- Ping menu (right-click / long-press on the board) ---------- */
+
+.ping-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.ping-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  animation: dialog-pop 0.16s ease-out both;
+}
+
+.ping-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.ping-option:hover,
+.ping-option:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ping-option-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.ping-option.danger .ping-option-dot {
+  background: #ff3b3b;
+  box-shadow: 0 0 8px #ff3b3b;
+}
+
+.switch-sub kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-line);
+}
+
 .feed:not(.open) .feed-entry:nth-child(2) {
   opacity: 0.8;
 }

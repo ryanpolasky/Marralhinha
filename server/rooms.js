@@ -27,6 +27,14 @@ const CHAT_MAX = 140;
 const CHAT_GAP_MS = 600;
 const CHAT_BURST = 5;
 const CHAT_WINDOW_MS = 10000;
+const TEAM_LOG_LIMIT = 60;
+const PING_COOLDOWN_MS = 1000;
+const PING_TYPES = ['look', 'danger'];
+const PING_BOUND = 16;
+const BOT_ACK_MS = 700;
+
+// In 2v2, partners sit across from each other
+const teamSeats = (seat) => [seat, (seat + 2) % 4];
 
 const cleanChat = (text) =>
   String(text ?? '')
@@ -67,6 +75,8 @@ class Room {
     this.humansAtStart = 0;
     // Player ids of the last round's winners: one of them starts the rematch on their board
     this.lastWinners = [];
+    // Team chat never enters the shared game log; each team's history only goes to that team's devices
+    this.teamLogs = [[], []];
     this.timer = null;
     this.timerKey = null;
     this.turnDeadline = null;
@@ -301,6 +311,7 @@ class Room {
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
     humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false }));
     this.swapOffers = [];
+    this.teamLogs = [[], []];
     this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
     this.humansAtStart = humans.length;
     this.changed();
@@ -362,8 +373,9 @@ class Room {
     this.hooks.onReaction?.(this, { seat, key, t: now });
   }
 
-  // Seated players and spectators can both chat; only seated players get a bubble under their nameplate
-  chat(userId, text) {
+  // Seated players and spectators can both chat; only seated players get a bubble under their nameplate.
+  // channel 'team' (2v2, seated only) goes to the two partners' devices and nowhere else.
+  chat(userId, text, channel = 'all') {
     const found = this.findByUser(userId);
     const player = found?.player || this.spectators.get(userId);
     if (!player) throw new UserError('You are not in this room');
@@ -375,9 +387,62 @@ class Room {
     player.chatTimes = (player.chatTimes || []).filter((t) => now - t < CHAT_WINDOW_MS);
     if (player.chatTimes.length >= CHAT_BURST || now - (player.chatTimes.at(-1) || 0) < CHAT_GAP_MS) throw new UserError('Whoa, slow down a little!');
     player.chatTimes.push(now);
+    if (channel === 'team' && seat !== null && this.game.mode === 'teams') {
+      const entry = { chat: true, team: true, seat, from: player.id, name: player.name, text: clean, t: now };
+      const log = this.teamLogs[seat % 2];
+      log.push(entry);
+      if (log.length > TEAM_LOG_LIMIT) log.splice(0, log.length - TEAM_LOG_LIMIT);
+      this.hooks.onTeam?.(this, teamSeats(seat), 'room:teamChat', entry);
+      this.hooks.onTeam?.(this, teamSeats(seat), 'room:reaction', { seat, text: clean, team: true, t: now });
+      this.touch();
+      return;
+    }
     rules.pushLog(this.game, { chat: true, seat, from: player.id, spectator: seat === null, name: player.name, text: clean, t: now });
     if (seat !== null) this.hooks.onReaction?.(this, { seat, text: clean, t: now });
     this.changed();
+  }
+
+  teamLogFor(userId) {
+    const found = this.findByUser(userId);
+    return found && this.game?.mode === 'teams' ? this.teamLogs[found.seat % 2] : [];
+  }
+
+  // Socket ids of the humans sitting in these seats (for team-only messages)
+  socketsForSeats(seats) {
+    return seats.flatMap((seat) => {
+      const p = this.seats[seat];
+      return p && !p.isBot && p.sockets ? [...p.sockets] : [];
+    });
+  }
+
+  // Drop an arrow on the board. Seated players ping their team (2v2) or everyone; spectators only if
+  // they're Dev (admin), always to everyone. A team ping at a bot partner gets a little acknowledgement.
+  ping(userId, { x, z, type, scope } = {}, { admin = false } = {}) {
+    const found = this.findByUser(userId);
+    const spectator = !found && this.spectators.get(userId);
+    if (!found && !spectator) throw new UserError('You are not in this room');
+    if (!found && !admin) throw new UserError('Only players can ping');
+    if (!this.game) throw new UserError('Pings open once the game starts');
+    const px = Number(x);
+    const pz = Number(z);
+    if (!Number.isFinite(px) || !Number.isFinite(pz) || Math.abs(px) > PING_BOUND || Math.abs(pz) > PING_BOUND) throw new UserError('Ping a spot on the board');
+    const player = found?.player || spectator;
+    const now = Date.now();
+    if (player.lastPing !== undefined && now - player.lastPing < PING_COOLDOWN_MS) return;
+    player.lastPing = now;
+    const seat = found ? found.seat : null;
+    const toTeam = seat !== null && scope === 'team' && this.game.mode === 'teams';
+    const ping = { id: newId(), seat, name: player.name, x: Math.round(px * 100) / 100, z: Math.round(pz * 100) / 100, type: PING_TYPES.includes(type) ? type : 'look', scope: toTeam ? 'team' : 'all', dev: !found, t: now };
+    this.touch();
+    this.hooks.onPing?.(this, ping, toTeam ? teamSeats(seat) : null);
+    const partner = toTeam ? this.seats[(seat + 2) % 4] : null;
+    if (partner?.isBot) {
+      const timer = setTimeout(() => {
+        this.banterTimers.delete(timer);
+        this.hooks.onPing?.(this, { ...ping, id: newId(), seat: (seat + 2) % 4, name: partner.name, type: 'ack', t: Date.now() }, teamSeats(seat));
+      }, BOT_ACK_MS);
+      this.banterTimers.add(timer);
+    }
   }
 
   botBanter() {

@@ -75,6 +75,16 @@ export function SettingsModal({ onClose }) {
         <div className="settings-group">
           <h3>Gameplay</h3>
           <AutoRollToggle />
+          <label className="switch-row" title="Show arrows other players drop on the board">
+            <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
+            <span className="switch" aria-hidden="true" />
+            <span className="switch-text">
+              Show pings
+              <span className="switch-sub">
+                Point at a spot and press <kbd>H</kbd> (or <kbd>G</kbd> for danger); right-click or long-press also works. In 2v2 pings go to your partner, hold <kbd>Shift</kbd> to ping everyone. Your own pings always show.
+              </span>
+            </span>
+          </label>
         </div>
       </div>
     </div>,

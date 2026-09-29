@@ -227,7 +227,7 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, v
         </Bubble>
       )}
       {reaction?.text && (
-        <Bubble key={reaction.id} anchor={chipRef} fit className="bubble chat" style={{ ...seatVars, '--sticker': '#fff6e8', '--tilt': '0deg' }}>
+        <Bubble key={reaction.id} anchor={chipRef} fit className={`bubble chat${reaction.team ? ' team' : ''}`} style={{ ...seatVars, '--sticker': reaction.team ? '#e6f4ff' : '#fff6e8', '--tilt': '0deg' }}>
           {reaction.text}
         </Bubble>
       )}
@@ -295,17 +295,45 @@ function RoomCode({ code }) {
   );
 }
 
-function ChatInput({ onSend }) {
+// In 2v2 the chat has a Team / All channel: Tab (while typing) or the pill switches it, and
+// "/t message" or "/a message" sends one message to a channel without switching
+function ChatInput({ onSend, teams = false }) {
   const [text, setText] = useState('');
+  const [channel, setChannel] = useState('all');
+  const active = teams ? channel : 'all';
+  const toggle = () => setChannel((c) => (c === 'team' ? 'all' : 'team'));
   const submit = async (e) => {
     e.preventDefault();
-    const message = text.trim();
+    let message = text.trim();
+    let target = active;
+    const shortcut = teams && message.match(/^\/(t|a)\s+(.+)/i);
+    if (shortcut) {
+      target = shortcut[1].toLowerCase() === 't' ? 'team' : 'all';
+      message = shortcut[2].trim();
+    }
     if (!message) return;
-    if (await onSend(message)) setText((current) => (current.trim() === message ? '' : current));
+    if (await onSend(message, target)) setText((current) => (current.trim() === text.trim() ? '' : current));
   };
   return (
-    <form className="chat-form" onSubmit={submit}>
-      <input value={text} onChange={(e) => setText(e.target.value)} maxLength={140} placeholder="Say something…" aria-label="Chat message" />
+    <form className={`chat-form${active === 'team' ? ' team' : ''}`} onSubmit={submit}>
+      {teams && (
+        <button type="button" className={`chat-channel ${active}`} onClick={toggle} title="Switch between team and all chat (Tab)" aria-label={`Chatting to ${active === 'team' ? 'your team' : 'everyone'}, click to switch`}>
+          {active === 'team' ? 'Team' : 'All'}
+        </button>
+      )}
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (teams && e.key === 'Tab') {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+        maxLength={140}
+        placeholder={active === 'team' ? 'Message your team… (Tab: all)' : teams ? 'Message everyone… (Tab: team)' : 'Say something…'}
+        aria-label={active === 'team' ? 'Team chat message' : 'Chat message'}
+      />
       <button className="chat-send" type="submit" disabled={!text.trim()} aria-label="Send message">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 12h15M13 6l6 6-6 6" />
@@ -422,7 +450,7 @@ function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], teamLog = [], rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -503,7 +531,8 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
       onView={() => onViewSeat?.(s)}
     />
   );
-  const log = (rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log).slice().reverse();
+  const shared = rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log;
+  const log = [...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
   const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
   const iWon = game.winners?.includes(mySeat);
@@ -573,11 +602,12 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
             {(feedOpen ? log : log.slice(0, 4)).map((entry, i) => (
               <div
                 key={`${entry.t}-${i}`}
-                className={`feed-entry${entry.chat ? ' chat' : ''}`}
+                className={`feed-entry${entry.chat ? ' chat' : ''}${entry.team ? ' team' : ''}`}
                 style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}
               >
                 {entry.chat && (
                   <b className="chat-name">
+                    {entry.team && <span className="chat-team-tag">Team</span>}
                     {isMine(entry) ? 'You' : entry.name}
                     {entry.spectator && <span className="chat-watching"> · watching</span>}
                   </b>
@@ -586,7 +616,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
               </div>
             ))}
           </div>
-          <ChatInput onSend={(text) => onAction('game:chat', { text })} />
+          <ChatInput teams={teams && mySeat >= 0} onSend={(text, channel) => onAction('game:chat', { text, channel })} />
         </div>
 
         <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>

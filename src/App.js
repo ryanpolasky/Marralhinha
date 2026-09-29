@@ -5,9 +5,11 @@ import { api, post, setToken } from './net/api';
 import { bootstrapAuth, startDiscordLogin, logout } from './net/auth';
 import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
+import { getSettings } from './game/settings';
+import PingMenu from './components/PingMenu';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
-import { ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, startPendingFor } from './game/moves';
+import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, startPendingFor } from './game/moves';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -22,6 +24,7 @@ const Scene = lazy(() => import('./three/Scene'));
 
 const ROOM_KEY = 'marralhinha:room';
 const NO_NAMES = [null, null, null, null];
+const NO_PINGS = [];
 
 const base = { zone: 'base' };
 const track = (idx) => ({ zone: 'track', idx });
@@ -118,6 +121,11 @@ const App = () => {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
   const [reactions, setReactions] = useState([]);
+  const [pings, setPings] = useState([]);
+  const [pingMenu, setPingMenu] = useState(null);
+  // Team chat arrives on its own channel (never in the shared room state), tagged with the room it belongs to
+  const [teamLog, setTeamLog] = useState({ code: null, entries: [] });
+  const mySeatRef = useRef(-1);
   const [modal, setModal] = useState(null);
   const sessionRef = useRef(null);
   const instanceRef = useRef(null);
@@ -194,6 +202,24 @@ const App = () => {
     socket.on('connect_error', onConnectError);
     socket.on('room:state', setRoom);
     socket.on('room:reaction', onReaction);
+    // Newest two pings per sender; your own always show, others respect the "Show pings" setting
+    const onPing = (ping) => {
+      const mine = ping.seat !== null && ping.seat === mySeatRef.current;
+      if (!mine && !getSettings().showPings) return;
+      const sender = (p) => (p.seat === null ? `dev:${p.name}` : p.seat);
+      setPings((list) => {
+        const fromSender = list.filter((p) => sender(p) === sender(ping));
+        const drop = fromSender.length >= 2 ? fromSender[0].id : null;
+        return [...list.filter((p) => p.id !== drop), ping];
+      });
+      sfx.ping(ping.type, ping.scope === 'team');
+      setTimeout(() => setPings((list) => list.filter((p) => p.id !== ping.id)), PING_LIFE_MS + 200);
+    };
+    const onTeamChat = (entry) => setTeamLog((log) => ({ ...log, entries: [...log.entries, entry].slice(-60) }));
+    const onTeamLog = ({ code, entries }) => setTeamLog({ code, entries });
+    socket.on('room:ping', onPing);
+    socket.on('room:teamChat', onTeamChat);
+    socket.on('room:teamLog', onTeamLog);
     socket.on('room:left', onRoomLeft);
     socket.on('account:update', setAccount);
 
@@ -217,6 +243,9 @@ const App = () => {
       socket.off('room:state', setRoom);
       socket.off('room:reaction', onReaction);
       socket.off('room:left', onRoomLeft);
+      socket.off('room:ping', onPing);
+      socket.off('room:teamChat', onTeamChat);
+      socket.off('room:teamLog', onTeamLog);
       socket.off('account:update', setAccount);
       socket.disconnect();
     };
@@ -304,6 +333,7 @@ const App = () => {
 
   const inRoom = !!(session && room && room.code === session.code);
   const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
+  mySeatRef.current = mySeat;
 
   const leave = async () => {
     // With another device still in the room, leaving here just hands control to that device
@@ -364,6 +394,11 @@ const App = () => {
     },
     [onAction]
   );
+  // Seated players can ping; spectators only if they're Dev (the server enforces this too)
+  const canPing = !!game && (mySeat >= 0 || !!account?.admin);
+  const teamMode = game?.mode === 'teams' && mySeat >= 0;
+  const sendPing = useCallback((ping) => onAction('game:ping', ping), [onAction]);
+  const myTeamLog = inRoom && teamLog.code === room.code && game ? teamLog.entries.filter((e) => e.t >= (game.pick?.t || 0)) : [];
 
   const accountBar = (
     <AccountBar
@@ -442,6 +477,7 @@ const App = () => {
         room={room}
         playerId={session.playerId}
         reactions={reactions}
+        teamLog={myTeamLog}
         rollPending={rollPending}
         startPending={startPending}
         onDismissStart={dismissStart}
@@ -467,7 +503,19 @@ const App = () => {
       <div className="scene-layer">
         <SceneBoundary>
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>
-            <Scene {...sceneProps} mySeat={inRoom ? mySeat : -1} boardSkinId={boardSkinId} onRoll={sceneRoll} onMove={sceneMove} resetKey={resetKey} />
+            <Scene
+              {...sceneProps}
+              mySeat={inRoom ? mySeat : -1}
+              boardSkinId={boardSkinId}
+              onRoll={sceneRoll}
+              onMove={sceneMove}
+              resetKey={resetKey}
+              pings={game ? pings : NO_PINGS}
+              teams={game?.mode === 'teams'}
+              canPing={canPing}
+              onPing={sendPing}
+              onPingMenu={setPingMenu}
+            />
           </Suspense>
         </SceneBoundary>
       </div>
@@ -497,6 +545,17 @@ const App = () => {
         />
       )}
       {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} />}
+      {pingMenu && canPing && (
+        <PingMenu
+          menu={pingMenu}
+          teams={teamMode}
+          onClose={() => setPingMenu(null)}
+          onPick={(type, scope) => {
+            sendPing({ x: pingMenu.x, z: pingMenu.z, type, scope });
+            setPingMenu(null);
+          }}
+        />
+      )}
       <DialogHost />
     </div>
   );

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 const KEY = 'marralhinha:settings';
 const LEGACY_MUTE_KEY = 'marralhinha:muted';
-const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false };
+const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false, showPings: true };
 
 function load() {
   let stored = {};

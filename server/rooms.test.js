@@ -254,6 +254,63 @@ test('a disconnected host hands over to the next connected player after a grace 
   room.start('u2');
 });
 
+function teamRoom(t, { botPartner = false } = {}) {
+  const sent = [];
+  const room = new Room('TEAM', {
+    onChange: () => {},
+    onReaction: (_, r) => sent.push({ to: 'all', event: 'room:reaction', payload: r }),
+    onTeam: (_, seats, event, payload) => sent.push({ to: seats, event, payload }),
+    onPing: (_, ping, seats) => sent.push({ to: seats || 'all', event: 'room:ping', payload: ping }),
+  });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u0', name: 'Ana' });
+  if (botPartner) room.addBot('u0', 2);
+  ['u2', 'u1', 'u3'].slice(botPartner ? 1 : 0).forEach((userId) => room.join({ userId, name: userId }));
+  room.seats.forEach((p, s) => p && !p.isBot && room.attach(p.userId, `s${s}`));
+  room.setTeams('u0', true);
+  room.start('u0');
+  return { room, sent };
+}
+
+test('team chat only reaches the two partners and never the shared game log', (t) => {
+  const { room, sent } = teamRoom(t);
+  const partnerOfAna = room.seats[2].userId;
+  const before = room.game.log.length;
+  room.chat('u0', 'go for their blue one', 'team');
+  assert.strictEqual(room.game.log.length, before, 'team chat stays out of the broadcast log');
+  const teamChat = sent.find((m) => m.event === 'room:teamChat');
+  assert.deepStrictEqual(teamChat.to, [0, 2]);
+  assert.strictEqual(teamChat.payload.text, 'go for their blue one');
+  assert.ok(sent.every((m) => m.to !== 'all'), 'nothing went to the whole room');
+  assert.strictEqual(room.teamLogFor(partnerOfAna).length, 1);
+  assert.strictEqual(room.teamLogFor(room.seats[1].userId).length, 0, 'opponents get no team history');
+  assert.deepStrictEqual(room.socketsForSeats([0, 2]).sort(), ['s0', 's2']);
+});
+
+test('pings: team or everyone for players, everyone-only for Dev spectators, bots acknowledge', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { room, sent } = teamRoom(t, { botPartner: true });
+  room.ping('u0', { x: 3, z: -4.126, type: 'danger', scope: 'team' });
+  const ping = sent.at(-1);
+  assert.deepStrictEqual({ to: ping.to, seat: ping.payload.seat, type: ping.payload.type, scope: ping.payload.scope, z: ping.payload.z }, { to: [0, 2], seat: 0, type: 'danger', scope: 'team', z: -4.13 });
+  t.mock.timers.tick(700);
+  assert.strictEqual(sent.at(-1).payload.type, 'ack', 'the bot partner acknowledges');
+  assert.strictEqual(sent.at(-1).payload.seat, 2);
+
+  const count = sent.length;
+  room.ping('u0', { x: 1, z: 1 });
+  assert.strictEqual(sent.length, count, 'cooldown between pings');
+  t.mock.timers.tick(1000);
+  room.ping('u0', { x: 1, z: 1, scope: 'all' });
+  assert.strictEqual(sent.at(-1).to, 'all');
+  assert.throws(() => room.ping('u1', { x: 99, z: 0 }), /spot on the board/);
+
+  room.join({ userId: 'viewer', name: 'Watcher' });
+  assert.throws(() => room.ping('viewer', { x: 0, z: 0 }), /Only players/);
+  room.ping('viewer', { x: 0, z: 0, scope: 'team' }, { admin: true });
+  assert.deepStrictEqual({ to: sent.at(-1).to, dev: sent.at(-1).payload.dev, seat: sent.at(-1).payload.seat }, { to: 'all', dev: true, seat: null });
+});
+
 test('chat is rate limited, open to spectators, and only once the game is on', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());
