@@ -2,6 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
+const MEDIA = path.join(ROOT, 'build', 'static', 'media');
+const LOGO_COLORS = ['#e03a3e', '#2f7de1', '#f4b400', '#2e9e55'];
+
+function logoFontUrl() {
+  try {
+    const file = fs.readdirSync(MEDIA).find((name) => /^fredoka-latin-700-normal\.[a-f0-9]+\.woff2$/.test(name));
+    return file ? `/static/media/${file}` : null;
+  } catch {
+    return null;
+  }
+}
 const PAGES = {
   '/terms': { file: 'TERMS.md', title: 'Terms of Service' },
   '/privacy': { file: 'PRIVACY.md', title: 'Privacy Policy' },
@@ -52,7 +63,9 @@ function markdownToHtml(markdown) {
   return out.join('\n');
 }
 
-const page = (title, body, otherRoute, otherTitle) => `<!DOCTYPE html>
+const logo = [...'Marralhinha!'].map((ch, i) => `<span style="--c:${LOGO_COLORS[i % 4]};--d:${(i * 0.07).toFixed(2)}s">${ch}</span>`).join('');
+
+const page = (title, body, otherRoute, otherTitle, fontUrl) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -62,13 +75,16 @@ const page = (title, body, otherRoute, otherTitle) => `<!DOCTYPE html>
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <style>
+  ${fontUrl ? `@font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 700; font-display: swap; src: url(${fontUrl}) format('woff2'); }` : ''}
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 50% 0%, #1f5a4f 0%, #0b1f24 60%) fixed; color: #fff6e8; font: 17px/1.65 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
   header, main, footer { width: min(760px, 100% - 32px); margin: 0 auto; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 0; }
-  .brand { font-size: 26px; font-weight: 800; text-decoration: none; letter-spacing: 0.01em; }
-  .brand span:nth-child(4n+1) { color: #e03a3e; } .brand span:nth-child(4n+2) { color: #2f7de1; } .brand span:nth-child(4n+3) { color: #f4b400; } .brand span:nth-child(4n) { color: #2e9e55; }
+  .logo { margin: 0; font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif; font-size: clamp(40px, 9vw, 56px); font-weight: 700; letter-spacing: -0.01em; line-height: 1; text-decoration: none; }
+  .logo span { display: inline-block; color: var(--c); text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 24px color-mix(in srgb, var(--c) 45%, transparent); animation: letter-bounce 2.8s ease-in-out infinite; animation-delay: var(--d); }
+  @keyframes letter-bounce { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-8px); } }
+  h1, h2, h3, .play { font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif; }
   .play { padding: 9px 18px; border-radius: 12px; background: #ff8a3d; color: #1b1208; font-weight: 700; text-decoration: none; box-shadow: 0 4px 0 #b3561a; }
   main { padding: 34px clamp(20px, 5vw, 48px); border-radius: 22px; background: rgba(8, 20, 24, 0.82); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); }
   h1 { margin: 0 0 6px; font-size: clamp(30px, 5vw, 40px); line-height: 1.15; color: #ffd166; }
@@ -92,7 +108,7 @@ const page = (title, body, otherRoute, otherTitle) => `<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <a class="brand" href="/" aria-label="Marralhinha home">${[...'Marralhinha!'].map((ch) => `<span>${ch}</span>`).join('')}</a>
+  <a class="logo" href="/" aria-label="Marralhinha home">${logo}</a>
   <a class="play" href="/">Play</a>
 </header>
 <main>
@@ -112,7 +128,7 @@ function legalRoutes(app) {
     app.get(route, (req, res, next) => {
       fs.readFile(path.join(ROOT, file), 'utf8', (err, markdown) => {
         if (err) return next();
-        res.type('html').set('Cache-Control', 'public, max-age=300').send(page(title, markdownToHtml(markdown), otherRoute, other.title));
+        res.type('html').set('Cache-Control', 'public, max-age=300').send(page(title, markdownToHtml(markdown), otherRoute, other.title, logoFontUrl()));
       });
     });
   });

@@ -54,7 +54,7 @@ class Economy {
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       daily: db.prepare('UPDATE users SET daily_day = ?, streak = ? WHERE id = ?'),
       counters: db.prepare('UPDATE users SET counter_day = ?, bot_games_today = ?, won_today = ? WHERE id = ?'),
-      stats: db.prepare('UPDATE users SET games = games + 1, wins = wins + ?, captures = captures + ? WHERE id = ?'),
+      stats: db.prepare('UPDATE users SET games = games + 1, wins = wins + ?, captures = captures + ?, sixes = sixes + ? WHERE id = ?'),
       pity: db.prepare('UPDATE users SET pity = ?, boxes_opened = boxes_opened + 1 WHERE id = ?'),
       addItem: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)'),
     };
@@ -138,10 +138,13 @@ class Economy {
 
         this.credit(userId, total, `game:${won ? 'win' : 'finish'}`);
         this.q.addXp.run(earned, userId);
-        this.q.stats.run(won ? 1 : 0, stats.captures, userId);
+        this.q.stats.run(won ? 1 : 0, stats.captures, stats.sixes || 0, userId);
         this.q.counters.run(today, botGames, wonToday, userId);
         results[seat] = { total, xp: earned, lines, note, level: after, leveledUp: after > before };
       }
+      const lucky = this.accounts.refreshLucky();
+      const luckySeat = lucky && players.find((p) => p.userId === lucky.holder)?.seat;
+      if (luckySeat !== undefined && luckySeat !== null && results[luckySeat]) results[luckySeat].luckyTag = true;
     });
     return results;
   }

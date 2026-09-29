@@ -1,13 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
+import { sfx } from '../game/sound';
 import RulesButton from './Rules';
 import { Copy } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
+import { ask } from './Dialog';
+
+// Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go
+function useSeatEvents(room, playerId) {
+  const [events, setEvents] = useState([]);
+  const prev = useRef(null);
+  useEffect(() => {
+    const humans = new Map([...room.seats, ...(room.spectators || [])].filter((p) => p && !p.isBot).map((p) => [p.id, p.name]));
+    const before = prev.current;
+    prev.current = humans;
+    if (!before) return;
+    const joined = [...humans].filter(([id]) => !before.has(id) && id !== playerId).map(([, name]) => `${name} joined`);
+    const left = [...before].filter(([id]) => !humans.has(id) && id !== playerId).map(([, name]) => `${name} left`);
+    const fresh = [...joined, ...left].map((text) => ({ id: `${Date.now()}-${Math.random()}`, text, joined: joined.includes(text) }));
+    if (!fresh.length) return;
+    if (joined.length) sfx.pop();
+    else sfx.click();
+    setEvents((list) => [...list, ...fresh].slice(-3));
+    fresh.forEach((event) => setTimeout(() => setEvents((list) => list.filter((e) => e.id !== event.id)), 3500));
+  }, [room.seats, room.spectators, playerId]);
+  return events;
+}
 
 export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const events = useSeatEvents(room, playerId);
+  const act = async (fn) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
   const isHost = room.hostId === playerId;
   const mySeat = room.seats.findIndex((p) => p?.id === playerId);
   const spectator = mySeat === -1;
@@ -22,7 +56,12 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.prompt('Copy this invite link:', inviteUrl);
+      ask({
+        title: 'Copy this invite link',
+        body: <input className="dialog-input" readOnly value={inviteUrl} autoFocus onFocus={(e) => e.target.select()} aria-label="Invite link" />,
+        confirm: 'Done',
+        cancel: null,
+      });
     }
   };
 
@@ -48,6 +87,13 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
           </div>
         )}
 
+        <div className="lobby-events" aria-live="polite">
+          {events.map((e) => (
+            <span key={e.id} className={`lobby-event${e.joined ? ' joined' : ''}`}>
+              {e.text}
+            </span>
+          ))}
+        </div>
         {spectator && <p className="lobby-notice">You're spectating. If a seat opens up before the game starts, tap Sit to join.{isAdmin && ' You can also pick two occupied seats to swap as Dev.'}</p>}
         {offered && (
           <div className="lobby-notice">
@@ -161,16 +207,19 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
         {isHost && seated < 4 && (
           <button
             className="btn ghost block"
-            onClick={async () => {
-              for (const s of SEATS.filter((seat) => !room.seats[seat])) await onAction('lobby:addBot', { seat: s });
-            }}
+            disabled={busy}
+            onClick={() =>
+              act(async () => {
+                for (const s of SEATS.filter((seat) => !room.seats[seat])) await onAction('lobby:addBot', { seat: s });
+              })
+            }
           >
             Fill empty seats with bots
           </button>
         )}
         {isHost ? (
-          <button className={`btn primary big block${seated >= 2 ? ' play-btn' : ''}`} disabled={seated < 2} onClick={() => onAction('game:start')}>
-            Start game
+          <button className={`btn primary big block${seated >= 2 ? ' play-btn' : ''}`} disabled={seated < 2 || busy} onClick={() => act(() => onAction('game:start'))}>
+            {busy ? 'Starting…' : 'Start game'}
           </button>
         ) : (
           <div className="waiting">{spectator ? 'Watching this table. Waiting for the host to start…' : 'Waiting for the host to start…'}</div>

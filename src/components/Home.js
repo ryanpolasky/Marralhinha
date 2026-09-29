@@ -67,6 +67,8 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
   const [spin, setSpin] = useState(0);
   const nameOk = name.trim().length > 0;
   const invited = /^[A-Z0-9]{4}$/.test(initialCode || '');
+  // Only grab focus on mouse/trackpad devices without a name yet, so phones don't pop the keyboard over the menu
+  const [autoFocusName] = useState(() => !name.trim() && window.matchMedia?.('(pointer: fine)').matches);
 
   return (
     <div className="screen">
@@ -86,7 +88,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
         <label className="field">
           <span>Your name</span>
           <div className="name-row">
-            <input value={name} maxLength={16} placeholder="Enter a nickname" onChange={(e) => onNameChange(e.target.value)} autoFocus />
+            <input value={name} maxLength={16} placeholder="Enter a nickname" onChange={(e) => onNameChange(e.target.value)} autoFocus={autoFocusName} />
             <button
               type="button"
               className="dice-btn"

@@ -4,25 +4,25 @@ import { IS_ACTIVITY } from '../net/config';
 import { ChestIcon, GiftIcon, Hanger, Shield, DiscordMark as DiscordLogo } from './Icons';
 import { SettingsButton } from './Settings';
 
-export default function AccountBar({ account, discordEnabled, onShop, onLocker, onDaily, onDiscord, onSignOut, onAdmin }) {
+export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin }) {
   if (!account) return null;
   const daily = account.daily;
   const pct = Math.min(100, (account.into / account.need) * 100);
   return (
     <div className="account-bar">
       <Nameplate plate={account.equipped.nameplate} className="account-plate">
-        <span className="level-badge" title={`Level ${account.level}`}>
-          {account.level}
-        </span>
-        <span className="account-info">
-          <span className="account-name-row">
-            <span className="account-name">{account.name}</span>
-            <TagBadges tags={account.tags} small />
+        <button type="button" className="account-profile-btn" onClick={onProfile} title="View your profile and stats" aria-label="View your profile and stats">
+          <span className="level-badge">{account.level}</span>
+          <span className="account-info">
+            <span className="account-name-row">
+              <span className="account-name">{account.name}</span>
+              <TagBadges tags={account.tags} small />
+            </span>
+            <span className="xp-bar" title={`${account.into} / ${account.need} XP`}>
+              <span style={{ width: `${pct}%` }} />
+            </span>
           </span>
-          <span className="xp-bar" title={`${account.into} / ${account.need} XP`}>
-            <span style={{ width: `${pct}%` }} />
-          </span>
-        </span>
+        </button>
         {account.discordLinked && !IS_ACTIVITY && (
           <button className="discord-linked" onClick={onSignOut} title="Signed in with Discord. Click to sign out.">
             <DiscordLogo />

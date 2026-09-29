@@ -11,6 +11,13 @@ const BOT_DELAY_MS = 450;
 const START_WHEEL_MS = 8500;
 const START_WINNER_MS = 2200;
 const AWAY_GRACE_MS = 20000;
+// Connected players get this long per roll/move before the game plays for them (keep in sync with src/game/moves.js)
+const TURN_MS = 30000;
+// After this many timed-out turns in a row a player counts as away and gets played for quickly
+const IDLE_MISSES = 2;
+const IDLE_DELAY_MS = 2500;
+// A disconnected host hands the host role to the next connected player after this long
+const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 30 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
@@ -58,6 +65,9 @@ class Room {
     // Player ids of the last round's winners: one of them starts the rematch on their board
     this.lastWinners = [];
     this.timer = null;
+    this.timerKey = null;
+    this.turnDeadline = null;
+    this.hostTimer = null;
     this.banterTimers = new Set();
     this.lastActive = Date.now();
   }
@@ -126,6 +136,7 @@ class Room {
     if (!player) return;
     player.sockets.add(socketId);
     player.connected = true;
+    if (player.id === this.hostId) this.cancelHostHandoff();
     this.touch();
     this.changed();
   }
@@ -136,7 +147,43 @@ class Room {
     player.sockets.delete(socketId);
     player.connected = player.sockets.size > 0;
     if (!player.connected) this.spectators.delete(userId);
+    if (!player.connected && player.id === this.hostId) this.scheduleHostHandoff();
     this.changed();
+  }
+
+  scheduleHostHandoff() {
+    this.cancelHostHandoff();
+    this.hostTimer = setTimeout(() => {
+      this.hostTimer = null;
+      const host = this.seats.find((p) => p && p.id === this.hostId);
+      if (host?.connected) return;
+      const next = this.seats.find((p) => p && !p.isBot && p.connected);
+      if (!next) return;
+      this.hostId = next.id;
+      this.changed();
+    }, HOST_HANDOFF_MS);
+  }
+
+  cancelHostHandoff() {
+    clearTimeout(this.hostTimer);
+    this.hostTimer = null;
+  }
+
+  // "Leave" from one device: other devices on the same account keep the seat. Returns true if the user fully left
+  leaveDevice(userId, socketId) {
+    const player = this.findViewer(userId);
+    if (!player) return true;
+    if ([...player.sockets].some((id) => id !== socketId)) {
+      this.detach(userId, socketId);
+      return false;
+    }
+    this.leave(userId);
+    return true;
+  }
+
+  // Seated in a game that is still being played
+  inLiveGame(userId) {
+    return !!(this.game && this.game.phase !== 'over' && this.findByUser(userId));
   }
 
   leave(userId) {
@@ -240,6 +287,7 @@ class Room {
     this.requireHost(userId);
     this.requireLobby();
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
+    humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false }));
     this.swapOffers = [];
     this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
     this.humansAtStart = humans.length;
@@ -263,8 +311,10 @@ class Room {
   }
 
   requireTurn(userId) {
-    const { seat } = this.require(userId);
+    const { seat, player } = this.require(userId);
     if (!this.game || this.game.turn !== seat) throw new UserError("It's not your turn");
+    player.missed = 0;
+    player.idle = false;
   }
 
   roll(userId) {
@@ -339,17 +389,31 @@ class Room {
     this.hooks.onChange(this);
   }
 
+  // Bots, away players and idle players get played for. Unrelated updates (chat, reactions, spectators)
+  // keep the running timer, so the turn clock never resets unless the turn itself changes
   scheduleAutoplay() {
+    const { game } = this;
+    const player = game && game.phase !== 'over' ? this.seats[game.turn] : null;
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle].join('|');
+    if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
-    const { game } = this;
-    if (!game || game.phase === 'over') return;
-    const player = this.seats[game.turn];
-    if (!player || (!player.isBot && player.connected)) return;
-    const delay = (player.isBot ? BOT_DELAY_MS + randomInt(0, 400) : AWAY_GRACE_MS) + animationMs(game);
+    this.timerKey = key;
+    this.turnDeadline = null;
+    if (!player) return;
+    const human = !player.isBot;
+    const base = !human ? BOT_DELAY_MS + randomInt(0, 400) : !player.connected ? AWAY_GRACE_MS : player.idle ? IDLE_DELAY_MS : TURN_MS;
+    const delay = base + animationMs(game);
+    if (human && player.connected && !player.idle) this.turnDeadline = Date.now() + delay;
     this.timer = setTimeout(() => {
       this.timer = null;
+      this.timerKey = null;
       if (this.game !== game || game.phase === 'over') return;
+      if (human && player.connected && !player.idle) {
+        player.missed = (player.missed || 0) + 1;
+        if (player.missed >= IDLE_MISSES) player.idle = true;
+        rules.addLog(game, `${player.name} ran out of time`, game.turn);
+      }
       if (game.phase === 'roll') rules.roll(game);
       else {
         rules.move(game, chooseMove(game).id);
@@ -370,6 +434,7 @@ class Room {
 
   dispose() {
     clearTimeout(this.timer);
+    this.cancelHostHandoff();
     this.banterTimers.forEach(clearTimeout);
   }
 
@@ -379,7 +444,9 @@ class Room {
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
-      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
+      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, idle: !!p.idle, devices: p.sockets?.size || 0, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
+      // Relative, so client clock skew doesn't matter
+      turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,
       game: this.game,

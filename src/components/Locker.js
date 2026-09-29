@@ -70,7 +70,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
                     </button>
                   ) : item.tag ? (
                     <div className="exclusive-note">
-                      <TagBadge tag={item.tag} /> Only players with the {TAGS[item.tag].label} tag can wear this.
+                      <TagBadge tag={item.tag} /> {TAGS[item.tag].unlock || `Only players with the ${TAGS[item.tag].label} tag can wear this.`}
                     </div>
                   ) : (
                     <button className="btn secondary block" onClick={onShop}>

@@ -644,7 +644,10 @@ const DICE = {
   holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
+  lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
+
+const ANIMATED_DICE = ['dev', 'holo', 'lucky'];
 
 function grid(ctx, size, step, color, width = 1) {
   ctx.strokeStyle = color;
@@ -723,6 +726,27 @@ function dieBackground(ctx, style, size, value) {
     ctx.lineWidth = 2.5;
     ctx.strokeRect(20, 20, size - 40, size - 40);
     ctx.setLineDash([]);
+  } else if (style === 'lucky') {
+    // Warmer, deeper gold than Solid Gold, packed with glitter flecks and a champagne inset border
+    const g = ctx.createRadialGradient(size * 0.35, size * 0.3, 10, size * 0.5, size * 0.5, size * 0.75);
+    g.addColorStop(0, '#fff3b8');
+    g.addColorStop(0.45, '#f0b93a');
+    g.addColorStop(0.8, '#b07512');
+    g.addColorStop(1, '#7a4d08');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 2600; i++) {
+      const bright = rand();
+      ctx.fillStyle = bright > 0.7 ? `rgba(255,255,240,${0.4 + rand() * 0.6})` : `rgba(${bright > 0.35 ? '255,214,110' : '120,70,5'},${0.25 + rand() * 0.45})`;
+      const s = 0.8 + rand() * 1.8;
+      ctx.fillRect(rand() * size, rand() * size, s, s);
+    }
+    ctx.strokeStyle = 'rgba(255,246,208,0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(14, 14, size - 28, size - 28);
+    ctx.strokeStyle = 'rgba(122,77,8,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(21, 21, size - 42, size - 42);
   } else if (style === 'gold') {
     const g = ctx.createLinearGradient(0, 0, size, size);
     g.addColorStop(0, '#fff0b0');
@@ -778,7 +802,7 @@ export function diceSkin(itemId) {
         Object.assign(params, { emissiveMap: new THREE.CanvasTexture(glow), emissive: '#ffffff', emissiveIntensity: spec.glow });
         params.emissiveMap.colorSpace = THREE.SRGBColorSpace;
       }
-      if (key === 'dev' || key === 'holo') {
+      if (ANIMATED_DICE.includes(key)) {
         const [mask, mctx] = makeCanvas(size, size);
         mctx.fillStyle = '#000';
         mctx.fillRect(0, 0, size, size);
@@ -794,7 +818,7 @@ export function diceSkin(itemId) {
         params.emissiveIntensity = 1;
       }
       const material = new THREE.MeshPhysicalMaterial(params);
-      if (key === 'dev' || key === 'holo') {
+      if (ANIMATED_DICE.includes(key)) {
         material.userData.skinTime = time;
         material.customProgramCacheKey = () => `dice-${key}-animated`;
         material.onBeforeCompile = (shader) => {
@@ -802,7 +826,22 @@ export function diceSkin(itemId) {
           shader.uniforms.uFacePhase = { value: value * 0.73 };
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', '#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;')
-            .replace('#include <emissivemap_fragment>', key === 'dev' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'lucky' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              vec2 g = uv * 42.0;
+              vec2 cell = floor(g);
+              vec2 local = fract(g) - 0.5;
+              float h = fract(sin(dot(cell + uFacePhase * 7.0, vec2(12.9898, 78.233))) * 43758.5453);
+              float h2 = fract(h * 91.7);
+              float twinkle = pow(max(sin(uSkinTime * (1.4 + h2 * 2.6) + h * 6.283185), 0.0), 16.0);
+              float star = max(1.0 - smoothstep(0.0, 0.05, abs(local.x)) , 1.0 - smoothstep(0.0, 0.05, abs(local.y))) * (1.0 - smoothstep(0.1, 0.45, length(local)));
+              float dotm = 1.0 - smoothstep(0.05, 0.2, length(local));
+              float sparkle = step(0.86, h) * twinkle * max(star, dotm);
+              float sweep = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 3.0 - uSkinTime * 1.2 + uFacePhase), 24.0);
+              totalEmissiveRadiance = (1.0 - pip) * (vec3(1.0, 0.9, 0.62) * sparkle * 2.4 + vec3(1.0, 0.78, 0.35) * sweep * 0.22)
+                + pip * vec3(0.04, 0.5, 0.24) * (0.3 + 0.2 * sin(uSkinTime * 2.0 + uFacePhase));
+            }` : key === 'dev' ? `{
               vec2 uv = vEmissiveMapUv;
               vec2 p = uv - 0.5;
               float pip = texture2D(emissiveMap, uv).r;

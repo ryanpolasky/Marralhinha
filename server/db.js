@@ -45,10 +45,17 @@ CREATE TABLE IF NOT EXISTS ledger (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ledger_user ON ledger(user_id);
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
 `;
 
 // Columns added after the first release; applied to existing databases on startup
-const MIGRATIONS = [['users', 'tags', "TEXT NOT NULL DEFAULT '[]'"]];
+const MIGRATIONS = [
+  ['users', 'tags', "TEXT NOT NULL DEFAULT '[]'"],
+  ['users', 'sixes', 'INTEGER NOT NULL DEFAULT 0'],
+];
 
 function migrate(db) {
   for (const [table, column, type] of MIGRATIONS) {

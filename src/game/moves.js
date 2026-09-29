@@ -7,6 +7,8 @@ export const ROLL_REVEAL_MS = 1050;
 export const START_WHEEL_MS = 8500;
 export const START_WHEEL_SPIN_MS = 4300;
 export const START_WINNER_MS = 2200;
+// Time a connected player gets per roll/move before the game plays for them (see TURN_MS in server/rooms.js)
+export const TURN_MS = 30000;
 export const startPendingFor = (game, now = Date.now()) => {
   if (!game?.pick) return 0;
   const total = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;

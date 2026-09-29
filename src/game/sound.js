@@ -97,10 +97,20 @@ export const sfx = {
       tone({ freq: jitter(700, 0.4), type: 'triangle', dur: 0.04, vol: 0.06, delay: d });
     });
   },
-  capture: () => {
+  // kind: 'mine' (you captured), 'victim' (you got captured) or 'other' (someone else's fight)
+  capture: (kind = 'other') => {
     noise({ dur: 0.45, vol: 0.25, freq: 600, to: 3000, q: 0.8 });
-    tone({ freq: 180, to: 45, type: 'sine', dur: 0.35, vol: 0.35 });
+    tone({ freq: 180, to: 45, type: 'sine', dur: 0.35, vol: kind === 'other' ? 0.25 : 0.35 });
     tone({ freq: 880, to: 220, type: 'square', dur: 0.25, vol: 0.04, delay: 0.05 });
+    if (kind === 'mine') [784, 988, 1175, 1568].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.14, vol: 0.12, delay: 0.18 + i * 0.06 }));
+    if (kind === 'victim') {
+      tone({ freq: 330, to: 220, type: 'triangle', dur: 0.3, vol: 0.13, delay: 0.25 });
+      tone({ freq: 247, to: 147, type: 'triangle', dur: 0.5, vol: 0.13, delay: 0.55 });
+    }
+  },
+  tick: (urgent = false) => {
+    tone({ freq: urgent ? 1400 : 1000, type: 'square', dur: 0.035, vol: urgent ? 0.07 : 0.045 });
+    noise({ dur: 0.02, vol: 0.06, freq: 3000, q: 3 });
   },
   pop: () => tone({ freq: 420, to: 980, dur: 0.13, vol: 0.18 }),
   home: () => [784, 988, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.22, vol: 0.14, delay: i * 0.08 })),

@@ -15,6 +15,8 @@ import AccountBar from './components/AccountBar';
 import Shop from './components/Shop';
 import Locker from './components/Locker';
 import Admin from './components/Admin';
+import Profile from './components/Profile';
+import { DialogHost, ask } from './components/Dialog';
 
 const Scene = lazy(() => import('./three/Scene'));
 
@@ -129,8 +131,17 @@ const App = () => {
         if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current }));
         const invite = urlCode();
         const saved = sessionRef.current?.code || storedRoom();
-        const code = invite ? (saved === invite ? invite : null) : saved;
-        if (code) enter(await request('room:join', { code }));
+        // No saved room on this device? Pick up wherever this account is already seated (e.g. on another device)
+        const code = invite ? (saved === invite ? invite : null) : saved || (await request('room:current')).code;
+        if (code) {
+          try {
+            enter(await request('room:join', { code }));
+          } catch (err) {
+            // Rooms live in server memory, so a missing saved room almost always means it closed or the server restarted
+            if (/not found/i.test(err.message) && code === saved) throw new Error(`Room ${code} has closed (the game server may have restarted). Start a new one!`);
+            throw err;
+          }
+        }
       } catch (err) {
         if (!IS_ACTIVITY) saveSession(null);
         notify(err.message);
@@ -159,11 +170,18 @@ const App = () => {
       sfx.pop();
       setTimeout(() => setReactions((list) => list.filter((r) => r.id !== id)), reaction.text ? 4500 : 2600);
     };
+    const onRoomLeft = ({ code, reason }) => {
+      if (sessionRef.current?.code !== code) return;
+      saveSession(null);
+      setUrl(null);
+      if (reason) notify(reason, 'good');
+    };
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
     socket.on('room:state', setRoom);
     socket.on('room:reaction', onReaction);
+    socket.on('room:left', onRoomLeft);
     socket.on('account:update', setAccount);
 
     bootstrapAuth()
@@ -185,6 +203,7 @@ const App = () => {
       socket.off('connect_error', onConnectError);
       socket.off('room:state', setRoom);
       socket.off('room:reaction', onReaction);
+      socket.off('room:left', onRoomLeft);
       socket.off('account:update', setAccount);
       socket.disconnect();
     };
@@ -200,11 +219,13 @@ const App = () => {
       const button = e.target.closest?.('button');
       if (button && !button.disabled) sfx.click();
     };
+    // pointerdown isn't a user activation everywhere (e.g. iOS Safari), so click/touchend/keydown also unlock
+    const gestures = ['click', 'touchend', 'keydown'];
     window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', unlock, { once: true });
+    gestures.forEach((type) => window.addEventListener(type, unlock));
     return () => {
       window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', unlock);
+      gestures.forEach((type) => window.removeEventListener(type, unlock));
     };
   }, []);
 
@@ -258,8 +279,13 @@ const App = () => {
   const inRoom = !!(session && room && room.code === session.code);
   const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
 
-  const leave = () => {
-    if (mySeat >= 0 && room?.game && room.game.phase !== 'over' && !window.confirm('Leave this game? A bot will take over your seat and you forfeit the rewards.')) return;
+  const leave = async () => {
+    // With another device still in the room, leaving here just hands control to that device
+    const onlyDevice = (room?.seats[mySeat]?.devices ?? 1) <= 1;
+    if (mySeat >= 0 && onlyDevice && room?.game && room.game.phase !== 'over') {
+      const ok = await ask({ title: 'Leave this game?', message: 'A bot will take over your seat and you forfeit the rewards.', confirm: 'Leave game', cancel: 'Keep playing', tone: 'danger' });
+      if (!ok) return;
+    }
     request('room:leave').catch(() => {});
     saveSession(null);
     setUrl(null);
@@ -314,11 +340,13 @@ const App = () => {
       discordEnabled={config.discord}
       onShop={() => setModal('shop')}
       onLocker={() => setModal('locker')}
+      onProfile={() => setModal('profile')}
       onAdmin={() => setModal('admin')}
       onDaily={claimDaily}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
       onSignOut={async () => {
-        if (!window.confirm('Sign out of Discord? Your progress stays saved to your Discord account for next time.')) return;
+        const ok = await ask({ title: 'Sign out of Discord?', message: 'Your progress stays saved to your Discord account for next time.', confirm: 'Sign out' });
+        if (!ok) return;
         await logout();
         localStorage.removeItem(ROOM_KEY);
         window.location.assign(window.location.pathname);
@@ -364,9 +392,7 @@ const App = () => {
         onQuickPlay={() =>
           run(async () => {
             await ensureName();
-            enter(await request('room:create'));
-            for (const seat of [1, 2, 3]) await request('lobby:addBot', { seat });
-            await request('game:start');
+            enter(await request('room:quickPlay'));
           })
         }
         onJoin={(code) =>
@@ -401,8 +427,8 @@ const App = () => {
     <div className={`app mode-${sceneProps.mode}`}>
       <div className="scene-layer">
         <SceneBoundary>
-          <Suspense fallback={null}>
-            <Scene {...sceneProps} boardSkinId={boardSkinId} onRoll={sceneRoll} onMove={sceneMove} resetKey={resetKey} />
+          <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>
+            <Scene {...sceneProps} mySeat={inRoom ? mySeat : -1} boardSkinId={boardSkinId} onRoll={sceneRoll} onMove={sceneMove} resetKey={resetKey} />
           </Suspense>
         </SceneBoundary>
       </div>
@@ -418,6 +444,8 @@ const App = () => {
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}
       {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onShop={() => setModal('shop')} />}
       {modal === 'admin' && account?.admin && <Admin account={account} onClose={() => setModal(null)} notify={notify} />}
+      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} />}
+      <DialogHost />
     </div>
   );
 };

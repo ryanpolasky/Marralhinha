@@ -70,12 +70,20 @@ export function TagBadge({ tag, small = false, title }) {
   return (
     <span className={`tag-badge tag-${tag}${small ? ' small' : ''}`} style={{ '--tag': info.color }} title={title ?? info.blurb}>
       {tag === 'dev' && <svg className="tag-code-icon" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3 1 8l5 5M18 3l5 5-5 5M14 1l-4 14" /></svg>}
+      {tag === 'lucky' && (
+        <svg className="tag-lucky-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
+        </svg>
+      )}
       {info.label}
     </span>
   );
 }
 
-export const TagBadges = ({ tags, small }) => (tags || []).map((tag) => <TagBadge key={tag} tag={tag} small={small} />);
+export const TagBadges = ({ tags, small }) => {
+  const visible = (tags || []).filter((tag) => !(tag === 'beta' && tags.includes('dev')));
+  return visible.map((tag) => <TagBadge key={tag} tag={tag} small={small} />);
+};
 
 export function ItemThumb({ itemId, seat = 0 }) {
   const item = ITEMS[itemId];
@@ -113,15 +121,18 @@ export function PreviewStage({ itemId, seat = 0, playerName }) {
   );
 }
 
-export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, footer, seat = 0 }) {
+export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, footer, seat = 0, label, disabled = false }) {
   const item = ITEMS[itemId];
   const rarity = rarityOf(item);
   return (
     <button
+      type="button"
       className={`item-card rarity-${item.rarity}${item.tag ? ` tag-${item.tag}` : ''}${owned ? '' : ' locked'}${equipped ? ' equipped' : ''}${selected ? ' selected' : ''}`}
       style={{ '--rarity': rarity.color }}
       onClick={onClick}
       title={item.desc}
+      aria-label={label}
+      aria-disabled={disabled || undefined}
     >
       <ItemThumb itemId={itemId} seat={seat} />
       <span className="item-name">{item.name}</span>

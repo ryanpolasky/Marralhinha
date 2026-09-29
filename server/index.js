@@ -38,8 +38,11 @@ const rooms = new RoomManager({
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
   onGameOver: (room, { players, botGame }) => {
     try {
+      const luckyBefore = accounts.luckyHolder();
       const rewards = economy.awardGame({ game: room.game, players, botGame });
-      setTimeout(() => players.forEach(({ userId }) => pushProfile(userId)), 0);
+      const touched = new Set(players.map((p) => p.userId));
+      if (luckyBefore && luckyBefore !== accounts.luckyHolder()) touched.add(luckyBefore);
+      setTimeout(() => touched.forEach((userId) => pushProfile(userId)), 0);
       return rewards;
     } catch (err) {
       console.error('[rewards]', err);
@@ -92,14 +95,39 @@ io.on('connection', (socket) => {
     socket.data.code = null;
     const room = rooms.rooms.get(code);
     if (!room || !room.findViewer(userId)) return;
-    if (permanently) room.leave(userId);
+    if (permanently) room.leaveDevice(userId, socket.id);
     else room.detach(userId, socket.id);
   };
 
-  const enter = (room) => {
+  // One room per account. Refuse to silently forfeit a live game elsewhere; anything else (lobbies,
+  // spectating, finished games) is left, and the user's other devices in those rooms are sent home
+  const otherRooms = (code) => rooms.roomsWithUser(userId).filter((room) => room.code !== code);
+  const ensureFree = (code) => {
+    const live = otherRooms(code).find((room) => room.inLiveGame(userId));
+    if (live) throw new UserError(`You're still playing in room ${live.code}. Leave that game first.`);
+  };
+  const leaveOthers = (code) => {
+    otherRooms(code).forEach((room) => {
+      const socketIds = [...(room.findViewer(userId)?.sockets || [])];
+      room.leave(userId);
+      socketIds.forEach((id) => {
+        const other = io.sockets.sockets.get(id);
+        if (!other || other.data.code !== room.code) return;
+        other.leave(room.code);
+        other.data.code = null;
+        if (other.id !== socket.id) other.emit('room:left', { code: room.code, reason: 'You joined another room on another device' });
+      });
+    });
+  };
+
+  // `target` is a room, or a factory for a brand-new one (checked before it gets created)
+  const enter = (target) => {
     const user = accounts.getUser(userId);
     if (!user) throw new UserError('Your account was not found, please reload');
+    ensureFree(typeof target === 'function' ? null : target.code);
+    const room = typeof target === 'function' ? target() : target;
     const player = room.join(accounts.publicInfo(user));
+    leaveOthers(room.code);
     if (socket.data.code && socket.data.code !== room.code) leaveCurrent(false);
     socket.data.code = room.code;
     socket.join(room.code);
@@ -107,9 +135,23 @@ io.on('connection', (socket) => {
     return { code: room.code, playerId: player.id };
   };
 
-  handle('room:create', () => enter(rooms.create()));
+  handle('room:create', () => enter(() => rooms.create()));
+  // One round trip for "Quick play vs bots", so a flaky connection can't leave a half-filled lobby behind
+  handle('room:quickPlay', () => {
+    const res = enter(() => rooms.create());
+    const room = rooms.get(res.code);
+    [0, 1, 2, 3].filter((seat) => !room.seats[seat]).forEach((seat) => room.addBot(userId, seat));
+    room.start(userId);
+    return res;
+  });
   handle('room:join', ({ code }) => enter(rooms.get(code)));
   handle('room:joinInstance', ({ instanceId }) => enter(rooms.forInstance(instanceId)));
+  // Lets a second device pick up wherever this account is seated (live games first)
+  handle('room:current', () => {
+    const seated = rooms.roomsWithUser(userId).filter((room) => room.findByUser(userId));
+    const room = seated.find((r) => r.inLiveGame(userId)) || seated[0];
+    return { code: room?.code || null };
+  });
   handle('room:leave', () => leaveCurrent(true));
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
   handle('lobby:offerSwap', ({ seat }) => current().offerSwap(userId, seat));

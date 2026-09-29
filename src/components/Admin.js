@@ -48,7 +48,8 @@ function UserEditor({ user, me, onChange, notify }) {
   };
 
   const toggleTag = (tag) => {
-    const next = user.tags.includes(tag) ? user.tags.filter((t) => t !== tag) : [...user.tags, tag];
+    const stored = user.tags.filter((t) => !TAGS[t]?.auto);
+    const next = stored.includes(tag) ? stored.filter((t) => t !== tag) : [...stored, tag];
     act('/tags', { tags: next }, `${user.name} ${user.tags.includes(tag) ? 'lost' : 'got'} the ${TAGS[tag].label} tag`);
   };
 
@@ -73,7 +74,7 @@ function UserEditor({ user, me, onChange, notify }) {
       <div className="admin-section">
         <h4>Tags</h4>
         <div className="tag-toggles">
-          {TAG_KEYS.map((tag) => {
+          {TAG_KEYS.filter((tag) => !TAGS[tag].auto).map((tag) => {
             const on = user.tags.includes(tag);
             const locked = isMe && on && TAGS[tag].admin;
             return (

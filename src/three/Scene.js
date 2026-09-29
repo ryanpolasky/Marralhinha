@@ -108,15 +108,54 @@ function useWinFireworks(board) {
   }, [board.phase, board.winners]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey }) {
+// Keyboard play: Tab / arrow keys / 1-9 pick a move (the board previews it), Enter plays it
+function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
+  const [keyMove, setKeyMove] = useState(null);
+  useEffect(() => setKeyMove(null), [movesKey]);
+  useEffect(() => {
+    if (!moves.length) return undefined;
+    const pick = (move) => {
+      setKeyMove(move.id);
+      setSelected({ seat: move.seat, marble: move.marble });
+    };
+    const onKey = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const index = moves.findIndex((m) => m.id === keyMove);
+      // Tab only takes over while nothing in the HUD has focus, so normal tabbing through buttons still works
+      const tab = e.key === 'Tab' && (e.target === document.body || e.target.tagName === 'CANVAS');
+      if (tab || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const back = e.key === 'ArrowLeft' || (tab && e.shiftKey);
+        pick(moves[index < 0 ? (back ? moves.length - 1 : 0) : (index + (back ? -1 : 1) + moves.length) % moves.length]);
+      } else if (/^[1-9]$/.test(e.key) && moves[Number(e.key) - 1]) {
+        pick(moves[Number(e.key) - 1]);
+      } else if (e.key === 'Enter' && keyMove && e.target.tagName !== 'BUTTON') {
+        e.preventDefault();
+        setKeyMove(null);
+        onMove(keyMove);
+      } else if (e.key === 'Escape' && keyMove) {
+        setKeyMove(null);
+        setSelected(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [moves, keyMove, onMove, setSelected]);
+  return keyMove;
+}
+
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey }) {
   const [selected, setSelected] = useState(null);
   const [hovered, setHovered] = useState(null);
+  // Every room update re-sends legalMoves as a new array; only reset selection when the moves really change
+  const movesKey = moves.map((m) => m.id).join('|');
+  const keyMove = useKeyboardMoves(moves, movesKey, onMove, setSelected);
 
   useEffect(() => {
     setSelected(null);
     setHovered(null);
     document.body.style.cursor = '';
-  }, [moves]);
+  }, [movesKey]);
 
   useWinFireworks(board);
 
@@ -143,6 +182,8 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           hovered={hovered}
           setHovered={setHovered}
           onMove={onMove}
+          keyMove={keyMove}
+          mySeat={mySeat}
         />
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
       </Turntable>

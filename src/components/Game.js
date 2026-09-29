@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
-import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
+import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, TURN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
+import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey } from '../game/catalog';
-import { Coins, Coin, TagBadges } from './Economy';
+import { Coins, Coin, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { useSettings } from '../game/settings';
 
@@ -59,7 +61,12 @@ function useAnnouncements(game, mySeat, nameOf) {
       const justRolled = roll && roll.t !== p.lastRoll?.t;
       push('Your turn!', 'Roll the dice', 'turn', justRolled ? ROLL_REVEAL_MS + 150 : mv && mv.t !== p.lastMove?.t ? 600 : 0, sfx.turn, (g) => g.phase === 'roll' && g.turn === mySeat && g.lastRoll?.t === rollKey);
     }
-    if (game.phase === 'over' && p.phase !== 'over' && mySeat >= 0) setTimeout(game.winners.includes(mySeat) ? sfx.win : sfx.lose, 1200);
+    if (game.phase === 'over' && p.phase !== 'over' && mySeat >= 0) {
+      setTimeout(() => {
+        duckMusic(3500);
+        (game.winners.includes(mySeat) ? sfx.win : sfx.lose)();
+      }, 1200);
+    }
   }, [game, mySeat, nameOf, push]);
 
   return items;
@@ -78,12 +85,13 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
   if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
   if (turn === mySeat) {
+    if (seats[mySeat]?.idle) return { title: 'Your turn!', sub: "You ran out of time, so we've been playing for you. Make a move to take back over." };
     return game.phase === 'roll'
       ? { title: 'Your turn!', sub: `Roll the dice${helpText}` }
-      : { title: `You rolled a ${game.die}`, sub: `Pick a glowing marble${helpText}` };
+      : { title: `You rolled a ${game.die}`, sub: `Pick a glowing marble${helpText}${FINE_POINTER ? ' (or Tab, then Enter)' : ''}` };
   }
   const p = seats[turn];
-  if (p && !p.isBot && !p.connected) return { title: `${p.name} is away`, sub: 'A bot will play for them shortly…' };
+  if (isAway(p)) return { title: `${p.name} is away`, sub: p.connected ? 'Playing for them until they’re back…' : 'A bot will play for them shortly…' };
   return game.phase === 'roll'
     ? { title: `${nameOf(turn)}'s turn`, sub: `Rolling…${helpText}` }
     : { title: `${nameOf(turn)} rolled a ${game.die}`, sub: `Thinking…${helpText}` };
@@ -144,36 +152,88 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   );
 }
 
-function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction }) {
+const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
+const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle);
+
+// Speech bubbles live in <body> and follow their chip every frame, so the scrolling (clipped) mobile
+// player bar can't hide them. Chat bubbles are capped to the chip's width so neighbours never overlap.
+function Bubble({ anchor, className, style, fit = false, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    let frame;
+    const place = () => {
+      const chip = anchor.current;
+      const el = ref.current;
+      if (chip && el) {
+        const r = chip.getBoundingClientRect();
+        if (fit) el.style.maxWidth = `${r.width}px`;
+        const half = el.offsetWidth / 2;
+        el.style.left = `${Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8)}px`;
+        el.style.top = `${r.bottom + 12}px`;
+      }
+      frame = requestAnimationFrame(place);
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, fit]);
+  return createPortal(
+    <div ref={ref} className={`${className} floating`} style={style}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+// Ring around the avatar that drains over the last TURN_MS of the turn and turns red for the final 5s
+function TurnClock({ deadline }) {
+  const remaining = useRef(Math.max(0, deadline - Date.now())).current;
+  const from = (1 - Math.min(1, remaining / TURN_MS)) * 100;
+  return (
+    <svg
+      className="turn-clock"
+      viewBox="0 0 40 40"
+      aria-hidden="true"
+      style={{ '--from': from, '--dur': `${Math.min(remaining, TURN_MS)}ms`, '--delay': `${Math.max(0, remaining - TURN_MS)}ms`, '--urgent': `${Math.max(0, remaining - 5000)}ms` }}
+    >
+      <circle cx="20" cy="20" r="18.5" pathLength="100" />
+    </svg>
+  );
+}
+
+function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock }) {
   const color = SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
+  const chipRef = useRef(null);
+  const seatVars = { '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark };
   return (
     <div
-      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${player && !player.isBot && !player.connected ? ' away' : ''}`}
-      style={{ '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark }}
+      ref={chipRef}
+      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}`}
+      style={seatVars}
     >
       {sticker && (
-        <div key={reaction.id} className="bubble" style={{ '--sticker': sticker.color, '--tilt': `${sticker.tilt}deg` }}>
+        <Bubble key={reaction.id} anchor={chipRef} className="bubble" style={{ ...seatVars, '--sticker': sticker.color, '--tilt': `${sticker.tilt}deg` }}>
           {sticker.label}
-        </div>
+        </Bubble>
       )}
       {reaction?.text && (
-        <div key={reaction.id} className="bubble chat" style={{ '--sticker': '#fff6e8', '--tilt': '0deg' }}>
+        <Bubble key={reaction.id} anchor={chipRef} fit className="bubble chat" style={{ ...seatVars, '--sticker': '#fff6e8', '--tilt': '0deg' }}>
           {reaction.text}
-        </div>
+        </Bubble>
       )}
       <span className="avatar">
         {(player?.name || '?').slice(0, 1).toUpperCase()}
         {player?.level && <span className="avatar-level">{player.level}</span>}
+        {clock && <TurnClock key={`${clock.key}:${clock.deadline}`} deadline={clock.deadline} />}
       </span>
       <div className="chip-body">
         <div className="chip-name">
-          {seat === mySeat ? 'You' : player?.name}
+          <span className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</span>
           <TagBadges tags={player?.tags} small />
           {player?.isBot && <span className="badge">bot</span>}
-          {player && !player.isBot && !player.connected && <span className="badge warn">away</span>}
+          {isAway(player) && <span className="badge warn">away</span>}
         </div>
         <div className="pips" aria-label={`${home} of 5 marbles home`}>
           {[0, 1, 2, 3, 4].map((i) => (
@@ -251,10 +311,11 @@ function Awards({ game, nameOf }) {
   );
 }
 
-function Rewards({ reward }) {
+function Rewards({ reward, onRevealed }) {
   const [shownLines, setShownLines] = useState(0);
   const payout = reward ? reward.lines.map((l) => `${l.label}:${l.amount}`).join('|') : '';
   const lineCount = reward?.lines.length || 0;
+  const done = !!reward && shownLines >= lineCount;
   useEffect(() => {
     if (!payout) return undefined;
     setShownLines(0);
@@ -266,6 +327,14 @@ function Rewards({ reward }) {
     );
     return () => timers.forEach(clearTimeout);
   }, [payout, lineCount]);
+  // Once the coins have counted in, celebrate the big moments and let the win screen show its follow-ups
+  useEffect(() => {
+    if (!done) return undefined;
+    onRevealed?.();
+    if (!reward.leveledUp && !reward.luckyTag) return undefined;
+    const t = setTimeout(() => sfx.reveal(reward.luckyTag ? 'legendary' : 'epic'), 150);
+    return () => clearTimeout(t);
+  }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!reward) return null;
   const total = reward.lines.slice(0, shownLines).reduce((sum, l) => sum + l.amount, 0);
   return (
@@ -279,6 +348,22 @@ function Rewards({ reward }) {
         </div>
       ))}
       {reward.note && <div className="reward-note">{reward.note}</div>}
+      {done && reward.leveledUp && (
+        <div className="reward-celebrate reward-levelup">
+          <span className="level-badge">{reward.level}</span>
+          <span>
+            <b>Level up!</b> You're now level {reward.level}.
+          </span>
+        </div>
+      )}
+      {done && reward.luckyTag && (
+        <div className="reward-celebrate reward-lucky">
+          <TagBadge tag="lucky" small />
+          <span>
+            <b>You're the Luckiest!</b> More sixes than anyone, ever. The Fortune die is yours to keep.
+          </span>
+        </div>
+      )}
       <div className="reward-total">
         <span>You earned</span>
         <Coins amount={total} />
@@ -331,9 +416,32 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
     return () => window.removeEventListener('keydown', onKey);
   }, [roll]);
 
+  // Turn clock: the server sends time left relative to when it sent the state; one key per turn step so
+  // unrelated updates (chat, reactions) don't restart the ring
+  const clockKey = `${game.turn}|${game.phase}|${game.lastRoll?.t}|${game.lastMove?.t}`;
+  const deadline = useMemo(() => (room.turnEndsIn != null ? Date.now() + room.turnEndsIn : null), [clockKey, room.turnEndsIn != null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clock = deadline && game.phase !== 'over' && !rollPending ? { key: clockKey, deadline } : null;
+  const myClock = clock && game.turn === mySeat;
+
+  // Ticks for the last 5 seconds of your own turn
+  useEffect(() => {
+    if (!myClock) return undefined;
+    const timers = [5, 4, 3, 2, 1].map((s) => {
+      const at = deadline - s * 1000 - Date.now();
+      return at > 0 ? setTimeout(() => sfx.tick(s <= 3), at) : null;
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [myClock, deadline]);
+
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => setRevealed(false), [game.phase]);
+  const myReward = game.rewards?.[mySeat];
+
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';
-  const chip = (s) => <PlayerChip key={s} seat={s} player={seats[s]} game={game} activeSeat={activeSeat} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} />;
+  const chip = (s) => (
+    <PlayerChip key={s} seat={s} player={seats[s]} game={game} activeSeat={activeSeat} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} clock={clock && game.turn === s ? clock : null} />
+  );
   const log = (rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log).slice().reverse();
   const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && entry.seat !== mySeat && entry.t > chatSeenAt).length;
   const iWon = game.winners?.includes(mySeat);
@@ -411,7 +519,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
               </div>
             ))}
           </div>
-          {mySeat >= 0 && <ChatInput onSend={(text) => onAction('game:chat', { text })} />}
+          {mySeat >= 0 ? <ChatInput onSend={(text) => onAction('game:chat', { text })} /> : <div className="chat-spectator">Chat is for players at the table. You can still read along.</div>}
         </div>
 
         <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
@@ -450,7 +558,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
                 <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />
               ))}
             </div>
-            <Rewards reward={game.rewards?.[mySeat]} />
+            <Rewards reward={myReward} onRevealed={() => setRevealed(true)} />
             <Awards game={game} nameOf={nameOf} />
             <div className="win-actions">
               {isHost ? (
@@ -460,9 +568,10 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
               ) : (
                 <div className="waiting">Waiting for the host to start another round…</div>
               )}
-              {coins >= BOX_PRICE && (
+              {/* Wait for the payout to count in, so the offer reflects what you just earned */}
+              {(revealed || !myReward) && coins >= BOX_PRICE && (
                 <button className="btn secondary block open-box-cta" onClick={onShop}>
-                  You can afford a box! Open one
+                  You can afford {Math.floor(coins / BOX_PRICE) > 1 ? `${Math.floor(coins / BOX_PRICE)} chests` : 'a chest'}! Open one
                 </button>
               )}
               <div className={`win-minor${onLeave ? '' : ' single'}`}>

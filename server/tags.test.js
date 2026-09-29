@@ -37,9 +37,15 @@ test('tag-exclusive cosmetics are owned through the tag, never dropped or sold',
   assert.equal(accounts.owns(id, 'marble.dev'), false);
   assert.throws(() => accounts.equip(id, 'marble', 'marble.dev'), /Dev only/);
 
+  accounts.setTags(id, ['beta']);
+  assert.equal(accounts.owns(id, 'marble.beta'), true);
+  assert.equal(accounts.owns(id, 'marble.dev'), false);
+  assert.equal(accounts.owns(id, 'marble.holo'), false);
+
   accounts.setTags(id, ['dev']);
   assert.equal(accounts.owns(id, 'marble.dev'), true);
-  assert.equal(accounts.owns(id, 'marble.beta'), false);
+  assert.ok(catalog.items.every((i) => accounts.owns(id, i.id)), 'dev unlocks every cosmetic');
+  accounts.equip(id, 'dice', 'dice.lucky');
   accounts.equip(id, 'marble', 'marble.dev');
   assert.equal(accounts.equipped(accounts.getUser(id)).marble, 'marble.dev');
 
@@ -59,6 +65,36 @@ test('tag-exclusive cosmetics are owned through the tag, never dropped or sold',
     const worn = Object.values(botCosmetics(seed)).map((itemId) => catalog.items.find((i) => i.id === itemId));
     assert.ok(worn.every((i) => !i.tag && ['common', 'rare'].includes(i.rarity)), 'bots wear common or rare gear, never exclusives');
   }
+});
+
+test('the Luckiest tag follows the all-time sixes leader, and the Fortune die stays with everyone who held it', () => {
+  const { accounts, economy } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const game = (sixes) => ({ winners: [0], stats: sixes.map((s) => ({ captures: 0, sixes: s })), marbles: sixes.map(() => []) });
+  const players = [{ seat: 0, userId: a.id }, { seat: 1, userId: b.id }];
+
+  assert.equal(accounts.luckyHolder(), null);
+  const first = economy.awardGame({ game: game([5, 3]), players, botGame: false });
+  assert.equal(first[0].luckyTag, true);
+  assert.equal(accounts.luckyHolder(), a.id);
+  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['lucky']);
+  assert.ok(accounts.owns(a.id, 'dice.lucky'));
+  assert.equal(accounts.owns(b.id, 'dice.lucky'), false);
+
+  economy.awardGame({ game: game([0, 2]), players, botGame: false });
+  assert.equal(accounts.luckyHolder(), a.id, 'a tie keeps the current holder');
+
+  economy.awardGame({ game: game([0, 1]), players, botGame: false });
+  assert.equal(accounts.luckyHolder(), b.id);
+  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), [], 'the old holder loses the tag');
+  assert.ok(accounts.owns(a.id, 'dice.lucky'), 'but keeps the die');
+  accounts.equip(a.id, 'dice', 'dice.lucky');
+  assert.equal(accounts.equipped(accounts.getUser(a.id)).dice, 'dice.lucky');
+
+  accounts.setTags(a.id, ['lucky', 'beta']);
+  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['beta'], 'admins cannot hand out the Luckiest tag');
+  assert.throws(() => accounts.grantItem(a.id, 'dice.lucky'), /Luckiest tag/);
 });
 
 test('admin grants: coins, items, names', () => {

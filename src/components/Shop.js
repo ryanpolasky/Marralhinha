@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BOXES, ITEMS, RARITIES, CURRENCY, catalog } from '../game/catalog';
+import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, PreviewStage, RarityTag, Coin } from './Economy';
@@ -198,7 +198,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
               </div>
             ))}
           {(shop?.featured || []).map((offer) => {
-            const owned = account.inventory.includes(offer.id);
+            const owned = canUse(account, offer.id);
             return (
               <ItemCard
                 key={offer.id}
@@ -208,17 +208,13 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                   owned ? (
                     <span className="item-price owned">Owned</span>
                   ) : (
-                    <span
-                      className={`item-price${account.coins < offer.price ? ' short' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!buying) buy(offer);
-                      }}
-                    >
-                      <Coin size={15} /> {offer.price.toLocaleString()}
+                    <span className={`item-price${account.coins < offer.price ? ' short' : ''}`}>
+                      <Coin size={15} /> {buying === offer.id ? '…' : offer.price.toLocaleString()}
                     </span>
                   )
                 }
+                label={owned ? `${ITEMS[offer.id].name}, owned` : `Buy ${ITEMS[offer.id].name} for ${offer.price.toLocaleString()} ${CURRENCY}`}
+                disabled={owned || !!buying}
                 onClick={() => !owned && !buying && buy(offer)}
               />
             );

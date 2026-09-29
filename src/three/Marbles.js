@@ -53,7 +53,7 @@ export function planMove(lastMove, board) {
   if (capture) {
     const colors = [SEAT_COLORS[seat].main, SEAT_COLORS[seat].light, SEAT_COLORS[capture.seat].main, '#ffffff', '#ffd166'];
     plans[`${capture.seat}-${capture.marble}`] = [
-      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { colors }, final: true },
+      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { colors, by: seat, victim: capture.seat }, final: true },
     ];
   }
   return plans;
@@ -63,7 +63,7 @@ function setCursor(pointer) {
   document.body.style.cursor = pointer ? 'pointer' : '';
 }
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover }) {
+function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -96,7 +96,7 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
       if (t >= 0 && !seg.begun) {
         seg.begun = true;
         if (seg.impact) {
-          sfx.capture();
+          sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
           fx.emit('burst', { position: [seg.from.x, 0.4, seg.from.z], colors: seg.impact.colors, count: 70, speed: 6, up: 5, size: 0.12 });
           fx.emit('shake', { amount: 0.35 });
         }
@@ -244,7 +244,7 @@ function PathDots({ move }) {
   });
 }
 
-export default function Marbles({ board, skins = [], moves, selected, setSelected, hovered, setHovered, onMove }) {
+export default function Marbles({ board, skins = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1 }) {
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board), [board.lastMove]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -282,13 +282,19 @@ export default function Marbles({ board, skins = [], moves, selected, setSelecte
               hovered={!!hovered && hovered.seat === seat && hovered.marble === marble}
               onClick={() => clickMarble(seat, marble, pos)}
               onHover={(on) => setHovered(on ? { seat, marble } : null)}
+              mySeat={mySeat}
             />
           );
         })
       )}
       {focusMoves.map((mv) => (
         <group key={`g-${mv.id}`}>
-          <Ghost move={mv} strong={!!selected} label={focusMoves.length > 1 ? moveLabel(mv) : null} onMove={onMove} />
+          <Ghost
+            move={mv}
+            strong={!!selected && (!keyMove || keyMove === mv.id)}
+            label={keyMove === mv.id ? `${moveLabel(mv)} · Enter` : focusMoves.length > 1 ? moveLabel(mv) : null}
+            onMove={onMove}
+          />
           <PathDots move={mv} />
         </group>
       ))}

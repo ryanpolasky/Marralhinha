@@ -22,6 +22,23 @@ test('chat messages land in the game log and pop a bubble for the sender', (t) =
   assert.strictEqual(reactions.at(-1).text, 'boa sorte!');
 });
 
+test('one account on two devices shares a seat; leaving on one device keeps it for the other', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  assert.strictEqual(room.join({ userId: 'u1', name: 'Ana' }).id, room.seats[0].id, 'the second device gets the same seat');
+  room.attach('u1', 's1b');
+  assert.strictEqual(room.view().seats[0].devices, 2);
+  assert.ok(room.inLiveGame('u1'));
+
+  assert.strictEqual(room.leaveDevice('u1', 's1'), false);
+  assert.ok(!room.seats[0].isBot && room.seats[0].connected, 'the other device still plays');
+  assert.strictEqual(room.view().seats[0].devices, 1);
+
+  assert.strictEqual(room.leaveDevice('u1', 's1b'), true);
+  assert.ok(room.seats[0].isBot, 'the last device leaving hands the seat to a bot');
+  assert.ok(!room.inLiveGame('u1'));
+});
+
 test('chat is cleaned, capped and ignores blank messages', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
@@ -154,6 +171,59 @@ test('full and active rooms admit spectators; Dev spectators can arrange seats b
   assert.strictEqual(room.view().spectators.length, 1);
   room.detach('late', 's6');
   assert.strictEqual(room.view().spectators.length, 0);
+});
+
+test('connected players get a turn clock that chat never resets; timing out twice marks them away', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room('TIME', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  room.pickStarter = () => ({ seat: 0, reason: 'winner' });
+  room.start('u1');
+  const first = room.view().turnEndsIn;
+  assert.ok(first >= 30000 && first <= 33000, `turn clock starts after the intro (${first})`);
+
+  t.mock.timers.tick(10000);
+  room.chat('u2', 'hurry up');
+  assert.strictEqual(room.view().turnEndsIn, first - 10000, 'chat does not reset the clock');
+
+  t.mock.timers.tick(first - 10000);
+  assert.strictEqual(room.seats[0].missed, 1);
+  assert.ok(room.game.log.some((e) => /ran out of time/.test(e.text)));
+  assert.strictEqual(room.view().seats[0].idle, false);
+
+  Object.assign(room.game, { turn: 0, phase: 'roll' });
+  room.changed();
+  t.mock.timers.tick(40000);
+  assert.strictEqual(room.view().seats[0].idle, true, 'two timeouts in a row mark the player away');
+
+  Object.assign(room.game, { turn: 0, phase: 'roll' });
+  room.roll('u1');
+  assert.strictEqual(room.view().seats[0].idle, false, 'acting again clears it');
+});
+
+test('a disconnected host hands over to the next connected player after a grace period', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room('HOST', { onChange: () => {} });
+  t.after(() => room.dispose());
+  const ana = room.join({ userId: 'u1', name: 'Ana' });
+  const rui = room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+
+  room.detach('u1', 's1');
+  t.mock.timers.tick(10000);
+  room.attach('u1', 's1b');
+  t.mock.timers.tick(10000);
+  assert.strictEqual(room.hostId, ana.id, 'a quick reconnect keeps the host');
+
+  room.detach('u1', 's1b');
+  t.mock.timers.tick(15000);
+  assert.strictEqual(room.hostId, rui.id);
+  room.start('u2');
 });
 
 test('chat is rate limited and only for seated players once the game is on', (t) => {

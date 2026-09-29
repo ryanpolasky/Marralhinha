@@ -1,6 +1,9 @@
 const { randomBytes, createHash } = require('crypto');
 const { transaction } = require('./db');
-const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS } = require('./catalog');
+const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
+
+const LUCKY_KEY = 'lucky_holder';
+const LUCKY_ITEM = 'dice.lucky';
 
 const SESSION_TOUCH_MS = 5 * 60 * 1000;
 const MAX_COIN_GRANT = 1000000;
@@ -20,6 +23,7 @@ const parse = (json, fallback) => {
 // Discord user ids that get the dev tag automatically when they log in (comma-separated env var)
 const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').split(',').map((s) => s.trim()).filter(Boolean));
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
+const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.includes(tag));
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
 const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]')";
 
@@ -57,8 +61,11 @@ class Accounts {
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
-        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ? WHERE id = ?`
+        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ?, sixes = sixes + ? WHERE id = ?`
       ),
+      getMeta: db.prepare('SELECT value FROM meta WHERE key = ?'),
+      setMeta: db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
+      luckiest: db.prepare('SELECT id, sixes FROM users WHERE sixes > 0 ORDER BY sixes DESC, created_at ASC LIMIT 1'),
       moveInventory: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?'),
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
@@ -123,7 +130,35 @@ class Accounts {
   }
 
   tags(user) {
-    return normalizeTags(parse(user.tags, []));
+    const stored = storableTags(parse(user.tags, []));
+    return normalizeTags(this.luckyHolder() === user.id ? [...stored, 'lucky'] : stored);
+  }
+
+  luckyHolder() {
+    return this.q.getMeta.get(LUCKY_KEY)?.value || null;
+  }
+
+  // What the profile card needs to show progress towards the Luckiest tag
+  luckyStatus(user) {
+    const holderId = this.luckyHolder();
+    const holder = holderId && this.getUser(holderId);
+    return { holder: holderId === user.id, holderSixes: holder ? holder.sixes : 0 };
+  }
+
+  // The Luckiest tag moves only when someone strictly passes the holder's all-time sixes.
+  // Every new holder gets the Fortune die for keeps. Returns { holder, previous } when it changes.
+  refreshLucky() {
+    const top = this.q.luckiest.get();
+    const current = this.luckyHolder();
+    const holder = current && this.getUser(current);
+    if (!top || (holder && holder.sixes >= top.sixes)) {
+      if (current && !holder) this.q.setMeta.run(LUCKY_KEY, null);
+      return null;
+    }
+    if (top.id === current) return null;
+    this.q.setMeta.run(LUCKY_KEY, top.id);
+    this.q.addItem.run(top.id, LUCKY_ITEM, Date.now());
+    return { holder: top.id, previous: holder ? current : null };
   }
 
   isAdmin(user) {
@@ -136,16 +171,20 @@ class Accounts {
     const user = typeof userOrId === 'string' ? this.getUser(userOrId) : userOrId;
     if (!user) return false;
     if (item.rarity === 'default') return true;
-    if (item.tag) return this.tags(user).includes(item.tag);
-    return this.inventory(user.id).includes(itemId);
+    const tags = this.tags(user);
+    if (tags.includes('dev')) return true;
+    if (this.inventory(user.id).includes(itemId)) return true;
+    if (item.tag) return tags.includes(item.tag);
+    return false;
   }
 
   equipped(user) {
     const stored = parse(user.equipped, {});
     const tags = this.tags(user);
+    const inv = this.inventory(user.id);
     const valid = (slot, id) => {
       const item = ITEMS.get(id);
-      return item && item.slot === slot && (!item.tag || tags.includes(item.tag));
+      return item && item.slot === slot && (tags.includes('dev') || !item.tag || tags.includes(item.tag) || inv.includes(id));
     };
     return Object.fromEntries(SLOTS.map((slot) => [slot, valid(slot, stored[slot]) ? stored[slot] : DEFAULTS[slot]]));
   }
@@ -166,7 +205,7 @@ class Accounts {
 
   setTags(userId, tags) {
     this.requireUser(userId);
-    const clean = normalizeTags(tags);
+    const clean = storableTags(tags);
     this.q.setTags.run(JSON.stringify(clean), userId);
     return clean;
   }
@@ -220,12 +259,14 @@ class Accounts {
 
   mergeGuest(guest, intoId) {
     const into = this.getUser(intoId);
-    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, intoId);
+    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, guest.sixes || 0, intoId);
     this.q.moveInventory.run(intoId, guest.id);
     this.q.moveSessions.run(intoId, guest.id);
     this.q.moveLedger.run(intoId, guest.id);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
+    if (this.luckyHolder() === guest.id) this.q.setMeta.run(LUCKY_KEY, intoId);
     this.q.deleteUser.run(guest.id);
+    this.refreshLucky();
   }
 
   search(query, limit = 40, { guests = true } = {}) {
@@ -257,7 +298,8 @@ class Accounts {
       tags: this.tags(user),
       admin: this.isAdmin(user),
       pity: parse(user.pity, {}),
-      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened },
+      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened, sixes: user.sixes },
+      lucky: this.luckyStatus(user),
       ...extras,
     };
   }
@@ -273,7 +315,7 @@ class Accounts {
       tags: this.tags(user),
       equipped: this.equipped(user),
       items: this.inventory(user.id).length,
-      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened },
+      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened, sixes: user.sixes },
       createdAt: user.created_at,
       lastSeen: user.last_seen,
     };
