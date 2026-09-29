@@ -814,6 +814,23 @@ button.pronounce:hover {
   font-size: 14px;
 }
 
+button.room-pill {
+  border: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button.room-pill:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+button.room-pill.copied {
+  background: rgba(46, 158, 85, 0.45);
+  letter-spacing: 0.02em;
+}
+
 .hud-buttons {
   justify-self: end;
   display: flex;
@@ -1489,6 +1506,148 @@ button.pronounce:hover {
 .hud-right {
   justify-self: end;
   pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* ---------- Lobby: turn timer ---------- */
+
+.turn-timer {
+  margin: 12px 0 4px;
+  padding: 10px 14px 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-line);
+}
+
+.turn-timer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.turn-timer-head b {
+  color: var(--gold);
+  font-size: 15px;
+}
+
+.turn-timer input[type='range'] {
+  width: 100%;
+  margin: 8px 0 2px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.turn-timer.readonly input[type='range'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.turn-timer-scale {
+  position: relative;
+  height: 16px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.turn-timer-scale span {
+  position: absolute;
+  top: 0;
+}
+
+.turn-timer-scale span:nth-child(1) {
+  left: 0;
+}
+
+/* 45s is the second-to-last stop of eight */
+.turn-timer-scale span:nth-child(2) {
+  left: calc(6 / 7 * 100%);
+  transform: translateX(-50%);
+}
+
+.turn-timer-scale span:nth-child(3) {
+  right: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ---------- Spectator eye ---------- */
+
+.spectators {
+  position: relative;
+}
+
+.spectators-btn {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+}
+
+.spectators-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1b1208;
+  background: var(--gold);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.spectators-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  min-width: 160px;
+  max-width: 240px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 20;
+}
+
+.spectators:hover .spectators-pop,
+.spectators:focus-within .spectators-pop,
+.spectators.open .spectators-pop {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.spectators-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.spectators-name {
+  padding: 2px 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reactions {
@@ -4053,25 +4212,6 @@ button.pronounce:hover {
   text-shadow: 0 0 8px rgba(255, 74, 90, 0.8);
 }
 
-.plate-dev .account-name::before {
-  content: '~# ';
-  color: #ff4a5a;
-  opacity: 0.9;
-}
-
-.plate-dev .account-name::after,
-.plate-dev .seat-name-text::after {
-  content: '▮';
-  margin-left: 2px;
-  animation: cursor-blink 1.1s steps(1) infinite;
-}
-
-@keyframes cursor-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 .plate-beta {
   --plate-ink: #ffffff;
   background: linear-gradient(rgba(255, 255, 255, 0.14) 0 1px, transparent 1px) 0 0 / 100% 9px, linear-gradient(90deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px) 0 0 / 9px 100%, #1b4fa0 !important;
@@ -5269,7 +5409,12 @@ select.admin-input optgroup {
 
 /* ---------- Turn clock ---------- */
 
+.avatar-level {
+  z-index: 1;
+}
+
 .turn-clock {
+  z-index: 0;
   position: absolute;
   inset: -5px;
   width: calc(100% + 10px);
@@ -5309,14 +5454,120 @@ select.admin-input optgroup {
 
 /* ---------- Chat: spectators ---------- */
 
-.chat-spectator {
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 12.5px;
+/* ---------- Clickable nameplates: view the board from their side ---------- */
+
+.players-bar .chip {
+  cursor: pointer;
+}
+
+.players-bar .chip:hover {
+  filter: brightness(1.12);
+}
+
+.players-bar .chip:focus-visible {
+  outline: 2px solid var(--seat-light);
+  outline-offset: 3px;
+}
+
+.chip.viewing {
+  outline: 2px dashed var(--seat-light);
+  outline-offset: 3px;
+}
+
+/* ---------- Admin: active games ---------- */
+
+.admin-games {
+  margin-bottom: 14px;
+}
+
+.admin-games h4 {
+  margin: 0 0 8px;
+}
+
+.admin-games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.admin-game {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-line);
+}
+
+.admin-game.phase-playing {
+  border-color: rgba(46, 158, 85, 0.55);
+}
+
+.admin-game-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-game-head .badge {
+  margin-left: 0;
+}
+
+.admin-game-phase {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.admin-game-phase.playing {
+  background: #2e9e55;
+  color: #fff;
+}
+
+.admin-game-players {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.admin-game-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.admin-game-player.away {
+  opacity: 0.55;
+}
+
+.admin-game-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--seat);
+}
+
+.admin-game > .btn,
+.admin-game > .small-text {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.chat-watching {
+  font-weight: 500;
+  font-size: 0.85em;
   color: var(--ink-dim);
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px dashed var(--glass-line);
 }
 
 /* ---------- Lobby: join / leave notices ---------- */

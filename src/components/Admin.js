@@ -4,6 +4,7 @@ import { CURRENCY, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, rarityOf 
 import { sfx } from '../game/sound';
 import { Coin, Coins, TagBadges } from './Economy';
 import { Close, Search, DiscordMark } from './Icons';
+import { SEAT_COLORS } from '../game/geometry';
 
 const ago = (t) => {
   const s = Math.max(0, (Date.now() - t) / 1000);
@@ -23,6 +24,68 @@ const LinkBadge = ({ user }) =>
       guest
     </span>
   );
+
+const PHASE_LABEL = { playing: 'Playing', lobby: 'Lobby', over: 'Results' };
+
+// Every room with a human in it, refreshed while the panel is open; Spectate drops you in as a watcher
+function ActiveGames({ currentCode, onSpectate, notify }) {
+  const [rooms, setRooms] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      api('/admin/rooms')
+        .then((res) => !cancelled && setRooms(res.rooms))
+        .catch((err) => !cancelled && notify(err.message));
+    load();
+    const t = setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [notify]);
+
+  return (
+    <div className="admin-games">
+      <h4>
+        Active games <span className="muted">{rooms ? rooms.length : '…'}</span>
+      </h4>
+      {rooms && rooms.length === 0 && <div className="muted small-text">Nobody's playing right now.</div>}
+      <div className="admin-games-list">
+        {(rooms || []).map((r) => (
+          <div key={r.code} className={`admin-game phase-${r.phase}`}>
+            <div className="admin-game-head">
+              <span className="room-pill">{r.code}</span>
+              <span className={`admin-game-phase ${r.phase}`}>{PHASE_LABEL[r.phase]}</span>
+              {r.activity && <span className="badge">Discord</span>}
+              {r.teams && <span className="badge">2v2</span>}
+              <span className="muted small-text">
+                {r.spectators ? `${r.spectators} watching · ` : ''}
+                {ago(r.lastActive)}
+              </span>
+            </div>
+            <div className="admin-game-players">
+              {r.players.map((p) => (
+                <span key={p.seat} className={`admin-game-player${p.away ? ' away' : ''}`} style={{ '--seat': SEAT_COLORS[p.seat].main }}>
+                  <span className="admin-game-dot" />
+                  {p.name}
+                  {p.isBot && <span className="muted"> (bot)</span>}
+                  {r.phase !== 'lobby' && <span className="muted"> {p.home}/5</span>}
+                </span>
+              ))}
+            </div>
+            {r.code === currentCode ? (
+              <span className="muted small-text">You're here</span>
+            ) : (
+              <button className="btn tiny secondary" onClick={() => onSpectate(r.code)}>
+                Spectate
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function UserEditor({ user, me, onChange, notify }) {
   const [busy, setBusy] = useState(false);
@@ -141,7 +204,7 @@ function UserEditor({ user, me, onChange, notify }) {
   );
 }
 
-export default function Admin({ account, onClose, notify }) {
+export default function Admin({ account, onClose, notify, currentCode, onSpectate }) {
   const [query, setQuery] = useState('');
   const [guests, setGuests] = useState(false);
   const [result, setResult] = useState(null);
@@ -186,6 +249,8 @@ export default function Admin({ account, onClose, notify }) {
             <Close />
           </button>
         </div>
+
+        <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />
 
         <label className="admin-search">
           <Search />

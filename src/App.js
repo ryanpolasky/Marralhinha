@@ -246,10 +246,23 @@ const App = () => {
     }
   };
 
+  // Same cleanup the server does, so we never re-send a name it already normalized
+  const cleanName = name.replace(/\s+/g, ' ').trim();
+
   const ensureName = async () => {
-    const clean = name.trim();
-    if (clean && account && clean !== account.name) setAccount((await post('/me/name', { name: clean })).profile);
+    if (cleanName && account && cleanName !== account.name) setAccount((await post('/me/name', { name: cleanName })).profile);
   };
+
+  // Save name edits on their own once typing pauses, instead of only when a room gets created
+  useEffect(() => {
+    if (!cleanName || !account || cleanName === account.name) return undefined;
+    const t = setTimeout(() => {
+      post('/me/name', { name: cleanName })
+        .then((res) => setAccount(res.profile))
+        .catch((err) => notify(err.message));
+    }, 900);
+    return () => clearTimeout(t);
+  }, [cleanName, account?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onAction = useCallback((event, payload) => request(event, payload).catch((err) => notify(err.message)), [notify]);
 
@@ -292,6 +305,10 @@ const App = () => {
   };
 
   const game = inRoom ? room.game : null;
+  // Clicking a nameplate in-game swings the board round to that player's side; cleared per game
+  const [viewOverride, setViewOverride] = useState(null);
+  const gameKey = game ? `${room.code}:${game.pick?.t}` : null;
+  useEffect(() => setViewOverride(null), [gameKey]);
   const rollPending = useRollPending(game?.lastRoll);
   const [startPending, dismissStart] = useStartPending(game);
   // The server chooses one board for everyone once a game starts; before that everyone previews their own
@@ -317,12 +334,12 @@ const App = () => {
       mode: 'game',
       board: rollPending ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
       names,
-      viewSeat,
+      viewSeat: viewOverride ?? viewSeat,
       cosmetics,
       moves: myTurn && g.phase === 'move' && !rollPending ? g.legalMoves : undefined,
       canRoll: myTurn && g.phase === 'roll' && !rollPending && !startPending,
     };
-  }, [inRoom, room, mySeat, account?.equipped, rollPending, startPending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, room, mySeat, account?.equipped, rollPending, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   const sceneRoll = useCallback(() => onAction('game:roll'), [onAction]);
@@ -416,7 +433,15 @@ const App = () => {
         onDismissStart={dismissStart}
         onAction={onAction}
         onLeave={IS_ACTIVITY ? null : leave}
-        onResetView={() => setResetKey((k) => k + 1)}
+        onResetView={() => {
+          setViewOverride(null);
+          setResetKey((k) => k + 1);
+        }}
+        viewSeat={viewOverride ?? Math.max(mySeat, 0)}
+        onViewSeat={(seat) => {
+          setViewOverride(seat === Math.max(mySeat, 0) ? null : seat);
+          setResetKey((k) => k + 1);
+        }}
         onShop={() => setModal('shop')}
         coins={account.coins}
       />
@@ -443,7 +468,20 @@ const App = () => {
       {screen}
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}
       {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onShop={() => setModal('shop')} />}
-      {modal === 'admin' && account?.admin && <Admin account={account} onClose={() => setModal(null)} notify={notify} />}
+      {modal === 'admin' && account?.admin && (
+        <Admin
+          account={account}
+          onClose={() => setModal(null)}
+          notify={notify}
+          currentCode={inRoom ? room.code : null}
+          onSpectate={(code) =>
+            run(async () => {
+              enter(await request('room:join', { code, spectate: true }));
+              setModal(null);
+            })
+          }
+        />
+      )}
       {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} />}
       <DialogHost />
     </div>

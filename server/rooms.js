@@ -11,8 +11,10 @@ const BOT_DELAY_MS = 450;
 const START_WHEEL_MS = 8500;
 const START_WINNER_MS = 2200;
 const AWAY_GRACE_MS = 20000;
-// Connected players get this long per roll/move before the game plays for them (keep in sync with src/game/moves.js)
-const TURN_MS = 30000;
+// Connected players get this long per roll/move before the game plays for them. The host picks it in the
+// lobby: 15-45s in 5s steps, or null for no limit (keep in sync with TURN_SECONDS in src/game/moves.js)
+const TURN_SECONDS_DEFAULT = 30;
+const TURN_SECONDS_OPTIONS = [15, 20, 25, 30, 35, 40, 45];
 // After this many timed-out turns in a row a player counts as away and gets played for quickly
 const IDLE_MISSES = 2;
 const IDLE_DELAY_MS = 2500;
@@ -61,6 +63,7 @@ class Room {
     this.hostId = null;
     this.game = null;
     this.teams = false;
+    this.turnSeconds = TURN_SECONDS_DEFAULT;
     this.humansAtStart = 0;
     // Player ids of the last round's winners: one of them starts the rematch on their board
     this.lastWinners = [];
@@ -101,7 +104,8 @@ class Room {
     if (this.game) throw new UserError('The game has already started');
   }
 
-  join(info) {
+  // `spectate` joins as a watcher even when a lobby seat is free (used by the admin "spectate" button)
+  join(info, { spectate = false } = {}) {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
@@ -113,7 +117,7 @@ class Room {
       Object.assign(spectator, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return spectator;
     }
-    const seat = this.game ? undefined : SEAT_ORDER.find((s) => !this.seats[s]);
+    const seat = this.game || spectate ? undefined : SEAT_ORDER.find((s) => !this.seats[s]);
     if (seat === undefined && this.spectators.size >= 32) throw new UserError('That room is full, including spectators');
     const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set() };
     if (seat === undefined) this.spectators.set(info.userId, player);
@@ -276,6 +280,14 @@ class Room {
     this.changed();
   }
 
+  setTurnTime(userId, seconds) {
+    this.requireHost(userId);
+    this.requireLobby();
+    if (seconds !== null && !TURN_SECONDS_OPTIONS.includes(seconds)) throw new UserError('Pick 15 to 45 seconds, or no limit');
+    this.turnSeconds = seconds;
+    this.changed();
+  }
+
   setTeams(userId, teams) {
     this.requireHost(userId);
     this.requireLobby();
@@ -350,8 +362,12 @@ class Room {
     this.hooks.onReaction?.(this, { seat, key, t: now });
   }
 
+  // Seated players and spectators can both chat; only seated players get a bubble under their nameplate
   chat(userId, text) {
-    const { seat, player } = this.require(userId);
+    const found = this.findByUser(userId);
+    const player = found?.player || this.spectators.get(userId);
+    if (!player) throw new UserError('You are not in this room');
+    const seat = found ? found.seat : null;
     if (!this.game) throw new UserError('Chat opens once the game starts');
     const clean = cleanChat(text);
     if (!clean) return;
@@ -359,8 +375,8 @@ class Room {
     player.chatTimes = (player.chatTimes || []).filter((t) => now - t < CHAT_WINDOW_MS);
     if (player.chatTimes.length >= CHAT_BURST || now - (player.chatTimes.at(-1) || 0) < CHAT_GAP_MS) throw new UserError('Whoa, slow down a little!');
     player.chatTimes.push(now);
-    rules.pushLog(this.game, { chat: true, seat, name: player.name, text: clean, t: now });
-    this.hooks.onReaction?.(this, { seat, text: clean, t: now });
+    rules.pushLog(this.game, { chat: true, seat, from: player.id, spectator: seat === null, name: player.name, text: clean, t: now });
+    if (seat !== null) this.hooks.onReaction?.(this, { seat, text: clean, t: now });
     this.changed();
   }
 
@@ -402,7 +418,9 @@ class Room {
     this.turnDeadline = null;
     if (!player) return;
     const human = !player.isBot;
-    const base = !human ? BOT_DELAY_MS + randomInt(0, 400) : !player.connected ? AWAY_GRACE_MS : player.idle ? IDLE_DELAY_MS : TURN_MS;
+    // No turn limit: connected players take as long as they like
+    if (human && player.connected && !player.idle && this.turnSeconds === null) return;
+    const base = !human ? BOT_DELAY_MS + randomInt(0, 400) : !player.connected ? AWAY_GRACE_MS : player.idle ? IDLE_DELAY_MS : this.turnSeconds * 1000;
     const delay = base + animationMs(game);
     if (human && player.connected && !player.idle) this.turnDeadline = Date.now() + delay;
     this.timer = setTimeout(() => {
@@ -444,12 +462,27 @@ class Room {
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
+      turnSeconds: this.turnSeconds,
       seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, idle: !!p.idle, devices: p.sockets?.size || 0, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
       // Relative, so client clock skew doesn't matter
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,
       game: this.game,
+    };
+  }
+
+  // Compact overview for the admin "active games" list
+  summary() {
+    const { game } = this;
+    return {
+      code: this.code,
+      activity: !!this.instanceId,
+      phase: !game ? 'lobby' : game.phase === 'over' ? 'over' : 'playing',
+      teams: this.teams,
+      players: this.seats.map((p, seat) => p && { seat, name: p.name, isBot: !!p.isBot, away: !p.isBot && (!p.connected || !!p.idle), home: game ? game.marbles[seat]?.filter((m) => m.zone === 'home').length ?? 0 : 0 }).filter(Boolean),
+      spectators: this.spectators.size,
+      lastActive: this.lastActive,
     };
   }
 }
@@ -484,6 +517,15 @@ class RoomManager {
     const room = this.create({ instanceId: id });
     this.instances.set(id, room.code);
     return room;
+  }
+
+  // Rooms with at least one human in them, live games first
+  list() {
+    const order = { playing: 0, lobby: 1, over: 2 };
+    return [...this.rooms.values()]
+      .filter((room) => room.hasHumans())
+      .map((room) => room.summary())
+      .sort((a, b) => order[a.phase] - order[b.phase] || b.lastActive - a.lastActive);
   }
 
   roomsWithUser(userId) {

@@ -53,7 +53,7 @@ const rooms = new RoomManager({
 setInterval(() => rooms.sweep(), 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, onProfileChange: pushProfile, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, onProfileChange: pushProfile, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
@@ -121,12 +121,12 @@ io.on('connection', (socket) => {
   };
 
   // `target` is a room, or a factory for a brand-new one (checked before it gets created)
-  const enter = (target) => {
+  const enter = (target, options) => {
     const user = accounts.getUser(userId);
     if (!user) throw new UserError('Your account was not found, please reload');
     ensureFree(typeof target === 'function' ? null : target.code);
     const room = typeof target === 'function' ? target() : target;
-    const player = room.join(accounts.publicInfo(user));
+    const player = room.join(accounts.publicInfo(user), options);
     leaveOthers(room.code);
     if (socket.data.code && socket.data.code !== room.code) leaveCurrent(false);
     socket.data.code = room.code;
@@ -144,7 +144,7 @@ io.on('connection', (socket) => {
     room.start(userId);
     return res;
   });
-  handle('room:join', ({ code }) => enter(rooms.get(code)));
+  handle('room:join', ({ code, spectate }) => enter(rooms.get(code), { spectate: spectate === true }));
   handle('room:joinInstance', ({ instanceId }) => enter(rooms.forInstance(instanceId)));
   // Lets a second device pick up wherever this account is seated (live games first)
   handle('room:current', () => {
@@ -165,6 +165,7 @@ io.on('connection', (socket) => {
   handle('lobby:addBot', ({ seat }) => current().addBot(userId, seat));
   handle('lobby:removeBot', ({ seat }) => current().removeBot(userId, seat));
   handle('lobby:teams', ({ teams }) => current().setTeams(userId, teams));
+  handle('lobby:turnTime', ({ seconds }) => current().setTurnTime(userId, seconds ?? null));
   handle('game:start', () => current().start(userId));
   handle('game:roll', () => current().roll(userId));
   handle('game:move', ({ moveId }) => current().move(userId, moveId));

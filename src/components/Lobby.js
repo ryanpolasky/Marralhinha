@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
+import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
 import RulesButton from './Rules';
 import { Copy } from './Icons';
@@ -26,6 +27,45 @@ function useSeatEvents(room, playerId) {
     fresh.forEach((event) => setTimeout(() => setEvents((list) => list.filter((e) => e.id !== event.id)), 3500));
   }, [room.seats, room.spectators, playerId]);
   return events;
+}
+
+// Host-only slider: 15-45 seconds per turn, with "no limit" at the far right. Sends once the thumb settles
+function TurnTimer({ seconds, isHost, onChange }) {
+  const serverIndex = Math.max(0, TURN_SECONDS.indexOf(seconds));
+  const [index, setIndex] = useState(serverIndex);
+  useEffect(() => setIndex(serverIndex), [serverIndex]);
+  useEffect(() => {
+    if (index === serverIndex) return undefined;
+    const t = setTimeout(() => onChange(TURN_SECONDS[index]), 250);
+    return () => clearTimeout(t);
+  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
+  const value = TURN_SECONDS[index];
+  const label = value === null ? 'No limit' : `${value}s per turn`;
+  return (
+    <div className={`turn-timer${isHost ? '' : ' readonly'}`} style={{ '--pct': index / (TURN_SECONDS.length - 1) }}>
+      <div className="turn-timer-head">
+        <span>Turn timer</span>
+        <b>{label}</b>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max={TURN_SECONDS.length - 1}
+        step="1"
+        value={index}
+        disabled={!isHost}
+        onChange={(e) => setIndex(Number(e.target.value))}
+        aria-label="Turn timer"
+        aria-valuetext={label}
+        title={isHost ? 'How long each player gets to roll or move before the game plays for them' : 'The host picks the turn timer'}
+      />
+      <div className="turn-timer-scale" aria-hidden="true">
+        <span>15s</span>
+        <span>45s</span>
+        <span>∞</span>
+      </div>
+    </div>
+  );
 }
 
 export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
@@ -194,6 +234,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
             </button>
           ))}
         </div>
+        <TurnTimer seconds={room.turnSeconds === undefined ? 30 : room.turnSeconds} isHost={isHost} onChange={(seconds) => onAction('lobby:turnTime', { seconds })} />
         <p className="lobby-mode">
           {seated < 2
             ? 'You need at least 2 players. Invite a friend or add a bot.'

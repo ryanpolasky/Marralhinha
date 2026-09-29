@@ -17,6 +17,9 @@
 # secrets
 .env
 
+# local agent notes
+AGENTS.md
+
 # misc
 .DS_Store
 .env.local

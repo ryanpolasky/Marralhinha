@@ -10,7 +10,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, onProfileChange, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -213,6 +213,13 @@ function createApi({ accounts, economy, onProfileChange, isAllowedOrigin }) {
       const { total, throwaway } = accounts.userCount();
       return { users, total, throwaway };
     })
+  );
+
+  router.get(
+    '/admin/rooms',
+    auth,
+    admin,
+    handle(() => ({ rooms: rooms ? rooms.list() : [] }))
   );
 
   router.post(

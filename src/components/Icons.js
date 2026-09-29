@@ -129,6 +129,13 @@ export const Copy = () => (
   </Icon>
 );
 
+export const Eye = () => (
+  <Icon>
+    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
 export const Chat = () => (
   <Icon>
     <path d="M4 5h16v11H9l-5 4V5z" />

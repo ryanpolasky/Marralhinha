@@ -205,6 +205,34 @@ test('connected players get a turn clock that chat never resets; timing out twic
   assert.strictEqual(room.view().seats[0].idle, false, 'acting again clears it');
 });
 
+test('the host sets the turn timer in the lobby: 15-45s, or no limit at all', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room('TURN', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  assert.strictEqual(room.view().turnSeconds, 30);
+  assert.throws(() => room.setTurnTime('u2', 15), /Only the host/);
+  assert.throws(() => room.setTurnTime('u1', 12), /15 to 45/);
+
+  room.setTurnTime('u1', 15);
+  room.pickStarter = () => ({ seat: 0, reason: 'winner' });
+  room.start('u1');
+  assert.ok(room.view().turnEndsIn <= 15000 + 2200);
+  assert.throws(() => room.setTurnTime('u1', 45), /already started/);
+
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.rematch('u1');
+  room.setTurnTime('u1', null);
+  room.start('u1');
+  assert.strictEqual(room.view().turnEndsIn, null, 'no clock without a limit');
+  t.mock.timers.tick(10 * 60 * 1000);
+  assert.strictEqual(room.seats[0].missed || 0, 0, 'nobody gets played for');
+});
+
 test('a disconnected host hands over to the next connected player after a grace period', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   const room = new Room('HOST', { onChange: () => {} });
@@ -226,12 +254,20 @@ test('a disconnected host hands over to the next connected player after a grace 
   room.start('u2');
 });
 
-test('chat is rate limited and only for seated players once the game is on', (t) => {
-  const { room } = startedRoom();
+test('chat is rate limited, open to spectators, and only once the game is on', (t) => {
+  const { room, reactions } = startedRoom();
   t.after(() => room.dispose());
   room.chat('u1', 'one');
   assert.throws(() => room.chat('u1', 'two'), UserError);
   assert.throws(() => room.chat('stranger', 'hey'), UserError);
+
+  const viewer = room.join({ userId: 'viewer', name: 'Watcher' });
+  room.attach('viewer', 's9');
+  const bubbles = reactions.length;
+  room.chat('viewer', 'go ana!');
+  const entry = room.game.log.at(-1);
+  assert.deepStrictEqual({ seat: entry.seat, from: entry.from, spectator: entry.spectator, text: entry.text }, { seat: null, from: viewer.id, spectator: true, text: 'go ana!' });
+  assert.strictEqual(reactions.length, bubbles, 'spectators have no nameplate, so no bubble');
 
   const lobby = new Room('LOBY', { onChange: () => {} });
   lobby.join({ userId: 'u1', name: 'Ana' });

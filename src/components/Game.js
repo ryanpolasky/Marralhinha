@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
-import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, TURN_MS } from '../game/moves';
+import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Eye } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey } from '../game/catalog';
 import { Coins, Coin, TagBadge, TagBadges } from './Economy';
@@ -184,33 +184,41 @@ function Bubble({ anchor, className, style, fit = false, children }) {
   );
 }
 
-// Ring around the avatar that drains over the last TURN_MS of the turn and turns red for the final 5s
-function TurnClock({ deadline }) {
+// Ring around the avatar that drains over the room's turn time and turns red for the final 5s
+function TurnClock({ deadline, total }) {
   const remaining = useRef(Math.max(0, deadline - Date.now())).current;
-  const from = (1 - Math.min(1, remaining / TURN_MS)) * 100;
+  const from = (1 - Math.min(1, remaining / total)) * 100;
   return (
     <svg
       className="turn-clock"
       viewBox="0 0 40 40"
       aria-hidden="true"
-      style={{ '--from': from, '--dur': `${Math.min(remaining, TURN_MS)}ms`, '--delay': `${Math.max(0, remaining - TURN_MS)}ms`, '--urgent': `${Math.max(0, remaining - 5000)}ms` }}
+      style={{ '--from': from, '--dur': `${Math.min(remaining, total)}ms`, '--delay': `${Math.max(0, remaining - total)}ms`, '--urgent': `${Math.max(0, remaining - 5000)}ms` }}
     >
       <circle cx="20" cy="20" r="18.5" pathLength="100" />
     </svg>
   );
 }
 
-function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock }) {
+function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView }) {
   const color = SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
   const chipRef = useRef(null);
   const seatVars = { '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark };
+  const who = seat === mySeat ? 'your' : `${player?.name || color.name}'s`;
   return (
     <div
       ref={chipRef}
-      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}`}
+      role="button"
+      tabIndex={0}
+      title={`View the board from ${who} side`}
+      aria-label={`View the board from ${who} side`}
+      aria-pressed={viewing}
+      onClick={onView}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), e.stopPropagation(), onView())}
+      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}`}
       style={seatVars}
     >
       {sticker && (
@@ -224,9 +232,9 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock })
         </Bubble>
       )}
       <span className="avatar">
+        {clock && <TurnClock key={`${clock.key}:${clock.deadline}`} deadline={clock.deadline} total={clock.total} />}
         {(player?.name || '?').slice(0, 1).toUpperCase()}
         {player?.level && <span className="avatar-level">{player.level}</span>}
-        {clock && <TurnClock key={`${clock.key}:${clock.deadline}`} deadline={clock.deadline} />}
       </span>
       <div className="chip-body">
         <div className="chip-name">
@@ -242,6 +250,48 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock })
         </div>
       </div>
     </div>
+  );
+}
+
+// Eye with a count when anyone is watching; hover, focus or tap lists who
+function Spectators({ spectators, playerId }) {
+  const [open, setOpen] = useState(false);
+  const watching = spectators.filter((p) => p.connected);
+  if (!watching.length) return null;
+  const label = `${watching.length} spectating`;
+  return (
+    <div className={`spectators${open ? ' open' : ''}`} onMouseLeave={() => setOpen(false)}>
+      <button type="button" className="icon-btn spectators-btn" onClick={() => setOpen((o) => !o)} onBlur={() => setOpen(false)} aria-label={`${label}: ${watching.map((p) => p.name).join(', ')}`} aria-expanded={open}>
+        <Eye />
+        <span className="spectators-count">{watching.length}</span>
+      </button>
+      <div className="spectators-pop" role="tooltip">
+        <div className="spectators-title">{label}</div>
+        {watching.map((p) => (
+          <div key={p.id} className="spectators-name">
+            {p.name}
+            {p.id === playerId && <span className="muted"> (you)</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoomCode({ code }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      sfx.pop();
+      setTimeout(() => setCopied(false), 1400);
+    } catch {}
+  };
+  return (
+    <button type="button" className={`room-pill${copied ? ' copied' : ''}`} onClick={copy} title="Copy room code" aria-label={`Room code ${code}, click to copy`}>
+      {copied ? 'Copied!' : code}
+    </button>
   );
 }
 
@@ -372,7 +422,7 @@ function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0 }) {
+export default function Game({ room, playerId, reactions = [], rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -420,7 +470,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
   // unrelated updates (chat, reactions) don't restart the ring
   const clockKey = `${game.turn}|${game.phase}|${game.lastRoll?.t}|${game.lastMove?.t}`;
   const deadline = useMemo(() => (room.turnEndsIn != null ? Date.now() + room.turnEndsIn : null), [clockKey, room.turnEndsIn != null]); // eslint-disable-line react-hooks/exhaustive-deps
-  const clock = deadline && game.phase !== 'over' && !rollPending ? { key: clockKey, deadline } : null;
+  const clock = deadline && room.turnSeconds && game.phase !== 'over' && !rollPending ? { key: clockKey, deadline, total: room.turnSeconds * 1000 } : null;
   const myClock = clock && game.turn === mySeat;
 
   // Ticks for the last 5 seconds of your own turn
@@ -440,10 +490,22 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';
   const chip = (s) => (
-    <PlayerChip key={s} seat={s} player={seats[s]} game={game} activeSeat={activeSeat} mySeat={mySeat} reaction={reactions.find((r) => r.seat === s)} clock={clock && game.turn === s ? clock : null} />
+    <PlayerChip
+      key={s}
+      seat={s}
+      player={seats[s]}
+      game={game}
+      activeSeat={activeSeat}
+      mySeat={mySeat}
+      reaction={reactions.find((r) => r.seat === s)}
+      clock={clock && game.turn === s ? clock : null}
+      viewing={viewSeat === s && s !== Math.max(mySeat, 0)}
+      onView={() => onViewSeat?.(s)}
+    />
   );
   const log = (rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log).slice().reverse();
-  const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && entry.seat !== mySeat && entry.t > chatSeenAt).length;
+  const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
+  const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
   const iWon = game.winners?.includes(mySeat);
 
   return (
@@ -451,7 +513,7 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
       <div className="hud-top">
         <div className="brand-chip">
           <span className="brand">Marralhinha</span>
-          {!room.activity && <span className="room-pill">{room.code}</span>}
+          {!room.activity && <RoomCode code={room.code} />}
           {mySeat < 0 && <span className="badge">Spectating</span>}
           <Coins amount={coins} className="hud-coins" />
         </div>
@@ -514,12 +576,17 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
                 className={`feed-entry${entry.chat ? ' chat' : ''}`}
                 style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}
               >
-                {entry.chat && <b className="chat-name">{entry.seat === mySeat ? 'You' : entry.name}</b>}
+                {entry.chat && (
+                  <b className="chat-name">
+                    {isMine(entry) ? 'You' : entry.name}
+                    {entry.spectator && <span className="chat-watching"> · watching</span>}
+                  </b>
+                )}
                 {entry.text}
               </div>
             ))}
           </div>
-          {mySeat >= 0 ? <ChatInput onSend={(text) => onAction('game:chat', { text })} /> : <div className="chat-spectator">Chat is for players at the table. You can still read along.</div>}
+          <ChatInput onSend={(text) => onAction('game:chat', { text })} />
         </div>
 
         <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
@@ -544,7 +611,10 @@ export default function Game({ room, playerId, reactions = [], rollPending = fal
             </button>
           )}
         </div>
-        <div className="hud-right">{mySeat >= 0 && <ReactionBar onReact={(key) => onAction('game:react', { key })} />}</div>
+        <div className="hud-right">
+          <Spectators spectators={room.spectators || []} playerId={playerId} />
+          {mySeat >= 0 && <ReactionBar onReact={(key) => onAction('game:react', { key })} />}
+        </div>
       </div>
 
       {showOver && (
