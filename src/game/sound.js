@@ -108,6 +108,10 @@ export const sfx = {
       tone({ freq: 247, to: 147, type: 'triangle', dur: 0.5, vol: 0.13, delay: 0.55 });
     }
   },
+  boardSwap: () => {
+    noise({ dur: 0.7, vol: 0.14, freq: 500, to: 4200, q: 0.6 });
+    [659, 988, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.35, vol: 0.07, delay: 0.12 + i * 0.07 }));
+  },
   tick: (urgent = false) => {
     tone({ freq: urgent ? 1400 : 1000, type: 'square', dur: 0.035, vol: urgent ? 0.07 : 0.045 });
     noise({ dur: 0.02, vol: 0.06, freq: 3000, q: 3 });

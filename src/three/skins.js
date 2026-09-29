@@ -1039,13 +1039,14 @@ function mainframeCanvases() {
   return [base, glow];
 }
 
+// Deeper Prussian blue with cyan linework, so the board doesn't read as the same blue as the Prototype marble
 function blueprintCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
-  ctx.fillStyle = '#1b4fa0';
+  ctx.fillStyle = '#123066';
   ctx.fillRect(0, 0, 1024, 1024);
-  grid(ctx, 1024, 32, 'rgba(255,255,255,0.12)');
-  grid(ctx, 1024, 128, 'rgba(255,255,255,0.3)', 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  grid(ctx, 1024, 32, 'rgba(140,220,255,0.12)');
+  grid(ctx, 1024, 128, 'rgba(140,220,255,0.3)', 2);
+  ctx.strokeStyle = 'rgba(190,240,255,0.85)';
   ctx.lineWidth = 3;
   ctx.setLineDash([14, 10]);
   [[256, 256, 150], [768, 768, 150], [768, 256, 90], [256, 768, 90]].forEach(([x, y, r]) => {
@@ -1060,11 +1061,6 @@ function blueprintCanvas() {
     ctx.stroke();
   });
   ctx.setLineDash([]);
-  ctx.font = '700 30px Consolas, "Courier New", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.fillText('MARRALHINHA  rev. B  scale 1:1', 60, 530);
-  ctx.fillText('Ø 0.74  ×  64 holes', 560, 530);
-  ctx.fillText('BETA BUILD', 60, 1000);
   return canvas;
 }
 
@@ -1188,7 +1184,8 @@ const SPECIAL_BOARDS = {
     const [base, glow] = mainframeCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: 0.045, roughness: 0.16, clearcoat: 1, dish: '#170d11', felt: '#12090c', cup: '#050305', accent: { color: '#ff4a5a', emissive: '#ff4a5a', emissiveIntensity: 1.5, roughness: 0.25 } };
   },
-  beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#16408a', felt: '#0f2c5c', cup: '#0a1f45', accent: { color: '#ffffff', metalness: 0.1, roughness: 0.5 } }),
+  // Sits on a green self-healing cutting mat instead of more blue felt
+  beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#15397a', felt: '#1f4a3c', cup: '#0b1d3f', accent: { color: '#bff0ff', metalness: 0.1, roughness: 0.5 } }),
 };
 
 export function boardSkin(itemId) {

@@ -76,7 +76,9 @@ export default function Profile({ account, onClose, onLocker }) {
             const item = ITEMS[account.equipped[slot]];
             return (
               <div key={slot} className="profile-slot">
-                <ItemThumb itemId={item.id} />
+                <span className="profile-slot-thumb">
+                  <ItemThumb itemId={item.id} />
+                </span>
                 <span className="profile-slot-name">{item.name}</span>
                 <span className="muted small-text">{SLOTS[slot].label}</span>
               </div>

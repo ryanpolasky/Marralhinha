@@ -4,13 +4,16 @@ import { useFrame } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, RING, HOME, BASE, BASE_TRAY, CENTER, INNER_CORNERS, entryIdx } from '../game/geometry';
 import { makeLabelTexture } from './textures';
 import { boardSkin } from './skins';
+import { fx } from './fx';
+import { sfx } from '../game/sound';
 
 export const HOLE_R = 0.37;
 const CENTER_R = HOLE_R;
 const DEPTH = 0.42;
 const BEVEL = 0.12;
 export const TABLE_Y = -(DEPTH + BEVEL * 2);
-const DISH_R = 2.2;
+export const DISH_R = 2.2;
+export const DISH_BEVEL = BEVEL;
 
 const sx = ([r, c]) => [c, -r];
 
@@ -191,8 +194,74 @@ function Table({ texture }) {
   );
 }
 
+const SWAP_MS = 150;
+const WAVE_S = 0.9;
+const WAVE_R = 13;
+
+// Glowing shockwave that sweeps out from the center while the board skin changes underneath it
+function SwapWave({ wave }) {
+  const ring = useRef();
+  const flash = useRef();
+  const start = useRef(null);
+  useEffect(() => {
+    start.current = wave ? null : undefined;
+  }, [wave]);
+  useFrame(({ clock }) => {
+    if (start.current === undefined) {
+      ring.current.visible = flash.current.visible = false;
+      return;
+    }
+    if (start.current === null) start.current = clock.elapsedTime;
+    const t = (clock.elapsedTime - start.current) / WAVE_S;
+    if (t >= 1) {
+      start.current = undefined;
+      return;
+    }
+    const eased = 1 - (1 - t) ** 3;
+    ring.current.visible = flash.current.visible = true;
+    ring.current.scale.setScalar(0.3 + eased * WAVE_R);
+    ring.current.material.opacity = (1 - t) ** 1.5;
+    flash.current.scale.setScalar(1 + eased * 6);
+    flash.current.material.opacity = Math.max(0, 0.7 - t * 2.2);
+  });
+  return (
+    <group position-y={0.06}>
+      <mesh ref={ring} rotation-x={-Math.PI / 2} visible={false} renderOrder={11}>
+        <ringGeometry args={[0.86, 1, 96]} />
+        <meshBasicMaterial color="#ffe7a3" transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      <mesh ref={flash} rotation-x={-Math.PI / 2} visible={false} renderOrder={11}>
+        <circleGeometry args={[1, 48]} />
+        <meshBasicMaterial color="#fff6d8" transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+    </group>
+  );
+}
+
+// The shown skin trails the requested one by a beat, so the swap happens under the wave's flash.
+// Previews (table=false) swap instantly: particles share a global bus and would spray onto the main board
+function useSkinTransition(skin, animate) {
+  const [shown, setShown] = useState(skin);
+  const [wave, setWave] = useState(0);
+  useEffect(() => {
+    if (skin === shown) return undefined;
+    // No show on the very first skin (page load), only on real swaps
+    if (!animate || !shown) {
+      setShown(skin);
+      return undefined;
+    }
+    setWave((w) => w + 1);
+    sfx.boardSwap();
+    fx.emit('burst', { position: [0, 0.3, 0], colors: ['#ffd166', '#fff3b0', '#ffffff'], count: 80, speed: 9, up: 2.5, size: 0.09, gravity: 0.35, life: 1.1, spread: 1.4 });
+    const t = setTimeout(() => setShown(skin), SWAP_MS);
+    return () => clearTimeout(t);
+  }, [skin]); // eslint-disable-line react-hooks/exhaustive-deps
+  return [shown, wave];
+}
+
 export default function Board({ active, names, turn, showNames, skin, table = true }) {
-  const materials = boardSkin(skin);
+  const [shownSkin, wave] = useSkinTransition(skin, table);
+  const materials = boardSkin(shownSkin);
   const boardGeometry = useMemo(buildBoardGeometry, []);
   const dishGeometries = useMemo(() => SEATS.map(buildDishGeometry), []);
   const stripGeometry = useMemo(buildHomeStripGeometry, []);
@@ -231,6 +300,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
       })}
       <Ring at={CENTER} inner={CENTER_R + 0.03} outer={CENTER_R + 0.16} material={materials.brass} />
       <TurnGem turn={turn ?? null} />
+      {table && <SwapWave wave={wave} />}
     </group>
   );
 }

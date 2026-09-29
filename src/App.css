@@ -4412,7 +4412,7 @@ button.room-pill.copied {
   filter: drop-shadow(0 0 6px #ff4a5a);
 }
 .thumb-board.skin-beta {
-  background: linear-gradient(rgba(255, 255, 255, 0.25) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(255, 255, 255, 0.25) 0 1px, transparent 1px) 0 0 / 8px 8px, #1b4fa0;
+  background: linear-gradient(rgba(140, 220, 255, 0.3) 0 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, rgba(140, 220, 255, 0.3) 0 1px, transparent 1px) 0 0 / 8px 8px, #123066;
 }
 
 /* ---------- Thumbs: new dice ---------- */
@@ -5369,6 +5369,14 @@ select.admin-input optgroup {
   text-align: center;
 }
 
+/* Thumbs differ in height per slot; a fixed box keeps every name on the same line */
+.profile-slot-thumb {
+  display: grid;
+  place-items: center;
+  height: 64px;
+  width: 100%;
+}
+
 .profile-slot-name {
   max-width: 100%;
   overflow: hidden;
@@ -5572,11 +5580,18 @@ select.admin-input optgroup {
 
 /* ---------- Lobby: join / leave notices ---------- */
 
+/* Floats over the page so notices never resize the lobby panel */
 .lobby-events {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   gap: 6px;
+  pointer-events: none;
 }
 
 .lobby-events:empty {
@@ -5584,18 +5599,21 @@ select.admin-input optgroup {
 }
 
 .lobby-event {
-  padding: 4px 12px;
+  padding: 6px 14px;
   border-radius: 99px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--ink-dim);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
   animation: lobby-event 3.5s ease both;
 }
 
 .lobby-event.joined {
   color: #bff5c9;
-  background: rgba(46, 158, 85, 0.22);
+  border-color: rgba(46, 158, 85, 0.6);
 }
 
 @keyframes lobby-event {

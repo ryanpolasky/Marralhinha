@@ -107,6 +107,14 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
 
   return (
     <div className="screen">
+      {/* Outside the panel: its backdrop-filter would otherwise trap this fixed overlay inside it */}
+      <div className="lobby-events" aria-live="polite">
+        {events.map((e) => (
+          <span key={e.id} className={`lobby-event${e.joined ? ' joined' : ''}`}>
+            {e.text}
+          </span>
+        ))}
+      </div>
       <div className="panel lobby">
         {room.activity ? (
           <div className="lobby-head">
@@ -127,13 +135,6 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
           </div>
         )}
 
-        <div className="lobby-events" aria-live="polite">
-          {events.map((e) => (
-            <span key={e.id} className={`lobby-event${e.joined ? ' joined' : ''}`}>
-              {e.text}
-            </span>
-          ))}
-        </div>
         {spectator && <p className="lobby-notice">You're spectating. If a seat opens up before the game starts, tap Sit to join.{isAdmin && ' You can also pick two occupied seats to swap as Dev.'}</p>}
         {offered && (
           <div className="lobby-notice">

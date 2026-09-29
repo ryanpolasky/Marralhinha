@@ -7,7 +7,7 @@ import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
-import { ROLL_REVEAL_MS, startPendingFor } from './game/moves';
+import { ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, startPendingFor } from './game/moves';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -65,6 +65,19 @@ function useRollPending(lastRoll) {
     return () => clearTimeout(timer);
   }, [t]);
   return pendingT !== null && pendingT === t;
+}
+
+// The starter's board is part of the wheel's reveal: keep your own board until the wheel lands
+function useBoardRevealed(game) {
+  const pick = game?.pick;
+  const wait = pick?.reason === 'wheel' ? START_WHEEL_SPIN_MS - (Date.now() - pick.t) : 0;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (wait <= 0) return undefined;
+    const timer = setTimeout(() => tick((n) => n + 1), wait + 20);
+    return () => clearTimeout(timer);
+  }, [wait > 0, pick?.t]); // eslint-disable-line react-hooks/exhaustive-deps
+  return wait <= 0;
 }
 
 // True while the "who starts" intro plays for a freshly started game
@@ -312,7 +325,8 @@ const App = () => {
   const rollPending = useRollPending(game?.lastRoll);
   const [startPending, dismissStart] = useStartPending(game);
   // The server chooses one board for everyone once a game starts; before that everyone previews their own
-  const tableBoard = game && game.boardSeat !== null ? room.seats[game.boardSeat]?.cosmetics?.board : null;
+  const boardRevealed = useBoardRevealed(game);
+  const tableBoard = game && game.boardSeat !== null && boardRevealed ? room.seats[game.boardSeat]?.cosmetics?.board : null;
   const boardSkinId = tableBoard || account?.equipped.board;
 
   const sceneProps = useMemo(() => {
