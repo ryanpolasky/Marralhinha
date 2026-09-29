@@ -131,11 +131,11 @@ function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
         pick(moves[index < 0 ? (back ? moves.length - 1 : 0) : (index + (back ? -1 : 1) + moves.length) % moves.length]);
       } else if (/^[1-9]$/.test(e.key) && moves[Number(e.key) - 1]) {
         pick(moves[Number(e.key) - 1]);
-      } else if (e.key === 'Enter' && keyMove && e.target.tagName !== 'BUTTON') {
+      } else if (e.key === 'Enter' && keyMove !== null && e.target.tagName !== 'BUTTON') {
         e.preventDefault();
         setKeyMove(null);
         onMove(keyMove);
-      } else if (e.key === 'Escape' && keyMove) {
+      } else if (e.key === 'Escape' && keyMove !== null) {
         setKeyMove(null);
         setSelected(null);
       }
