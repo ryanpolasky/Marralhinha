@@ -19,3 +19,7 @@ export const startPendingFor = (game, now = Date.now()) => {
 
 export const homeCount = (marbles) => marbles.filter((p) => p.zone === 'home').length;
 export const partnerOf = (seat) => (seat + 2) % 4;
+
+// 2v2: your partner stepped away and it's their turn, so you play it for them (mirrors coverFor in server/rooms.js)
+export const coveringTurn = (game, seats, mySeat) =>
+  !!game && game.mode === 'teams' && mySeat >= 0 && game.turn === partnerOf(mySeat) && !!seats[game.turn]?.away && !seats[mySeat]?.away;

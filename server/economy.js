@@ -108,7 +108,13 @@ class Economy {
         let wonToday = fresh ? user.won_today : 0;
         const won = game.winners.includes(seat);
         const stats = game.stats[seat];
-        const captures = Math.min(stats.captures, REWARDS.maxCaptures);
+        // Sixes and captures the bot or a covering partner made for this seat aren't yours (keeps Luckiest honest)
+        const played = game.played?.[seat];
+        const ownCaptures = Math.max(0, stats.captures - (played?.coveredCaptures || 0));
+        const ownSixes = Math.max(0, (stats.sixes || 0) - (played?.coveredSixes || 0));
+        // The bot played most of your turns (away, timed out, disconnected): no rewards, unless you're Dev
+        const botCarried = !!played && played.botRolls * 2 > played.rolls && !this.accounts.isAdmin(user);
+        const captures = Math.min(ownCaptures, REWARDS.maxCaptures);
         const home = game.marbles[seat].filter((p) => p.zone === 'home').length;
 
         let lines = [{ label: 'Game finished', amount: REWARDS.finish }];
@@ -118,7 +124,10 @@ class Economy {
         if (won && !wonToday) lines.push({ label: 'First win of the day', amount: REWARDS.firstWinOfDay });
 
         let note = null;
-        if (botGame) {
+        if (botCarried) {
+          lines = [];
+          note = 'The bot played most of your turns, so no rewards this game.';
+        } else if (botGame) {
           if (botGames >= REWARDS.botGamesPerDay) {
             lines = [];
             note = `Daily bot-game rewards used up (${REWARDS.botGamesPerDay}/${REWARDS.botGamesPerDay}). Play with friends for more!`;
@@ -138,9 +147,9 @@ class Economy {
 
         this.credit(userId, total, `game:${won ? 'win' : 'finish'}`);
         this.q.addXp.run(earned, userId);
-        this.q.stats.run(won ? 1 : 0, stats.captures, stats.sixes || 0, userId);
+        this.q.stats.run(won && !botCarried ? 1 : 0, ownCaptures, ownSixes, userId);
         this.q.counters.run(today, botGames, wonToday, userId);
-        results[seat] = { total, xp: earned, lines, note, level: after, leveledUp: after > before };
+        results[seat] = { total, xp: earned, lines, note, level: after, leveledUp: after > before, botCarried };
       }
       const lucky = this.accounts.refreshLucky();
       const luckySeat = lucky && players.find((p) => p.userId === lucky.holder)?.seat;

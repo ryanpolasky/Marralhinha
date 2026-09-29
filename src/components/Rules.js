@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Credit } from './About';
 import { RING, HOME, BASE, SEAT_COLORS, BASE_TRAY } from '../game/geometry';
-import { Arrow, BoardArt, Die, Label, Marble, Mark, Ring, RowArt, Trail, rowAt } from './TutorialArt';
+import { Arrow, BoardArt, Coin, Defs, Die, Dish, Label, Marble, Mark, PingMark, Ring, RowArt, Trail, rowAt } from './TutorialArt';
 
 const RED = SEAT_COLORS[0];
 const redPath = [...Array.from({ length: 62 }, (_, i) => RING[i + 2]), RING[0], ...HOME[0]];
@@ -14,6 +14,10 @@ const SLIDES = [
     art: (id) => (
       <BoardArt id={id} baseMarbles={{ 0: 4, 1: 5, 2: 5, 3: 5 }}>
         <Trail points={redPath.filter((_, i) => i % 2 === 0 || i === redPath.length - 1)} color={RED.light} />
+        {/* Where they're headed: all five spots in the red home column */}
+        {HOME[0].map((p, i) => (
+          <Marble key={i} id={id} seat={0} at={p} r={0.34} ghost />
+        ))}
         <Marble id={id} seat={0} at={RING[2]} />
       </BoardArt>
     ),
@@ -33,16 +37,31 @@ const SLIDES = [
   },
   {
     title: 'Sixes roll again',
-    text: 'Roll a 6 and you get another roll once you have moved, even if nothing could move.',
-    art: () => (
-      <svg className="tutorial-art" viewBox="-5 -3 10 6" role="img" aria-hidden="true">
-        <Die at={[0, -2.4]} value={6} size={2.4} />
-        <Arrow from={[-1.2, -0.9]} to={[-1.2, 0.9]} bend={-1.4} color="#ffd166" width={0.18} />
-        <Arrow from={[1.2, 0.9]} to={[1.2, -0.9]} bend={-1.4} color="#ffd166" width={0.18} />
-        <Label at={[0, 0]} color="#ffd166" size={0.8}>
-          again!
+    text: 'Roll a 6 and you get another roll once you have moved, even if nothing could move. Anything else, and the turn passes to the next player.',
+    // Reads left to right as a timeline: 6, move, roll again; a non-6 ends the turn
+    art: (id) => (
+      <svg className="tutorial-art" viewBox="-0.6 -2.6 12.4 5.3" role="img" aria-hidden="true">
+        <Defs id={id} />
+        <Die at={[0, 1.2]} value={6} size={2} />
+        <Label at={[1.75, 1.2]} size={0.5}>
+          move…
         </Label>
-        <Die at={[0, 2.4]} value={4} size={2.4} />
+        <Arrow from={[-0.3, 2.45]} to={[-0.3, 4.35]} bend={-0.7} color="#ffd166" width={0.16} />
+        <Label at={[-1.75, 3.4]} color="#ffd166" size={0.62}>
+          roll again!
+        </Label>
+        <Die at={[0, 5.6]} value={4} size={2} />
+        <Label at={[1.75, 5.6]} size={0.5}>
+          move…
+        </Label>
+        <Arrow from={[-0.3, 6.85]} to={[-0.3, 8.85]} bend={-0.7} color="#9fb3b8" width={0.13} dashed />
+        <Label at={[-1.75, 7.85]} color="#9fb3b8" size={0.5}>
+          turn passes
+        </Label>
+        <Marble id={id} seat={1} at={[0, 10.2]} r={0.72} />
+        <Label at={[1.75, 10.2]} size={0.5} color={SEAT_COLORS[1].light}>
+          next player
+        </Label>
       </svg>
     ),
   },
@@ -50,15 +69,18 @@ const SLIDES = [
     title: 'Capture!',
     text: "Land exactly on an opponent's marble to knock it all the way back to its dish.",
     art: (id) => (
-      <RowArt id={id} holes={6} height={5} extra={2.6}>
+      <RowArt id={id} holes={6} height={5.4} extra={2.6}>
+        {/* The roll sits up top; the captured marble visibly flies into its own (blue) dish */}
+        <Die at={[-1.75, 8.7]} value={3} size={1.2} />
         <Arrow from={rowAt(1, -0.5)} to={rowAt(4, -0.55)} bend={-1.3} color={RED.light} width={0.14} />
         <Marble id={id} seat={0} at={rowAt(1)} />
         <Marble id={id} seat={1} at={rowAt(4)} />
-        <Arrow from={rowAt(4, 0.5)} to={[2.1, 6.6]} bend={-0.8} color={SEAT_COLORS[1].light} width={0.12} dashed />
-        <Label at={[2.1, 3.3]} size={0.55} color={SEAT_COLORS[1].light}>
+        <Dish id={id} at={[1.55, 8.7]} seat={1} />
+        <Marble id={id} seat={1} at={[1.55, 8.7]} r={0.34} ghost />
+        <Arrow from={rowAt(4, 0.5)} to={[1.3, 7.75]} bend={0.7} color={SEAT_COLORS[1].light} width={0.12} dashed />
+        <Label at={[2.2, 4.4]} size={0.52} color={SEAT_COLORS[1].light}>
           back to its dish!
         </Label>
-        <Die at={rowAt(6.6)} value={3} size={1.7} />
       </RowArt>
     ),
   },
@@ -135,8 +157,52 @@ const SLIDES = [
     ),
   },
   {
+    title: 'Stepping away',
+    text: "Need a break? Hit the coffee cup (or B) and your nameplate shows brb while the bot plays your turns. In teams, your partner plays them for you instead. Hit I'm back, or just roll, to jump back in. The catch: if the bot plays more than half your turns you earn nothing that game, and sixes or captures made for you never count toward your stats.",
+    art: (id) => (
+      <svg className="tutorial-art" viewBox="0 -0.2 12 6.6" role="img" aria-hidden="true">
+        <Defs id={id} />
+        {/* coffee cup */}
+        <g transform="translate(1.9 2.1)">
+          <path d="M-0.95,-0.6h1.9v0.95a0.95,0.95 0 0 1 -0.95,0.95h-0.1a0.95,0.95 0 0 1 -0.95,-0.95z" fill="#fff6e6" stroke="#caa77a" strokeWidth="0.08" />
+          <path d="M0.95,-0.35h0.3a0.42,0.42 0 0 1 0,0.84h-0.3" fill="none" stroke="#caa77a" strokeWidth="0.12" />
+          <path d="M-0.35,-1.35c0,0.25 0.2,0.35 0.2,0.55M0.2,-1.35c0,0.25 0.2,0.35 0.2,0.55" fill="none" stroke="#9fb3b8" strokeWidth="0.09" strokeLinecap="round" />
+        </g>
+        <Label at={[3.6, 1.9]} size={0.6} color="#ffe38a">
+          brb
+        </Label>
+        <Arrow from={[2.1, 3.3]} to={[2.1, 5.2]} color="#ffd166" width={0.14} />
+        {/* bot */}
+        <g transform="translate(6.5 2.1)">
+          <line x1="0" y1="-1.05" x2="0" y2="-1.45" stroke="#8cc2ff" strokeWidth="0.1" />
+          <circle cx="0" cy="-1.55" r="0.14" fill="#8cc2ff" />
+          <rect x="-0.9" y="-1" width="1.8" height="1.6" rx="0.45" fill="#2b4e6e" stroke="#8cc2ff" strokeWidth="0.1" />
+          <circle cx="-0.38" cy="-0.25" r="0.2" fill="#8cc2ff" />
+          <circle cx="0.38" cy="-0.25" r="0.2" fill="#8cc2ff" />
+          <rect x="-0.4" y="0.2" width="0.8" height="0.12" rx="0.06" fill="#8cc2ff" />
+        </g>
+        <Label at={[3.6, 6.5]} size={0.5}>
+          bot plays
+        </Label>
+        <Label at={[2.1, 8.2]} size={0.5} color="#9fb3b8">
+          or
+        </Label>
+        <Marble id={id} seat={2} at={[2.1, 10]} r={0.62} />
+        <Label at={[3.6, 10]} size={0.5} color={SEAT_COLORS[2].light}>
+          partner (2v2)
+        </Label>
+        {/* the downside */}
+        <Coin at={[5.35, 2.4]} size={0.95} />
+        <Mark at={[5.75, 2.85]} ok={false} size={0.5} />
+        <Label at={[5.4, 7.4]} size={0.5} color="#ff8a8a">
+          bot played over half? no rewards
+        </Label>
+      </svg>
+    ),
+  },
+  {
     title: 'Handy tips',
-    text: 'Tap a glowing marble to see where it would land. If it has two options, both show up for you to pick. Drag to spin the board, scroll to zoom, and use the chat to trash talk.',
+    text: 'Tap a glowing marble to see where it would land; with two options, both show up. Keyboard: Space rolls, Tab then Enter picks a move. Point at a spot and press H to ping it (G to warn), or right-click / long-press. Drag to spin the board, scroll to zoom, and use the chat to trash talk.',
     art: (id) => (
       <BoardArt id={id} view="-2.4 -3.2 12 9.8" dishes={[0, 1]} baseMarbles={{ 0: 3, 1: 4 }}>
         <Ring at={RING[8]} r={0.62} width={0.12} color="#ffe066" />
@@ -148,6 +214,10 @@ const SLIDES = [
         </Label>
         <Label at={[-1.05, 0]} size={0.6} color="#ffd166">
           Shortcut
+        </Label>
+        <PingMark at={RING[5]} color={SEAT_COLORS[1].light} />
+        <Label at={[RING[5][0] + 1.1, RING[5][1]]} size={0.55} color={SEAT_COLORS[1].light}>
+          ping (H)
         </Label>
       </BoardArt>
     ),

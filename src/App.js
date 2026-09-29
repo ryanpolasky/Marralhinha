@@ -9,7 +9,7 @@ import { getSettings } from './game/settings';
 import PingMenu from './components/PingMenu';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
-import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, startPendingFor } from './game/moves';
+import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, coveringTurn, startPendingFor } from './game/moves';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -374,7 +374,7 @@ const App = () => {
       return { mode: 'lobby', board: { active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
     }
     const g = room.game;
-    const myTurn = g.turn === mySeat && g.phase !== 'over';
+    const myTurn = (g.turn === mySeat || coveringTurn(g, room.seats, mySeat)) && g.phase !== 'over';
     return {
       mode: 'game',
       board: rollPending ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,

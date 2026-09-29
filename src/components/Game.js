@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
-import { homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
+import { coveringTurn, homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
@@ -84,13 +84,25 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
   const helping = game.mode === 'teams' && homeCount(game.marbles[turn]) === 5;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
   if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
+  if (coveringTurn(game, seats, mySeat)) {
+    const partner = seats[turn]?.name || 'your partner';
+    return game.phase === 'roll'
+      ? { title: `Play for ${partner}`, sub: 'They stepped away, so roll for them' }
+      : { title: `You rolled a ${game.die} for ${partner}`, sub: 'Pick one of their glowing marbles' };
+  }
   if (turn === mySeat) {
+    if (seats[mySeat]?.away) return { title: 'Your turn (you stepped away)', sub: "The bot's got it. Hit I'm back or roll to take over." };
     if (seats[mySeat]?.idle) return { title: 'Your turn!', sub: "You ran out of time, so we've been playing for you. Make a move to take back over." };
     return game.phase === 'roll'
       ? { title: 'Your turn!', sub: `Roll the dice${helpText}` }
       : { title: `You rolled a ${game.die}`, sub: `Pick a glowing marble${helpText}${FINE_POINTER ? ' (or Tab, then Enter)' : ''}` };
   }
   const p = seats[turn];
+  if (p?.away && !p.isBot) {
+    const cover = game.mode === 'teams' ? seats[partnerOf(turn)] : null;
+    const covered = cover && !cover.isBot && cover.connected && !cover.away && !cover.idle;
+    return { title: `${p.name} stepped away`, sub: covered ? `${nameOf(partnerOf(turn))} ${partnerOf(turn) === mySeat ? 'are' : 'is'} playing for them…` : 'A bot is playing for them…' };
+  }
   if (isAway(p)) return { title: `${p.name} is away`, sub: p.connected ? 'Playing for them until they’re back…' : 'A bot will play for them shortly…' };
   return game.phase === 'roll'
     ? { title: `${nameOf(turn)}'s turn`, sub: `Rolling…${helpText}` }
@@ -153,7 +165,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
 }
 
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
-const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle);
+const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle || p.away);
 
 // Speech bubbles live in <body> and follow their chip every frame, so the scrolling (clipped) mobile
 // player bar can't hide them. Chat bubbles are capped to the chip's width so neighbours never overlap.
@@ -241,7 +253,7 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, v
           <span className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</span>
           <TagBadges tags={player?.tags} small />
           {player?.isBot && <span className="badge">bot</span>}
-          {isAway(player) && <span className="badge warn">away</span>}
+          {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
         </div>
         <div className="pips" aria-label={`${home} of 5 marbles home`}>
           {[0, 1, 2, 3, 4].map((i) => (
@@ -498,16 +510,32 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const announcements = useAnnouncements(game, mySeat, nameOf);
 
   const activeSeat = rollPending ? game.lastRoll.seat : game.turn;
-  const myTurn = activeSeat === mySeat && game.phase !== 'over';
+  const covering = coveringTurn(game, seats, mySeat);
+  const myTurn = (activeSeat === mySeat || (covering && !rollPending)) && game.phase !== 'over';
+  const meAway = !!seats[mySeat]?.away;
+  const setAway = useCallback((away) => onAction('game:away', { away }), [onAction]);
+
+  // B toggles stepping away (not while typing or in a dialog)
+  useEffect(() => {
+    if (mySeat < 0 || game.phase === 'over') return undefined;
+    const onKey = (e) => {
+      if (e.key.toLowerCase() !== 'b' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      setAway(!meAway);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mySeat, game.phase, meAway, setAway]);
   const canRoll = myTurn && game.phase === 'roll' && !rollPending && !startPending;
   const roll = useCallback(() => canRoll && onAction('game:roll'), [canRoll, onAction]);
   const { autoRoll } = useSettings();
 
   useEffect(() => {
-    if (!autoRoll || !canRoll) return undefined;
+    // Auto-roll never plays for you while you've stepped away (that would bring you "back")
+    if (!autoRoll || !canRoll || meAway) return undefined;
     const t = setTimeout(roll, 650);
     return () => clearTimeout(t);
-  }, [autoRoll, canRoll, roll, game.lastRoll?.t]);
+  }, [autoRoll, canRoll, roll, game.lastRoll?.t, meAway]);
 
   useEffect(() => {
     if (game.phase !== 'over') {
@@ -534,7 +562,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const clockKey = `${game.turn}|${game.phase}|${game.lastRoll?.t}|${game.lastMove?.t}`;
   const deadline = useMemo(() => (room.turnEndsIn != null ? Date.now() + room.turnEndsIn : null), [clockKey, room.turnEndsIn != null]); // eslint-disable-line react-hooks/exhaustive-deps
   const clock = deadline && room.turnSeconds && game.phase !== 'over' && !rollPending ? { key: clockKey, deadline, total: room.turnSeconds * 1000 } : null;
-  const myClock = clock && game.turn === mySeat;
+  const myClock = clock && (game.turn === mySeat || covering) && !meAway;
 
   // Ticks for the last 5 seconds of your own turn
   useEffect(() => {
@@ -679,9 +707,29 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         </div>
         <div className="hud-right">
           <Spectators spectators={room.spectators || []} playerId={playerId} />
+          {mySeat >= 0 && game.phase !== 'over' && (
+            <button className={`icon-btn away-btn${meAway ? ' on' : ''}`} onClick={() => setAway(!meAway)} aria-pressed={meAway} title={meAway ? "I'm back (B)" : 'Step away: the bot plays for you (B)'} aria-label={meAway ? "I'm back" : 'Step away'}>
+              <Coffee />
+            </button>
+          )}
           {mySeat >= 0 && <ReactionBar onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
+
+      {meAway && game.phase !== 'over' && (
+        <div className="away-banner" role="status">
+          <div className="away-title">You stepped away</div>
+          <div className="away-sub">
+            {teams && seats[partnerOf(mySeat)] && !seats[partnerOf(mySeat)].isBot && seats[partnerOf(mySeat)].connected && !seats[partnerOf(mySeat)].away
+              ? `${seats[partnerOf(mySeat)].name} is playing your turns.`
+              : 'The bot is playing your turns.'}
+            {!isAdmin && " If the bot plays more than half your turns this game, you won't earn rewards."}
+          </div>
+          <button className="btn primary big" onClick={() => setAway(false)}>
+            I'm back
+          </button>
+        </div>
+      )}
 
       {showOver && (
         <div className="win-screen">

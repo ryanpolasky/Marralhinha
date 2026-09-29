@@ -21,7 +21,7 @@ function roundedPath(points, r) {
 const CROSS_D = roundedPath(CROSS, 0.6);
 const xy = ([r, c]) => [c, r];
 
-function Defs({ id }) {
+export function Defs({ id }) {
   return (
     <defs>
       <linearGradient id={`${id}-wood`} x1="0" y1="0" x2="1" y2="1">
@@ -48,11 +48,11 @@ function Defs({ id }) {
   );
 }
 
-export function Marble({ id, seat, at, ghost = false, r = 0.42 }) {
+export function Marble({ id, seat, at, ghost = false, r = 0.42, dim = false }) {
   const [x, y] = xy(at);
   if (ghost) return <circle cx={x} cy={y} r={r} fill={SEAT_COLORS[seat].light} opacity="0.45" stroke="#fff" strokeWidth="0.08" strokeDasharray="0.18 0.12" />;
   return (
-    <g>
+    <g opacity={dim ? 0.4 : 1}>
       <circle cx={x + 0.05} cy={y + 0.12} r={r} fill="#000" opacity="0.3" />
       <circle cx={x} cy={y} r={r} fill={`url(#${id}-m${seat})`} />
       <ellipse cx={x - r * 0.32} cy={y - r * 0.38} rx={r * 0.3} ry={r * 0.2} fill="#fff" opacity="0.8" />
@@ -119,6 +119,42 @@ export function Die({ at, value, size = 1.6, mark }) {
         <circle key={i} cx={x + dx * pip} cy={y + dy * pip} r={size * 0.09} fill={value === 1 || value === 6 ? '#c8283a' : '#2a1d12'} />
       ))}
       {mark && <Mark at={[at[0] - h, at[1] + h]} ok={mark === 'yes'} size={size * 0.52} />}
+    </g>
+  );
+}
+
+// A small marble dish (for "sent back home" and similar)
+export function Dish({ id, at, seat, r = 0.85 }) {
+  const [x, y] = xy(at);
+  return (
+    <g>
+      <circle cx={x} cy={y + 0.1} r={r} fill="#000" opacity="0.3" />
+      <circle cx={x} cy={y} r={r} fill={`url(#${id}-dish)`} stroke="#5a3212" strokeWidth="0.08" />
+      <circle cx={x} cy={y} r={r * 0.86} fill="none" stroke={SEAT_COLORS[seat].main} strokeWidth="0.12" />
+    </g>
+  );
+}
+
+// The in-game ping: an arrow pointing down at a ring
+export function PingMark({ at, color = '#ff8a8a' }) {
+  const [x, y] = xy(at);
+  return (
+    <g>
+      <circle cx={x} cy={y} r="0.55" fill="none" stroke={color} strokeWidth="0.12" />
+      <path d={`M${x},${y - 0.2}L${x - 0.36},${y - 0.95}L${x + 0.36},${y - 0.95}Z`} fill={color} />
+      <rect x={x - 0.11} y={y - 1.55} width="0.22" height="0.65" rx="0.08" fill={color} />
+    </g>
+  );
+}
+
+export function Coin({ at, size = 1 }) {
+  const [x, y] = xy(at);
+  const r = size / 2;
+  return (
+    <g>
+      <circle cx={x} cy={y} r={r} fill="#f6c343" stroke="#a8740f" strokeWidth={size * 0.07} />
+      <circle cx={x} cy={y} r={r * 0.66} fill="none" stroke="#fff0b8" strokeWidth={size * 0.05} opacity="0.8" />
+      <circle cx={x} cy={y} r={r * 0.36} fill="#d99a1c" />
     </g>
   );
 }

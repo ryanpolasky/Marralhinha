@@ -102,6 +102,34 @@ test('match rewards: full for human games, halved and capped for bot games', () 
   assert.ok(nextDay[0].total > 0, 'cap resets the next day');
 });
 
+test('bot-carried players (>half their turns) get nothing unless Dev; covered sixes and captures never count', () => {
+  const { accounts, economy } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const now = Date.parse('2026-03-03T12:00:00Z');
+  const game = {
+    ...fakeGame({ captures: [3, 2] }),
+    stats: [{ captures: 3, sixes: 4 }, { captures: 2, sixes: 3 }],
+    played: [{ rolls: 10, botRolls: 6, coveredSixes: 2, coveredCaptures: 1 }, { rolls: 10, botRolls: 5, coveredSixes: 1, coveredCaptures: 2 }],
+  };
+  const res = economy.awardGame({ game, players: [{ seat: 0, userId: a.id }, { seat: 1, userId: b.id }], botGame: false, now });
+  assert.equal(res[0].total, 0);
+  assert.equal(res[0].botCarried, true);
+  assert.match(res[0].note, /bot played most/);
+  assert.equal(accounts.getUser(a.id).wins, 0, 'a bot-carried win is not a win');
+  assert.equal(accounts.getUser(a.id).sixes, 2, 'only your own sixes count');
+  assert.equal(accounts.getUser(a.id).captures, 2);
+
+  assert.equal(res[1].botCarried, false, 'exactly half is still yours');
+  assert.ok(!res[1].lines.some((l) => /Captures/.test(l.label)), 'covered captures earn nothing');
+  assert.equal(accounts.getUser(b.id).sixes, 2);
+
+  accounts.setTags(a.id, ['dev']);
+  const dev = economy.awardGame({ game, players: [{ seat: 0, userId: a.id }], botGame: false, now });
+  assert.ok(dev[0].total > 0, 'Dev is exempt from the bot-carried rule');
+  assert.equal(accounts.getUser(a.id).sixes, 4, '...but still only gets their own sixes');
+});
+
 test('discord login links a guest, or merges it into an existing discord account', () => {
   const { accounts, economy } = setup();
   const guest = accounts.createUser({ name: 'Guesty' });

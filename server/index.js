@@ -181,6 +181,7 @@ io.on('connection', (socket) => {
   handle('game:move', ({ moveId }) => current().move(userId, moveId));
   handle('game:react', ({ key }) => current().react(userId, key));
   handle('game:chat', ({ text, channel }) => current().chat(userId, text, channel === 'team' ? 'team' : 'all'));
+  handle('game:away', ({ away }) => current().stepAway(userId, away === true));
   handle('game:setBoard', ({ item }) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can change the table board');
     current().setBoard(userId, typeof item === 'string' ? item : null);

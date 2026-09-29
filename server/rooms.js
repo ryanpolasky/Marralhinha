@@ -321,10 +321,13 @@ class Room {
     this.requireHost(userId);
     this.requireLobby();
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
-    humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false }));
+    humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false, away: false }));
     this.swapOffers = [];
     this.teamLogs = [[], []];
     this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
+    // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
+    // disconnected), plus the sixes/captures someone else made for this seat, which never count towards its stats
+    this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
     this.humansAtStart = humans.length;
     this.changed();
   }
@@ -345,26 +348,65 @@ class Room {
     this.changed();
   }
 
+  // The partner who can take an away player's turn in 2v2: seated, human, present and not away themselves
+  coverFor(seat) {
+    if (this.game?.mode !== 'teams' || !this.seats[seat]?.away) return null;
+    const partner = this.seats[(seat + 2) % 4];
+    return partner && !partner.isBot && partner.connected && !partner.away && !partner.idle ? partner : null;
+  }
+
+  // Returns who is acting for the turn: 'self', or 'partner' when covering for an away teammate.
+  // Acting on your own turn also brings you back from being away.
   requireTurn(userId) {
     const { seat, player } = this.require(userId);
-    if (!this.game || this.game.turn !== seat) throw new UserError("It's not your turn");
-    player.missed = 0;
-    player.idle = false;
+    const turn = this.game?.turn;
+    const kind = turn === seat ? 'self' : turn !== undefined && this.coverFor(turn) === player ? 'partner' : null;
+    if (!kind) throw new UserError("It's not your turn");
+    Object.assign(player, { missed: 0, idle: false }, kind === 'self' ? { away: false } : {});
+    return kind;
+  }
+
+  // Bookkeeping for rewards and stats (see game.played in start)
+  recordRoll(seat, kind) {
+    const played = this.game.played?.[seat];
+    if (!played) return;
+    played.rolls += 1;
+    if (kind === 'bot') played.botRolls += 1;
+    if (kind !== 'self' && this.game.lastRoll?.die === 6) played.coveredSixes += 1;
+  }
+
+  recordMove(seat, kind) {
+    const played = this.game.played?.[seat];
+    if (played && kind !== 'self' && this.game.lastMove?.capture) played.coveredCaptures += 1;
   }
 
   roll(userId) {
-    this.requireTurn(userId);
+    const kind = this.requireTurn(userId);
     if (this.game.phase !== 'roll') throw new UserError('Pick a marble to move first');
+    const seat = this.game.turn;
     rules.roll(this.game);
+    this.recordRoll(seat, kind);
     this.changed();
   }
 
   move(userId, moveId) {
-    this.requireTurn(userId);
+    const kind = this.requireTurn(userId);
     if (this.game.phase !== 'move') throw new UserError('Roll the dice first');
     if (!this.game.legalMoves.some((m) => m.id === moveId)) throw new UserError("That move isn't allowed");
+    const seat = this.game.turn;
     rules.move(this.game, moveId);
+    this.recordMove(seat, kind);
     this.afterMove();
+    this.changed();
+  }
+
+  // "Step away": the bot (or, in 2v2, your partner) plays your turns until you come back
+  stepAway(userId, away) {
+    const { player } = this.require(userId);
+    if (!this.game || this.game.phase === 'over') throw new UserError('You can only step away during a game');
+    if (!!player.away === away) return;
+    Object.assign(player, { away }, away ? {} : { idle: false, missed: 0 });
+    rules.addLog(this.game, away ? `${player.name} stepped away` : `${player.name} is back`);
     this.changed();
   }
 
@@ -487,7 +529,8 @@ class Room {
   scheduleAutoplay() {
     const { game } = this;
     const player = game && game.phase !== 'over' ? this.seats[game.turn] : null;
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle].join('|');
+    const cover = player ? this.coverFor(game.turn) : null;
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
@@ -495,23 +538,35 @@ class Room {
     this.turnDeadline = null;
     if (!player) return;
     const human = !player.isBot;
+    // Waiting on a person: the player themselves, or their partner covering while they're away
+    const waiting = human && (cover || (player.connected && !player.idle && !player.away));
     // No turn limit: connected players take as long as they like
-    if (human && player.connected && !player.idle && this.turnSeconds === null) return;
-    const base = !human ? BOT_DELAY_MS + randomInt(0, 400) : !player.connected ? AWAY_GRACE_MS : player.idle ? IDLE_DELAY_MS : this.turnSeconds * 1000;
+    if (waiting && this.turnSeconds === null) return;
+    const base = waiting
+      ? this.turnSeconds * 1000
+      : !human || player.away
+        ? BOT_DELAY_MS + randomInt(0, 400)
+        : !player.connected
+          ? AWAY_GRACE_MS
+          : IDLE_DELAY_MS;
     const delay = base + animationMs(game);
-    if (human && player.connected && !player.idle) this.turnDeadline = Date.now() + delay;
+    if (waiting) this.turnDeadline = Date.now() + delay;
     this.timer = setTimeout(() => {
       this.timer = null;
       this.timerKey = null;
       if (this.game !== game || game.phase === 'over') return;
-      if (human && player.connected && !player.idle) {
+      if (waiting && !cover) {
         player.missed = (player.missed || 0) + 1;
         if (player.missed >= IDLE_MISSES) player.idle = true;
         rules.addLog(game, `${player.name} ran out of time`, game.turn);
       }
-      if (game.phase === 'roll') rules.roll(game);
-      else {
+      const seat = game.turn;
+      if (game.phase === 'roll') {
+        rules.roll(game);
+        if (human) this.recordRoll(seat, 'bot');
+      } else {
         rules.move(game, chooseMove(game).id);
+        if (human) this.recordMove(seat, 'bot');
         this.afterMove();
       }
       this.changed();
@@ -540,7 +595,7 @@ class Room {
       activity: !!this.instanceId,
       teams: this.teams,
       turnSeconds: this.turnSeconds,
-      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, idle: !!p.idle, devices: p.sockets?.size || 0, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
+      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, idle: !!p.idle, away: !!p.away, devices: p.sockets?.size || 0, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
       // Relative, so client clock skew doesn't matter
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
@@ -557,7 +612,7 @@ class Room {
       activity: !!this.instanceId,
       phase: !game ? 'lobby' : game.phase === 'over' ? 'over' : 'playing',
       teams: this.teams,
-      players: this.seats.map((p, seat) => p && { seat, name: p.name, isBot: !!p.isBot, away: !p.isBot && (!p.connected || !!p.idle), home: game ? game.marbles[seat]?.filter((m) => m.zone === 'home').length ?? 0 : 0 }).filter(Boolean),
+      players: this.seats.map((p, seat) => p && { seat, name: p.name, isBot: !!p.isBot, away: !p.isBot && (!p.connected || !!p.idle || !!p.away), home: game ? game.marbles[seat]?.filter((m) => m.zone === 'home').length ?? 0 : 0 }).filter(Boolean),
       spectators: this.spectators.size,
       lastActive: this.lastActive,
     };

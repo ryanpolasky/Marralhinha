@@ -129,6 +129,14 @@ export const Copy = () => (
   </Icon>
 );
 
+export const Coffee = () => (
+  <Icon>
+    <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" />
+    <path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17" />
+    <path d="M8 3.5c0 1 1 1.5 1 2.5M12 3.5c0 1 1 1.5 1 2.5" />
+  </Icon>
+);
+
 export const BoardIcon = () => (
   <Icon>
     <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />

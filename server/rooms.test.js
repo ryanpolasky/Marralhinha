@@ -311,6 +311,35 @@ test('pings: team or everyone for players, everyone-only for Dev spectators, bot
   assert.deepStrictEqual({ to: sent.at(-1).to, dev: sent.at(-1).payload.dev, seat: sent.at(-1).payload.seat }, { to: 'all', dev: true, seat: null });
 });
 
+test('step away: in 2v2 the partner covers your turns, otherwise the bot plays them quickly', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { room } = teamRoom(t);
+  // Seats: u0 (0) + u2 (2) vs u1 (1) + u3 (3)
+  Object.assign(room.game, { turn: 0, phase: 'roll' });
+  room.stepAway('u0', true);
+  assert.strictEqual(room.view().seats[0].away, true);
+  assert.match(room.game.log.at(-1).text, /stepped away/);
+  assert.throws(() => room.roll('u1'), /not your turn/, 'opponents cannot cover');
+  assert.ok(room.view().turnEndsIn > 0, 'the covering partner gets the normal turn clock');
+  room.roll('u2');
+  assert.strictEqual(room.game.played[0].rolls, 1);
+  assert.strictEqual(room.game.played[0].botRolls, 0, 'partner turns are not bot turns');
+
+  // Partner away too: the bot takes over at bot speed
+  Object.assign(room.game, { turn: 0, phase: 'roll' });
+  room.stepAway('u2', true);
+  room.changed();
+  assert.strictEqual(room.view().turnEndsIn, null);
+  t.mock.timers.tick(15000);
+  assert.ok(room.game.played[0].botRolls >= 1);
+
+  // Acting on your own turn brings you back
+  Object.assign(room.game, { turn: 0, phase: 'roll' });
+  room.roll('u0');
+  assert.strictEqual(room.view().seats[0].away, false);
+  assert.throws(() => room.stepAway('stranger', true), /not in this room/);
+});
+
 test('the table board can be swapped mid-game and reset to the starter', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
