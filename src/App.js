@@ -356,7 +356,8 @@ const App = () => {
   const [startPending, dismissStart] = useStartPending(game);
   // The server chooses one board for everyone once a game starts; before that everyone previews their own
   const boardRevealed = useBoardRevealed(game);
-  const tableBoard = game && game.boardSeat !== null && boardRevealed ? room.seats[game.boardSeat]?.cosmetics?.board : null;
+  // A Dev's mid-game pick wins over the starter's board
+  const tableBoard = game?.boardOverride || (game && game.boardSeat !== null && boardRevealed ? room.seats[game.boardSeat]?.cosmetics?.board : null);
   const boardSkinId = tableBoard || account?.equipped.board;
 
   const sceneProps = useMemo(() => {
@@ -478,6 +479,7 @@ const App = () => {
         playerId={session.playerId}
         reactions={reactions}
         teamLog={myTeamLog}
+        isAdmin={!!account.admin}
         rollPending={rollPending}
         startPending={startPending}
         onDismissStart={dismissStart}

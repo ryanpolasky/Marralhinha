@@ -129,6 +129,12 @@ export const Copy = () => (
   </Icon>
 );
 
+export const BoardIcon = () => (
+  <Icon>
+    <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />
+  </Icon>
+);
+
 export const Eye = () => (
   <Icon>
     <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />

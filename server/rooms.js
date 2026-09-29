@@ -2,6 +2,7 @@ const { randomBytes, randomInt } = require('crypto');
 const rules = require('./game/rules');
 const { chooseMove } = require('./game/bot');
 const { botCosmetics } = require('./economy');
+const { ITEMS } = require('./catalog');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SEAT_ORDER = [0, 2, 1, 3];
@@ -287,6 +288,17 @@ class Room {
     this.requireLobby();
     if (!this.seats[seat]?.isBot) throw new UserError('Only bots can be removed');
     this.seats[seat] = null;
+    this.changed();
+  }
+
+  // Dev-only (checked by the caller): swap the table's board mid-game, or pass null to go back to the starter's
+  setBoard(userId, itemId) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (!this.game) throw new UserError('Start a game first');
+    const item = itemId === null ? null : ITEMS.get(itemId);
+    if (itemId !== null && item?.slot !== 'board') throw new UserError('Unknown board');
+    this.game.boardOverride = itemId;
+    rules.addLog(this.game, item ? `The table is now on ${item.name}` : "The table is back on the starter's board");
     this.changed();
   }
 

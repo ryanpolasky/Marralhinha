@@ -37,7 +37,7 @@ function Ping({ ping, teams }) {
   const rings = useRef();
   const label = useRef();
   const color = colorOf(ping);
-  const partner = ping.seat !== null && ping.scope === 'team' ? SEAT_COLORS[(ping.seat + 2) % 4].main : null;
+  const team = ping.seat !== null && ping.scope === 'team';
   const danger = ping.type === 'danger';
   const ack = ping.type === 'ack';
   const texture = useMemo(() => makeLabelTexture(labelFor(ping, teams), danger ? DANGER : color), [ping, teams, danger, color]);
@@ -72,25 +72,26 @@ function Ping({ ping, teams }) {
         <group ref={arrow}>
           <mesh position-y={-0.28} rotation-x={Math.PI}>
             <coneGeometry args={[0.32, 0.55, 20]} />
-            <meshStandardMaterial color={color} emissive={danger ? DANGER : color} emissiveIntensity={0.6} roughness={0.35} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} roughness={0.35} />
           </mesh>
           <mesh position-y={0.22}>
             <cylinderGeometry args={[0.1, 0.1, 0.5, 12]} />
-            <meshStandardMaterial color={color} emissive={danger ? DANGER : color} emissiveIntensity={0.6} roughness={0.35} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} roughness={0.35} />
           </mesh>
         </group>
       )}
+      {/* Ripples are always the sender's colour; danger pings just ripple outward faster and in threes */}
       <group ref={rings} position-y={0.05}>
         {(danger ? [0, 1, 2] : [0]).map((i) => (
           <mesh key={i} rotation-x={-Math.PI / 2} renderOrder={12}>
             <ringGeometry args={[0.42, 0.56, 40]} />
-            <meshBasicMaterial color={danger ? DANGER : color} transparent depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial color={color} transparent depthWrite={false} toneMapped={false} />
           </mesh>
         ))}
-        {partner && !danger && (
+        {team && !danger && (
           <mesh rotation-x={-Math.PI / 2} renderOrder={12}>
-            <ringGeometry args={[0.62, 0.7, 40]} />
-            <meshBasicMaterial color={partner} transparent depthWrite={false} toneMapped={false} />
+            <ringGeometry args={[0.64, 0.7, 40]} />
+            <meshBasicMaterial color={color} transparent depthWrite={false} toneMapped={false} />
           </mesh>
         )}
       </group>

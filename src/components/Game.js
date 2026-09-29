@@ -6,10 +6,10 @@ import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Eye } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
-import { BOXES, ITEMS, skinKey } from '../game/catalog';
-import { Coins, Coin, TagBadge, TagBadges } from './Economy';
+import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
+import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { useSettings } from '../game/settings';
 
@@ -253,6 +253,41 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, v
   );
 }
 
+// Dev-only: swap the whole table's board mid-game
+function BoardPicker({ current, onPick }) {
+  const [open, setOpen] = useState(false);
+  const boards = itemsForSlot('board');
+  return (
+    <div className="board-picker">
+      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Change the table board (Dev)" title="Change the table board (Dev)" aria-expanded={open}>
+        <BoardIcon />
+      </button>
+      {open && (
+        <>
+          <div className="board-picker-backdrop" onClick={() => setOpen(false)} />
+          <div className="board-picker-pop" role="menu" aria-label="Table board">
+            <div className="board-picker-head">
+              <span>Table board</span>
+              <TagBadge tag="dev" small />
+            </div>
+            <div className="board-picker-grid">
+              {boards.map((b) => (
+                <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} title={b.desc}>
+                  <ItemThumb itemId={b.id} />
+                  <span>{b.name}</span>
+                </button>
+              ))}
+            </div>
+            <button className="btn tiny ghost block" onClick={() => onPick(null)}>
+              Back to the starter's board
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Eye with a count when anyone is watching; hover, focus or tap lists who
 function Spectators({ spectators, playerId }) {
   const [open, setOpen] = useState(false);
@@ -450,7 +485,7 @@ function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], teamLog = [], rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -560,6 +595,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], rol
         </div>
 
         <div className="hud-buttons">
+          {isAdmin && <BoardPicker current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null} onPick={(item) => onAction('game:setBoard', { item })} />}
           <SettingsButton />
           <button className="icon-btn" onClick={onResetView} aria-label="Reset camera" title="Reset camera">
             <Camera />

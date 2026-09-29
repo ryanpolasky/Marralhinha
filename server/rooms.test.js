@@ -311,6 +311,18 @@ test('pings: team or everyone for players, everyone-only for Dev spectators, bot
   assert.deepStrictEqual({ to: sent.at(-1).to, dev: sent.at(-1).payload.dev, seat: sent.at(-1).payload.seat }, { to: 'all', dev: true, seat: null });
 });
 
+test('the table board can be swapped mid-game and reset to the starter', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  assert.throws(() => room.setBoard('u1', 'marble.holo'), /Unknown board/);
+  assert.throws(() => room.setBoard('stranger', 'board.neon'), /not in this room/);
+  room.setBoard('u1', 'board.neon');
+  assert.strictEqual(room.view().game.boardOverride, 'board.neon');
+  assert.match(room.game.log.at(-1).text, /Neon Night/);
+  room.setBoard('u1', null);
+  assert.strictEqual(room.view().game.boardOverride, null);
+});
+
 test('chat is rate limited, open to spectators, and only once the game is on', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());
