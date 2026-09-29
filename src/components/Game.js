@@ -497,7 +497,7 @@ function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -625,7 +625,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         <div className="hud-buttons">
           {isAdmin && <BoardPicker current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null} onPick={(item) => onAction('game:setBoard', { item })} />}
           <SettingsButton />
-          <button className="icon-btn" onClick={onResetView} aria-label="Reset camera" title="Reset camera">
+          <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
             <Camera />
           </button>
           <button className="icon-btn" onClick={() => setRulesOpen(true)} aria-label="How to play" title="How to play">

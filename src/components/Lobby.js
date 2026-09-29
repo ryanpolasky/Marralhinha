@@ -7,6 +7,7 @@ import { Copy } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
+import Marquee from './Marquee';
 
 // Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go
 function useSeatEvents(room, playerId) {
@@ -156,7 +157,16 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
             const mine = p && p.id === playerId;
             return (
               <div key={s} className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}`} style={{ '--seat': color.main, '--seat-light': color.light }}>
-                <span className="marble-dot" />
+                <span className="seat-dot">
+                  <span className="marble-dot" />
+                  {p && p.id === room.hostId && (
+                    <svg className="host-crown" viewBox="0 0 24 16" role="img" aria-label="Host">
+                      <title>Host</title>
+                      <path d="M2 13 1 3l6 4.5L12 1l5 6.5L23 3l-1 10z" />
+                      <rect x="2" y="13" width="20" height="2.6" rx="1.2" />
+                    </svg>
+                  )}
+                </span>
                 <div className="seat-info">
                   <div className="seat-color">
                     {color.name}
@@ -165,10 +175,8 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
                   {p ? (
                     <Nameplate plate={p.cosmetics?.nameplate} className="seat-name">
                       {p.level && <span className="level-badge small">{p.level}</span>}
-                      <span className="seat-name-text">{p.name}</span>
+                      <Marquee className="seat-name-text">{p.name}</Marquee>
                       <TagBadges tags={p.tags} small />
-                      {mine && <span className="badge">you</span>}
-                      {p.id === room.hostId && <span className="badge gold">host</span>}
                       {p.isBot && <span className="badge">bot</span>}
                       {!p.isBot && !p.connected && <span className="badge warn">away</span>}
                     </Nameplate>
@@ -186,6 +194,12 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
                       }
                     }}>
                       {swapFrom === s ? 'Cancel' : swapFrom === null ? 'Select seat' : 'Swap here'}
+                    </button>
+                  )}
+                  {/* Bots don't need to agree: swap straight into their seat */}
+                  {p && p.isBot && !isAdmin && mySeat >= 0 && (
+                    <button className="btn tiny secondary" onClick={() => onAction('lobby:takeBotSeat', { seat: s })}>
+                      Take seat
                     </button>
                   )}
                   {p && !mine && mySeat >= 0 && (isAdmin || !p.isBot) && (

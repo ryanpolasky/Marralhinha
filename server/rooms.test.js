@@ -340,6 +340,25 @@ test('step away: in 2v2 the partner covers your turns, otherwise the bot plays t
   assert.throws(() => room.stepAway('stranger', true), /not in this room/);
 });
 
+test('favourite colour: you get it when free, and anyone can swap straight into a bot seat', (t) => {
+  const room = new Room('FAVE', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' }, { prefer: 3 });
+  assert.strictEqual(room.findByUser('u1').seat, 3, 'favourite seat when free');
+  room.join({ userId: 'u2', name: 'Rui' }, { prefer: 3 });
+  assert.strictEqual(room.findByUser('u2').seat, 0, 'taken, so the usual order');
+  room.join({ userId: 'u3', name: 'Zé' }, { prefer: 'green' });
+  assert.strictEqual(room.findByUser('u3').seat, 2, 'junk preference is ignored');
+
+  room.addBot('u1', 1);
+  room.takeBotSeat('u2', 1);
+  assert.strictEqual(room.findByUser('u2').seat, 1);
+  assert.ok(room.seats[0].isBot, 'the bot takes your old seat');
+  assert.throws(() => room.takeBotSeat('u2', 3), /no bot/);
+  room.start('u1');
+  assert.throws(() => room.takeBotSeat('u2', 0), /already started/);
+});
+
 test('the table board can be swapped mid-game and reset to the starter', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());

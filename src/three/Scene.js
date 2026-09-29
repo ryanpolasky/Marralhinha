@@ -17,15 +17,23 @@ const NO_COSMETICS = [];
 const NO_PINGS = [];
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-function CameraRig({ mode, resetKey, spinning }) {
+// How far you can pan the look-at point from the board's center (in board units)
+const PAN_LIMIT = 9;
+const _toCamera = new THREE.Vector3();
+const _homeDir = new THREE.Vector3();
+
+function CameraRig({ mode, resetKey, spinning, onOffView }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
-    Object.assign(c, { enablePan: false, enableDamping: true, dampingFactor: 0.08, minPolarAngle: 0.1, maxPolarAngle: 1.05, rotateSpeed: 0.5, zoomSpeed: 0.7 });
+    // Right-drag / Shift+drag / two fingers pan along the table (not up into the air)
+    Object.assign(c, { enablePan: true, screenSpacePanning: false, panSpeed: 0.8, enableDamping: true, dampingFactor: 0.08, minPolarAngle: 0.1, maxPolarAngle: 1.05, rotateSpeed: 0.5, zoomSpeed: 0.7 });
     return c;
   }, [camera, gl]);
   useEffect(() => () => controls.dispose(), [controls]);
   const tween = useRef(null);
+  const home = useRef(null);
+  const offView = useRef(false);
 
   useEffect(() => {
     const aspect = size.width / size.height;
@@ -35,6 +43,7 @@ function CameraRig({ mode, resetKey, spinning }) {
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
+    home.current = { target, distance, dir: position.clone().sub(target).normalize() };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
     controls.enabled = game;
@@ -66,7 +75,25 @@ function CameraRig({ mode, resetKey, spinning }) {
       l.h = size.height;
       camera.setViewOffset(size.width, size.height, 0, l.shift, size.width, size.height);
     }
+    controls.target.x = THREE.MathUtils.clamp(controls.target.x, -PAN_LIMIT, PAN_LIMIT);
+    controls.target.z = THREE.MathUtils.clamp(controls.target.z, -PAN_LIMIT, PAN_LIMIT);
+    controls.target.y = 0;
     controls.update();
+
+    // Tell the HUD when you've wandered off the default view (panned, zoomed or orbited away), so it
+    // can nudge the reset-camera button. Only reports changes, not every frame.
+    const h = home.current;
+    let off = false;
+    if (h && mode === 'game' && !spinning && !tween.current) {
+      _toCamera.copy(camera.position).sub(controls.target);
+      const zoom = Math.abs(_toCamera.length() - h.distance) / h.distance;
+      const angle = _toCamera.normalize().angleTo(_homeDir.copy(h.dir));
+      off = controls.target.distanceTo(h.target) > 0.8 || zoom > 0.12 || angle > 0.22;
+    }
+    if (off !== offView.current) {
+      offView.current = off;
+      onOffView?.(off);
+    }
   });
   return null;
 }
@@ -153,6 +180,7 @@ const LONG_PRESS_MS = 450;
 function PingSurface({ pointer, onMenu }) {
   const ref = useRef();
   const press = useRef(null);
+  const rightDown = useRef(null);
   const toLocal = (e) => {
     const p = ref.current.parent.worldToLocal(e.point.clone());
     return { x: p.x, z: p.z, screenX: e.nativeEvent.clientX, screenY: e.nativeEvent.clientY };
@@ -175,15 +203,20 @@ function PingSurface({ pointer, onMenu }) {
         cancel();
       }}
       onPointerDown={(e) => {
-        if (e.nativeEvent.pointerType !== 'touch') return;
         const at = toLocal(e);
+        if (e.nativeEvent.button === 2) rightDown.current = at;
+        if (e.nativeEvent.pointerType !== 'touch') return;
         press.current = { x: at.screenX, y: at.screenY, timer: setTimeout(() => onMenu(at), LONG_PRESS_MS) };
       }}
-      onPointerUp={cancel}
-      onContextMenu={(e) => {
-        e.nativeEvent.preventDefault();
-        onMenu(toLocal(e));
+      // Right-drag pans the camera, so the ping menu only opens on a right-click that didn't move
+      onPointerUp={(e) => {
+        cancel();
+        const start = rightDown.current;
+        rightDown.current = null;
+        if (e.nativeEvent.button !== 2 || !start) return;
+        if (Math.hypot(e.nativeEvent.clientX - start.screenX, e.nativeEvent.clientY - start.screenY) < 6) onMenu(start);
       }}
+      onContextMenu={(e) => e.nativeEvent.preventDefault()}
     >
       <planeGeometry args={[32, 32]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -209,7 +242,7 @@ function usePingKeys(pointer, canPing, onPing) {
   }, [pointer, canPing, onPing]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView }) {
   const pointer = useRef(null);
   usePingKeys(pointer, canPing, onPing);
   const openPingMenu = (at) => {
@@ -260,7 +293,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} />
+      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} onOffView={onCameraOffView} />
     </Canvas>
   );
 }

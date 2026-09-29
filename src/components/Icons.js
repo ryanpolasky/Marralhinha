@@ -103,8 +103,9 @@ export const Search = () => (
 export const Help = () => (
   <Icon>
     <circle cx="12" cy="12" r="9.5" />
-    <path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 4" />
-    <path d="M12 17.5h.01" />
+    {/* Smaller mark, optically centered, with a solid dot well clear of the ring */}
+    <path d="M9.9 9a2.2 2.2 0 0 1 4.25 .75c0 1.45-2.15 1.8-2.15 3.15" strokeWidth="2" />
+    <circle cx="12" cy="15.8" r="1.1" fill="currentColor" stroke="none" />
   </Icon>
 );
 

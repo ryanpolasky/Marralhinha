@@ -97,6 +97,9 @@ function useStartPending(game) {
   return [remaining > 0 && dismissed !== pickT, () => setDismissed(pickT)];
 }
 
+// Favourite colour from Settings, sent whenever we take a seat so the server can give it to us if it's free
+const favorite = () => getSettings().favoriteSeat;
+
 const storedRoom = () => {
   try {
     return localStorage.getItem(ROOM_KEY);
@@ -149,14 +152,14 @@ const App = () => {
     let cancelled = false;
     const resume = async () => {
       try {
-        if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current }));
+        if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current, prefer: favorite() }));
         const invite = urlCode();
         const saved = sessionRef.current?.code || storedRoom();
         // No saved room on this device? Pick up wherever this account is already seated (e.g. on another device)
         const code = invite ? (saved === invite ? invite : null) : saved || (await request('room:current')).code;
         if (code) {
           try {
-            enter(await request('room:join', { code }));
+            enter(await request('room:join', { code, prefer: favorite() }));
           } catch (err) {
             // Rooms live in server memory, so a missing saved room almost always means it closed or the server restarted
             if (/not found/i.test(err.message) && code === saved) throw new Error(`Room ${code} has closed (the game server may have restarted). Start a new one!`);
@@ -387,6 +390,8 @@ const App = () => {
   }, [inRoom, room, mySeat, account?.equipped, rollPending, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
+  // True while the camera is panned/zoomed/orbited away from the default view (pulses the reset button)
+  const [cameraOff, setCameraOff] = useState(false);
   const sceneRoll = useCallback(() => onAction('game:roll'), [onAction]);
   const sceneMove = useCallback(
     (moveId) => {
@@ -453,19 +458,19 @@ const App = () => {
         onCreate={() =>
           run(async () => {
             await ensureName();
-            enter(await request('room:create'));
+            enter(await request('room:create', { prefer: favorite() }));
           })
         }
         onQuickPlay={() =>
           run(async () => {
             await ensureName();
-            enter(await request('room:quickPlay'));
+            enter(await request('room:quickPlay', { prefer: favorite() }));
           })
         }
         onJoin={(code) =>
           run(async () => {
             await ensureName();
-            enter(await request('room:join', { code }));
+            enter(await request('room:join', { code, prefer: favorite() }));
           })
         }
       />
@@ -485,6 +490,7 @@ const App = () => {
         onDismissStart={dismissStart}
         onAction={onAction}
         onLeave={IS_ACTIVITY ? null : leave}
+        cameraOff={cameraOff}
         onResetView={() => {
           setViewOverride(null);
           setResetKey((k) => k + 1);
@@ -517,6 +523,7 @@ const App = () => {
               canPing={canPing}
               onPing={sendPing}
               onPingMenu={setPingMenu}
+              onCameraOffView={setCameraOff}
             />
           </Suspense>
         </SceneBoundary>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
+import { SEAT_COLORS } from '../game/geometry';
 import { Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
 
 const STEP = 0.05;
@@ -74,6 +75,7 @@ export function SettingsModal({ onClose }) {
         </div>
         <div className="settings-group">
           <h3>Gameplay</h3>
+          <FavoriteColor />
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -89,6 +91,37 @@ export function SettingsModal({ onClose }) {
       </div>
     </div>,
     document.body
+  );
+}
+
+// Which colour you'd like to sit at: used for quick play, new rooms, and joining rooms when it's free
+function FavoriteColor() {
+  const { favoriteSeat } = useSettings();
+  const options = [...SEAT_COLORS.map((c, seat) => ({ seat, ...c })), { seat: null, name: 'Any' }];
+  return (
+    <div className="setting favorite-color">
+      <div className="setting-head">
+        <span className="setting-label">Favourite colour</span>
+        <span className="setting-hint">you get it whenever the seat is free</span>
+      </div>
+      <div className="favorite-options" role="radiogroup" aria-label="Favourite colour">
+        {options.map((o) => (
+          <button
+            key={o.name}
+            type="button"
+            role="radio"
+            aria-checked={favoriteSeat === o.seat}
+            className={`favorite-option${favoriteSeat === o.seat ? ' on' : ''}${o.seat === null ? ' any' : ''}`}
+            style={o.seat === null ? undefined : { '--seat': o.main, '--seat-light': o.light }}
+            onClick={() => updateSettings({ favoriteSeat: o.seat })}
+            title={o.name}
+          >
+            {o.seat !== null && <span className="marble-dot mini" />}
+            <span>{o.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

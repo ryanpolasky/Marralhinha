@@ -202,7 +202,7 @@ const SLIDES = [
   },
   {
     title: 'Handy tips',
-    text: 'Tap a glowing marble to see where it would land; with two options, both show up. Keyboard: Space rolls, Tab then Enter picks a move. Point at a spot and press H to ping it (G to warn), or right-click / long-press. Drag to spin the board, scroll to zoom, and use the chat to trash talk.',
+    text: 'Tap a glowing marble to see where it would land; with two options, both show up. Keyboard: Space rolls, Tab then Enter picks a move. Point at a spot and press H to ping it (G to warn), or right-click / long-press. Drag to spin the board, right-drag or two fingers to pan, scroll to zoom (the camera button takes you back), and use the chat to trash talk.',
     art: (id) => (
       <BoardArt id={id} view="-2.4 -3.2 12 9.8" dishes={[0, 1]} baseMarbles={{ 0: 3, 1: 4 }}>
         <Ring at={RING[8]} r={0.62} width={0.12} color="#ffe066" />

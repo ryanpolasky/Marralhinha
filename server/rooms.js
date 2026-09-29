@@ -116,7 +116,8 @@ class Room {
   }
 
   // `spectate` joins as a watcher even when a lobby seat is free (used by the admin "spectate" button)
-  join(info, { spectate = false } = {}) {
+  // `prefer` is the player's favourite colour (seat 0-3): used when it's free, otherwise the usual order
+  join(info, { spectate = false, prefer = null } = {}) {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
@@ -128,7 +129,8 @@ class Room {
       Object.assign(spectator, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return spectator;
     }
-    const seat = this.game || spectate ? undefined : SEAT_ORDER.find((s) => !this.seats[s]);
+    const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
+    const seat = this.game || spectate ? undefined : (favourite ?? SEAT_ORDER.find((s) => !this.seats[s]));
     if (seat === undefined && this.spectators.size >= 32) throw new UserError('That room is full, including spectators');
     const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set() };
     if (seat === undefined) this.spectators.set(info.userId, player);
@@ -259,6 +261,16 @@ class Room {
     this.requireLobby();
     const { player } = this.require(userId);
     this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id);
+    this.changed();
+  }
+
+  // Bots don't mind: any seated player can swap straight into a bot's seat (the bot takes theirs)
+  takeBotSeat(userId, seat) {
+    this.requireLobby();
+    const { seat: from } = this.require(userId);
+    if (!Number.isInteger(seat) || !this.seats[seat]?.isBot) throw new UserError('That seat has no bot in it');
+    [this.seats[from], this.seats[seat]] = [this.seats[seat], this.seats[from]];
+    this.swapOffers = [];
     this.changed();
   }
 

@@ -145,17 +145,20 @@ io.on('connection', (socket) => {
     return { code: room.code, playerId: player.id };
   };
 
-  handle('room:create', () => enter(() => rooms.create()));
-  // One round trip for "Quick play vs bots", so a flaky connection can't leave a half-filled lobby behind
-  handle('room:quickPlay', () => {
-    const res = enter(() => rooms.create());
+  // Favourite colour from the client's settings: a seat number, or anything else for "no preference"
+  const preferOf = (payload) => (Number.isInteger(payload?.prefer) ? payload.prefer : null);
+
+  handle('room:create', (payload) => enter(() => rooms.create(), { prefer: preferOf(payload) }));
+  // One round trip for "Quick play vs bots": a lobby with bots in every other seat, so you can still
+  // swap colours, switch on teams or change the timer before hitting Start
+  handle('room:quickPlay', (payload) => {
+    const res = enter(() => rooms.create(), { prefer: preferOf(payload) });
     const room = rooms.get(res.code);
     [0, 1, 2, 3].filter((seat) => !room.seats[seat]).forEach((seat) => room.addBot(userId, seat));
-    room.start(userId);
     return res;
   });
-  handle('room:join', ({ code, spectate }) => enter(rooms.get(code), { spectate: spectate === true }));
-  handle('room:joinInstance', ({ instanceId }) => enter(rooms.forInstance(instanceId)));
+  handle('room:join', (payload) => enter(rooms.get(payload.code), { spectate: payload.spectate === true, prefer: preferOf(payload) }));
+  handle('room:joinInstance', (payload) => enter(rooms.forInstance(payload.instanceId), { prefer: preferOf(payload) }));
   // Lets a second device pick up wherever this account is seated (live games first)
   handle('room:current', () => {
     const seated = rooms.roomsWithUser(userId).filter((room) => room.findByUser(userId));
@@ -165,6 +168,7 @@ io.on('connection', (socket) => {
   handle('room:leave', () => leaveCurrent(true));
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
   handle('lobby:offerSwap', ({ seat }) => current().offerSwap(userId, seat));
+  handle('lobby:takeBotSeat', ({ seat }) => current().takeBotSeat(userId, seat));
   handle('lobby:respondSwap', ({ fromId, accept }) => current().respondSwap(userId, fromId, accept === true));
   handle('lobby:cancelSwap', () => current().cancelSwap(userId));
   handle('lobby:forceSwap', ({ seat, fromSeat }) => {
