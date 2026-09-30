@@ -80,6 +80,8 @@ const announceLucky = (change) => {
 const rooms = new RoomManager({
   onChange: (room) => io.to(room.code).emit('room:state', room.view()),
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
+  onHostChange: (room, host) => io.to(room.code).emit('room:host', host),
+  onRematchVote: (room, vote) => io.to(room.code).emit('room:rematch', vote),
   onTeam: emitToSeats,
   onPing: (room, ping, seats) => (seats ? emitToSeats(room, seats, 'room:ping', ping) : io.to(room.code).emit('room:ping', ping)),
   onGameOver: (room, { players, botGame }) => {

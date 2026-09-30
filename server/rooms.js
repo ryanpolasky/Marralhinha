@@ -86,6 +86,7 @@ class Room {
     this.turnDeadline = null;
     this.hostTimer = null;
     this.banterTimers = new Set();
+    this.rematchVotes = new Set();
     this.lastActive = Date.now();
   }
 
@@ -118,6 +119,22 @@ class Room {
     if (this.game) throw new UserError('The game has already started');
   }
 
+  hostPlayer() {
+    return this.seats.find((p) => p && p.id === this.hostId) || null;
+  }
+
+  setHost(player) {
+    const from = this.hostPlayer();
+    if (from?.id === player.id || player.isBot) return;
+    // Fresh rooms and offline hosts don't need the fanfare
+    const freshRoom = !from && !this.seats.some((p) => p && !p.isBot && p !== player);
+    this.hostId = player.id;
+    this.rematchVotes.delete(player.id);
+    if (freshRoom || !player.connected) return;
+    if (this.game) rules.addLog(this.game, `${player.name} is the host now`, null);
+    this.hooks.onHostChange?.(this, { id: player.id, name: player.name, from: from?.name ?? null });
+  }
+
   // `spectate` joins as a watcher even when a lobby seat is free (used by the admin "spectate" button)
   // `prefer` is the player's favourite colour (seat 0-3): used when it's free, otherwise the usual order
   join(info, { spectate = false, prefer = null } = {}) {
@@ -139,7 +156,7 @@ class Room {
     if (seat === undefined) this.spectators.set(info.userId, player);
     else {
       this.seats[seat] = player;
-      if (!this.hostId) this.hostId = player.id;
+      if (!this.hostId) this.setHost(player);
     }
     return player;
   }
@@ -163,8 +180,9 @@ class Room {
     if (player.id === this.hostId) this.cancelHostHandoff();
     else {
       // Someone arrived while the host is gone: (re)start the handoff countdown so the lobby is never hostless
-      const host = this.seats.find((p) => p && p.id === this.hostId);
+      const host = this.hostPlayer();
       if (host && !host.isBot && !host.connected) this.scheduleHostHandoff();
+      else if (!host && this.seats.includes(player)) this.setHost(player);
     }
     this.touch();
     this.changed();
@@ -182,6 +200,7 @@ class Room {
       this.spectators.delete(userId);
       if (player.id === this.hostId) this.scheduleHostHandoff();
       if (!this.anyoneConnected()) this.emptyAt = Date.now();
+      this.maybeRematch();
     }
     this.changed();
   }
@@ -191,17 +210,22 @@ class Room {
     return this.seats.some((p) => p && !p.isBot && p.connected) || [...this.spectators.values()].some((p) => p.connected);
   }
 
+  // The countdown runs from goneAt, so a host gone past the grace period yields on the spot
   scheduleHostHandoff() {
     this.cancelHostHandoff();
+    const host = this.hostPlayer();
+    if (!host || host.isBot) return;
+    const delay = Math.max(0, (host.goneAt ?? Date.now()) + HOST_HANDOFF_MS - Date.now());
     this.hostTimer = setTimeout(() => {
       this.hostTimer = null;
-      const host = this.seats.find((p) => p && p.id === this.hostId);
-      if (host?.connected) return;
+      const current = this.hostPlayer();
+      if (!current || current.connected || current.isBot) return;
       const next = this.seats.find((p) => p && !p.isBot && p.connected);
       if (!next) return;
-      this.hostId = next.id;
+      this.setHost(next);
+      this.maybeRematch();
       this.changed();
-    }, HOST_HANDOFF_MS);
+    }, delay);
   }
 
   cancelHostHandoff() {
@@ -232,14 +256,21 @@ class Room {
       return;
     }
     const { seat, player } = this.require(userId);
+    this.rematchVotes.delete(player.id);
     this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id && offer.toId !== player.id);
+    // Hand the host off before the seat becomes a stand-in
+    if (player.id === this.hostId) {
+      this.cancelHostHandoff();
+      const next = this.seats.find((p) => p && p !== player && !p.isBot && p.connected) ?? this.seats.find((p) => p && p !== player && !p.isBot);
+      if (next) this.setHost(next);
+      else this.hostId = null;
+    }
     if (this.game && this.game.phase !== 'over') {
       this.seats[seat] = { id: player.id, name: `${player.name} (bot)`, isBot: true, connected: true, cosmetics: player.cosmetics, level: player.level, standIn: true };
       rules.addLog(this.game, `${player.name} left, a bot takes over`, seat);
     } else this.seats[seat] = null;
-    // Prefer a connected human as the next host; a disconnected one only gets it as a last resort
-    if (player.id === this.hostId) this.hostId = this.seats.find((p) => p && !p.isBot && p.connected)?.id ?? this.seats.find((p) => p && !p.isBot)?.id ?? null;
     if (!this.anyoneConnected()) this.emptyAt = Date.now();
+    this.maybeRematch();
     this.changed();
   }
 
@@ -252,7 +283,9 @@ class Room {
     this.seats[seat] = player;
     if (found) this.seats[found.seat] = null;
     else this.spectators.delete(userId);
-    if (!this.hostId) this.hostId = player.id;
+    const host = this.hostPlayer();
+    if (!host) this.setHost(player);
+    else if (!host.isBot && !host.connected) this.scheduleHostHandoff();
     this.swapOffers = [];
     this.changed();
   }
@@ -374,16 +407,22 @@ class Room {
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
+    this.beginGame();
+    this.changed();
+  }
+
+  // start() without the host check: a unanimous vote goes straight to the next round
+  beginGame() {
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
     humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false, away: false }));
     this.swapOffers = [];
     this.teamLogs = [[], []];
+    this.rematchVotes.clear();
     this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
     // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
     this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
     this.humansAtStart = humans.length;
-    this.changed();
   }
 
   pickStarter() {
@@ -393,13 +432,52 @@ class Room {
     return { seat: active[randomInt(active.length)], reason: 'wheel' };
   }
 
+  // A host press fires instantly; anyone else's press toggles a vote. All votes in = next round.
   rematch(userId) {
-    this.requireHost(userId);
+    const { player } = this.require(userId);
     if (!this.game || this.game.phase !== 'over') throw new UserError('The game is not over yet');
+    if (player.id === this.hostId) {
+      this.doRematch();
+      this.changed();
+      return;
+    }
+    const now = Date.now();
+    if (now - (player.lastVote || 0) < REACTION_COOLDOWN_MS) return;
+    player.lastVote = now;
+    const on = !this.rematchVotes.delete(player.id);
+    if (on) this.rematchVotes.add(player.id);
+    Object.assign(player, { away: false, idle: false, missed: 0 });
+    rules.addLog(this.game, on ? `${player.name} wants a rematch` : `${player.name} backed out of the rematch`, null);
+    const fired = this.maybeRematch();
+    this.changed();
+    this.hooks.onRematchVote?.(this, { id: player.id, name: player.name, on, fired });
+  }
+
+  rematchNeeded() {
+    return this.seats.filter((p) => p && !p.isBot && p.connected && !p.away && !p.idle && p.id !== this.hostId);
+  }
+
+  rematchStatus() {
+    const needed = this.rematchNeeded();
+    const voters = needed.filter((p) => this.rematchVotes.has(p.id)).map((p) => p.id);
+    const pending = needed.filter((p) => !this.rematchVotes.has(p.id)).map((p) => p.id);
+    return { voters, pending };
+  }
+
+  maybeRematch() {
+    if (!this.game || this.game.phase !== 'over') return false;
+    const { voters, pending } = this.rematchStatus();
+    if (!voters.length || pending.length) return false;
+    this.doRematch();
+    if (this.seats.filter(Boolean).length >= 2) this.beginGame();
+    return true;
+  }
+
+  doRematch() {
     this.lastWinners = this.game.winners.map((s) => this.seats[s]?.id).filter(Boolean);
     this.game = null;
     this.seats = this.seats.map((p) => (p && p.standIn ? null : p));
-    this.changed();
+    this.rematchVotes.clear();
   }
 
   // The partner who can take an away player's turn in 2v2: seated, human, present and not away themselves
@@ -675,6 +753,7 @@ class Room {
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,
+      rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       game: this.game,
     };
   }

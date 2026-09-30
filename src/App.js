@@ -228,10 +228,22 @@ const App = () => {
     const onTeamChat = (entry) => setTeamLog((log) => ({ ...log, entries: [...log.entries, entry].slice(-60) }));
     const onTeamLog = ({ code, entries }) => setTeamLog({ code, entries });
     const onLuckyChange = (message) => notify(message, 'good');
+    const onHost = ({ id, name }) => {
+      const mine = id === sessionRef.current?.playerId;
+      notify(mine ? "You're the host now. Start when ready." : `${name} is the host now`, 'good');
+      (mine ? sfx.turn : sfx.pop)();
+    };
+    const onRematchVote = ({ id, name, on, fired }) => {
+      if (id === sessionRef.current?.playerId || fired) return;
+      notify(on ? `${name} wants a rematch` : `${name} backed out of the rematch`, 'good');
+      sfx.pop();
+    };
     socket.on('room:ping', onPing);
     socket.on('room:teamChat', onTeamChat);
     socket.on('room:teamLog', onTeamLog);
     socket.on('room:left', onRoomLeft);
+    socket.on('room:host', onHost);
+    socket.on('room:rematch', onRematchVote);
     socket.on('account:update', setAccount);
     socket.on('luckiest:change', onLuckyChange);
 
@@ -255,6 +267,8 @@ const App = () => {
       socket.off('room:state', setRoom);
       socket.off('room:reaction', onReaction);
       socket.off('room:left', onRoomLeft);
+      socket.off('room:host', onHost);
+      socket.off('room:rematch', onRematchVote);
       socket.off('room:ping', onPing);
       socket.off('room:teamChat', onTeamChat);
       socket.off('room:teamLog', onTeamLog);

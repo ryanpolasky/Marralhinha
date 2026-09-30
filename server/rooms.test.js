@@ -295,6 +295,97 @@ test('a disconnected host hands over to the next connected player after a grace 
   room.start('u2');
 });
 
+test('host changes are announced, except the very first host and offline targets', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const events = [];
+  const room = new Room('HOST2', { onChange: () => {}, onHostChange: (_, h) => events.push(h) });
+  t.after(() => room.dispose());
+  const ana = room.join({ userId: 'u1', name: 'Ana' });
+  const rui = room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  assert.strictEqual(events.length, 0, 'the first host needs no introduction');
+
+  room.detach('u1', 's1');
+  t.mock.timers.tick(15000);
+  assert.strictEqual(room.hostId, rui.id);
+  assert.deepStrictEqual(events.at(-1), { id: rui.id, name: 'Rui', from: 'Ana' });
+
+  // A leaving host can land on a disconnected player; no toast for someone who can't see it
+  room.leave('u2');
+  assert.strictEqual(room.hostId, ana.id);
+  assert.strictEqual(events.length, 1);
+
+  // A host who's been gone past the grace period yields the moment someone returns
+  t.mock.timers.tick(60000);
+  const ruiBack = room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u2', 's3');
+  t.mock.timers.tick(0);
+  assert.strictEqual(room.hostId, ruiBack.id);
+  assert.strictEqual(events.at(-1).name, 'Rui');
+});
+
+test('rematch votes from every non-host human start the next round on their own', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room('VOTE', { onChange: () => {} });
+  t.after(() => room.dispose());
+  ['u1', 'u2', 'u3'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.start('u1');
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  const first = room.game;
+  const [u2, u3] = [room.seats[2].id, room.seats[1].id];
+
+  t.mock.timers.tick(1300);
+  room.rematch('u2');
+  assert.strictEqual(room.game, first, 'one vote just marks them in');
+  assert.deepStrictEqual(room.view().rematch, { voters: [u2], pending: [u3] });
+
+  t.mock.timers.tick(1300);
+  room.rematch('u2');
+  assert.deepStrictEqual(room.view().rematch.voters, [], 'voting again backs out');
+  t.mock.timers.tick(1300);
+  room.rematch('u2');
+  t.mock.timers.tick(1300);
+  room.rematch('u3');
+  assert.notStrictEqual(room.game, first, 'everyone in starts the next round');
+  assert.strictEqual(room.game.phase, 'roll');
+  assert.strictEqual(room.game.turn, 2, 'the winner still starts the rematch');
+  assert.strictEqual(room.view().rematch, null);
+
+  // The host's button stays instant, and stray votes don't linger into the lobby
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  t.mock.timers.tick(1300);
+  room.rematch('u3');
+  room.rematch('u1');
+  assert.strictEqual(room.game, null);
+  assert.deepStrictEqual(room.view().rematch, null);
+  room.start('u1');
+});
+
+test('a holdout leaving completes a pending rematch vote', (t) => {
+  const room = new Room('VLEAVE', { onChange: () => {} });
+  t.after(() => room.dispose());
+  ['u1', 'u2', 'u3'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.start('u1');
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  const first = room.game;
+
+  room.rematch('u2');
+  assert.strictEqual(room.game, first);
+  room.leave('u3');
+  assert.ok(room.game && room.game.phase !== 'over', 'the only remaining voter carried it');
+  assert.strictEqual(room.game.turn, 2);
+});
+
 function teamRoom(t, { botPartner = false } = {}) {
   const sent = [];
   const room = new Room('TEAM', {

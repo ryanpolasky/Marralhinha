@@ -523,12 +523,20 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
   );
 }
 
-export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf, isHost, coins = 0, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
+export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf, isHost, coins = 0, rematch = null, playerId = null, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
   const [revealed, setRevealed] = useState(false);
   const reward = game.rewards?.[mySeat];
   const iWon = !!game.winners?.includes(mySeat);
   const chests = Math.floor(coins / BOX_PRICE);
   const title = iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`;
+  const nameOfId = (id) => {
+    const s = seats.findIndex((p) => p?.id === id);
+    return s === mySeat ? 'You' : s >= 0 ? nameOf(s) : null;
+  };
+  const voters = (rematch?.voters || []).map(nameOfId).filter(Boolean);
+  const pending = (rematch?.pending || []).map(nameOfId).filter(Boolean);
+  const needed = voters.length + pending.length;
+  const iVoted = !!rematch?.voters?.includes(playerId);
   return (
     <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity ? ' activity-win-card' : ''}${reward ? '' : ' no-payout'}`}>
       <div className="win-intro">
@@ -566,8 +574,24 @@ export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf
           <button className="btn primary big block play-btn" onClick={() => onAction('game:rematch')}>
             Play again
           </button>
+        ) : mySeat >= 0 ? (
+          <button
+            className={`btn big block play-btn ${iVoted ? 'secondary' : 'primary'}`}
+            onClick={() => onAction('game:rematch')}
+            title={iVoted ? 'Click again to back out' : 'Vote for another round; it starts the moment everyone is in'}
+            aria-pressed={iVoted}
+          >
+            {iVoted ? `You're in! (${voters.length}/${needed})` : 'Rematch'}
+          </button>
         ) : (
           <div className="waiting">Waiting for the host to start another round…</div>
+        )}
+        {voters.length > 0 && (
+          <div className="win-rematch" aria-live="polite">
+            <b>{voters.join(' · ')}</b>
+            {` ${voters.length === 1 ? 'wants' : 'want'} a rematch`}
+            {pending.length > 0 && <span className="win-rematch-wait"> · waiting on {pending.length === 1 ? pending[0] : `${pending.length} more`}</span>}
+          </div>
         )}
         <div className={`win-minor${onLeave ? '' : ' single'}`}>
           <button className="btn ghost" onClick={onViewBoard}>
@@ -884,6 +908,8 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
             nameOf={nameOf}
             isHost={isHost}
             coins={coins}
+            rematch={room.rematch}
+            playerId={playerId}
             onAction={onAction}
             onShop={onShop}
             onLeave={onLeave}

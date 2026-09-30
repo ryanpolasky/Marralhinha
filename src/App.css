@@ -1698,10 +1698,17 @@ button.room-pill.copied {
 .activity-win-card .win-actions {
   grid-area: actions;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding-top: 18px;
   border-top: 1px solid var(--glass-line);
+}
+
+.activity-win-card .win-rematch {
+  flex-basis: 100%;
+  order: 2;
+  justify-content: center;
 }
 
 .activity-win-card .win-minor { order: -1; display: flex; gap: 8px; margin-right: auto; }
@@ -2125,6 +2132,27 @@ button.room-pill.copied {
 .win-actions {
   display: grid;
   gap: 10px;
+}
+
+.win-rematch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  text-align: center;
+  animation: panel-in 0.25s ease-out;
+}
+
+.win-rematch b {
+  color: var(--ink);
+}
+
+.win-rematch-wait {
+  opacity: 0.75;
 }
 
 .win-payout .open-box-cta {
