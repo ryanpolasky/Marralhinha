@@ -531,13 +531,13 @@ function Rewards({ reward, onRevealed }) {
         <div className="reward-celebrate reward-lucky">
           <TagBadge tag="lucky" small />
           <span>
-            <b>You're the Luckiest!</b> Your last 20 games have the highest luck score. Hold the title for seven total days to unlock the Golden Die.
+            <b>You're the Luckiest!</b> Your last 10 games have the highest luck score. Hold the title for three total days to unlock the Golden Die.
           </span>
         </div>
       )}
       {done && reward.goldenDie && (
         <div className="reward-celebrate reward-lucky">
-          <span><b>Golden Die unlocked!</b> Seven total days as Luckiest. It's yours permanently.</span>
+          <span><b>Golden Die unlocked!</b> Three total days as Luckiest. It's yours permanently.</span>
         </div>
       )}
       <div className="reward-total">

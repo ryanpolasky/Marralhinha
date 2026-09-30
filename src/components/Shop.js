@@ -257,7 +257,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
           <div className="supporter-shop-body">
             <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
             <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, and more to come! Only the look changes; never the gameplay.</p>
-            <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya! <span className="supporter-signature">— Ryan :)</span></p>
+            <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
             <div className="supporter-actions">
               {account.tags.includes('supporter') ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
                 <button className="btn primary" disabled={!shop?.supporter || syncingSupporter} onClick={purchaseSupporter}>
@@ -265,6 +265,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                 </button>
               )}
               {shop?.supporter && account.discordLinked && !account.tags.includes('supporter') && <button className="btn secondary" disabled={syncingSupporter} onClick={refreshSupporter}>{syncingSupporter ? 'Checking…' : 'Already purchased? Check access'}</button>}
+              <span className="supporter-signature">— Ryan :)</span>
             </div>
             <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
           </div>

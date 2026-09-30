@@ -72,7 +72,7 @@ const announceLucky = (change) => {
   }
   for (const id of unlocked) {
     const name = accounts.getUser(id)?.name;
-    if (name) io.emit('luckiest:change', `${name} unlocked the Golden Die after reigning as Luckiest for 7 total days!`);
+    if (name) io.emit('luckiest:change', `${name} unlocked the Golden Die after reigning as Luckiest for 3 total days!`);
   }
   new Set([holder, previous, ...unlocked].filter(Boolean)).forEach(pushProfile);
 };
@@ -104,6 +104,7 @@ const rooms = new RoomManager({
     }
   },
 });
+accounts.refreshGoldenUnlocks().forEach(pushProfile);
 announceLucky(accounts.refreshLucky(Date.now(), { inactivityOnly: true }));
 setInterval(() => {
   rooms.sweep();

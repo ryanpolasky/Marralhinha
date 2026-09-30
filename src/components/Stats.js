@@ -37,22 +37,55 @@ export function StatGrid({ stats }) {
   );
 }
 
-const duration = (seconds) => `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+const duration = (seconds) => {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return days ? `${days}d ${hours}h` : hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+};
 
 export function LuckiestPanel({ lucky }) {
   if (!lucky) return null;
-  const remainingGames = Math.max(0, lucky.requiredGames - lucky.games);
-  const rate = (lucky.rate * 100).toFixed(1);
+  const games = Math.min(lucky.games, lucky.requiredGames);
+  const remaining = lucky.requiredGames - games;
+  const goldRequired = lucky.goldenDieRequiredSeconds || 259200;
+  const goldProgress = lucky.goldenDieUnlocked ? goldRequired : Math.min(lucky.totalSeconds, goldRequired);
+  const status = lucky.holder ? 'Current holder' : remaining ? `${remaining} more ${remaining === 1 ? 'game' : 'games'} to qualify` : lucky.eligible ? `Eligible · luck score ${lucky.score.toFixed(2)}` : lucky.rolls ? 'Inactive · finish a game to rejoin' : 'No recorded rolls yet';
   return (
-    <div className={`profile-lucky${lucky.holder ? ' holder' : ''}`}>
-      <TagBadge tag="lucky" small />
-      <div>
-        <div>{remainingGames ? `${remainingGames} more completed ${remainingGames === 1 ? 'game' : 'games'} with recorded rolls for Luckiest eligibility.` : lucky.eligible ? `${lucky.sixes} sixes / ${lucky.rolls} rolls · ${rate}% six rate (expected ${(lucky.expectedRate * 100).toFixed(1)}%).` : 'Complete a game to return to Luckiest eligibility.'}</div>
-        <div className="muted small-text">Last {lucky.games} / {lucky.requiredGames} recorded games · {lucky.holder ? 'Current Luckiest' : lucky.eligible ? `Luck score: ${lucky.score.toFixed(2)}` : 'Not currently eligible'}</div>
-        <div className="muted small-text">Time as Luckiest: {duration(lucky.totalSeconds)} · Longest reign: {duration(lucky.longestSeconds)} · {lucky.reignCount} reigns</div>
-        <div className="muted small-text">{lucky.goldenDieUnlocked ? 'Golden Die permanently unlocked' : `${duration(lucky.goldenDieRemainingSeconds)} until Golden Die unlock`}</div>
+    <details className={`profile-lucky${lucky.holder ? ' holder' : ''}`}>
+      <summary className="profile-lucky-head">
+        <TagBadge tag="lucky" small />
+        <span className="profile-lucky-overview">
+          <span>{lucky.holder ? 'Current holder' : !remaining && !lucky.eligible ? 'Play a game to requalify' : `${games} / ${lucky.requiredGames} games`}</span>
+          <span className="profile-lucky-track" role="progressbar" aria-label="Games toward Luckiest eligibility" aria-valuemin={0} aria-valuemax={lucky.requiredGames} aria-valuenow={games}>
+            <span style={{ width: `${(games / lucky.requiredGames) * 100}%` }} />
+          </span>
+        </span>
+        <span className="profile-lucky-chevron" aria-hidden="true" />
+      </summary>
+      <div className="profile-lucky-details">
+        <div className="profile-lucky-status">{status}</div>
+        <div className="profile-lucky-metrics">
+          <div><b>{lucky.sixes.toLocaleString()}</b><span>Sixes</span></div>
+          <div><b>{lucky.rolls.toLocaleString()}</b><span>Rolls</span></div>
+          <div><b>{(lucky.rate * 100).toFixed(1)}%</b><span>Six rate <small>· {(lucky.expectedRate * 100).toFixed(1)}% expected</small></span></div>
+        </div>
+        <div className="profile-lucky-section">
+          <h4>Time holding Luckiest</h4>
+          <div className="profile-lucky-metrics">
+            <div><b>{duration(lucky.totalSeconds)}</b><span>Total</span></div>
+            <div><b>{duration(lucky.longestSeconds)}</b><span>Longest reign</span></div>
+            <div><b>{lucky.reignCount}</b><span>Reigns</span></div>
+          </div>
+        </div>
+        <div className="profile-lucky-section">
+          <div className="profile-lucky-gold-head"><h4>Progress to Golden Die</h4><span>{lucky.goldenDieUnlocked ? 'Unlocked permanently' : `${duration(lucky.goldenDieRemainingSeconds)} left`}</span></div>
+          <span className="profile-lucky-track gold" role="progressbar" aria-label="Golden Die reign time" aria-valuemin={0} aria-valuemax={goldRequired} aria-valuenow={goldProgress}>
+            <span style={{ width: `${(goldProgress / goldRequired) * 100}%` }} />
+          </span>
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
 

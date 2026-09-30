@@ -3055,8 +3055,8 @@ button.room-pill.copied {
 .supporter-price { margin-left: auto; color: #b5f1e1; font-weight: 700; }
 .supporter-shop-body p { margin: 10px 0 0; line-height: 1.5; }
 .supporter-shop-body .supporter-thanks { max-width: 720px; margin-top: 14px; color: #e1f5ea; }
-.supporter-signature { display: block; margin-top: 10px; color: #b5f1e1; font-weight: 700; font-style: italic; text-align: right; }
-.supporter-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 18px 0 10px; }
+.supporter-signature { margin-left: auto; color: #b5f1e1; font-weight: 700; font-style: italic; white-space: nowrap; }
+.supporter-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px 0 10px; }
 .supporter-owned { color: #bbf5e2; font-weight: 700; }
 @media (max-width: 620px) {
   .supporter-shop-body { padding: 16px; }
@@ -5936,27 +5936,47 @@ select.admin-input optgroup {
 }
 
 .profile-lucky {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   margin-top: 12px;
-  padding: 10px 12px;
   border-radius: 12px;
-  font-size: 14px;
   text-align: left;
   background: rgba(255, 209, 102, 0.08);
   border: 1px dashed rgba(255, 209, 102, 0.4);
-}
-
-.profile-lucky .tag-badge {
-  margin-left: 0;
-  flex: none;
 }
 
 .profile-lucky.holder {
   border-style: solid;
   box-shadow: 0 0 18px rgba(255, 209, 102, 0.25);
 }
+
+.profile-lucky-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.profile-lucky-head::-webkit-details-marker { display: none; }
+.profile-lucky-head:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 12px; }
+.profile-lucky .tag-badge { margin-left: 0; flex: none; }
+.profile-lucky-overview { flex: 1; min-width: 0; display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.profile-lucky-track { display: block; height: 6px; border-radius: 99px; overflow: hidden; background: rgba(255, 209, 102, 0.16); }
+.profile-lucky-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c49027, #ffe08a); }
+.profile-lucky-chevron { width: 8px; height: 8px; border-right: 2px solid var(--gold); border-bottom: 2px solid var(--gold); transform: rotate(45deg); transition: transform 0.2s; }
+.profile-lucky[open] .profile-lucky-chevron { transform: rotate(225deg); }
+.profile-lucky-details { display: grid; gap: 12px; padding: 14px; border-top: 1px solid rgba(255, 209, 102, 0.24); }
+.profile-lucky:not([open]) .profile-lucky-details { display: none; }
+.profile-lucky-status { font-size: 13px; font-weight: 700; color: var(--gold); }
+.profile-lucky-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.profile-lucky-metrics > div { display: grid; align-content: start; gap: 3px; min-width: 0; padding: 9px; border-radius: 9px; background: rgba(255, 255, 255, 0.05); }
+.profile-lucky-metrics b { font-size: 16px; color: var(--ink); }
+.profile-lucky-metrics span { font-size: 11px; color: var(--ink-dim); }
+.profile-lucky-metrics small { font-size: 10px; }
+.profile-lucky-section h4 { margin: 0 0 7px; font-size: 12px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.profile-lucky-gold-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 12px; color: var(--ink-dim); }
+.profile-lucky-track.gold { height: 7px; }
+.profile-lucky-gold-head + .profile-lucky-track { margin-top: 7px; }
 
 .profile-section {
   margin: 18px 0 8px;

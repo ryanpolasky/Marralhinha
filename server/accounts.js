@@ -4,10 +4,10 @@ const discord = require('./discord');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
 const LUCKY_ITEM = 'dice.lucky';
-const LUCK_WINDOW_GAMES = 20;
+const LUCK_WINDOW_GAMES = 10;
 const LUCK_ACTIVITY_DAYS = 14;
 const LUCK_EXPECTED_SIX_RATE = 1 / 6;
-const GOLDEN_DIE_REQUIRED_SECONDS = 604800;
+const GOLDEN_DIE_REQUIRED_SECONDS = 3 * 86400;
 const LUCK_ACTIVITY_MS = LUCK_ACTIVITY_DAYS * 86400000;
 
 const SESSION_TOUCH_MS = 5 * 60 * 1000;
@@ -84,6 +84,7 @@ class Accounts {
       reignTime: db.prepare('UPDATE users SET luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?) WHERE id = ?'),
       reignCount: db.prepare('UPDATE users SET luckiest_reign_count = luckiest_reign_count + 1 WHERE id = ?'),
       unlockDie: db.prepare('UPDATE users SET golden_die_unlocked = 1, golden_die_unlocked_at = ? WHERE id = ? AND golden_die_unlocked = 0'),
+      earnedDie: db.prepare('SELECT id FROM users WHERE luckiest_total_seconds >= ? AND golden_die_unlocked = 0'),
       moveInventory: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?'),
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
@@ -180,10 +181,22 @@ class Accounts {
       totalSeconds, longestSeconds: Math.max(user.luckiest_longest_reign_seconds, activeSeconds),
       reignCount: user.luckiest_reign_count, goldenDieUnlocked: !!user.golden_die_unlocked,
       goldenDieRemainingSeconds: Math.max(0, GOLDEN_DIE_REQUIRED_SECONDS - totalSeconds),
+      goldenDieRequiredSeconds: GOLDEN_DIE_REQUIRED_SECONDS,
       requiredGames: LUCK_WINDOW_GAMES, expectedRate: LUCK_EXPECTED_SIX_RATE };
   }
 
-  // The Luckiest tag moves only when an eligible player's last 20 completed games have the best score.
+  refreshGoldenUnlocks(now = Date.now()) {
+    return transaction(this.db, () => {
+      const ids = this.q.earnedDie.all(GOLDEN_DIE_REQUIRED_SECONDS).map(({ id }) => id);
+      for (const id of ids) {
+        this.q.unlockDie.run(now, id);
+        this.q.addItem.run(id, LUCKY_ITEM, now);
+      }
+      return ids;
+    });
+  }
+
+  // The Luckiest tag moves only when an eligible player's last 10 completed games have the best score.
   // Reigns accumulate towards a permanent die, including time from earlier reigns.
   refreshLucky(now = Date.now(), { inactivityOnly = false } = {}) {
     return transaction(this.db, () => {

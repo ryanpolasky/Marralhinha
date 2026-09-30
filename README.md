@@ -95,7 +95,7 @@ Players can carry tags, shown next to their name everywhere (account bar, lobby,
 - **Dev**: admin. Unlocks the exclusive Dev set (Singularity marble, Mainframe board, Overclock dice, Root nameplate) and the **Admin** panel in the account bar: search players, toggle tags, grant Marbucks and items, rename.
 - **Beta**: early testers. Unlocks the Blueprint set (Prototype marble, Blueprint board, Test Build dice, Blueprint nameplate).
 - **Supporter**: a verified one-time Discord purchase. Unlocks the Tideglass marble, Moonwake board, Beacon die, and Keepsake nameplate while the entitlement is active.
-- **Luckiest**: the highest eligible recent-game luck score. The Golden Die unlocks permanently after seven cumulative days holding the title.
+- **Luckiest**: the highest luck score across the last 10 completed games, with at least one game in the past 14 days. The Golden Die unlocks permanently after three cumulative days holding the title.
 
 Exclusive cosmetics never drop from chests or appear among Marbucks offers. Dev and Beta items follow their tags; Supporter follows its server-verified Discord entitlement. Tags are defined in `src/shared/cosmetics.json` (`tags`), items opt in with a `"tag"` field.
 

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import Shop from './components/Shop';
 import Lobby from './components/Lobby';
+import { LuckiestPanel } from './components/Stats';
 import { canUse, collectible, itemsForSlot } from './game/catalog';
 
 // CRA resets jest.fn mocks between tests, so plain functions it is
@@ -44,6 +45,26 @@ test('holding Luckiest alone does not unlock the Golden Die', () => {
   expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(true);
 });
 
+test('Luckiest starts collapsed with a ten-game bar and reveals readable stats on demand', () => {
+  const lucky = { games: 1, requiredGames: 10, holder: false, eligible: false, rolls: 12, sixes: 2, rate: 1 / 6, expectedRate: 1 / 6, score: null, totalSeconds: 0, longestSeconds: 0, reignCount: 0, goldenDieUnlocked: false, goldenDieRequiredSeconds: 259200, goldenDieRemainingSeconds: 259200 };
+  const { container, rerender } = render(<LuckiestPanel lucky={lucky} />);
+  const panel = container.querySelector('details.profile-lucky');
+  expect(panel).not.toHaveAttribute('open');
+  expect(screen.getByText('1 / 10 games')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', { name: 'Games toward Luckiest eligibility' })).toHaveAttribute('aria-valuenow', '1');
+  expect(panel.querySelector('.profile-lucky-details')).toBeInTheDocument();
+  fireEvent.click(panel.querySelector('summary'));
+  expect(panel).toHaveAttribute('open');
+  expect(screen.getByText('9 more games to qualify')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', { name: 'Golden Die reign time' })).toHaveAttribute('aria-valuemax', '259200');
+  expect(screen.getByRole('progressbar', { name: 'Golden Die reign time' })).toHaveAttribute('aria-valuenow', '0');
+  fireEvent.click(panel.querySelector('summary'));
+  rerender(<LuckiestPanel lucky={{ ...lucky, games: 10, eligible: false }} />);
+  expect(screen.getByText('Play a game to requalify')).toBeInTheDocument();
+  rerender(<LuckiestPanel lucky={{ ...lucky, games: 10, eligible: true, score: 1.42 }} />);
+  expect(screen.getByText('10 / 10 games')).toBeInTheDocument();
+});
+
 test('locker lists ordinary rarities before Luckiest, Supporter, Beta and Dev', () => {
   const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'lucky', 'supporter', 'beta', 'dev'];
   for (const slot of ['marble', 'board', 'dice', 'nameplate']) {
@@ -59,6 +80,7 @@ test('Supporter pack does not unlock until the profile carries a verified tag', 
   expect(screen.getByRole('button', { name: /Discord checkout coming soon/i })).toBeDisabled();
   expect(screen.getByText(/from the bottom of my heart/i)).toBeInTheDocument();
   expect(screen.getByText('— Ryan :)')).toHaveClass('supporter-signature');
+  expect(screen.getByText('— Ryan :)').closest('.supporter-actions')).toContainElement(screen.getByRole('button', { name: /Discord checkout coming soon/i }));
   expect(screen.getByRole('img', { name: /Tideglass marble and Beacon die/i })).toHaveAttribute('width', '680');
   expect(document.querySelector('.item-grid.featured').compareDocumentPosition(document.querySelector('.supporter-shop')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   rerender(<Shop account={{ ...account, tags: ['supporter'] }} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
