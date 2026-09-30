@@ -54,7 +54,7 @@ class Economy {
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       daily: db.prepare('UPDATE users SET daily_day = ?, streak = ? WHERE id = ?'),
       counters: db.prepare('UPDATE users SET counter_day = ?, bot_games_today = ?, won_today = ? WHERE id = ?'),
-      stats: db.prepare('UPDATE users SET games = games + 1, wins = wins + ?, captures = captures + ?, sixes = sixes + ? WHERE id = ?'),
+      stats: db.prepare('UPDATE users SET games = games + 1, wins = wins + ?, captures = captures + ?, sixes = sixes + ?, captured = captured + ?, shortcuts = shortcuts + ?, marbles_home = marbles_home + ? WHERE id = ?'),
       pity: db.prepare('UPDATE users SET pity = ?, boxes_opened = boxes_opened + 1 WHERE id = ?'),
       addItem: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)'),
     };
@@ -147,7 +147,7 @@ class Economy {
 
         this.credit(userId, total, `game:${won ? 'win' : 'finish'}`);
         this.q.addXp.run(earned, userId);
-        this.q.stats.run(won && !botCarried ? 1 : 0, ownCaptures, ownSixes, userId);
+        this.q.stats.run(won && !botCarried ? 1 : 0, ownCaptures, ownSixes, stats.captured || 0, stats.shortcuts || 0, home, userId);
         this.q.counters.run(today, botGames, wonToday, userId);
         results[seat] = { total, xp: earned, lines, note, level: after, leveledUp: after > before, botCarried };
       }
@@ -158,36 +158,48 @@ class Economy {
     return results;
   }
 
+  // The shared "shake the chest" half of openBox and grantBox: pity counters, the weighted roll and the item
+  rollBox(user, box, rand) {
+    const pity = parse(user.pity);
+    const counters = pity[box.id] || { epic: 0, legendary: 0 };
+    const sinceEpic = counters.epic + 1;
+    const sinceLegendary = counters.legendary + 1;
+
+    let rarity;
+    if (sinceLegendary >= box.pity.legendary) rarity = 'legendary';
+    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary }, rand);
+    else rarity = weightedPick(box.weights, rand);
+
+    pity[box.id] = {
+      epic: rarity === 'epic' || rarity === 'legendary' ? 0 : sinceEpic,
+      legendary: rarity === 'legendary' ? 0 : sinceLegendary,
+    };
+    this.q.pity.run(JSON.stringify(pity), user.id);
+
+    const pool = itemsOfRarity(rarity);
+    const item = pool[rand(pool.length)];
+    const duplicate = this.accounts.owns(user.id, item.id);
+    const refund = duplicate ? catalog.rarities[rarity].dupe : 0;
+    if (duplicate) this.credit(user.id, refund, `dupe:${item.id}`);
+    else this.q.addItem.run(user.id, item.id, Date.now());
+    return { item: item.id, rarity, duplicate, refund };
+  }
+
   openBox(userId, boxId, rand = (n) => randomInt(n)) {
     const box = BOXES.get(boxId);
     if (!box) throw new EconomyError('Unknown box');
     return transaction(this.db, () => {
       const user = this.user(userId);
       this.spend(user, box.price, `box:${box.id}`);
-      const pity = parse(user.pity);
-      const counters = pity[box.id] || { epic: 0, legendary: 0 };
-      const sinceEpic = counters.epic + 1;
-      const sinceLegendary = counters.legendary + 1;
-
-      let rarity;
-      if (sinceLegendary >= box.pity.legendary) rarity = 'legendary';
-      else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary }, rand);
-      else rarity = weightedPick(box.weights, rand);
-
-      pity[box.id] = {
-        epic: rarity === 'epic' || rarity === 'legendary' ? 0 : sinceEpic,
-        legendary: rarity === 'legendary' ? 0 : sinceLegendary,
-      };
-      this.q.pity.run(JSON.stringify(pity), userId);
-
-      const pool = itemsOfRarity(rarity);
-      const item = pool[rand(pool.length)];
-      const duplicate = this.accounts.owns(userId, item.id);
-      const refund = duplicate ? catalog.rarities[rarity].dupe : 0;
-      if (duplicate) this.credit(userId, refund, `dupe:${item.id}`);
-      else this.q.addItem.run(userId, item.id, Date.now());
-      return { item: item.id, rarity, duplicate, refund };
+      return this.rollBox(user, box, rand);
     });
+  }
+
+  // A chest handed out for free (a thank-you gift attached to a report, event prizes): same odds, no cost
+  grantBox(userId, boxId, rand = (n) => randomInt(n)) {
+    const box = BOXES.get(boxId);
+    if (!box) throw new EconomyError('Unknown box');
+    return transaction(this.db, () => this.rollBox(this.user(userId), box, rand));
   }
 
   shop(now = Date.now()) {

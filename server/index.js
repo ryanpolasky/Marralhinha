@@ -6,6 +6,8 @@ const { Server } = require('socket.io');
 const { openDb } = require('./db');
 const { Accounts } = require('./accounts');
 const { Economy } = require('./economy');
+const { Reports } = require('./reports');
+const { Matches } = require('./matches');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
 const { legalRoutes } = require('./legal');
@@ -18,6 +20,8 @@ const isAllowedOrigin = (origin) => (allowedOrigins ? allowedOrigins.includes(or
 const db = openDb();
 const accounts = new Accounts(db);
 const economy = new Economy(db, accounts);
+const reports = new Reports(db);
+const matches = new Matches(db, accounts);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -29,7 +33,7 @@ const io = new Server(server, {
 const pushProfile = (userId) => {
   const user = accounts.getUser(userId);
   if (!user) return;
-  io.to(`user:${userId}`).emit('account:update', accounts.profile(user, { daily: economy.dailyStatus(user) }));
+  io.to(`user:${userId}`).emit('account:update', accounts.profile(user, { daily: economy.dailyStatus(user), replies: reports.pendingReplies(userId) }));
   rooms.roomsWithUser(userId).forEach((room) => room.updateUser(accounts.publicInfo(user)));
 };
 
@@ -48,6 +52,7 @@ const rooms = new RoomManager({
     try {
       const luckyBefore = accounts.luckyHolder();
       const rewards = economy.awardGame({ game: room.game, players, botGame });
+      matches.record(room);
       const touched = new Set(players.map((p) => p.userId));
       if (luckyBefore && luckyBefore !== accounts.luckyHolder()) touched.add(luckyBefore);
       setTimeout(() => touched.forEach((userId) => pushProfile(userId)), 0);
@@ -61,7 +66,7 @@ const rooms = new RoomManager({
 setInterval(() => rooms.sweep(), 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, onProfileChange: pushProfile, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {

@@ -137,7 +137,8 @@ function useWinFireworks(board) {
   }, [board.phase, board.winners]);
 }
 
-// Keyboard play: Tab / arrow keys / 1-9 pick a move (the board previews it), Enter plays it
+// Keyboard play: Tab / arrows cycle every option; 1-9 picks the nth movable marble, and pressing the
+// same number again cycles that marble's options (e.g. step vs shortcut). Enter plays, Esc cancels
 function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
   const [keyMove, setKeyMove] = useState(null);
   useEffect(() => setKeyMove(null), [movesKey]);
@@ -147,6 +148,9 @@ function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
       setKeyMove(move.id);
       setSelected({ seat: move.seat, marble: move.marble });
     };
+    // Movable marbles in move order — numbers map to these, not to the flat move list, so a marble
+    // with two options still counts as one "marble" to tap through
+    const marbleOrder = [...new Set(moves.map((m) => `${m.seat}:${m.marble}`))];
     const onKey = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       const index = moves.findIndex((m) => m.id === keyMove);
@@ -156,8 +160,12 @@ function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
         e.preventDefault();
         const back = e.key === 'ArrowLeft' || (tab && e.shiftKey);
         pick(moves[index < 0 ? (back ? moves.length - 1 : 0) : (index + (back ? -1 : 1) + moves.length) % moves.length]);
-      } else if (/^[1-9]$/.test(e.key) && moves[Number(e.key) - 1]) {
-        pick(moves[Number(e.key) - 1]);
+      } else if (/^[1-9]$/.test(e.key)) {
+        const key = marbleOrder[Number(e.key) - 1];
+        if (!key) return;
+        const options = moves.filter((m) => `${m.seat}:${m.marble}` === key);
+        const at = options.findIndex((m) => m.id === keyMove);
+        pick(options[at < 0 ? 0 : (at + 1) % options.length]);
       } else if (e.key === 'Enter' && keyMove !== null && e.target.tagName !== 'BUTTON') {
         e.preventDefault();
         setKeyMove(null);

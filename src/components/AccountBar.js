@@ -1,10 +1,10 @@
 import React from 'react';
 import { Coins, Nameplate, TagBadges } from './Economy';
 import { IS_ACTIVITY } from '../net/config';
-import { ChestIcon, GiftIcon, Hanger, Shield, DiscordMark as DiscordLogo } from './Icons';
+import { Bug, ChestIcon, GiftIcon, Hanger, Mail, Shield, Trophy, DiscordMark as DiscordLogo } from './Icons';
 import { SettingsButton } from './Settings';
 
-export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin }) {
+export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin, onBoards, onReport, onMail }) {
   if (!account) return null;
   const daily = account.daily;
   const pct = Math.min(100, (account.into / account.need) * 100);
@@ -54,6 +54,25 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           <Hanger />
           <span>Locker</span>
         </button>
+        {onBoards && (
+          <button className="bar-btn boards" onClick={onBoards} title="Leaderboards">
+            <Trophy />
+            <span>Boards</span>
+          </button>
+        )}
+        {account.replies?.length > 0 && onMail && (
+          <button className="bar-btn mail has-mail" onClick={onMail} title={`${account.replies.length} repl${account.replies.length === 1 ? 'y' : 'ies'} from the devs`}>
+            <Mail />
+            <span>Mail</span>
+            <span className="mail-count">{account.replies.length}</span>
+          </button>
+        )}
+        {onReport && (
+          <button className="bar-btn report" onClick={onReport} title="Report a bug or suggest a feature">
+            <Bug />
+            <span>Report</span>
+          </button>
+        )}
         {account.admin && (
           <button className="bar-btn admin-btn" onClick={onAdmin} title="Manage players and tags">
             <Shield />

@@ -18,6 +18,9 @@ import Shop from './components/Shop';
 import Locker from './components/Locker';
 import Admin from './components/Admin';
 import Profile from './components/Profile';
+import PlayerCard from './components/PlayerCard';
+import Leaderboard from './components/Leaderboard';
+import { ReportModal, RepliesModal } from './components/Reports';
 import { DialogHost, ask } from './components/Dialog';
 
 const Scene = lazy(() => import('./three/Scene'));
@@ -130,6 +133,9 @@ const App = () => {
   const [teamLog, setTeamLog] = useState({ code: null, entries: [] });
   const mySeatRef = useRef(-1);
   const [modal, setModal] = useState(null);
+  // The player card being peeked at (right-clicked nameplates, end-screen rows, leaderboard rows)
+  const [peek, setPeek] = useState(null);
+  const mailShown = useRef(false);
   const sessionRef = useRef(null);
   const instanceRef = useRef(null);
 
@@ -334,6 +340,14 @@ const App = () => {
     }
   };
 
+  // Dev replies to your reports pop once per session, on first profile load
+  useEffect(() => {
+    if (account?.replies?.length && !mailShown.current) {
+      mailShown.current = true;
+      setModal('replies');
+    }
+  }, [account?.replies?.length]);
+
   const inRoom = !!(session && room && room.code === session.code);
   const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
   mySeatRef.current = mySeat;
@@ -414,6 +428,9 @@ const App = () => {
       onLocker={() => setModal('locker')}
       onProfile={() => setModal('profile')}
       onAdmin={() => setModal('admin')}
+      onBoards={() => setModal('boards')}
+      onReport={() => setModal('report')}
+      onMail={account?.replies?.length ? () => setModal('replies') : undefined}
       onDaily={claimDaily}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
       onSignOut={async () => {
@@ -501,6 +518,7 @@ const App = () => {
           setResetKey((k) => k + 1);
         }}
         onShop={() => setModal('shop')}
+        onPlayerStats={(p) => p?.userId && setPeek(p)}
         coins={account.coins}
       />
     );
@@ -553,7 +571,11 @@ const App = () => {
           }
         />
       )}
-      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} />}
+      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} onReport={() => setModal('report')} />}
+      {modal === 'boards' && account && <Leaderboard meId={account.id} onClose={() => setModal(null)} onPlayer={(u) => setPeek({ ...u, userId: u.id })} />}
+      {modal === 'report' && account && <ReportModal onClose={() => setModal(null)} notify={notify} />}
+      {modal === 'replies' && account && <RepliesModal replies={account.replies || []} onClose={() => setModal(null)} onClaim={setAccount} />}
+      {peek && <PlayerCard userId={peek.userId} hint={peek} onClose={() => setPeek(null)} />}
       {pingMenu && canPing && (
         <PingMenu
           menu={pingMenu}

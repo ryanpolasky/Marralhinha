@@ -49,12 +49,50 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  response TEXT,
+  gift TEXT,
+  created_at INTEGER NOT NULL,
+  resolved_at INTEGER,
+  seen_at INTEGER,
+  claimed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS reports_user ON reports(user_id);
+CREATE INDEX IF NOT EXISTS reports_status ON reports(status);
+CREATE TABLE IF NOT EXISTS matches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  players INTEGER NOT NULL,
+  bots INTEGER NOT NULL,
+  turns INTEGER NOT NULL,
+  seats TEXT NOT NULL,
+  winners TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS match_players (
+  match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  seat INTEGER NOT NULL,
+  won INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (match_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS match_players_user ON match_players(user_id);
 `;
 
 // Columns added after the first release; applied to existing databases on startup
 const MIGRATIONS = [
   ['users', 'tags', "TEXT NOT NULL DEFAULT '[]'"],
   ['users', 'sixes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'captured', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'shortcuts', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'marbles_home', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
 function migrate(db) {

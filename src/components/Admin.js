@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api, post } from '../net/api';
-import { CURRENCY, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, rarityOf } from '../game/catalog';
+import { CURRENCY, BOXES, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, rarityOf } from '../game/catalog';
 import { sfx } from '../game/sound';
 import { Coin, Coins, TagBadges } from './Economy';
-import { Close, Search, DiscordMark } from './Icons';
+import { Close, Search, DiscordMark, Bug } from './Icons';
+import { giftLabel, KIND_LABEL, StatusPill } from './Reports';
 import { SEAT_COLORS } from '../game/geometry';
 
 const ago = (t) => {
@@ -204,7 +205,192 @@ function UserEditor({ user, me, onChange, notify }) {
   );
 }
 
+// A single report in the admin queue: the text, a reply box and an optional thank-you gift
+function ReportEditor({ report, onDone, notify }) {
+  const [response, setResponse] = useState(report.response || '');
+  const [giftType, setGiftType] = useState(report.gift?.type || '');
+  const [giftAmount, setGiftAmount] = useState(report.gift?.amount || 250);
+  const [giftItem, setGiftItem] = useState(report.gift?.item || DROPPABLE[0].id);
+  const [giftBox, setGiftBox] = useState(report.gift?.box || BOXES[0].id);
+  const [busy, setBusy] = useState(false);
+  const grouped = useMemo(() => SLOT_KEYS.map((slot) => [slot, DROPPABLE.filter((i) => i.slot === slot)]), []);
+
+  useEffect(() => {
+    setResponse(report.response || '');
+    setGiftType(report.gift?.type || '');
+    if (report.gift?.amount) setGiftAmount(report.gift.amount);
+    if (report.gift?.item) setGiftItem(report.gift.item);
+    if (report.gift?.box) setGiftBox(report.gift.box);
+  }, [report.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gift =
+    giftType === 'coins' ? { type: 'coins', amount: giftAmount } : giftType === 'box' ? { type: 'box', box: giftBox } : giftType === 'item' ? { type: 'item', item: giftItem } : null;
+
+  const resolve = async () => {
+    setBusy(true);
+    try {
+      const res = await post(`/admin/reports/${report.id}/resolve`, { response, gift });
+      sfx.pop();
+      notify(`Resolved${gift ? ` with ${giftLabel(gift)}` : ''} — ${report.userName || 'the player'} sees it next login`, 'good');
+      onDone(res.report);
+    } catch (err) {
+      notify(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reopen = async () => {
+    setBusy(true);
+    try {
+      const res = await post(`/admin/reports/${report.id}/reopen`);
+      onDone(res.report);
+    } catch (err) {
+      notify(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-editor">
+      <div className="admin-editor-head">
+        <div>
+          <div className="admin-user-name">
+            <span className={`report-kind-tag ${report.kind}`}>{KIND_LABEL[report.kind]}</span>
+            <StatusPill status={report.status} />
+            {report.claimed && <span className="badge">gift claimed</span>}
+          </div>
+          <div className="muted small-text">
+            from <b>{report.userName || 'a deleted account'}</b> · {ago(report.createdAt)}
+            {report.resolvedAt ? ` · resolved ${ago(report.resolvedAt)}` : ''}
+          </div>
+        </div>
+      </div>
+
+      <p className="report-text-view big">{report.text}</p>
+
+      <div className="admin-section">
+        <h4>Reply <span className="muted">(they see this next time they log in)</span></h4>
+        <textarea
+          className="admin-input grow report-text"
+          rows={3}
+          maxLength={600}
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          placeholder="Thanks for reporting! Fixed in the next update…"
+          aria-label="Reply to the player"
+        />
+      </div>
+
+      <div className="admin-section">
+        <h4>Thank-you gift</h4>
+        <div className="admin-row-inline">
+          <select className="admin-input" value={giftType} onChange={(e) => setGiftType(e.target.value)} aria-label="Gift type">
+            <option value="">No gift</option>
+            <option value="coins">{CURRENCY}</option>
+            <option value="box">Chest</option>
+            <option value="item">Cosmetic</option>
+          </select>
+          {giftType === 'coins' && <input type="number" className="admin-input" min={1} max={100000} value={giftAmount} onChange={(e) => setGiftAmount(Number(e.target.value))} aria-label="Coin amount" />}
+          {giftType === 'box' && (
+            <select className="admin-input" value={giftBox} onChange={(e) => setGiftBox(e.target.value)} aria-label="Chest">
+              {BOXES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {giftType === 'item' && (
+            <select className="admin-input grow" value={giftItem} onChange={(e) => setGiftItem(e.target.value)} aria-label="Cosmetic">
+              {grouped.map(([slot, items]) => (
+                <optgroup key={slot} label={SLOTS[slot].label}>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({rarityOf(i).label})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+
+      <div className="admin-row-inline">
+        <button className="btn primary" disabled={busy} onClick={resolve}>
+          {report.status === 'resolved' ? 'Update resolution' : 'Resolve & send'}
+        </button>
+        {report.status === 'resolved' && (
+          <button className="btn ghost" disabled={busy} onClick={reopen}>
+            Reopen
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The bug/idea queue: open reports first, optionally the resolved history
+function ReportList({ notify }) {
+  const [all, setAll] = useState(false);
+  const [reports, setReports] = useState(null);
+  const [selected, setSelected] = useState(null);
+
+  const load = (include = all) =>
+    api(`/admin/reports${include ? '?all=1' : ''}`)
+      .then((res) => setReports(res.reports))
+      .catch((err) => notify(err.message));
+
+  useEffect(() => {
+    let cancelled = false;
+    api(`/admin/reports${all ? '?all=1' : ''}`)
+      .then((res) => !cancelled && setReports(res.reports))
+      .catch((err) => !cancelled && notify(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [all, notify]);
+
+  const onDone = (report) => {
+    setReports((list) => (list || []).map((r) => (r.id === report.id ? report : r)).filter((r) => all || r.status === 'open'));
+    setSelected(report);
+    load();
+  };
+
+  const current = selected && (reports || []).find((r) => r.id === selected.id);
+
+  return (
+    <div className="admin-body">
+      <div className="admin-list">
+        <label className="switch-row compact">
+          <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
+          <span className="switch" aria-hidden="true" />
+          <span className="switch-text">Show resolved too</span>
+        </label>
+        {(reports || []).length === 0 && <div className="muted center admin-empty">No {all ? '' : 'open '}reports. The mailbox is empty!</div>}
+        {(reports || []).map((r) => (
+          <button key={r.id} className={`admin-row${current?.id === r.id ? ' active' : ''}`} onClick={() => setSelected(r)}>
+            <span className="admin-row-name">
+              <span className={`report-kind-tag ${r.kind}`}>{r.kind === 'bug' ? <Bug size={13} /> : '💡'} {KIND_LABEL[r.kind]}</span>
+              <StatusPill status={r.status} />
+            </span>
+            <span className="admin-row-meta">
+              {r.userName || 'deleted'} · {ago(r.createdAt)}
+              {r.gift && !r.claimed ? ' · gift waiting' : ''}
+            </span>
+            <span className="admin-row-text">{r.text.length > 90 ? `${r.text.slice(0, 90)}…` : r.text}</span>
+          </button>
+        ))}
+      </div>
+      {current ? <ReportEditor report={current} onDone={onDone} notify={notify} /> : <div className="admin-editor muted center admin-empty">Pick a report to reply or attach a thank-you gift.</div>}
+    </div>
+  );
+}
+
 export default function Admin({ account, onClose, notify, currentCode, onSpectate }) {
+  const [tab, setTab] = useState('players');
   const [query, setQuery] = useState('');
   const [guests, setGuests] = useState(false);
   const [result, setResult] = useState(null);
@@ -244,43 +430,60 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
       <div className="panel modal admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Admin">
         <div className="modal-head">
           <h2>Admin</h2>
-          <span className="muted">{result ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
+          <div className="admin-tabs" role="tablist">
+            {[
+              ['players', 'Players'],
+              ['reports', 'Reports'],
+              ['games', 'Games'],
+            ].map(([key, label]) => (
+              <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => setTab(key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="muted">{result && tab === 'players' ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
             <Close />
           </button>
         </div>
 
-        <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />
+        {tab === 'games' && <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />}
 
-        <label className="admin-search">
-          <Search />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, account id or Discord id…" autoFocus aria-label="Search players" />
-          <button type="button" className={`btn tiny ${query === '#tagged' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#tagged' ? '' : '#tagged')}>
-            Tagged
-          </button>
-          <button type="button" className={`btn tiny ${guests ? 'secondary' : 'ghost'}`} onClick={() => setGuests((g) => !g)} title="Include guest accounts that never played (every fresh browser makes one)">
-            Guests
-          </button>
-        </label>
+        {tab === 'reports' && <ReportList notify={notify} />}
 
-        <div className="admin-body">
-          <div className={`admin-list${loading ? ' loading' : ''}`}>
-            {users.length === 0 && !loading && <div className="muted center admin-empty">No players match.{!guests && ' Drive-by guests are hidden; hit Guests to include them.'}</div>}
-            {users.map((u) => (
-              <button key={u.id} className={`admin-row${current?.id === u.id ? ' active' : ''}`} onClick={() => setSelected(u)}>
-                <span className="admin-row-name">
-                  {u.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />}
-                  {u.name}
-                  <TagBadges tags={u.tags} small />
-                </span>
-                <span className="admin-row-meta">
-                  Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · {ago(u.lastSeen)}
-                </span>
+        {tab === 'players' && (
+          <>
+            <label className="admin-search">
+              <Search />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, account id or Discord id…" autoFocus aria-label="Search players" />
+              <button type="button" className={`btn tiny ${query === '#tagged' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#tagged' ? '' : '#tagged')}>
+                Tagged
               </button>
-            ))}
-          </div>
-          {current ? <UserEditor user={current} me={account} onChange={onChange} notify={notify} /> : <div className="admin-editor muted center admin-empty">Pick a player to manage their tags, {CURRENCY} and items.</div>}
-        </div>
+              <button type="button" className={`btn tiny ${guests ? 'secondary' : 'ghost'}`} onClick={() => setGuests((g) => !g)} title="Include guest accounts that never played (every fresh browser makes one)">
+                Guests
+              </button>
+            </label>
+
+            <div className="admin-body">
+              <div className={`admin-list${loading ? ' loading' : ''}`}>
+                {users.length === 0 && !loading && <div className="muted center admin-empty">No players match.{!guests && ' Drive-by guests are hidden; hit Guests to include them.'}</div>}
+                {users.map((u) => (
+                  <button key={u.id} className={`admin-row${current?.id === u.id ? ' active' : ''}`} onClick={() => setSelected(u)}>
+                    <span className="admin-row-name">
+                      {u.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />}
+                      {u.name}
+                      <TagBadges tags={u.tags} small />
+                    </span>
+                    <span className="admin-row-meta">
+                      Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · {ago(u.lastSeen)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {current ? <UserEditor user={current} me={account} onChange={onChange} notify={notify} /> : <div className="admin-editor muted center admin-empty">Pick a player to manage their tags, {CURRENCY} and items.</div>}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

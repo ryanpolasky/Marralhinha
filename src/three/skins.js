@@ -642,7 +642,7 @@ const DICE = {
   ruby: { bg: '#b8182a', pip: '#ffffff', one: '#ffffff', roughness: 0.14, clearcoat: 1 },
   sky: { bg: '#3d9be0', pip: '#ffffff', one: '#ffffff', roughness: 0.2, clearcoat: 0.6 },
   wood: { bg: 'wood', pip: '#2b1608', one: '#2b1608', roughness: 0.6 },
-  jade: { bg: 'jade', pip: '#f0fff4', one: '#f0fff4', roughness: 0.1, clearcoat: 1 },
+  jade: { bg: 'jade', pip: '#0d3320', one: '#0d3320', roughness: 0.1, clearcoat: 1 },
   obsidian: { bg: '#121014', pip: '#f3c24f', one: '#f3c24f', roughness: 0.06, clearcoat: 1 },
   glow: { bg: '#10141a', pip: '#5dff9d', one: '#ff5dcf', roughness: 0.3, glow: 1.6 },
   gold: { bg: 'gold', pip: '#3b2400', one: '#3b2400', roughness: 0.22, metalness: 0.95 },
@@ -678,9 +678,9 @@ function dieBackground(ctx, style, size, value) {
   const rand = seeded(200 + value);
   if (style === 'wood') ctx.drawImage(makeWoodCanvas({ base: '#b9824a', grain: '80,40,15', seed: 30 + value, size: 256 }), 0, 0);
   else if (style === 'jade') {
-    ctx.fillStyle = '#3a9a69';
+    ctx.fillStyle = '#2e7d54';
     ctx.fillRect(0, 0, size, size);
-    nebula(ctx, rand, { colors: ['#9fe8bf', '#1f6b45'], count: 14, w: size, h: size, alpha: 0.4 });
+    nebula(ctx, rand, { colors: ['#7ccfa0', '#1b5c3a'], count: 14, w: size, h: size, alpha: 0.35 });
   } else if (style === 'marble') {
     ctx.fillStyle = '#efece6';
     ctx.fillRect(0, 0, size, size);

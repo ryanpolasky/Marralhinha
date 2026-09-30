@@ -158,6 +158,30 @@ export const Chat = () => (
   </Icon>
 );
 
+export const Bug = ({ size = 20 }) => (
+  <Icon size={size}>
+    <ellipse cx="12" cy="14" rx="5.5" ry="6.5" />
+    <circle cx="12" cy="5.5" r="2.4" />
+    <path d="M7 9.5 4 7M17 9.5 20 7M6.5 14H3M17.5 14H21M7 18.5 4.5 21M17 18.5 19.5 21M9.8 4.5 8.5 2.5M14.2 4.5l1.3-2" />
+    <path d="M12 9v9" />
+  </Icon>
+);
+
+export const Trophy = ({ size = 20 }) => (
+  <Icon size={size}>
+    <path d="M7 4h10v4.5a5 5 0 0 1-10 0V4z" />
+    <path d="M7 5.5H4.5a2.5 2.5 0 0 0 2.6 3.5M17 5.5h2.5a2.5 2.5 0 0 1-2.6 3.5" />
+    <path d="M12 13.5V17M8.5 20h7M10 17h4" />
+  </Icon>
+);
+
+export const Mail = ({ size = 20 }) => (
+  <Icon size={size}>
+    <rect x="3" y="5.5" width="18" height="13" rx="2" />
+    <path d="m4 7 8 6 8-6" />
+  </Icon>
+);
+
 export const DieIcon = ({ size = 26 }) => (
   <Icon size={size}>
     <rect x="3.5" y="3.5" width="17" height="17" rx="4" />

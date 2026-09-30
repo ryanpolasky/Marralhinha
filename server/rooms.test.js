@@ -48,7 +48,7 @@ test('chat is cleaned, capped and ignores blank messages', (t) => {
   room.chat('u2', `hi\u202Ethere ${'x'.repeat(300)}`);
   const entry = room.game.log.at(-1);
   assert.ok(entry.text.startsWith('hi there'));
-  assert.strictEqual(entry.text.length, 140);
+  assert.strictEqual(entry.text.length, 280);
 });
 
 test('four-player rooms default to free-for-all and only the host can switch on teams', (t) => {

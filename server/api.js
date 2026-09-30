@@ -3,6 +3,7 @@ const { randomBytes } = require('crypto');
 const discord = require('./discord');
 const { AccountError } = require('./accounts');
 const { EconomyError } = require('./economy');
+const { ReportError } = require('./reports');
 const { TAG_KEYS, ADMIN_TAGS } = require('./catalog');
 
 class ApiError extends Error {}
@@ -10,7 +11,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -50,7 +51,7 @@ function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin 
     try {
       res.json((await fn(req, res)) ?? { ok: true });
     } catch (err) {
-      const expected = err instanceof ApiError || err instanceof AccountError || err instanceof EconomyError;
+      const expected = err instanceof ApiError || err instanceof AccountError || err instanceof EconomyError || err instanceof ReportError;
       if (!expected) console.error(`[api ${req.path}]`, err);
       res.status(expected ? 400 : 500).json({ error: expected ? err.message : 'Something went wrong' });
     }
@@ -58,7 +59,7 @@ function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin 
 
   const profileOf = (userId) => {
     const user = accounts.getUser(userId);
-    return accounts.profile(user, { daily: economy.dailyStatus(user) });
+    return accounts.profile(user, { daily: economy.dailyStatus(user), replies: reports ? reports.pendingReplies(userId) : [] });
   };
   const changed = (userId) => {
     onProfileChange(userId);
@@ -175,6 +176,54 @@ function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin 
 
   router.get('/shop', auth, handle(() => economy.shop()));
 
+  // Bug reports & feature ideas: players file them, devs answer with a note and maybe a gift
+  router.post(
+    '/reports',
+    auth,
+    handle((req) => ({ report: reports.file(req.user.id, req.body?.kind, req.body?.text) }))
+  );
+
+  router.get('/reports', auth, handle((req) => ({ reports: reports.mine(req.user.id) })));
+
+  // "Seen it" for replies with no gift attached
+  router.post(
+    '/reports/:id/seen',
+    auth,
+    handle((req) => {
+      reports.dismiss(req.params.id, req.user.id);
+    })
+  );
+
+  router.post(
+    '/reports/:id/claim',
+    auth,
+    handle((req) => {
+      const report = reports.get(req.params.id);
+      const gift = reports.takeGift(req.params.id, req.user.id);
+      let result = null;
+      if (gift?.type === 'coins') economy.credit(req.user.id, gift.amount, `report:${report.id}`);
+      else if (gift?.type === 'box') result = economy.grantBox(req.user.id, gift.box);
+      else if (gift?.type === 'item') {
+        accounts.grantItem(req.user.id, gift.item);
+        result = { item: gift.item };
+      }
+      return { gift, result, profile: changed(req.user.id) };
+    })
+  );
+
+  router.get('/leaderboard', auth, handle(() => ({ boards: matches.leaders() })));
+
+  // Another player's public card + recent games, for the in-game and end-screen peeks
+  router.get(
+    '/players/:id',
+    auth,
+    handle((req) => {
+      const user = accounts.getUser(String(req.params.id || ''));
+      if (!user) throw new ApiError('Player not found');
+      return { player: accounts.publicCard(user), matches: matches.history(user.id, 20) };
+    })
+  );
+
   router.post(
     '/shop/open',
     auth,
@@ -267,6 +316,27 @@ function createApi({ accounts, economy, rooms, onProfileChange, isAllowedOrigin 
       accounts.rename(user.id, req.body?.name);
       return adminResult(user);
     })
+  );
+
+  router.get(
+    '/admin/reports',
+    auth,
+    admin,
+    handle((req) => ({ reports: reports.list({ includeResolved: req.query.all === '1' }) }))
+  );
+
+  router.post(
+    '/admin/reports/:id/resolve',
+    auth,
+    admin,
+    handle((req) => ({ report: reports.resolve(req.params.id, req.body?.response, req.body?.gift) }))
+  );
+
+  router.post(
+    '/admin/reports/:id/reopen',
+    auth,
+    admin,
+    handle((req) => ({ report: reports.reopen(req.params.id) }))
   );
 
   router.use((req, res) => res.status(404).json({ error: 'Not found' }));

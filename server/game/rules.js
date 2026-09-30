@@ -6,7 +6,7 @@ const ARM = 16;
 const MARBLES = 5;
 const HOME_LEN = 5;
 const LAST_TRACK = 62;
-const LOG_LIMIT = 60;
+const LOG_LIMIT = 100;
 
 const entryIdx = (seat) => (seat * ARM + 2) % TRACK_LEN;
 const exitCorner = (seat) => (seat * ARM + 56) % TRACK_LEN;

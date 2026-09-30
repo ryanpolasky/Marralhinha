@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 const KEY = 'marralhinha:settings';
 const LEGACY_MUTE_KEY = 'marralhinha:muted';
 // favoriteSeat: 0-3 (Red, Blue, Yellow, Green) or null for no preference
-const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false, showPings: true, favoriteSeat: null };
+const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false, showPings: true, favoriteSeat: null, showLogs: false };
 
 function load() {
   let stored = {};

@@ -61,7 +61,7 @@ class Accounts {
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
-        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ?, sixes = sixes + ? WHERE id = ?`
+        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ?, sixes = sixes + ?, captured = captured + ?, shortcuts = shortcuts + ?, marbles_home = marbles_home + ? WHERE id = ?`
       ),
       getMeta: db.prepare('SELECT value FROM meta WHERE key = ?'),
       setMeta: db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
@@ -69,6 +69,8 @@ class Accounts {
       moveInventory: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?'),
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
+      moveReports: db.prepare('UPDATE reports SET user_id = ? WHERE user_id = ?'),
+      moveMatchPlayers: db.prepare('UPDATE match_players SET user_id = ? WHERE user_id = ?'),
       deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       addCoins: db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?'),
@@ -259,10 +261,12 @@ class Accounts {
 
   mergeGuest(guest, intoId) {
     const into = this.getUser(intoId);
-    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, guest.sixes || 0, intoId);
+    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, guest.sixes || 0, guest.captured || 0, guest.shortcuts || 0, guest.marbles_home || 0, intoId);
     this.q.moveInventory.run(intoId, guest.id);
     this.q.moveSessions.run(intoId, guest.id);
     this.q.moveLedger.run(intoId, guest.id);
+    this.q.moveReports.run(intoId, guest.id);
+    this.q.moveMatchPlayers.run(intoId, guest.id);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     if (this.luckyHolder() === guest.id) this.q.setMeta.run(LUCKY_KEY, intoId);
     this.q.deleteUser.run(guest.id);
@@ -298,9 +302,23 @@ class Accounts {
       tags: this.tags(user),
       admin: this.isAdmin(user),
       pity: parse(user.pity, {}),
-      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened, sixes: user.sixes },
+      stats: this.statLine(user),
       lucky: this.luckyStatus(user),
       ...extras,
+    };
+  }
+
+  // The numbers shown on profiles, player cards and the admin view
+  statLine(user) {
+    return {
+      games: user.games,
+      wins: user.wins,
+      captures: user.captures,
+      captured: user.captured || 0,
+      boxes: user.boxes_opened,
+      sixes: user.sixes || 0,
+      shortcuts: user.shortcuts || 0,
+      home: user.marbles_home || 0,
     };
   }
 
@@ -315,9 +333,22 @@ class Accounts {
       tags: this.tags(user),
       equipped: this.equipped(user),
       items: this.inventory(user.id).length,
-      stats: { games: user.games, wins: user.wins, captures: user.captures, boxes: user.boxes_opened, sixes: user.sixes },
+      stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,
+    };
+  }
+
+  // What other players see when they peek at someone's card: look, level and lifetime numbers
+  publicCard(user) {
+    return {
+      id: user.id,
+      name: user.name,
+      equipped: this.equipped(user),
+      level: levelInfo(user.xp).level,
+      tags: this.tags(user),
+      stats: this.statLine(user),
+      createdAt: user.created_at,
     };
   }
 

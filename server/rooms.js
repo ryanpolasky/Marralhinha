@@ -11,6 +11,8 @@ const BOT_DELAY_MS = 450;
 // How long the client shows the "who starts" wheel; bots wait for it (keep in sync with START_WHEEL_MS in src/game/moves.js)
 const START_WHEEL_MS = 8500;
 const START_WINNER_MS = 2200;
+// A disconnected player gets this much grace, once, counted from the moment they dropped — then the bot
+// plays their turns at idle speed until they're back
 const AWAY_GRACE_MS = 20000;
 // Connected players get this long per roll/move before the game plays for them. The host picks it in the
 // lobby: 15-45s in 5s steps, or null for no limit (keep in sync with TURN_SECONDS in src/game/moves.js)
@@ -24,11 +26,11 @@ const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 30 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
-const CHAT_MAX = 140;
+const CHAT_MAX = 280;
 const CHAT_GAP_MS = 600;
 const CHAT_BURST = 5;
 const CHAT_WINDOW_MS = 10000;
-const TEAM_LOG_LIMIT = 60;
+const TEAM_LOG_LIMIT = 100;
 const PING_COOLDOWN_MS = 1000;
 const PING_TYPES = ['look', 'danger'];
 const PING_BOUND = 16;
@@ -132,7 +134,7 @@ class Room {
     const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
     const seat = this.game || spectate ? undefined : (favourite ?? SEAT_ORDER.find((s) => !this.seats[s]));
     if (seat === undefined && this.spectators.size >= 32) throw new UserError('That room is full, including spectators');
-    const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set() };
+    const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set(), goneAt: Date.now() };
     if (seat === undefined) this.spectators.set(info.userId, player);
     else {
       this.seats[seat] = player;
@@ -153,7 +155,14 @@ class Room {
     if (!player) return;
     player.sockets.add(socketId);
     player.connected = true;
+    player.goneAt = null;
+    this.emptyAt = null;
     if (player.id === this.hostId) this.cancelHostHandoff();
+    else {
+      // Someone arrived while the host is gone: (re)start the handoff countdown so the lobby is never hostless
+      const host = this.seats.find((p) => p && p.id === this.hostId);
+      if (host && !host.isBot && !host.connected) this.scheduleHostHandoff();
+    }
     this.touch();
     this.changed();
   }
@@ -163,9 +172,18 @@ class Room {
     if (!player) return;
     player.sockets.delete(socketId);
     player.connected = player.sockets.size > 0;
-    if (!player.connected) this.spectators.delete(userId);
-    if (!player.connected && player.id === this.hostId) this.scheduleHostHandoff();
+    if (!player.connected) {
+      player.goneAt = Date.now();
+      this.spectators.delete(userId);
+      if (player.id === this.hostId) this.scheduleHostHandoff();
+      if (!this.anyoneConnected()) this.emptyAt = Date.now();
+    }
     this.changed();
+  }
+
+  // Is at least one human (seated or spectating) actually connected right now
+  anyoneConnected() {
+    return this.seats.some((p) => p && !p.isBot && p.connected) || [...this.spectators.values()].some((p) => p.connected);
   }
 
   scheduleHostHandoff() {
@@ -214,7 +232,9 @@ class Room {
       this.seats[seat] = { id: player.id, name: `${player.name} (bot)`, isBot: true, connected: true, cosmetics: player.cosmetics, level: player.level, standIn: true };
       rules.addLog(this.game, `${player.name} left, a bot takes over`, seat);
     } else this.seats[seat] = null;
-    if (player.id === this.hostId) this.hostId = this.seats.find((p) => p && !p.isBot)?.id ?? null;
+    // Prefer a connected human as the next host; a disconnected one only gets it as a last resort
+    if (player.id === this.hostId) this.hostId = this.seats.find((p) => p && !p.isBot && p.connected)?.id ?? this.seats.find((p) => p && !p.isBot)?.id ?? null;
+    if (!this.anyoneConnected()) this.emptyAt = Date.now();
     this.changed();
   }
 
@@ -554,14 +574,15 @@ class Room {
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
     // No turn limit: connected players take as long as they like
     if (waiting && this.turnSeconds === null) return;
+    const now = Date.now();
     const base = waiting
       ? this.turnSeconds * 1000
       : !human || player.away
         ? BOT_DELAY_MS + randomInt(0, 400)
         : !player.connected
-          ? AWAY_GRACE_MS
+          ? Math.max(BOT_DELAY_MS, (player.goneAt ?? now) + AWAY_GRACE_MS - now)
           : IDLE_DELAY_MS;
-    const delay = base + animationMs(game);
+    const delay = base + animationMs(game, now);
     if (waiting) this.turnDeadline = Date.now() + delay;
     this.timer = setTimeout(() => {
       this.timer = null;
@@ -590,8 +611,10 @@ class Room {
   }
 
   isAbandoned(now = Date.now()) {
-    const anyoneHere = this.seats.some((p) => p && !p.isBot && p.connected) || [...this.spectators.values()].some((p) => p.connected);
-    return !this.hasHumans() || (!anyoneHere && now - this.lastActive > ROOM_TTL_MS);
+    if (!this.hasHumans()) return true;
+    if (this.anyoneConnected()) return false;
+    // Everyone's gone: the room dies ROOM_TTL_MS after the last human left, even if bots keep moving marbles
+    return now - (this.emptyAt ?? this.lastActive) > ROOM_TTL_MS;
   }
 
   dispose() {
@@ -601,13 +624,28 @@ class Room {
   }
 
   view() {
+    const now = Date.now();
     return {
       code: this.code,
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
       turnSeconds: this.turnSeconds,
-      seats: this.seats.map((p) => p && { id: p.id, name: p.name, isBot: p.isBot, connected: p.connected, idle: !!p.idle, away: !!p.away, devices: p.sockets?.size || 0, cosmetics: p.cosmetics, level: p.level, tags: p.tags || [] }),
+      seats: this.seats.map((p) => p && {
+        id: p.id,
+        name: p.name,
+        userId: p.userId ?? null,
+        isBot: p.isBot,
+        connected: p.connected,
+        // ms until a disconnected player's reconnect grace runs out and the bot plays at normal speed
+        coverGrace: p.connected || p.away || p.isBot ? 0 : Math.max(0, (p.goneAt ?? now) + AWAY_GRACE_MS - now),
+        idle: !!p.idle,
+        away: !!p.away,
+        devices: p.sockets?.size || 0,
+        cosmetics: p.cosmetics,
+        level: p.level,
+        tags: p.tags || [],
+      }),
       // Relative, so client clock skew doesn't matter
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),

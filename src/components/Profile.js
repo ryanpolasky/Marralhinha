@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../net/api';
 import { ITEMS, SLOTS, SLOT_KEYS, canUse, collectible } from '../game/catalog';
 import { ItemThumb, Nameplate, TagBadge, TagBadges } from './Economy';
+import { StatGrid, MatchHistory } from './Stats';
 import { Close } from './Icons';
 
 function luckyLine({ lucky, stats }) {
@@ -10,25 +12,30 @@ function luckyLine({ lucky, stats }) {
   return `${needed.toLocaleString()} more six${needed === 1 ? '' : 'es'} to take the Luckiest tag.`;
 }
 
-export default function Profile({ account, onClose, onLocker }) {
+export default function Profile({ account, onClose, onLocker, onReport, history }) {
+  const [matches, setMatches] = useState(history || null);
+
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Match history piggybacks on the public player endpoint, same one other players see
+  useEffect(() => {
+    if (history) return undefined;
+    let cancelled = false;
+    api(`/players/${encodeURIComponent(account.id)}`)
+      .then((res) => !cancelled && setMatches(res.matches))
+      .catch(() => !cancelled && setMatches([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [account.id, history]);
+
   const { stats } = account;
   const pool = collectible(account);
   const collected = pool.filter((item) => canUse(account, item.id)).length;
-  const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
-  const tiles = [
-    ['Games', stats.games],
-    ['Wins', stats.wins],
-    ['Win rate', `${winRate}%`],
-    ['Captures', stats.captures],
-    ['Sixes', stats.sixes || 0],
-    ['Chests', stats.boxes],
-  ];
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -56,19 +63,15 @@ export default function Profile({ account, onClose, onLocker }) {
           Level {account.level} · {account.into.toLocaleString()} / {account.need.toLocaleString()} XP to level {account.level + 1}
         </p>
 
-        <div className="profile-stats">
-          {tiles.map(([label, value]) => (
-            <div key={label} className="profile-stat">
-              <b>{typeof value === 'number' ? value.toLocaleString() : value}</b>
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
+        <StatGrid stats={stats} />
 
         <div className={`profile-lucky${account.lucky?.holder ? ' holder' : ''}`}>
           <TagBadge tag="lucky" small />
           <span>{luckyLine(account)}</span>
         </div>
+
+        <h3 className="profile-section">Match history</h3>
+        <MatchHistory matches={matches} meId={account.id} />
 
         <h3 className="profile-section">Loadout</h3>
         <div className="profile-loadout">
@@ -90,6 +93,11 @@ export default function Profile({ account, onClose, onLocker }) {
           <span className="muted">
             {collected} / {pool.length} cosmetics collected
           </span>
+          {onReport && (
+            <button className="btn link" onClick={onReport}>
+              Found a bug?
+            </button>
+          )}
           <button className="btn secondary" onClick={onLocker}>
             Open locker
           </button>
