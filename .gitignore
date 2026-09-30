@@ -33,3 +33,6 @@ yarn-error.log*
 
 # private planning
 docs/OVERHAUL_PLAN.md
+
+# local component previews
+src/Previews.js
