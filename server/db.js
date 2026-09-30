@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { randomBytes } = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
+
+const DB_FILE = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'marralhinha.db');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -108,6 +111,7 @@ const MIGRATIONS = [
   ['users', 'luckiest_longest_reign_seconds', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'golden_die_unlocked', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'golden_die_unlocked_at', 'INTEGER'],
+  ['users', 'supporter_entitlement_id', 'TEXT'],
   ['match_players', 'roll_count', 'INTEGER'],
   ['match_players', 'six_count', 'INTEGER'],
 ];
@@ -120,13 +124,40 @@ function migrate(db) {
   db.exec("UPDATE users SET golden_die_unlocked = 1 WHERE golden_die_unlocked = 0 AND id IN (SELECT user_id FROM inventory WHERE item_id = 'dice.lucky')");
 }
 
-function openDb(file = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'marralhinha.db')) {
+function openDb(file = DB_FILE) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
   migrate(db);
   return db;
+}
+
+function backupDb(db, file = DB_FILE, now = Date.now(), directory = process.env.DB_BACKUP_DIR || path.join(path.dirname(path.resolve(file)), 'backups')) {
+  if (file === ':memory:') return null;
+  const day = new Date(now).toISOString().slice(0, 10);
+  const prefix = `${path.basename(file, path.extname(file))}-${day}-`;
+  fs.mkdirSync(directory, { recursive: true });
+  const valid = (snapshotFile) => {
+    let snapshot;
+    try {
+      snapshot = new DatabaseSync(snapshotFile, { readOnly: true });
+      return snapshot.prepare('PRAGMA integrity_check').get().integrity_check === 'ok' && !!snapshot.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+    } catch {
+      return false;
+    } finally {
+      snapshot?.close();
+    }
+  };
+  if (fs.readdirSync(directory).some((name) => name.startsWith(prefix) && name.endsWith('.sqlite') && valid(path.join(directory, name)))) return null;
+  const name = `${prefix}${new Date(now).toISOString().slice(11, 19).replace(/:/g, '')}-${randomBytes(8).toString('hex')}`;
+  const partial = path.join(directory, `${name}.partial`);
+  const complete = path.join(directory, `${name}.sqlite`);
+  db.prepare('VACUUM INTO ?').run(partial);
+  if (!valid(partial)) throw new Error(`SQLite backup failed integrity check: ${partial}`);
+  if (fs.existsSync(complete)) throw new Error(`SQLite backup destination already exists: ${complete}`);
+  fs.renameSync(partial, complete);
+  return complete;
 }
 
 const depth = new WeakMap();
@@ -147,4 +178,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDb, transaction, migrate };
+module.exports = { openDb, transaction, migrate, backupDb };

@@ -55,6 +55,16 @@ export async function startDiscordLogin() {
   window.location.assign(discordStartUrl(ticket));
 }
 
+export async function purchaseDiscordSku(clientId, skuId) {
+  if (IS_ACTIVITY) {
+    if (!discordSdk) throw new Error('Discord purchase is unavailable right now');
+    const entitlements = await discordSdk.commands.startPurchase({ sku_id: skuId });
+    return Array.isArray(entitlements) && entitlements.some((entitlement) => entitlement.sku_id === skuId);
+  }
+  openExternal(`https://discord.com/application-directory/${clientId}/store/${skuId}`);
+  return false;
+}
+
 // Discord's sandbox blocks normal new-tab links, so Activities have to ask the SDK
 export function openExternal(url) {
   if (discordSdk) discordSdk.commands.openExternalLink({ url }).catch(() => {});

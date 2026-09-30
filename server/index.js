@@ -3,11 +3,12 @@ const http = require('http');
 const path = require('path');
 const express = require('express');
 const { Server } = require('socket.io');
-const { openDb, transaction } = require('./db');
+const { openDb, transaction, backupDb } = require('./db');
 const { Accounts } = require('./accounts');
 const { Economy } = require('./economy');
 const { Reports } = require('./reports');
 const { Matches } = require('./matches');
+const discord = require('./discord');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
 const { legalRoutes } = require('./legal');
@@ -18,6 +19,16 @@ const allowedOrigins = process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.spl
 const isAllowedOrigin = (origin) => (allowedOrigins ? allowedOrigins.includes(origin) : process.env.NODE_ENV !== 'production');
 
 const db = openDb();
+const runBackup = () => {
+  try {
+    const saved = backupDb(db);
+    if (saved) console.log(`[backup] ${saved}`);
+  } catch (err) {
+    console.error('[backup]', err);
+  }
+};
+setTimeout(runBackup, 5000).unref();
+setInterval(runBackup, 60 * 60 * 1000).unref();
 const accounts = new Accounts(db);
 const economy = new Economy(db, accounts);
 const reports = new Reports(db);
@@ -35,6 +46,15 @@ const pushProfile = (userId) => {
   if (!user) return;
   io.to(`user:${userId}`).emit('account:update', accounts.profile(user, { daily: economy.dailyStatus(user), replies: reports.pendingReplies(userId) }));
   rooms.roomsWithUser(userId).forEach((room) => room.updateUser(accounts.publicInfo(user)));
+};
+
+const syncSupporter = async (userId) => {
+  const user = accounts.getUser(userId);
+  if (!user?.discord_id || !discord.supporterConfigured()) return false;
+  const entitlementId = await discord.supporterEntitlement(user.discord_id);
+  const changed = accounts.setSupporter(userId, entitlementId);
+  if (changed) pushProfile(userId);
+  return changed;
 };
 
 // Team-only messages go straight to the partners' sockets, never to the room broadcast
@@ -93,9 +113,13 @@ setInterval(() => {
     console.error('[luckiest]', err);
   }
 }, 60 * 1000).unref();
+setInterval(() => {
+  if (!discord.supporterConfigured()) return;
+  accounts.q.supporterAccounts.all().forEach(({ id }) => syncSupporter(id).catch((err) => console.error('[supporter]', err)));
+}, 10 * 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, syncSupporter, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
@@ -103,9 +127,14 @@ if (fs.existsSync(BUILD_DIR)) {
   app.get('*', (req, res) => res.sendFile(path.join(BUILD_DIR, 'index.html')));
 }
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const user = accounts.userForToken(socket.handshake.auth?.token);
   if (!user) return next(new Error('unauthorized'));
+  try {
+    await syncSupporter(user.id);
+  } catch (err) {
+    console.error('[supporter]', err);
+  }
   socket.data.userId = user.id;
   socket.data.blitz = Array.isArray(socket.handshake.auth?.features) && socket.handshake.auth.features.includes('blitz');
   return next();

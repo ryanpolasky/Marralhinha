@@ -1,5 +1,6 @@
 const { randomBytes, createHash } = require('crypto');
 const { transaction } = require('./db');
+const discord = require('./discord');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
 const LUCKY_ITEM = 'dice.lucky';
@@ -62,6 +63,8 @@ class Accounts {
       rename: db.prepare('UPDATE users SET name = ? WHERE id = ?'),
       setEquipped: db.prepare('UPDATE users SET equipped = ? WHERE id = ?'),
       setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
+      setSupporter: db.prepare('UPDATE users SET supporter_entitlement_id = ? WHERE id = ?'),
+      supporterAccounts: db.prepare('SELECT id, discord_id FROM users WHERE supporter_entitlement_id IS NOT NULL AND discord_id IS NOT NULL'),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
@@ -149,7 +152,7 @@ class Accounts {
 
   tags(user) {
     const stored = storableTags(parse(user.tags, []));
-    return normalizeTags(this.luckyHolder() === user.id ? [...stored, 'lucky'] : stored);
+    return normalizeTags([...stored, ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
   }
 
   luckyHolder() {
@@ -269,6 +272,14 @@ class Accounts {
     const clean = storableTags(tags);
     this.q.setTags.run(JSON.stringify(clean), userId);
     return clean;
+  }
+
+  setSupporter(userId, entitlementId) {
+    const user = this.requireUser(userId);
+    const verified = entitlementId || null;
+    if (user.supporter_entitlement_id === verified) return false;
+    this.q.setSupporter.run(verified, userId);
+    return true;
   }
 
   addTag(userId, tag) {

@@ -11,6 +11,7 @@
   "tags": {
     "dev": { "label": "Dev", "color": "#ff4a5a", "admin": true, "blurb": "Built this thing." },
     "beta": { "label": "Beta", "color": "#5fb8ff", "admin": false, "blurb": "Played before it was cool." },
+    "supporter": { "label": "Supporter", "color": "#a7f3de", "admin": false, "auto": true, "blurb": "Helped keep the table lit.", "unlock": "The Supporter Pack is a one-time $5.99 purchase through Discord. Thank you for keeping this little game alive." },
     "lucky": {
       "label": "Luckiest",
       "color": "#ffd166",
@@ -49,6 +50,7 @@
     { "id": "marble.eye", "slot": "marble", "name": "Dragon Eye", "rarity": "legendary", "desc": "It's watching your opponents. Always." },
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
+    { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
@@ -70,6 +72,7 @@
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Still on the drafting table." },
     { "id": "board.dev", "slot": "board", "name": "Mainframe", "rarity": "exclusive", "tag": "dev", "desc": "Black glass, molten traces. The table the game runs on." },
+    { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "Midnight-blue lacquer, fine silver tide lines and a soft sea-glass glow around every turn." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },
@@ -90,6 +93,7 @@
     { "id": "dice.holo", "slot": "dice", "name": "Prism", "rarity": "legendary", "desc": "Every roll, a different color." },
     { "id": "dice.beta", "slot": "dice", "name": "Test Build", "rarity": "exclusive", "tag": "beta", "desc": "May contain bugs. Rolls anyway." },
     { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
+    { "id": "dice.supporter", "slot": "dice", "name": "Beacon", "rarity": "exclusive", "tag": "supporter", "desc": "Brushed midnight metal with luminous porcelain faces and crisp turquoise pips. Just as fair as every other die." },
     { "id": "dice.lucky", "slot": "dice", "name": "Golden Die", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Permanently unlocked after seven cumulative days as Luckiest." },
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
@@ -112,7 +116,8 @@
     { "id": "plate.holo", "slot": "nameplate", "name": "Prism", "rarity": "legendary", "desc": "Every color at once." },
     { "id": "plate.diamond", "slot": "nameplate", "name": "Diamond", "rarity": "legendary", "desc": "Sparkles. Constantly. Unapologetically." },
     { "id": "plate.beta", "slot": "nameplate", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Drafted by an early tester." },
-    { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" }
+    { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" },
+    { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." }
   ],
   "boxes": [
     {

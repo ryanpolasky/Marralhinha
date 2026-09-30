@@ -4,6 +4,7 @@ import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, PreviewStage, RarityTag, Coin } from './Economy';
 import { Close } from './Icons';
+import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const SHAKE_MS = 1500;
@@ -84,6 +85,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [opening, setOpening] = useState(null);
   const [showRates, setShowRates] = useState(null);
   const [buying, setBuying] = useState(null);
+  const [syncingSupporter, setSyncingSupporter] = useState(false);
   const refreshIn = useCountdown(shop?.refreshAt);
 
   useEffect(() => {
@@ -129,6 +131,31 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
     } finally {
       setBuying(null);
     }
+  };
+
+  const refreshSupporter = async () => {
+    setSyncingSupporter(true);
+    try {
+      const { profile } = await post('/shop/supporter/refresh');
+      onProfile(profile);
+      notify(profile.tags.includes('supporter') ? 'Thank you for supporting Marralhinha! Your set is ready in the locker.' : 'No Supporter purchase found yet. If you just bought it, wait a moment and try again.', 'good');
+    } catch (err) {
+      notify(err.message);
+    } finally {
+      setSyncingSupporter(false);
+    }
+  };
+
+  const purchaseSupporter = async () => {
+    if (!account.discordLinked) return startDiscordLogin().catch((err) => notify(err.message));
+    if (!shop?.supporter) return undefined;
+    try {
+      const purchasedInActivity = await purchaseDiscordSku(shop.supporter.clientId, shop.supporter.skuId);
+      if (purchasedInActivity) await refreshSupporter();
+    } catch (err) {
+      notify(err.message);
+    }
+    return undefined;
   };
 
   return (
@@ -220,7 +247,28 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
             );
           })}
         </div>
-        <p className="muted small-text center">Everything here is cosmetic and bought with {CURRENCY} you earn by playing. No real money, ever.</p>
+        <p className="muted small-text center">Featured items and chests use {CURRENCY} earned by playing. No pay-to-win.</p>
+
+        <section className="supporter-shop" aria-label="Support the game">
+          <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcSet="/supporter-pack-still.png" />
+            <img className="supporter-art" src="/supporter-pack.gif" alt="The Tideglass marble and Beacon die floating above a moonlit table" width="680" height="240" />
+          </picture>
+          <div className="supporter-shop-body">
+            <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
+            <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, and more to come! Only the look changes; never the gameplay.</p>
+            <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya! <span className="supporter-signature">— Ryan :)</span></p>
+            <div className="supporter-actions">
+              {account.tags.includes('supporter') ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
+                <button className="btn primary" disabled={!shop?.supporter || syncingSupporter} onClick={purchaseSupporter}>
+                  {!shop?.supporter ? 'Discord checkout coming soon' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support'}
+                </button>
+              )}
+              {shop?.supporter && account.discordLinked && !account.tags.includes('supporter') && <button className="btn secondary" disabled={syncingSupporter} onClick={refreshSupporter}>{syncingSupporter ? 'Checking…' : 'Already purchased? Check access'}</button>}
+            </div>
+            <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+          </div>
+        </section>
       </div>
 
       {opening && (

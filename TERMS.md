@@ -1,9 +1,9 @@
 # Terms of Service
 
 **Marralhinha Online**
-Effective date: September 27, 2026
+Effective date: September 30, 2026
 
-Marralhinha Online ("the game") is a free hobby project made and run by Ryan Polasky ("I", "me"). By playing, you agree to these terms. If you don't agree, please don't play.
+Marralhinha Online ("the game") is a free-to-play hobby project with an optional cosmetic Supporter Pack, made and run by Ryan Polasky ("I", "me"). By playing, you agree to these terms. If you don't agree, please don't play.
 
 ## Who can play
 You must be at least 13 years old, or the minimum age to use Discord where you live if that is higher. If you play through Discord, you also have to follow Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines).
@@ -15,6 +15,7 @@ The game creates a guest account for you automatically, and you can link it to D
 - Marbucks are an in-game currency you earn by playing. They **cannot be bought with real money**, and neither Marbucks nor any in-game item can be sold, traded or exchanged for real money or anything of value outside the game.
 - Lootboxes (chests) are opened with Marbucks only. Their drop rates are shown in the shop.
 - Cosmetics are purely visual and give no gameplay advantage.
+- The optional Supporter Pack is a one-time purchase through Discord. Discord handles payment, checkout, receipts and applicable refunds; the game checks your Discord entitlement to provide access to its badge and cosmetics. If Discord revokes the entitlement, access ends. You must link the purchasing Discord account to use the pack.
 - Marbucks, items and progress are a license to use them in the game, not property you own. I may rebalance, change or remove them, and progress may be reset or lost (for example because of bugs or maintenance).
 
 ## Play fair and be nice
@@ -34,10 +35,10 @@ Marralhinha is a traditional board game from Terceira, in the Açores. This digi
 The game isn't made by, endorsed by, or affiliated with Discord.
 
 ## No guarantees
-The game is provided "as is" and "as available", for free. I don't promise that it will always be online, bug-free, or that your progress will never be lost. I may change, pause or shut down the game at any time.
+The game is provided "as is" and "as available". Playing is free; the Supporter Pack is optional. I don't promise that it will always be online, bug-free, or that your progress will never be lost. I may change, pause or shut down the game at any time.
 
 ## Limitation of liability
-To the fullest extent allowed by law, I'm not liable for any indirect, incidental or consequential damages, or for any loss of data or in-game progress, arising from your use of the game. Since the game is free, my total liability for any claim related to it is limited to zero dollars (USD $0), where the law allows.
+To the fullest extent allowed by law, I'm not liable for any indirect, incidental or consequential damages, or for any loss of data or in-game progress, arising from your use of the game. Nothing here limits rights that cannot legally be excluded, including any applicable consumer rights for paid purchases.
 
 ## Privacy
 How your data is handled is explained in the [Privacy Policy](PRIVACY.md).

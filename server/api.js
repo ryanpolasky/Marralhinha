@@ -11,7 +11,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, syncSupporter, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -126,10 +126,11 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
 
   router.post(
     '/auth/redeem',
-    handle((req) => {
+    handle(async (req) => {
       const token = take(`login:${req.body?.code}`);
       const user = token && accounts.userForToken(token);
       if (!user) throw new ApiError('That login link expired, please try again');
+      try { await syncSupporter(user.id); } catch (err) { console.error('[supporter]', err); }
       return { token, profile: profileOf(user.id) };
     })
   );
@@ -141,11 +142,15 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       if (!req.body?.code) throw new ApiError('Missing authorization code');
       const tokens = await discord.exchangeCode(req.body.code, { withRedirect: false });
       const user = accounts.loginDiscord(await discord.fetchUser(tokens.access_token));
+      try { await syncSupporter(user.id); } catch (err) { console.error('[supporter]', err); }
       return { token: accounts.createSession(user.id), accessToken: tokens.access_token, profile: profileOf(user.id) };
     })
   );
 
-  router.get('/me', auth, handle((req) => ({ profile: profileOf(req.user.id) })));
+  router.get('/me', auth, handle(async (req) => {
+    try { await syncSupporter(req.user.id); } catch (err) { console.error('[supporter]', err); }
+    return { profile: profileOf(req.user.id) };
+  }));
 
   router.post(
     '/me/name',
@@ -159,7 +164,8 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
   router.post(
     '/me/equip',
     auth,
-    handle((req) => {
+    handle(async (req) => {
+      if (req.body?.item && String(req.body.item).endsWith('.supporter')) await syncSupporter(req.user.id);
       accounts.equip(req.user.id, req.body?.slot, req.body?.item);
       return { profile: changed(req.user.id) };
     })
@@ -174,7 +180,14 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     })
   );
 
-  router.get('/shop', auth, handle(() => economy.shop()));
+  router.get('/shop', auth, handle(() => ({ ...economy.shop(), supporter: discord.supporterConfigured() ? { skuId: discord.config().supporterSkuId, clientId: discord.config().clientId } : null })));
+
+  router.post('/shop/supporter/refresh', auth, handle(async (req) => {
+    if (!discord.supporterConfigured()) throw new ApiError('Supporter checkout is not available yet');
+    if (!req.user.discord_id) throw new ApiError('Link a Discord account to support the game');
+    await syncSupporter(req.user.id);
+    return { profile: profileOf(req.user.id) };
+  }));
 
   // Bug reports & feature ideas: players file them, devs answer with a note and maybe a gift
   router.post(

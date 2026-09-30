@@ -576,6 +576,58 @@ const MARBLES = {
       },
     };
   },
+  supporter: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const [glow, gctx] = makeCanvas(512, 256);
+    const rand = seeded(313 + seat);
+    const water = ctx.createLinearGradient(0, 0, 0, 256);
+    water.addColorStop(0, '#082d3c');
+    water.addColorStop(0.5, mix(c.main, '#44b6ad', 0.55));
+    water.addColorStop(1, '#082d3c');
+    ctx.fillStyle = water;
+    ctx.fillRect(0, 0, 512, 256);
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 13; i++) {
+      const line = { y0: i * 24 - 22, amp: 11 + rand() * 18, k: 1 + Math.floor(rand() * 2), phase: rand() * TAU, w: 512 };
+      wavyLine(ctx, { ...line, width: 7 + rand() * 9, color: i % 3 ? c.light : '#e0fff5', alpha: 0.28 });
+      wavyLine(gctx, { ...line, width: 2.5, color: i % 3 ? c.main : '#b9fff0', alpha: 0.65 });
+    }
+    for (let i = 0; i < 115; i++) {
+      ctx.fillStyle = rand() > 0.6 ? 'rgba(241,255,246,0.6)' : 'rgba(152,236,215,0.35)';
+      const x = rand() * 512;
+      const y = rand() * 256;
+      const radius = 0.4 + rand() * 1.5;
+      for (const dx of [-512, 0, 512]) {
+        ctx.beginPath();
+        ctx.arc(x + dx, y, radius, 0, TAU);
+        ctx.fill();
+      }
+    }
+    const map = finishMarble(canvas);
+    const emissiveMap = finishMarble(glow);
+    const uniforms = { uTide: { value: 0 }, uTideColor: { value: new THREE.Color(c.light) } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uTide;\nuniform vec3 uTideColor;')
+        .replace('#include <emissivemap_fragment>', `{
+          vec2 uv = vEmissiveMapUv;
+          float tideU = uv.x * 6.28318530718;
+          float ripple = sin(tideU * 2.0 - uTide);
+          vec2 drift = vec2(uTide * 0.075, 0.018 * sin(tideU * 2.0 - uTide * 1.5));
+          vec3 currents = texture2D(emissiveMap, uv + drift).rgb;
+          float ribbon = pow(0.5 + 0.5 * sin(uv.y * 25.0 + ripple * 1.5 - uTide * 2.4), 12.0);
+          float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.7);
+          float sparkle = pow(max(sin(tideU * 5.0 + uv.y * 31.0 - uTide * 4.0), 0.0), 30.0) * ribbon;
+          totalEmissiveRadiance = currents * (0.5 + ribbon * 1.3) + uTideColor * (ribbon * 0.3 + rim * 0.5 + sparkle * 0.25);
+        }`);
+    };
+    return { map, emissiveMap, emissive: c.light, emissiveIntensity: 0.48, roughness: 0.09, clearcoat: 1, clearcoatRoughness: 0.04, iridescence: 0.36,
+      onBeforeCompile, customProgramCacheKey: () => 'marble-supporter-tide',
+      animate: (m, t) => { uniforms.uTide.value = reducedMotion?.matches ? 0 : t + seat * 1.7; } };
+  },
   beta: (c) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     ctx.fillStyle = mix(c.main, '#1b4fa0', 0.55);
@@ -656,10 +708,11 @@ const DICE = {
   holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
+  supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter'];
 
 function grid(ctx, size, step, color, width = 1) {
   ctx.strokeStyle = color;
@@ -738,6 +791,23 @@ function dieBackground(ctx, style, size, value) {
     ctx.lineWidth = 2.5;
     ctx.strokeRect(20, 20, size - 40, size - 40);
     ctx.setLineDash([]);
+  } else if (style === 'supporter') {
+    const g = ctx.createLinearGradient(0, 0, size, size);
+    g.addColorStop(0, '#f6fff4');
+    g.addColorStop(0.5, '#b7e5df');
+    g.addColorStop(1, '#65979e');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = 'rgba(9,58,67,0.62)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(8, 8, size - 16, size - 16);
+    ctx.strokeStyle = 'rgba(247,255,242,0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(17, 17, size - 34, size - 34);
+    for (let i = 0; i < 32; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.12 + rand() * 0.35})`;
+      ctx.fillRect(rand() * size, rand() * size, 0.5 + rand() * 1.4, 0.5 + rand() * 1.4);
+    }
   } else if (style === 'lucky') {
     // Warmer, deeper gold than Solid Gold, packed with glitter flecks and a champagne inset border
     const g = ctx.createRadialGradient(size * 0.35, size * 0.3, 10, size * 0.5, size * 0.5, size * 0.75);
@@ -832,13 +902,27 @@ export function diceSkin(itemId) {
       const material = new THREE.MeshPhysicalMaterial(params);
       if (ANIMATED_DICE.includes(key)) {
         material.userData.skinTime = time;
+        if (key === 'supporter') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
         material.customProgramCacheKey = () => `dice-${key}-animated`;
         material.onBeforeCompile = (shader) => {
           shader.uniforms.uSkinTime = time;
           shader.uniforms.uFacePhase = { value: value * 0.73 };
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', '#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;')
-            .replace('#include <emissivemap_fragment>', key === 'lucky' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'supporter' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              vec2 p = uv - 0.5;
+              float edge = max(abs(p.x), abs(p.y));
+              float rail = 1.0 - smoothstep(0.008, 0.03, abs(edge - 0.428));
+              float angle = atan(p.y, p.x);
+              float runner = pow(0.5 + 0.5 * sin(angle * 2.0 - uSkinTime * 2.0 + uFacePhase), 9.0);
+              float caustic = pow(0.5 + 0.5 * sin(uv.y * 19.0 + sin(uv.x * 13.0 - uSkinTime) - uSkinTime * 1.65 + uFacePhase), 14.0);
+              float face = 1.0 - smoothstep(0.24, 0.37, edge);
+              vec3 seaGlass = vec3(0.27, 0.88, 0.73);
+              totalEmissiveRadiance = (1.0 - pip) * (seaGlass * rail * (0.25 + runner * 1.8)
+                + vec3(0.74, 1.0, 0.89) * rail * runner * 0.4 + seaGlass * caustic * face * 0.28);
+            }` : key === 'lucky' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               vec2 g = uv * 42.0;
@@ -895,7 +979,7 @@ export function diceSkin(itemId) {
 
 export function animateDiceSkin(materials) {
   const time = materials[0]?.userData.skinTime;
-  if (time) time.value = performance.now() / 1000;
+  if (time) time.value = materials[0].userData.reducedMotion?.matches ? 0 : performance.now() / 1000;
 }
 
 const WOODS = {
@@ -962,6 +1046,32 @@ function oceanCanvases() {
     const spec = { y0: rand() * 1024, amp: 20 + rand() * 60, k: 2 + Math.floor(rand() * 4), phase: rand() * TAU, width: 2 + rand() * 6, w: 1024 };
     wavyLine(bctx, { ...spec, color: '#8fe3ff', alpha: 0.18 + rand() * 0.25 });
     wavyLine(gctx, { ...spec, color: '#5fd0ff', alpha: 0.35 + rand() * 0.4 });
+  }
+  return [base, glow];
+}
+
+function moonwakeCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  const rand = seeded(359);
+  const bg = bctx.createLinearGradient(0, 0, 1024, 1024);
+  bg.addColorStop(0, '#071f32');
+  bg.addColorStop(0.5, '#164557');
+  bg.addColorStop(1, '#082537');
+  bctx.fillStyle = bg;
+  bctx.fillRect(0, 0, 1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 34; i++) {
+    const line = { y0: i * 34 - 42, amp: 11 + rand() * 28, k: 1 + Math.floor(rand() * 3), phase: rand() * TAU, w: 1024 };
+    wavyLine(bctx, { ...line, color: i % 4 ? '#82c9c8' : '#e1f3df', width: 1.6 + rand() * 2.2, alpha: 0.16 + rand() * 0.16 });
+    if (i % 4 === 0) wavyLine(gctx, { ...line, color: '#8ee8d6', width: 2.2, alpha: 0.3 });
+  }
+  for (let i = 0; i < 240; i++) {
+    bctx.fillStyle = rand() > 0.85 ? 'rgba(242,255,240,0.6)' : 'rgba(171,231,220,0.18)';
+    bctx.beginPath();
+    bctx.arc(rand() * 1024, rand() * 1024, 0.4 + rand() * 1.3, 0, TAU);
+    bctx.fill();
   }
   return [base, glow];
 }
@@ -1198,6 +1308,10 @@ const SPECIAL_BOARDS = {
   },
   // Sits on a green self-healing cutting mat instead of more blue felt
   beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#15397a', felt: '#1f4a3c', cup: '#0b1d3f', accent: { color: '#bff0ff', metalness: 0.1, roughness: 0.5 } }),
+  supporter: () => {
+    const [base, glow] = moonwakeCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 0.32, repeat: 0.045, roughness: 0.14, clearcoat: 1, dish: '#174b56', felt: '#071f2d', cup: '#061b26', accent: { color: '#b1ebd9', metalness: 0.72, roughness: 0.22, emissive: '#7ac8b7', emissiveIntensity: 0.23 } };
+  },
 };
 
 export function boardSkin(itemId) {

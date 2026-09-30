@@ -1,9 +1,9 @@
 # Privacy Policy
 
 **Marralhinha Online**
-Effective date: September 27, 2026
+Effective date: September 30, 2026
 
-Marralhinha Online ("the game") is a free hobby project made and run by Ryan Polasky ("I", "me"). This policy explains what the game collects, why, and what you can do about it. The short version: the game only keeps what it needs to save your progress, it never sells anything, and there are no ads or trackers.
+Marralhinha Online ("the game") is a free-to-play hobby project with an optional cosmetic Supporter Pack, made and run by Ryan Polasky ("I", "me"). This policy explains what the game collects, why, and what you can do about it. The short version: the game keeps what it needs to save your progress and verify optional purchases through Discord; there are no ads or trackers.
 
 ## What the game collects
 
@@ -25,6 +25,8 @@ The game asks Discord for the `identify` permission only. From that, it stores:
 
 The game does **not** get your email address, friends list, servers or messages. Discord access tokens are only used at login to look up your profile and are never saved on the server. If you log in with Discord after playing as a guest, your guest progress is merged into your Discord-linked account.
 
+If you buy the Supporter Pack, the server asks Discord whether your account has an active entitlement for its SKU and stores the entitlement ID while access is active. The game does not receive or store your payment card details. Discord handles checkout and payment under its own privacy policy.
+
 ### While you play
 - Live game state (the board, rolls, moves, reactions, chat messages and room codes) is kept in the server's memory only while a room is active, and is discarded after the room goes idle. Chat messages are never written to the database.
 - Your IP address is used briefly, in memory only, to limit how many guest accounts can be created from one network. It is not stored in the database.
@@ -34,11 +36,11 @@ The game does **not** get your email address, friends list, servers or messages.
 The game keeps three items in your browser's local storage: your login token, the room you were last in (so a refresh puts you back), and whether sound is muted. The game does not use cookies, analytics, advertising or tracking scripts, and its fonts are served by the game itself rather than by a third party.
 
 ## How your information is used
-Only to run the game: saving your progress and cosmetics, showing your name, level and cosmetics to the other players at your table, paying out rewards, preventing abuse, and fixing problems.
+To run the game: saving your progress and cosmetics, showing your name, level and cosmetics to other players at your table, paying out rewards, checking optional Supporter entitlements, preventing abuse, and fixing problems.
 
 ## Who can see it
 - **Other players** at your table can see your display name, level, equipped cosmetics, what you do in the game (rolls, moves and reactions), and the chat messages you send. Please don't share personal information in chat.
-- **Discord** handles the login step and, when you play inside Discord, runs the Activity. Discord's own [Privacy Policy](https://discord.com/privacy) applies to that.
+- **Discord** handles login, optional Supporter checkout and entitlement verification and, when you play inside Discord, runs the Activity. Discord's own [Privacy Policy](https://discord.com/privacy) applies to that.
 - **Service providers** that host the game may process data on my behalf.
 - **Legal requests:** I may share information if the law requires it.
 

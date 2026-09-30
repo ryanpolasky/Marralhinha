@@ -11,10 +11,11 @@ export const ITEMS = Object.fromEntries(catalog.items.map((item) => [item.id, it
 export const BOXES = catalog.boxes;
 export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slot, catalog.slots[slot].default]));
 export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'exclusive'];
+const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'lucky', 'supporter', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag);
 
 export const itemsForSlot = (slot) =>
-  catalog.items.filter((item) => item.slot === slot).sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
+  catalog.items.filter((item) => item.slot === slot).sort((a, b) => LOCKER_ORDER.indexOf(a.tag || a.rarity) - LOCKER_ORDER.indexOf(b.tag || b.rarity));
 
 // Tag-exclusive items borrow their tag's color and label ("Dev exclusive") instead of the generic rarity
 export const rarityOf = (item) => {

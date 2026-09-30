@@ -1,7 +1,50 @@
 import { planMove } from './Marbles';
+import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
+
+test('Supporter materials animate their accents without animating pip colors under reduced motion', () => {
+  const gradient = { addColorStop: () => {} };
+  const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+  const originalMatchMedia = window.matchMedia;
+  const motion = { matches: false };
+  window.matchMedia = () => motion;
+  try {
+    const marble = marbleSkin('marble.supporter', 0);
+    const marbleShader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    marble.material.onBeforeCompile(marbleShader);
+    expect(marbleShader.fragmentShader).toContain('uTideColor');
+    expect(marbleShader.fragmentShader).toContain('totalEmissiveRadiance');
+    expect(marbleShader.fragmentShader).toContain('float tideU = uv.x * 6.28318530718;');
+    expect(marbleShader.fragmentShader).toContain('tideU * 2.0');
+    expect(marbleShader.fragmentShader).toContain('tideU * 5.0');
+    marble.animate(3);
+    expect(marbleShader.uniforms.uTide.value).toBe(3);
+
+    const dice = diceSkin('dice.supporter');
+    expect(dice).toHaveLength(6);
+    for (const material of dice) {
+      const shader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+      material.onBeforeCompile(shader);
+      expect(shader.fragmentShader).toContain('1.0 - pip');
+      expect(shader.fragmentShader).toContain('uSkinTime');
+      expect(material.customProgramCacheKey()).toBe('dice-supporter-animated');
+    }
+    animateDiceSkin(dice);
+    expect(dice[0].userData.skinTime.value).toBeGreaterThan(0);
+    motion.matches = true;
+    marble.animate(4);
+    animateDiceSkin(dice);
+    expect(marbleShader.uniforms.uTide.value).toBe(0);
+    expect(dice[0].userData.skinTime.value).toBe(0);
+  } finally {
+    getContext.mockRestore();
+    if (originalMatchMedia) window.matchMedia = originalMatchMedia;
+    else delete window.matchMedia;
+  }
+});
 
 test('a marble hopping past another taps on top of it instead of passing through', () => {
   const board = {

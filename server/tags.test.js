@@ -1,11 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');
-const { openDb, migrate } = require('./db');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { randomBytes } = require('crypto');
+const { openDb, migrate, backupDb } = require('./db');
 const { Accounts } = require('./accounts');
 const { Economy, featuredFor, utcDay, botCosmetics } = require('./economy');
 const { catalog, DROPPABLE, BOXES } = require('./catalog');
 const { Matches } = require('./matches');
+const discord = require('./discord');
 
 const setup = () => {
   const db = openDb(':memory:');
@@ -27,6 +32,64 @@ test('tags are stored, normalized and drive the admin flag', () => {
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['dev', 'beta'], 'tags keep catalog order');
   assert.equal(accounts.isAdmin(accounts.getUser(id)), true);
   assert.deepEqual(accounts.publicInfo(accounts.getUser(id)).tags, ['dev', 'beta']);
+});
+
+test('Supporter is ordered above Luckiest and cannot be granted as a stored tag', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Supporter' });
+  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky']);
+  assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 4);
+  accounts.setTags(id, ['supporter', 'lucky', 'beta']);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
+  assert.equal(accounts.owns(id, 'marble.supporter'), false);
+  assert.throws(() => accounts.equip(id, 'marble', 'marble.supporter'), /Supporter only/);
+  assert.throws(() => accounts.grantItem(id, 'marble.supporter'), /Supporter tag/);
+  assert.ok(DROPPABLE.every((item) => item.tag !== 'supporter'));
+});
+
+test('Discord entitlement verification grants and revokes the entire Supporter set', async () => {
+  const env = ['DISCORD_CLIENT_ID', 'DISCORD_BOT_TOKEN', 'DISCORD_SUPPORTER_SKU_ID'];
+  const previous = env.map((key) => process.env[key]);
+  const originalFetch = global.fetch;
+  const appId = '123456789012345678';
+  const skuId = '234567890123456789';
+  const discordId = '345678901234567890';
+  try {
+    Object.assign(process.env, { DISCORD_CLIENT_ID: appId, DISCORD_BOT_TOKEN: 'test-bot-token', DISCORD_SUPPORTER_SKU_ID: skuId });
+    const entitlement = { id: 'ent-1', application_id: appId, sku_id: skuId, user_id: discordId, deleted: false, consumed: false, ends_at: null };
+    global.fetch = async (url, options) => {
+      assert.equal(url.searchParams.get('user_id'), discordId);
+      assert.equal(url.searchParams.get('sku_ids'), skuId);
+      assert.equal(options.headers.Authorization, 'Bot test-bot-token');
+      return { ok: true, json: async () => [
+        { ...entitlement, id: 'wrong-user', user_id: 'not-the-buyer' },
+        { ...entitlement, id: 'refunded', deleted: true },
+        { ...entitlement, id: 'other-sku', sku_id: '456789012345678901' },
+        { ...entitlement, id: 'future', starts_at: '2099-01-01T00:00:00Z' },
+        { ...entitlement, id: 'expired', ends_at: '2020-01-01T00:00:00Z' },
+        entitlement,
+      ] };
+    };
+    const { accounts } = setup();
+    const { id } = accounts.createUser({ name: 'S' });
+    accounts.q.linkDiscord.run(discordId, null, id);
+    assert.equal(await discord.supporterEntitlement(discordId), 'ent-1');
+    assert.equal(accounts.setSupporter(id, 'ent-1'), true);
+    assert.deepEqual(accounts.tags(accounts.getUser(id)), ['supporter']);
+    for (const item of catalog.items.filter((item) => item.tag === 'supporter')) assert.equal(accounts.owns(id, item.id), true);
+    accounts.equip(id, 'marble', 'marble.supporter');
+    global.fetch = async () => ({ ok: true, json: async () => [{ ...entitlement, deleted: true }] });
+    assert.equal(await discord.supporterEntitlement(discordId), null);
+    accounts.setSupporter(id, null);
+    assert.deepEqual(accounts.tags(accounts.getUser(id)), []);
+    assert.equal(accounts.equipped(accounts.getUser(id)).marble, 'marble.classic');
+    accounts.setSupporter(id, 'ent-1');
+    delete process.env.DISCORD_BOT_TOKEN;
+    assert.equal(accounts.owns(id, 'marble.supporter'), false, 'unconfigured verification fails closed');
+  } finally {
+    env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    global.fetch = originalFetch;
+  }
 });
 
 test('tag-exclusive cosmetics are owned through the tag, never dropped or sold', () => {
@@ -188,6 +251,35 @@ test('linking a guest preserves an active reign and its recorded games', () => {
   assert.equal(accounts.luckWindow(account.id, now).games, 20);
   assert.equal(accounts.getUser(account.id).luckiest_reign_count, 1);
   assert.deepEqual(accounts.tags(accounts.getUser(account.id)), ['lucky']);
+});
+
+test('daily SQLite backups include committed WAL data and never overwrite earlier snapshots', (t) => {
+  const file = path.join(os.tmpdir(), `marralhinha-backup-test-${randomBytes(8).toString('hex')}.db`);
+  const db = openDb(file);
+  t.after(() => {
+    db.close();
+    const prefix = path.basename(file, '.db');
+    for (const name of fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith(prefix))) fs.unlinkSync(path.join(os.tmpdir(), name));
+  });
+  const accounts = new Accounts(db);
+  accounts.createUser({ name: 'First' });
+  const day = Date.parse('2026-09-30T12:00:00Z');
+  fs.writeFileSync(path.join(os.tmpdir(), `${path.basename(file, '.db')}-2026-09-30-corrupt.sqlite`), 'not a backup');
+  const first = backupDb(db, file, day, os.tmpdir());
+  assert.ok(first && first.endsWith('.sqlite'));
+  assert.equal(backupDb(db, file, day + 3600000, os.tmpdir()), null);
+  accounts.createUser({ name: 'Second' });
+  const second = backupDb(db, file, day + 86400000, os.tmpdir());
+  assert.ok(second && second !== first);
+  for (const [snapshot, expected] of [[first, 1], [second, 2]]) {
+    const copy = new DatabaseSync(snapshot, { readOnly: true });
+    assert.equal(copy.prepare('SELECT COUNT(*) AS n FROM users').get().n, expected);
+    assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+    copy.close();
+  }
+  const memory = openDb(':memory:');
+  assert.equal(backupDb(memory, ':memory:'), null);
+  memory.close();
 });
 
 test('migration preserves previously earned Fortune dice without inventing old game rolls', () => {
