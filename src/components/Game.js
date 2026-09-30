@@ -213,7 +213,7 @@ function TurnClock({ deadline, total }) {
   );
 }
 
-function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats }) {
+export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats }) {
   const color = SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
@@ -255,6 +255,7 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, v
       <span className="avatar">
         {clock && <TurnClock key={`${clock.key}:${clock.deadline}`} deadline={clock.deadline} total={clock.total} />}
         {(player?.name || '?').slice(0, 1).toUpperCase()}
+        {player?.avatar && <img className="avatar-img" src={player.avatar} alt="" draggable={false} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         {player?.level && <span className="avatar-level">{player.level}</span>}
       </span>
       <div className="chip-body">
@@ -463,27 +464,127 @@ export function ReactionBar({ onReact }) {
   );
 }
 
-function Awards({ game, nameOf }) {
-  const awards = computeAwards(game);
-  if (!awards.length) return null;
+// Final table: winners first, then by marbles home; each player's awards ride on their own row.
+// Awards are shuffled once per mount so the pop-in order varies game to game but never mid-screen.
+export function Standings({ game, seats, mySeat, onPlayerStats }) {
+  const [awards] = useState(() => computeAwards(game));
+  const won = (s) => !!game.winners?.includes(s);
+  const order = [...game.active].sort((a, b) => won(b) - won(a) || homeCount(game.marbles[b]) - homeCount(game.marbles[a]));
   return (
-    <div className="awards">
-      {awards.map((a, i) => (
-        <div key={a.title} className="award" style={{ '--seat': SEAT_COLORS[a.seat].main, '--seat-light': SEAT_COLORS[a.seat].light, '--i': i }}>
-          <span className="award-medal">{a.value}</span>
-          <div>
-            <div className="award-title">{a.title}</div>
-            <div className="award-who">
-              {nameOf(a.seat)} · {a.blurb}
-            </div>
-          </div>
-        </div>
-      ))}
+    <div className="win-players">
+      {order.map((s) => {
+        const p = seats[s];
+        const human = p && !p.isBot && p.userId && s !== mySeat && onPlayerStats;
+        const mine = awards.filter((a) => a.seat === s);
+        const marbles = game.marbles[s] || [];
+        const home = homeCount(marbles);
+        return (
+          <button
+            key={s}
+            type="button"
+            className={`win-player${human ? '' : ' quiet'}${won(s) ? ' won' : ''}`}
+            style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light, '--seat-dark': SEAT_COLORS[s].dark }}
+            disabled={!human}
+            onClick={() => human && onPlayerStats(p)}
+            title={human ? `See ${p.name}'s stats` : undefined}
+          >
+            <span className="marble-dot" />
+            <span className="win-player-main">
+              <span className="win-player-head">
+                <span className="win-player-name">{s === mySeat ? 'You' : p?.name || SEAT_COLORS[s].name}</span>
+                <TagBadges tags={p?.tags} small />
+                {p?.isBot && <span className="badge">bot</span>}
+              </span>
+              {mine.length > 0 && (
+                <span className="win-player-awards">
+                  {mine.map((a) => (
+                    <span key={a.title} className="award-chip" title={a.blurb} style={{ '--i': awards.indexOf(a) }}>
+                      <b>{a.value}</b>
+                      {a.title}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+            <span className="win-player-side">
+              {won(s) && <span className="win-player-won">won</span>}
+              {marbles.length > 0 && (
+                <span className="pips" aria-label={`${home} of ${marbles.length} marbles home`}>
+                  {marbles.map((_, i) => (
+                    <span key={i} className={i < home ? 'on' : ''} />
+                  ))}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function Rewards({ reward, onRevealed }) {
+export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf, isHost, coins = 0, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
+  const [revealed, setRevealed] = useState(false);
+  const reward = game.rewards?.[mySeat];
+  const iWon = !!game.winners?.includes(mySeat);
+  const chests = Math.floor(coins / BOX_PRICE);
+  const title = iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`;
+  return (
+    <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity ? ' activity-win-card' : ''}${reward ? '' : ' no-payout'}`}>
+      <div className="win-intro">
+        <div className="win-marbles">
+          {game.winners.map((s) => (
+            <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />
+          ))}
+        </div>
+        <div className="win-headline">
+          <div className="win-kicker">{iWon ? 'Victory!' : 'Game over'}</div>
+          <h2>{title}</h2>
+        </div>
+        <div className="win-meta">
+          {game.mode === 'teams' ? 'Teams' : 'Free-for-all'} · {game.variant === 'blitz' ? 'Blitz' : 'Classic'}
+        </div>
+      </div>
+      {reward && (
+        <div className="win-payout">
+          <div className="win-section-label">Your payout</div>
+          <Rewards reward={reward} onRevealed={() => setRevealed(true)} />
+          {/* Holds its slot but stays hidden until the payout counts in, so the offer reflects what you just earned */}
+          {chests > 0 && (
+            <button className={`btn secondary block open-box-cta${revealed ? '' : ' pending'}`} onClick={onShop}>
+              You can afford {chests > 1 ? `${chests} chests` : 'a chest'}! Open one
+            </button>
+          )}
+        </div>
+      )}
+      <div className="win-social">
+        <div className="win-section-label">Standings</div>
+        <Standings game={game} seats={seats} mySeat={mySeat} onPlayerStats={onPlayerStats} />
+      </div>
+      <div className="win-actions">
+        {isHost ? (
+          <button className="btn primary big block play-btn" onClick={() => onAction('game:rematch')}>
+            Play again
+          </button>
+        ) : (
+          <div className="waiting">Waiting for the host to start another round…</div>
+        )}
+        <div className={`win-minor${onLeave ? '' : ' single'}`}>
+          <button className="btn ghost" onClick={onViewBoard}>
+            View board
+          </button>
+          {onLeave && (
+            <button className="btn ghost" onClick={onLeave}>
+              Leave
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Rewards({ reward, onRevealed }) {
   const [shownLines, setShownLines] = useState(0);
   const payout = reward ? reward.lines.map((l) => `${l.label}:${l.amount}`).join('|') : '';
   const lineCount = reward?.lines.length || 0;
@@ -511,8 +612,8 @@ function Rewards({ reward, onRevealed }) {
   const total = reward.lines.slice(0, shownLines).reduce((sum, l) => sum + l.amount, 0);
   return (
     <div className="rewards">
-      {reward.lines.slice(0, shownLines).map((line) => (
-        <div key={line.label} className={`reward-line${line.levelUp ? ' level-up' : ''}`}>
+      {reward.lines.map((line, i) => (
+        <div key={line.label} className={`reward-line${i < shownLines ? ' shown' : ''}${line.levelUp ? ' level-up' : ''}`}>
           <span>{line.label}</span>
           <span className="reward-amount">
             +{line.amount} <Coin size={15} />
@@ -520,24 +621,24 @@ function Rewards({ reward, onRevealed }) {
         </div>
       ))}
       {reward.note && <div className="reward-note">{reward.note}</div>}
-      {done && reward.leveledUp && (
-        <div className="reward-celebrate reward-levelup">
+      {reward.leveledUp && (
+        <div className={`reward-celebrate reward-levelup${done ? ' shown' : ''}`}>
           <span className="level-badge">{reward.level}</span>
           <span>
             <b>Level up!</b> You're now level {reward.level}.
           </span>
         </div>
       )}
-      {done && reward.luckyTag && (
-        <div className="reward-celebrate reward-lucky">
+      {reward.luckyTag && (
+        <div className={`reward-celebrate reward-lucky${done ? ' shown' : ''}`}>
           <TagBadge tag="lucky" small />
           <span>
             <b>You're the Luckiest!</b> Your last 10 games have the highest luck score. Hold the title for three total days to unlock the Golden Die.
           </span>
         </div>
       )}
-      {done && reward.goldenDie && (
-        <div className="reward-celebrate reward-lucky">
+      {reward.goldenDie && (
+        <div className={`reward-celebrate reward-lucky${done ? ' shown' : ''}`}>
           <span><b>Golden Die unlocked!</b> Three total days as Luckiest. It's yours permanently.</span>
         </div>
       )}
@@ -627,9 +728,6 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     return () => timers.forEach(clearTimeout);
   }, [myClock, deadline]);
 
-  const [revealed, setRevealed] = useState(false);
-  useEffect(() => setRevealed(false), [game.phase]);
-  const myReward = game.rewards?.[mySeat];
 
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';
@@ -777,71 +875,21 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       {showOver && (
         <div ref={winScreenRef} className={`win-screen${room.activity ? ' activity-win-screen' : ''}`}>
           {iWon && <Confetti />}
-          <div ref={winCardRef} className={`panel win-card${iWon ? ' won' : ''}${room.activity ? ' activity-win-card' : ''}`}>
-            <div className="win-intro">
-            <div className="win-kicker">{iWon ? 'Victory!' : 'Game over'}</div>
-            <h2>{iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`}</h2>
-            <div className="win-marbles">
-              {game.winners.map((s) => (
-                <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />
-              ))}
-            </div>
-            </div>
-            <div className="win-payout"><Rewards reward={myReward} onRevealed={() => setRevealed(true)} /></div>
-            <div className="win-social">
-            <Awards game={game} nameOf={nameOf} />
-            {onPlayerStats && (
-              <div className="win-players">
-                {game.active.map((s) => {
-                  const p = seats[s];
-                  const human = p && !p.isBot && p.userId && s !== mySeat;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      className={`win-player${human ? '' : ' quiet'}`}
-                      style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }}
-                      disabled={!human}
-                      onClick={() => human && onPlayerStats(p)}
-                      title={human ? `See ${p.name}'s stats` : undefined}
-                    >
-                      <span className="marble-dot" />
-                      <span className="win-player-name">{s === mySeat ? 'You' : p?.name || SEAT_COLORS[s].name}</span>
-                      <TagBadges tags={p?.tags} small />
-                      {p?.isBot && <span className="badge">bot</span>}
-                      {game.winners?.includes(s) && <span className="win-player-won">won</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            </div>
-            <div className="win-actions">
-              {isHost ? (
-                <button className="btn primary big block play-btn" onClick={() => onAction('game:rematch')}>
-                  Play again
-                </button>
-              ) : (
-                <div className="waiting">Waiting for the host to start another round…</div>
-              )}
-              {/* Wait for the payout to count in, so the offer reflects what you just earned */}
-              {(revealed || !myReward) && coins >= BOX_PRICE && (
-                <button className="btn secondary block open-box-cta" onClick={onShop}>
-                  You can afford {Math.floor(coins / BOX_PRICE) > 1 ? `${Math.floor(coins / BOX_PRICE)} chests` : 'a chest'}! Open one
-                </button>
-              )}
-              <div className={`win-minor${onLeave ? '' : ' single'}`}>
-                <button className="btn ghost" onClick={() => setShowOver(false)}>
-                  View board
-                </button>
-                {onLeave && (
-                  <button className="btn ghost" onClick={onLeave}>
-                    Leave
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <WinCard
+            cardRef={winCardRef}
+            activity={room.activity}
+            game={game}
+            seats={seats}
+            mySeat={mySeat}
+            nameOf={nameOf}
+            isHost={isHost}
+            coins={coins}
+            onAction={onAction}
+            onShop={onShop}
+            onLeave={onLeave}
+            onViewBoard={() => setShowOver(false)}
+            onPlayerStats={onPlayerStats}
+          />
         </div>
       )}
 

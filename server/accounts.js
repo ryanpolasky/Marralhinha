@@ -32,6 +32,13 @@ const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.in
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
 const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]')";
 
+// CDN url for a linked account's Discord avatar; Discord picks a default from the id when none is set
+function avatarUrl(user) {
+  if (!user.discord_id) return null;
+  if (!user.avatar) return `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.discord_id) >> 22n) % 6}.png`;
+  return `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.${user.avatar.startsWith('a_') ? 'gif' : 'png'}?size=128`;
+}
+
 function levelInfo(xp) {
   let level = 1;
   let floor = 0;
@@ -436,7 +443,7 @@ class Accounts {
   }
 
   publicInfo(user) {
-    return { userId: user.id, name: user.name, cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user) };
+    return { userId: user.id, name: user.name, avatar: avatarUrl(user), cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user) };
   }
 }
 

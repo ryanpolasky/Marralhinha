@@ -37,5 +37,9 @@ export function computeAwards(game) {
   add('Shortcut Fan', 'most center jumps', best((s) => s.shortcuts));
   add('Hot Hands', 'best average roll', best((s) => (s.rolls >= 4 ? s.pips / s.rolls : 0), 0.1), (v) => v.toFixed(1));
   add('Punching Bag', 'got captured the most', best((s) => s.captured));
+  for (let i = awards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [awards[i], awards[j]] = [awards[j], awards[i]];
+  }
   return awards;
 }

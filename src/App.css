@@ -891,6 +891,16 @@ button.room-pill.copied {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   background: radial-gradient(circle at 32% 28%, var(--seat-light), var(--seat) 55%, rgba(0, 0, 0, 0.5) 110%);
+  box-shadow: 0 0 0 2px var(--seat);
+}
+
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .chip.turn .avatar {
@@ -899,7 +909,7 @@ button.room-pill.copied {
 
 @keyframes avatar-pulse {
   50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--seat) 35%, transparent);
+    box-shadow: 0 0 0 2px var(--seat), 0 0 0 6px color-mix(in srgb, var(--seat) 35%, transparent);
   }
 }
 
@@ -1578,46 +1588,129 @@ button.room-pill.copied {
   z-index: 20;
 }
 
+/* ---------- Win card ----------
+   One structure for every view: header (outcome) · payout · standings · footer (actions).
+   Narrow: a single stacked column. Discord activity: header band on top, standings and payout
+   as two equal-height cards, and a dialog-style footer bar. */
+
 .win-card {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   width: min(560px, 100%);
   max-height: 92vh;
   overflow-y: auto;
   position: relative;
   z-index: 1;
+  padding: 24px;
 }
 
-.win-intro,
+.win-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.win-headline {
+  min-width: 0;
+}
+
+.win-meta {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+
 .win-payout,
-.win-social { display: contents; }
+.win-social {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.win-section-label {
+  padding-left: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
 
 .win-screen.activity-win-screen { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+
 .win-card.activity-win-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-areas:
+    'intro intro'
+    'social payout'
+    'actions actions';
+  gap: 18px 20px;
   max-width: none;
   max-height: none;
   overflow: visible;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 20px;
-  align-items: start;
+  padding: 22px 24px;
 }
-.activity-win-card .win-intro,
-.activity-win-card .win-payout,
-.activity-win-card .win-social { display: block; min-width: 0; }
-.activity-win-card .win-intro { grid-column: 1; grid-row: 1; }
-.activity-win-card .win-payout { grid-column: 2; grid-row: 1; }
-.activity-win-card .win-social { grid-column: 1; grid-row: 2; }
-.activity-win-card .win-actions { grid-column: 2; grid-row: 2; }
-.activity-win-card h2 { font-size: 28px; }
-.activity-win-card .win-marbles { margin-bottom: 0; }
-.activity-win-card .awards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 8px; }
-.activity-win-card .win-players { margin: 0; }
-.activity-win-card .win-player { padding: 5px 9px; }
-.activity-win-card .rewards { margin-bottom: 0; }
-.activity-win-card .btn.big { font-size: 17px; padding: 10px 18px; }
+
+.activity-win-card.no-payout {
+  grid-template-areas:
+    'intro intro'
+    'social social'
+    'actions actions';
+}
+
+.activity-win-card .win-intro {
+  grid-area: intro;
+  flex-direction: row;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--glass-line);
+  text-align: left;
+}
+
+.activity-win-card .win-meta {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-line);
+}
+
+.activity-win-card .win-marbles { gap: 8px; }
+.activity-win-card .win-marbles .marble-dot { --size: 48px; }
+.activity-win-card h2 { font-size: 30px; }
+.activity-win-card .win-kicker { font-size: 13px; }
+
+.activity-win-card .win-social { grid-area: social; }
+.activity-win-card .win-payout { grid-area: payout; }
+/* Whichever column is shorter absorbs the difference without leaving a hole: standings rows grow
+   evenly, or the receipt stretches with its total on the floor and the chest offer just below */
+.activity-win-card .win-players { flex: 1; }
+.activity-win-card .win-player { flex: 1 1 auto; }
+.activity-win-card .win-payout > .rewards { flex: 1; }
+.activity-win-card .win-payout > .rewards > .reward-total { margin-top: auto; }
+
+.activity-win-card .win-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--glass-line);
+}
+
+.activity-win-card .win-minor { order: -1; display: flex; gap: 8px; margin-right: auto; }
+.activity-win-card .win-actions > .btn.block { width: auto; }
+.activity-win-card .play-btn { order: 1; min-width: 200px; font-size: 18px; padding: 11px 24px; }
+.activity-win-card .win-actions > .waiting { order: 1; padding: 11px 18px; }
 
 .win-kicker {
-  font-size: 16px;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.2em;
   color: var(--ink-dim);
@@ -1629,8 +1722,8 @@ button.room-pill.copied {
 }
 
 .win-card h2 {
-  margin: 6px 0 12px;
-  font-size: 34px;
+  margin: 4px 0 0;
+  font-size: 32px;
   line-height: 1.1;
 }
 
@@ -1638,7 +1731,6 @@ button.room-pill.copied {
   display: flex;
   justify-content: center;
   gap: 14px;
-  margin-bottom: 14px;
 }
 
 .win-marbles .marble-dot {
@@ -2033,6 +2125,10 @@ button.room-pill.copied {
 .win-actions {
   display: grid;
   gap: 10px;
+}
+
+.win-payout .open-box-cta {
+  margin: 0;
 }
 
 .win-minor {
@@ -2478,74 +2574,11 @@ button.room-pill.copied {
   }
 }
 
-.awards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 6px;
-  margin: 0 0 16px;
-  text-align: left;
-}
-
-.awards .award {
-  padding: 6px 10px;
-  gap: 10px;
-}
-
-.awards .award-medal {
-  min-width: 34px;
-  height: 34px;
-  font-size: 15px;
-}
-
-.awards .award-title {
-  font-size: 14px;
-}
-
-.awards .award-who {
-  font-size: 12px;
-}
-
-.award {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--seat) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--seat) 45%, transparent);
-  animation: award-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-  animation-delay: calc(0.5s + var(--i) * 0.12s);
-}
-
 @keyframes award-in {
   from {
     opacity: 0;
     transform: translateX(-24px);
   }
-}
-
-.award-medal {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 6px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 18px;
-  color: #3b2a00;
-  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 55%, #b8860b);
-  box-shadow: 0 3px 0 #8a6100;
-}
-
-.award-title {
-  font-weight: 700;
-  font-size: 17px;
-}
-
-.award-who {
-  color: var(--ink-dim);
-  font-size: 14px;
 }
 
 .coins {
@@ -2806,6 +2839,12 @@ button.room-pill.copied {
   background: radial-gradient(circle at 50% 50%, #f4c542 0 8%, transparent 9%) 0 0 / 22px 22px,
     radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(255, 255, 255, 0.55) 35% 42%, transparent 43%) 0 0 / 22px 22px, #1f4f9a !important;
   border-color: #f4f1e8 !important;
+}
+
+.plate-azulejo .account-name,
+.plate-azulejo .chip-name,
+.plate-azulejo .seat-name-text {
+  text-shadow: 0 1px 3px #0a1c3d, 0 0 6px #0a1c3d;
 }
 
 .plate-carbon {
@@ -3910,7 +3949,9 @@ button.room-pill.copied {
 }
 
 .rewards {
-  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(246, 195, 67, 0.08);
@@ -3918,11 +3959,18 @@ button.room-pill.copied {
   text-align: left;
 }
 
+
+
 .reward-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 3px 0;
+  visibility: hidden;
+}
+
+.reward-line.shown {
+  visibility: visible;
   animation: award-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 
@@ -3959,6 +4007,11 @@ button.room-pill.copied {
 .open-box-cta {
   margin-bottom: 12px;
   animation: daily-wiggle 2.4s ease-in-out infinite;
+}
+
+.open-box-cta.pending {
+  visibility: hidden;
+  opacity: 0;
 }
 
 .boot-spinner {
@@ -4549,6 +4602,7 @@ button.room-pill.copied {
 
 .reward-lucky .tag-badge {
   margin-left: 0;
+  flex-shrink: 0;
 }
 
 .tag-badge.tag-beta {
@@ -6302,6 +6356,11 @@ select.admin-input optgroup {
   padding: 10px 12px;
   border-radius: 12px;
   font-size: 14px;
+  visibility: hidden;
+}
+
+.reward-celebrate.shown {
+  visibility: visible;
   animation: reward-celebrate 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 
@@ -6601,21 +6660,26 @@ select.admin-input optgroup {
 
 /* ---------- Win screen player list ---------- */
 
+/* A single scoreboard card; rows are flat inside it so it pairs with the payout card */
 .win-players {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 12px 0 4px;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-line);
 }
 
 .win-player {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.04);
+  gap: 12px;
+  min-height: 50px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
   color: var(--ink);
   font: inherit;
   text-align: left;
@@ -6623,25 +6687,102 @@ select.admin-input optgroup {
   transition: background 0.15s;
 }
 
+.win-player.won {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--seat) 24%, transparent), color-mix(in srgb, var(--seat) 6%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--seat) 40%, transparent);
+}
+
 .win-player:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .win-player:disabled {
   cursor: default;
-  opacity: 0.8;
+}
+
+.win-player > .marble-dot {
+  --size: 26px;
+  flex: none;
+}
+
+.win-player-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.win-player-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.win-player-head > :not(.win-player-name) {
+  flex: none;
 }
 
 .win-player-name {
   font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-player-awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.award-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 2px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffe9b0;
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  white-space: nowrap;
+  animation: award-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: calc(0.5s + var(--i) * 0.12s);
+}
+
+.award-chip b {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 99px;
+  font-size: 10px;
+  color: #3b2a00;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 55%, #b8860b);
+}
+
+.win-player-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: none;
+}
+
+.win-player-side .pips {
+  margin: 0;
 }
 
 .win-player-won {
-  margin-left: auto;
   font-size: 11px;
   color: var(--gold);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   font-weight: 800;
 }
 
@@ -6892,6 +7033,9 @@ textarea.report-text {
 /* ---------- Preview gallery (#preview) ---------- */
 
 .preview-shell {
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
   min-height: 100vh;
   padding: 26px;
   background: radial-gradient(ellipse at 50% 0%, #173c36, #0b1f24 70%);
@@ -6947,6 +7091,20 @@ textarea.report-text {
   border-radius: 22px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-line);
+}
+
+.preview-win-slot > .win-card {
+  width: 100%;
+  max-height: none;
+}
+
+/* ?still: freeze animations at their end state for headless screenshots */
+.preview-shell.still *,
+.preview-shell.still *::before,
+.preview-shell.still *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
 }
 
 .preview-note {

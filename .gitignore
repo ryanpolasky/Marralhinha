@@ -38,4 +38,4 @@ docs/OVERHAUL_PLAN.md
 # local component previews
 src/Previews.js
 
-/.idea
+/.idea.devinignore

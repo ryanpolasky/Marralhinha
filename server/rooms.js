@@ -124,12 +124,12 @@ class Room {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
-      Object.assign(existing.player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+      Object.assign(existing.player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return existing.player;
     }
     const spectator = this.spectators.get(info.userId);
     if (spectator) {
-      Object.assign(spectator, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+      Object.assign(spectator, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
       return spectator;
     }
     const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
@@ -147,7 +147,7 @@ class Room {
   updateUser(info) {
     const player = this.findViewer(info.userId);
     if (!player) return;
-    Object.assign(player, { name: info.name, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+    Object.assign(player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
     this.changed();
   }
 
@@ -658,6 +658,7 @@ class Room {
       seats: this.seats.map((p) => p && {
         id: p.id,
         name: p.name,
+        avatar: p.avatar ?? null,
         userId: p.userId ?? null,
         isBot: p.isBot,
         connected: p.connected,
