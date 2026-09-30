@@ -157,6 +157,24 @@ const SLIDES = [
     ),
   },
   {
+    title: 'Blitz (optional)',
+    text: 'The host can also pick Blitz: a smaller 40-space board, 3 marbles and a 3-hole home stretch. Same rules, roughly a third of the time, and it pays 60% of Classic rewards.',
+    art: (id) => (
+      <RowArt id={id} holes={3} height={3.4} extra={3.6}>
+        <rect x="-0.55" y="-0.52" width={2 * 1.3 + 1.1} height="1.04" rx="0.45" fill={RED.main} opacity="0.9" />
+        {[0, 1, 2].map((i) => (
+          <circle key={i} cx={i * 1.3} cy="0" r="0.36" fill={`url(#${id}-hole)`} />
+        ))}
+        <Marble id={id} seat={0} at={rowAt(0)} />
+        <Marble id={id} seat={0} at={rowAt(1)} />
+        <Marble id={id} seat={0} at={rowAt(2)} ghost />
+        <Label at={[4.6, 0]} size={0.72} color="#ffd166">
+          ×3
+        </Label>
+      </RowArt>
+    ),
+  },
+  {
     title: 'Stepping away',
     text: "Need a break? Hit the coffee cup (or B) and your nameplate shows brb while the bot plays your turns. In teams, your partner plays them for you instead. Hit I'm back, or just roll, to jump back in. The catch: if the bot plays more than half your turns you earn nothing that game, and sixes or captures made for you never count toward your stats.",
     art: (id) => (

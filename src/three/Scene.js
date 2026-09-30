@@ -9,7 +9,7 @@ import Particles from './Particles';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
-import { SEAT_COLORS } from '../game/geometry';
+import { SEAT_COLORS, layoutFor } from '../game/geometry';
 
 const BG = '#0b1f24';
 const NO_MOVES = [];
@@ -17,12 +17,10 @@ const NO_COSMETICS = [];
 const NO_PINGS = [];
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-// How far you can pan the look-at point from the board's center (in board units)
-const PAN_LIMIT = 9;
 const _toCamera = new THREE.Vector3();
 const _homeDir = new THREE.Vector3();
 
-function CameraRig({ mode, resetKey, spinning, onOffView }) {
+function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
@@ -39,7 +37,8 @@ function CameraRig({ mode, resetKey, spinning, onOffView }) {
     const aspect = size.width / size.height;
     const game = mode === 'game';
     const elevation = game ? 0.86 : 0.8;
-    const distance = Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect);
+    const zoom = Math.max(0.68, layout.spec.halfLength / 8.75);
+    const distance = Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect) * zoom;
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
@@ -47,7 +46,7 @@ function CameraRig({ mode, resetKey, spinning, onOffView }) {
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
     controls.enabled = game;
-  }, [mode, resetKey, size.width, size.height, camera, controls]);
+  }, [mode, resetKey, size.width, size.height, camera, controls, layout]);
 
   useEffect(() => {
     controls.autoRotate = mode !== 'game' || spinning;
@@ -75,8 +74,9 @@ function CameraRig({ mode, resetKey, spinning, onOffView }) {
       l.h = size.height;
       camera.setViewOffset(size.width, size.height, 0, l.shift, size.width, size.height);
     }
-    controls.target.x = THREE.MathUtils.clamp(controls.target.x, -PAN_LIMIT, PAN_LIMIT);
-    controls.target.z = THREE.MathUtils.clamp(controls.target.z, -PAN_LIMIT, PAN_LIMIT);
+    const panLimit = layout.spec.halfLength + 0.25;
+    controls.target.x = THREE.MathUtils.clamp(controls.target.x, -panLimit, panLimit);
+    controls.target.z = THREE.MathUtils.clamp(controls.target.z, -panLimit, panLimit);
     controls.target.y = 0;
     controls.update();
 
@@ -233,7 +233,7 @@ function PingSurface({ pointer, onMenu }) {
 }
 
 // H pings, G pings danger; in 2v2 they go to your partner unless you hold Shift (everyone)
-function usePingKeys(pointer, canPing, onPing) {
+function usePingKeys(pointer, canPing, onPing, layout) {
   useEffect(() => {
     if (!canPing) return undefined;
     const onKey = (e) => {
@@ -242,19 +242,20 @@ function usePingKeys(pointer, canPing, onPing) {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       const at = pointer.current;
       if (!at) return;
-      const [x, z] = snapToSpot(at.x, at.z);
+      const [x, z] = snapToSpot(at.x, at.z, layout);
       onPing({ x, z, type: key === 'g' ? 'danger' : 'look', scope: e.shiftKey ? 'all' : 'team' });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pointer, canPing, onPing]);
+  }, [pointer, canPing, onPing, layout]);
 }
 
 export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView }) {
+  const layout = layoutFor(board.variant);
   const pointer = useRef(null);
-  usePingKeys(pointer, canPing, onPing);
+  usePingKeys(pointer, canPing, onPing, layout);
   const openPingMenu = (at) => {
-    const [x, z] = snapToSpot(at.x, at.z);
+    const [x, z] = snapToSpot(at.x, at.z, layout);
     onPingMenu?.({ ...at, x, z });
   };
   const [selected, setSelected] = useState(null);
@@ -283,7 +284,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights />
       <Turntable viewSeat={viewSeat}>
-        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} />
+        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} layout={layout} />
         <Particles />
         <Marbles
           board={board}
@@ -296,12 +297,13 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           onMove={onMove}
           keyMove={keyMove}
           mySeat={mySeat}
+          layout={layout}
         />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
-        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} />
+        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} onOffView={onCameraOffView} />
+      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} onOffView={onCameraOffView} layout={layout} />
     </Canvas>
   );
 }

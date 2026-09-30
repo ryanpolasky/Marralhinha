@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { SEATS, SEAT_COLORS, RING, HOME, BASE, BASE_TRAY, CENTER, INNER_CORNERS, entryIdx } from '../game/geometry';
+import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
 import { boardSkin } from './skins';
 import { fx } from './fx';
@@ -14,6 +14,7 @@ const BEVEL = 0.12;
 export const TABLE_Y = -(DEPTH + BEVEL * 2);
 export const DISH_R = 2.2;
 export const DISH_BEVEL = BEVEL;
+const CLASSIC_LAYOUT = layoutFor('classic');
 
 const sx = ([r, c]) => [c, -r];
 
@@ -51,35 +52,37 @@ function flatten(geometry) {
 
 const EXTRUDE = { depth: DEPTH, bevelEnabled: true, bevelThickness: BEVEL, bevelSize: 0.09, bevelSegments: 3, curveSegments: 22 };
 
-function buildBoardGeometry() {
-  const W = 2.75;
-  const L = 8.75;
+function buildBoardGeometry(layout) {
+  const { halfWidth: W, halfLength: L } = layout.spec;
   const cross = [[-W, -L], [W, -L], [W, -W], [L, -W], [L, W], [W, W], [W, L], [-W, L], [-W, W], [-L, W], [-L, -W], [-W, -W]];
   const shape = new THREE.Shape();
-  roundedPolygon(shape, cross.map(([x, y]) => [x, -y]), 0.65);
-  [...RING, ...HOME.flat()].forEach((p) => shape.holes.push(holePath(sx(p), HOLE_R)));
+  roundedPolygon(shape, cross.map(([x, y]) => [x, -y]), Math.min(0.65, W * 0.35));
+  [...layout.RING, ...layout.HOME.flat()].forEach((p) => shape.holes.push(holePath(sx(p), HOLE_R)));
   shape.holes.push(holePath(sx(CENTER), CENTER_R));
   return flatten(new THREE.ExtrudeGeometry(shape, EXTRUDE));
 }
 
-function buildDishGeometry(seat) {
+function buildDishGeometry(seat, layout) {
   const shape = new THREE.Shape();
-  shape.absarc(0, 0, DISH_R, 0, Math.PI * 2, false);
-  const [tr, tc] = BASE_TRAY[seat];
-  BASE[seat].forEach(([r, c]) => shape.holes.push(holePath([c - tc, -(r - tr)], HOLE_R)));
+  shape.absarc(0, 0, layout.spec.dishR, 0, Math.PI * 2, false);
+  const [tr, tc] = layout.BASE_TRAY[seat];
+  layout.BASE[seat].forEach(([r, c]) => shape.holes.push(holePath([c - tc, -(r - tr)], HOLE_R)));
   return flatten(new THREE.ExtrudeGeometry(shape, { ...EXTRUDE, curveSegments: 40 }));
 }
 
-function buildHomeStripGeometry() {
+function buildHomeStripGeometry(layout) {
+  const rows = layout.spec.homeRows;
+  const end = rows[0] + 0.6;
+  const start = rows[rows.length - 1] - 0.55;
   const shape = new THREE.Shape();
-  roundedPolygon(shape, [[-0.52, -2.45], [0.52, -2.45], [0.52, -7.6], [-0.52, -7.6]], 0.4);
-  [3, 4, 5, 6, 7].forEach((r) => shape.holes.push(holePath([0, -r], HOLE_R + 0.03)));
+  roundedPolygon(shape, [[-0.52, -start], [0.52, -start], [0.52, -end], [-0.52, -end]], 0.4);
+  rows.forEach((r) => shape.holes.push(holePath([0, -r], HOLE_R + 0.03)));
   return new THREE.ShapeGeometry(shape, 24).rotateX(-Math.PI / 2);
 }
 
-function Cups({ material }) {
+function Cups({ material, layout }) {
   const ref = useRef();
-  const points = useMemo(() => [...RING, ...HOME.flat(), ...BASE.flat()], []);
+  const points = useMemo(() => [...layout.RING, ...layout.HOME.flat(), ...layout.BASE.flat()], [layout]);
   const geometry = useMemo(() => new THREE.SphereGeometry(HOLE_R - 0.08, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), []);
   useLayoutEffect(() => {
     const m = new THREE.Matrix4();
@@ -88,7 +91,7 @@ function Cups({ material }) {
   }, [points]);
   return (
     <group>
-      <instancedMesh ref={ref} args={[geometry, null, points.length]} material={material} receiveShadow />
+      <instancedMesh key={points.length} ref={ref} args={[geometry, null, points.length]} material={material} receiveShadow />
       <mesh position={[0, -BEVEL * 0.9, 0]} material={material} receiveShadow>
         <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
       </mesh>
@@ -125,9 +128,10 @@ const mixHex = (a, b, t) => `#${[1, 3, 5].map((i) => Math.round(parseInt(a.slice
 const DIMMED = SEAT_COLORS.map((c) => mixHex(c.main, '#4a3a2c', 0.74));
 const seatColor = (seat, active) => (active ? SEAT_COLORS[seat].main : DIMMED[seat]);
 
-function Dish({ seat, geometry, material, active, isTurn, name }) {
+function Dish({ seat, geometry, material, active, isTurn, name, layout }) {
   const rimRef = useRef();
-  const [r, c] = BASE_TRAY[seat];
+  const [r, c] = layout.BASE_TRAY[seat];
+  const dishR = layout.spec.dishR;
   const color = SEAT_COLORS[seat];
   useFrame(({ clock }) => {
     const mat = rimRef.current.material;
@@ -138,7 +142,7 @@ function Dish({ seat, geometry, material, active, isTurn, name }) {
       <group position={[c, 0, r]}>
         <mesh geometry={geometry} material={material} castShadow receiveShadow />
         <mesh ref={rimRef} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
-          <ringGeometry args={[DISH_R - 0.2, DISH_R - 0.04, 64]} />
+          <ringGeometry args={[dishR - 0.2, dishR - 0.04, 64]} />
           <meshStandardMaterial color={seatColor(seat, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
         </mesh>
       </group>
@@ -147,7 +151,7 @@ function Dish({ seat, geometry, material, active, isTurn, name }) {
   );
 }
 
-function TurnGem({ turn }) {
+function TurnGem({ turn, layout }) {
   const ref = useRef();
   const mat = useRef();
   const color = useMemo(() => new THREE.Color(), []);
@@ -157,7 +161,7 @@ function TurnGem({ turn }) {
       g.visible = false;
       return;
     }
-    const [r, c] = BASE_TRAY[turn];
+    const [r, c] = layout.BASE_TRAY[turn];
     if (!g.visible) g.position.set(c, 2, r);
     g.visible = true;
     const k = 1 - Math.exp(-dt * 5);
@@ -259,18 +263,21 @@ function useSkinTransition(skin, animate) {
   return [shown, wave];
 }
 
-export default function Board({ active, names, turn, showNames, skin, table = true }) {
+export default function Board({ active, names, turn, showNames, skin, table = true, layout = CLASSIC_LAYOUT }) {
   const [shownSkin, wave] = useSkinTransition(skin, table);
   const materials = boardSkin(shownSkin);
-  const boardGeometry = useMemo(buildBoardGeometry, []);
-  const dishGeometries = useMemo(() => SEATS.map(buildDishGeometry), []);
-  const stripGeometry = useMemo(buildHomeStripGeometry, []);
+  const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
+  const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
+  const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);
+  useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
+  useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
+  useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
 
   return (
     <group>
       {table && <Table texture={materials.felt} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
-      <Cups material={materials.cup} />
+      <Cups material={materials.cup} layout={layout} />
 
       {SEATS.map((s) => {
         const seated = active.includes(s);
@@ -279,17 +286,17 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
             <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
               <meshStandardMaterial color={seatColor(s, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
             </mesh>
-            <Ring at={RING[entryIdx(s)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={seatColor(s, seated)} />
-            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} />
+            <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={seatColor(s, seated)} />
+            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
           </group>
         );
       })}
 
-      {INNER_CORNERS.map((i) => {
-        const [r, c] = RING[i];
+      {layout.INNER_CORNERS.map((i) => {
+        const [r, c] = layout.RING[i];
         return (
           <group key={i}>
-            <Ring at={RING[i]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.12} material={materials.brass} />
+            <Ring at={layout.RING[i]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.12} material={materials.brass} />
             {[0.3, 0.5, 0.7].map((t) => (
               <mesh key={t} position={[c * t, 0.01, r * t]} rotation-x={-Math.PI / 2} rotation-z={Math.PI / 4} material={materials.brass}>
                 <planeGeometry args={[0.14, 0.14]} />
@@ -299,7 +306,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
         );
       })}
       <Ring at={CENTER} inner={CENTER_R + 0.03} outer={CENTER_R + 0.16} material={materials.brass} />
-      <TurnGem turn={turn ?? null} />
+      <TurnGem turn={turn ?? null} layout={layout} />
       {table && <SwapWave wave={wave} />}
     </group>
   );

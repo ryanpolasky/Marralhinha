@@ -81,7 +81,7 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
     return { title: roller === mySeat ? 'Rolling…' : `${nameOf(roller)} is rolling…`, sub: 'Fingers crossed…' };
   }
   const turn = game.turn;
-  const helping = game.mode === 'teams' && homeCount(game.marbles[turn]) === 5;
+  const helping = game.mode === 'teams' && game.marbles[turn].length > 0 && homeCount(game.marbles[turn]) === game.marbles[turn].length;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
   if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
   if (coveringTurn(game, seats, mySeat)) {
@@ -95,7 +95,7 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
     if (seats[mySeat]?.idle) return { title: 'Your turn!', sub: "You ran out of time, so we've been playing for you. Make a move to take back over." };
     return game.phase === 'roll'
       ? { title: 'Your turn!', sub: `Roll the dice${helpText}` }
-      : { title: `You rolled a ${game.die}`, sub: `Pick a glowing marble${helpText}${FINE_POINTER ? ' (or 1-5 / Tab, then Enter)' : ''}` };
+      : { title: `You rolled a ${game.die}`, sub: `Pick a glowing marble${helpText}${FINE_POINTER ? ` (or 1-${game.spec?.marbles || 5} / Tab, then Enter)` : ''}` };
   }
   const p = seats[turn];
   if (p?.away && !p.isBot) {
@@ -263,8 +263,8 @@ function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, v
           {player?.isBot && <span className="badge">bot</span>}
           {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
         </div>
-        <div className="pips" aria-label={`${home} of 5 marbles home`}>
-          {[0, 1, 2, 3, 4].map((i) => (
+        <div className="pips" aria-label={`${home} of ${game.marbles[seat].length} marbles home`}>
+          {game.marbles[seat].map((_, i) => (
             <span key={i} className={i < home ? 'on' : ''} />
           ))}
         </div>

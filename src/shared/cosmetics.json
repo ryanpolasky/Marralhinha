@@ -140,6 +140,7 @@
     "maxCaptures": 8,
     "perMarbleHome": 3,
     "firstWinOfDay": 100,
+    "variantMultiplier": { "classic": 1, "blitz": 0.6 },
     "botGameMultiplier": 0.5,
     "botGamesPerDay": 6,
     "daily": { "base": 60, "perStreakDay": 15, "maxStreakBonus": 6 },

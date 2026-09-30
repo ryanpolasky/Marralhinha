@@ -1,18 +1,26 @@
 const { randomInt } = require('crypto');
+const BOARDS = require('../../src/shared/boards.json');
 
-// Keep this ring layout in sync with src/game/geometry.js
-const TRACK_LEN = 64;
-const ARM = 16;
-const MARBLES = 5;
-const HOME_LEN = 5;
-const LAST_TRACK = 62;
+const CLASSIC = BOARDS.classic;
+const specOf = (state) => state?.spec || CLASSIC;
+const boardSpec = (variant = 'classic') => {
+  const spec = BOARDS[variant];
+  if (!spec) throw new Error('Unknown board variant');
+  return spec;
+};
+
+const TRACK_LEN = CLASSIC.trackLen;
+const ARM = CLASSIC.arm;
+const MARBLES = CLASSIC.marbles;
+const HOME_LEN = CLASSIC.home;
+const LAST_TRACK = CLASSIC.lastTrack;
 const LOG_LIMIT = 100;
 
-const entryIdx = (seat) => (seat * ARM + 2) % TRACK_LEN;
-const exitCorner = (seat) => (seat * ARM + 56) % TRACK_LEN;
-const entryCorners = (seat) => [8, 24, 40].map((o) => (seat * ARM + o) % TRACK_LEN);
-const progressOf = (seat, idx) => (idx - entryIdx(seat) + TRACK_LEN) % TRACK_LEN;
-const idxOf = (seat, progress) => (entryIdx(seat) + progress) % TRACK_LEN;
+const entryIdx = (seat, spec = CLASSIC) => (seat * spec.arm + spec.entry) % spec.trackLen;
+const exitCorner = (seat, spec = CLASSIC) => (seat * spec.arm + spec.exit) % spec.trackLen;
+const entryCorners = (seat, spec = CLASSIC) => spec.corners.map((o) => (seat * spec.arm + o) % spec.trackLen);
+const progressOf = (seat, idx, spec = CLASSIC) => (idx - entryIdx(seat, spec) + spec.trackLen) % spec.trackLen;
+const idxOf = (seat, progress, spec = CLASSIC) => (entryIdx(seat, spec) + progress) % spec.trackLen;
 const partnerOf = (seat) => (seat + 2) % 4;
 
 const cellKey = (seat, pos) => {
@@ -25,14 +33,17 @@ const cellKey = (seat, pos) => {
 const rollDie = () => randomInt(1, 7);
 
 // `starter` skips the dice roll-off: { seat, reason: 'wheel' | 'winner' }. The starter also lends their board to the table.
-function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null } = {}) {
+function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null, variant = 'classic' } = {}) {
+  const spec = boardSpec(variant);
   const active = [0, 1, 2, 3].filter((s) => seats[s]);
   if (active.length < 2) throw new Error('Need at least 2 players');
   const state = {
+    variant: spec.id,
+    spec,
     mode: teams && active.length === 4 ? 'teams' : 'solo',
     active,
     names: seats.map((p) => (p ? p.name : null)),
-    marbles: [0, 1, 2, 3].map((s) => (seats[s] ? Array.from({ length: MARBLES }, () => ({ zone: 'base' })) : [])),
+    marbles: [0, 1, 2, 3].map((s) => (seats[s] ? Array.from({ length: spec.marbles }, () => ({ zone: 'base' })) : [])),
     turn: null,
     phase: 'roll',
     die: null,
@@ -100,19 +111,19 @@ function occupancy(state) {
   return map;
 }
 
-function stepPath(seat, pos, n) {
+function stepPath(seat, pos, n, spec = CLASSIC) {
   const cells = [];
   let { zone } = pos;
-  let progress = zone === 'track' ? progressOf(seat, pos.idx) : null;
+  let progress = zone === 'track' ? progressOf(seat, pos.idx, spec) : null;
   let slot = zone === 'home' ? pos.slot : null;
   for (let i = 0; i < n; i++) {
     if (zone === 'track') {
-      if (progress >= LAST_TRACK) {
+      if (progress >= spec.lastTrack) {
         zone = 'home';
         slot = 0;
       } else progress++;
-    } else if (++slot >= HOME_LEN) return null;
-    cells.push(zone === 'track' ? { zone, idx: idxOf(seat, progress) } : { zone, slot });
+    } else if (++slot >= spec.home) return null;
+    cells.push(zone === 'track' ? { zone, idx: idxOf(seat, progress, spec) } : { zone, slot });
   }
   return cells;
 }
@@ -120,6 +131,7 @@ function stepPath(seat, pos, n) {
 function computeLegalMoves(state) {
   if (state.phase !== 'move') return [];
   const owner = controlledSeat(state);
+  const spec = specOf(state);
   const { die } = state;
   const occ = occupancy(state);
   const oneOrSix = die === 1 || die === 6;
@@ -136,14 +148,14 @@ function computeLegalMoves(state) {
     if (pos.zone === 'base') {
       if (!oneOrSix || baseOffered) return;
       baseOffered = true;
-      tryLand(marble, 'enter', { zone: 'track', idx: entryIdx(owner) }, pos);
+      tryLand(marble, 'enter', { zone: 'track', idx: entryIdx(owner, spec) }, pos);
     } else if (pos.zone === 'center') {
-      if (oneOrSix) tryLand(marble, 'exitCenter', { zone: 'track', idx: exitCorner(owner) }, pos);
+      if (oneOrSix) tryLand(marble, 'exitCenter', { zone: 'track', idx: exitCorner(owner, spec) }, pos);
     } else {
-      const path = stepPath(owner, pos, die);
+      const path = stepPath(owner, pos, die, spec);
       const blocked = !path || path.slice(0, -1).some((cell) => occ.get(cellKey(owner, cell))?.seat === owner);
       if (!blocked) tryLand(marble, 'step', path[path.length - 1], pos, path);
-      if (oneOrSix && pos.zone === 'track' && entryCorners(owner).includes(pos.idx)) {
+      if (oneOrSix && pos.zone === 'track' && entryCorners(owner, spec).includes(pos.idx)) {
         tryLand(marble, 'enterCenter', { zone: 'center' }, pos);
       }
     }
@@ -201,7 +213,7 @@ function move(state, moveId) {
   const verb = { enter: 'brought a marble into play', enterCenter: 'jumped into the center', exitCenter: 'took the shortcut out of the center', step: `moved ${state.die}` }[mv.kind];
   addLog(state, `${who} ${verb}${to.zone === 'home' && mv.from.zone !== 'home' ? ' — reached home!' : ''}${capture ? ` and captured ${state.names[capture.seat]}!` : ''}`, seat);
 
-  if (isFinished(state, seat) && mv.from.zone !== 'home') addLog(state, `${who} has all 5 marbles home!`, seat);
+  if (isFinished(state, seat) && mv.from.zone !== 'home') addLog(state, `${who} has all ${specOf(state).marbles} marbles home!`, seat);
 
   const winners = findWinners(state);
   if (winners) {
@@ -227,6 +239,10 @@ function findWinners(state) {
 }
 
 module.exports = {
+  BOARDS,
+  CLASSIC,
+  specOf,
+  boardSpec,
   TRACK_LEN,
   ARM,
   MARBLES,

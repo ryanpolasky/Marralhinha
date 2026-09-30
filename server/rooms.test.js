@@ -67,6 +67,47 @@ test('four-player rooms default to free-for-all and only the host can switch on 
   assert.throws(() => room.setTeams('u1', false), /already started/);
 });
 
+test('blitz is host-only, starts with three marbles and survives rematch', (t) => {
+  const room = new Room('BLTZ', { onChange: () => {} });
+  t.after(() => room.dispose());
+  ['u1', 'u2'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  assert.strictEqual(room.view().variant, 'classic');
+  assert.throws(() => room.setVariant('u2', 'blitz'), /Only the host/);
+  assert.throws(() => room.setVariant('u1', 'speedy'), /Unknown board variant/);
+
+  room.setVariant('u1', 'blitz');
+  room.start('u1');
+  assert.strictEqual(room.game.variant, 'blitz');
+  assert.strictEqual(room.game.marbles[0].length, 3);
+  assert.throws(() => room.setVariant('u1', 'classic'), /already started/);
+
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.rematch('u1');
+  assert.strictEqual(room.view().variant, 'blitz');
+  room.start('u1');
+  assert.strictEqual(room.game.variant, 'blitz');
+  assert.strictEqual(room.game.marbles[0].length, 3);
+});
+
+test('an old client without blitz support blocks the table switching over', (t) => {
+  const room = new Room('OLD', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2', { blitz: false });
+  assert.throws(() => room.setVariant('u1', 'blitz'), /reload/);
+  room.attach('u2', 's3');
+  assert.throws(() => room.setVariant('u1', 'blitz'), /reload/, 'one old device still blocks the table');
+  room.detach('u2', 's2');
+  room.setVariant('u1', 'blitz');
+  assert.strictEqual(room.view().variant, 'blitz');
+});
+
 test('first game: a random seated player starts on their board; rematch: a winner starts on theirs', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());

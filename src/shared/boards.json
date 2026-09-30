@@ -1,0 +1,58 @@
+{
+  "classic": {
+    "id": "classic",
+    "label": "Classic",
+    "arm": 16,
+    "trackLen": 64,
+    "lastTrack": 62,
+    "marbles": 5,
+    "home": 5,
+    "entry": 2,
+    "corner": 8,
+    "corners": [8, 24, 40],
+    "exit": 56,
+    "armShape": [
+      [8, 0], [8, 1], [8, 2],
+      [7, 2], [6, 2], [5, 2], [4, 2], [3, 2],
+      [2, 2],
+      [2, 3], [2, 4], [2, 5], [2, 6], [2, 7],
+      [2, 8], [1, 8]
+    ],
+    "halfWidth": 2.75,
+    "halfLength": 8.75,
+    "homeRows": [7, 6, 5, 4, 3],
+    "baseCenter": [5.8, 5.8],
+    "baseOffsets": [[-1.1, -1.1], [-1.1, 1.1], [0, 0], [1.1, -1.1], [1.1, 1.1]],
+    "dishR": 2.2,
+    "dieSpot": [8.7, 4.3],
+    "dieThrowFrom": [15, 9]
+  },
+  "blitz": {
+    "id": "blitz",
+    "label": "Blitz",
+    "arm": 10,
+    "trackLen": 40,
+    "lastTrack": 38,
+    "marbles": 3,
+    "home": 3,
+    "entry": 2,
+    "corner": 5,
+    "corners": [5, 15, 25],
+    "exit": 35,
+    "armShape": [
+      [5, 0], [5, 1], [5, 2],
+      [4, 2], [3, 2],
+      [2, 2],
+      [2, 3], [2, 4],
+      [2, 5], [1, 5]
+    ],
+    "halfWidth": 1.75,
+    "halfLength": 5.75,
+    "homeRows": [4, 3, 2],
+    "baseCenter": [3.9, 3.9],
+    "baseOffsets": [[-1.1, 0], [0, 0], [1.1, 0]],
+    "dishR": 1.6,
+    "dieSpot": [5.7, 2.7],
+    "dieThrowFrom": [9.3, 5.6]
+  }
+}

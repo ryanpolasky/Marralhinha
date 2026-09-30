@@ -78,6 +78,7 @@ io.use((socket, next) => {
   const user = accounts.userForToken(socket.handshake.auth?.token);
   if (!user) return next(new Error('unauthorized'));
   socket.data.userId = user.id;
+  socket.data.blitz = Array.isArray(socket.handshake.auth?.features) && socket.handshake.auth.features.includes('blitz');
   return next();
 });
 
@@ -139,12 +140,13 @@ io.on('connection', (socket) => {
     if (!user) throw new UserError('Your account was not found, please reload');
     ensureFree(typeof target === 'function' ? null : target.code);
     const room = typeof target === 'function' ? target() : target;
+    if (room.variant === 'blitz' && !socket.data.blitz) throw new UserError('Reload the page to play Blitz');
     const player = room.join(accounts.publicInfo(user), options);
     leaveOthers(room.code);
     if (socket.data.code && socket.data.code !== room.code) leaveCurrent(false);
     socket.data.code = room.code;
     socket.join(room.code);
-    room.attach(userId, socket.id);
+    room.attach(userId, socket.id, { blitz: socket.data.blitz });
     // Team chat isn't in the shared state, so hand this device its team's history directly
     socket.emit('room:teamLog', { code: room.code, entries: room.teamLogFor(userId) });
     return { code: room.code, playerId: player.id };
@@ -184,6 +186,7 @@ io.on('connection', (socket) => {
   handle('lobby:addBot', ({ seat }) => current().addBot(userId, seat));
   handle('lobby:removeBot', ({ seat }) => current().removeBot(userId, seat));
   handle('lobby:teams', ({ teams }) => current().setTeams(userId, teams));
+  handle('lobby:variant', ({ variant }) => current().setVariant(userId, variant));
   handle('lobby:turnTime', ({ seconds }) => current().setTurnTime(userId, seconds ?? null));
   handle('game:start', () => current().start(userId));
   handle('game:roll', () => current().roll(userId));

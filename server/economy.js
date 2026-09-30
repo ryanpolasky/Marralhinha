@@ -137,6 +137,11 @@ class Economy {
             note = `Bot game: half rewards (${botGames}/${REWARDS.botGamesPerDay} today)`;
           }
         }
+        const variantMultiplier = REWARDS.variantMultiplier?.[game.variant] ?? 1;
+        if (variantMultiplier !== 1 && lines.length) {
+          lines = lines.map((l) => (l.label === 'First win of the day' ? l : { ...l, amount: Math.floor(l.amount * variantMultiplier) }));
+          note = `${note ? `${note} · ` : ''}Blitz: ${Math.round(variantMultiplier * 100)}% rewards (shorter game)`;
+        }
         if (won && lines.length) wonToday = 1;
 
         const earned = lines.reduce((sum, l) => sum + l.amount, 0);

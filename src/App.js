@@ -10,6 +10,7 @@ import PingMenu from './components/PingMenu';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
 import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, coveringTurn, startPendingFor } from './game/moves';
+import BOARDS from './shared/boards.json';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -387,8 +388,9 @@ const App = () => {
     const viewSeat = Math.max(mySeat, 0);
     if (!room.game) {
       const active = [0, 1, 2, 3].filter((s) => room.seats[s]);
-      const marbles = [0, 1, 2, 3].map((s) => (room.seats[s] ? Array.from({ length: 5 }, () => base) : []));
-      return { mode: 'lobby', board: { active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
+      const spec = BOARDS[room.variant] || BOARDS.classic;
+      const marbles = [0, 1, 2, 3].map((s) => (room.seats[s] ? Array.from({ length: spec.marbles }, () => base) : []));
+      return { mode: 'lobby', board: { variant: spec.id, active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
     }
     const g = room.game;
     const myTurn = (g.turn === mySeat || coveringTurn(g, room.seats, mySeat)) && g.phase !== 'over';

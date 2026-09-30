@@ -8,6 +8,7 @@ import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
 import Marquee from './Marquee';
+import BOARDS from '../shared/boards.json';
 
 // Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go
 function useSeatEvents(room, playerId) {
@@ -232,6 +233,20 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
 
         {!!room.spectators?.length && <p className="lobby-spectators">Spectating: {room.spectators.map((p) => p.name).join(', ')}</p>}
 
+        <div className="mode-picker" role="radiogroup" aria-label="Board variant">
+          {Object.values(BOARDS).map((spec) => (
+            <button
+              key={spec.id}
+              role="radio"
+              aria-checked={(room.variant || 'classic') === spec.id}
+              className={`mode-option${(room.variant || 'classic') === spec.id ? ' on' : ''}`}
+              disabled={!isHost}
+              onClick={() => (room.variant || 'classic') !== spec.id && onAction('lobby:variant', { variant: spec.id })}
+            >
+              {spec.label}
+            </button>
+          ))}
+        </div>
         <div className="mode-picker" role="radiogroup" aria-label="Game mode">
           {[
             [false, 'Free-for-all'],
@@ -250,6 +265,9 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
           ))}
         </div>
         <TurnTimer seconds={room.turnSeconds === undefined ? 30 : room.turnSeconds} isHost={isHost} onChange={(seconds) => onAction('lobby:turnTime', { seconds })} />
+        <p className="lobby-mode">
+          {(room.variant || 'classic') === 'blitz' ? 'Blitz: 3 marbles, smaller board, about a third of the time. Pays 60%.' : 'Classic: 5 marbles, full board, full rewards.'}
+        </p>
         <p className="lobby-mode">
           {seated < 2
             ? 'You need at least 2 players. Invite a friend or add a bot.'

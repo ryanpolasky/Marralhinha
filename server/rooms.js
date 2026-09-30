@@ -74,6 +74,7 @@ class Room {
     this.hostId = null;
     this.game = null;
     this.teams = false;
+    this.variant = 'classic';
     this.turnSeconds = TURN_SECONDS_DEFAULT;
     this.humansAtStart = 0;
     // Player ids of the last round's winners: one of them starts the rematch on their board
@@ -134,7 +135,7 @@ class Room {
     const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
     const seat = this.game || spectate ? undefined : (favourite ?? SEAT_ORDER.find((s) => !this.seats[s]));
     if (seat === undefined && this.spectators.size >= 32) throw new UserError('That room is full, including spectators');
-    const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set(), goneAt: Date.now() };
+    const player = { id: newId(), ...info, isBot: false, connected: false, sockets: new Set(), clients: new Map(), blitz: false, goneAt: Date.now() };
     if (seat === undefined) this.spectators.set(info.userId, player);
     else {
       this.seats[seat] = player;
@@ -150,9 +151,11 @@ class Room {
     this.changed();
   }
 
-  attach(userId, socketId) {
+  attach(userId, socketId, { blitz = true } = {}) {
     const player = this.findViewer(userId);
     if (!player) return;
+    player.clients?.set(socketId, blitz);
+    player.blitz = player.clients ? [...player.clients.values()].every(Boolean) : blitz;
     player.sockets.add(socketId);
     player.connected = true;
     player.goneAt = null;
@@ -171,6 +174,8 @@ class Room {
     const player = this.findViewer(userId);
     if (!player) return;
     player.sockets.delete(socketId);
+    player.clients?.delete(socketId);
+    if (player.clients?.size) player.blitz = [...player.clients.values()].every(Boolean);
     player.connected = player.sockets.size > 0;
     if (!player.connected) {
       player.goneAt = Date.now();
@@ -349,6 +354,23 @@ class Room {
     this.changed();
   }
 
+  setVariant(userId, variant) {
+    this.requireHost(userId);
+    this.requireLobby();
+    let spec;
+    try {
+      spec = rules.boardSpec(variant);
+    } catch {
+      throw new UserError('Unknown board variant');
+    }
+    if (spec.id === 'blitz') {
+      const outdated = [...this.seats, ...this.spectators.values()].some((p) => p && !p.isBot && p.connected && p.blitz === false);
+      if (outdated) throw new UserError('Everyone at the table needs to reload before playing Blitz');
+    }
+    this.variant = spec.id;
+    this.changed();
+  }
+
   start(userId) {
     this.requireHost(userId);
     this.requireLobby();
@@ -356,7 +378,7 @@ class Room {
     humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false, away: false }));
     this.swapOffers = [];
     this.teamLogs = [[], []];
-    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null });
+    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
     // disconnected), plus the sixes/captures someone else made for this seat, which never count towards its stats
     this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
@@ -630,6 +652,7 @@ class Room {
       hostId: this.hostId,
       activity: !!this.instanceId,
       teams: this.teams,
+      variant: this.game?.variant || this.variant,
       turnSeconds: this.turnSeconds,
       seats: this.seats.map((p) => p && {
         id: p.id,
@@ -662,6 +685,7 @@ class Room {
       activity: !!this.instanceId,
       phase: !game ? 'lobby' : game.phase === 'over' ? 'over' : 'playing',
       teams: this.teams,
+      variant: game?.variant || this.variant,
       players: this.seats.map((p, seat) => p && { seat, name: p.name, isBot: !!p.isBot, away: !p.isBot && (!p.connected || !!p.idle || !!p.away), home: game ? game.marbles[seat]?.filter((m) => m.zone === 'home').length ?? 0 : 0 }).filter(Boolean),
       spectators: this.spectators.size,
       lastActive: this.lastActive,

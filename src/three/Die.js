@@ -2,12 +2,12 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { DIE_SPOT, DIE_THROW_FROM, BASE_TRAY } from '../game/geometry';
+import { layoutFor } from '../game/geometry';
 import { ROLL_REVEAL_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
-import { TABLE_Y, DISH_R, DISH_BEVEL } from './Board';
+import { TABLE_Y, DISH_BEVEL } from './Board';
 import { fx } from './fx';
 
 const SIZE = 0.85;
@@ -21,13 +21,13 @@ const FACE_NORMALS = { 2: [1, 0, 0], 5: [-1, 0, 0], 1: [0, 1, 0], 6: [0, -1, 0],
 const spot = ([r, c], y = REST_Y) => new THREE.Vector3(c, y, r);
 
 // A landed die (half its diagonal, in any spin) plus a hair of air must stay outside the marble tray's rim
-const TRAY_CLEARANCE = DISH_R + DISH_BEVEL + SIZE * 0.75 + 0.08;
-function clearOfTray(position, seat) {
-  const [r, c] = BASE_TRAY[seat];
+function clearOfTray(position, seat, layout) {
+  const clearance = layout.spec.dishR + DISH_BEVEL + SIZE * 0.75 + 0.08;
+  const [r, c] = layout.BASE_TRAY[seat];
   const dx = position.x - c;
   const dz = position.z - r;
   const dist = Math.hypot(dx, dz);
-  if (dist < TRAY_CLEARANCE) position.set(c + (dx / dist) * TRAY_CLEARANCE, position.y, r + (dz / dist) * TRAY_CLEARANCE);
+  if (dist < clearance) position.set(c + (dx / dist) * clearance, position.y, r + (dz / dist) * clearance);
   return position;
 }
 
@@ -62,7 +62,7 @@ function useDieAssets() {
   );
 }
 
-function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone, assets }) {
+function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone, assets, layout }) {
   const materials = diceSkin(skin);
   const ref = useRef();
   const glow = useRef();
@@ -71,7 +71,7 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
     anim.current = {
-      pos: spot(DIE_SPOT[seat]),
+      pos: spot(layout.DIE_SPOT[seat]),
       quat: faceUp(settled ? lastRoll.die : 5, 0.4),
       seen: spawnT ? null : lastRoll?.t,
       roll: null,
@@ -88,11 +88,11 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
     if (!lastRoll || lastRoll.seat !== seat || lastRoll.t === a.seen) return;
     a.seen = lastRoll.t;
     const inHand = a.scale > 0.5;
-    const land = clearOfTray(spot(DIE_SPOT[seat]).add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8)), seat);
+    const land = clearOfTray(spot(layout.DIE_SPOT[seat]).add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8)), seat, layout);
     a.roll = {
       start: null,
       die: lastRoll.die,
-      from: inHand ? a.pos.clone() : spot(DIE_THROW_FROM[seat]),
+      from: inHand ? a.pos.clone() : spot(layout.DIE_THROW_FROM[seat]),
       to: land,
       height: inHand ? 1.8 : 2.6,
       final: faceUp(lastRoll.die, Math.random() * Math.PI * 2),
@@ -104,7 +104,7 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
     a.gone = false;
     a.label.start = -10;
     sfx.dice();
-  }, [lastRoll, seat]);
+  }, [lastRoll, seat, layout]);
 
   const spinQ = useMemo(() => new THREE.Quaternion(), []);
   const twist = useMemo(() => new THREE.Quaternion(), []);
@@ -205,7 +205,7 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
   );
 }
 
-export default function Dice({ lastRoll, turn, idleSeat = 0, canRoll, onRoll, skins = [] }) {
+export default function Dice({ lastRoll, turn, idleSeat = 0, canRoll, onRoll, skins = [], layout = layoutFor('classic') }) {
   const assets = useDieAssets();
   const idle = turn === null || turn === undefined;
   const activeSeat = idle ? idleSeat : lastRoll?.seat === turn || canRoll ? turn : null;
@@ -224,7 +224,7 @@ export default function Dice({ lastRoll, turn, idleSeat = 0, canRoll, onRoll, sk
 
   return dice.map((d) => (
     <DieBody
-      key={d.seat}
+      key={`${d.seat}:${layout.spec.id}`}
       seat={d.seat}
       skin={skins[d.seat]}
       spawnT={d.spawnT}
@@ -234,6 +234,7 @@ export default function Dice({ lastRoll, turn, idleSeat = 0, canRoll, onRoll, sk
       onRoll={onRoll}
       onGone={onGone}
       assets={assets}
+      layout={layout}
     />
   ));
 }

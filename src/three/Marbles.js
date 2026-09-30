@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { SEAT_COLORS, positionOf } from '../game/geometry';
+import { SEAT_COLORS, positionIn, layoutFor } from '../game/geometry';
 import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
@@ -12,8 +12,9 @@ export const MARBLE_R = 0.335;
 const REST_Y = 0.07;
 const STACKED_Y = REST_Y + MARBLE_R * 1.95;
 
-const worldOf = (seat, pos, marble) => {
-  const [r, c] = positionOf(seat, pos, marble);
+const CLASSIC_LAYOUT = layoutFor('classic');
+const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
+  const [r, c] = positionIn(seat, pos, marble, layout);
   return new THREE.Vector3(c, REST_Y, r);
 };
 
@@ -24,17 +25,17 @@ function hopTiming(dist) {
   return { dur: 0.3 + dist * 0.05, height: 0.5 + dist * 0.22 };
 }
 
-export function planMove(lastMove, board) {
+export function planMove(lastMove, board, layout = CLASSIC_LAYOUT) {
   const plans = {};
   if (!lastMove) return plans;
   const { seat, marble, capture } = lastMove;
-  const others = board.active.flatMap((s) => board.marbles[s].flatMap((pos, m) => (pos.zone === 'base' || (s === seat && m === marble) ? [] : [worldOf(s, pos, m)])));
+  const others = board.active.flatMap((s) => board.marbles[s].flatMap((pos, m) => (pos.zone === 'base' || (s === seat && m === marble) ? [] : [worldOf(s, pos, m, layout)])));
   const occupied = (spot) => others.some((o) => Math.abs(o.x - spot.x) < 0.05 && Math.abs(o.z - spot.z) < 0.05);
   const path = lastMove.path || [lastMove.to];
-  let prev = worldOf(seat, lastMove.from, marble);
+  let prev = worldOf(seat, lastMove.from, marble, layout);
   let total = 0;
   const hops = path.map((cell, i) => {
-    const to = worldOf(seat, cell, marble);
+    const to = worldOf(seat, cell, marble, layout);
     const timing = hopTiming(prev.distanceTo(to));
     prev = to;
     const tap = i < path.length - 1 && occupied(to);
@@ -53,7 +54,7 @@ export function planMove(lastMove, board) {
   if (capture) {
     const colors = [SEAT_COLORS[seat].main, SEAT_COLORS[seat].light, SEAT_COLORS[capture.seat].main, '#ffffff', '#ffd166'];
     plans[`${capture.seat}-${capture.marble}`] = [
-      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { colors, by: seat, victim: capture.seat }, final: true },
+      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { colors, by: seat, victim: capture.seat }, final: true },
     ];
   }
   return plans;
@@ -188,11 +189,11 @@ function GhostLabel({ text, color }) {
 
 const moveLabel = (move) => (move.kind === 'enterCenter' ? 'Shortcut' : move.capture ? 'Capture!' : move.kind === 'exitCenter' ? 'Out of center' : `Move ${move.path.length}`);
 
-function Ghost({ move, strong, label, onMove }) {
+function Ghost({ move, strong, label, onMove, layout }) {
   const ref = useRef();
   const ring = useRef();
   const color = SEAT_COLORS[move.seat];
-  const target = worldOf(move.seat, move.to, move.marble);
+  const target = worldOf(move.seat, move.to, move.marble, layout);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     ref.current.position.y = REST_Y + 0.25 + Math.sin(t * 4) * 0.07;
@@ -231,10 +232,10 @@ function Ghost({ move, strong, label, onMove }) {
   );
 }
 
-function PathDots({ move }) {
+function PathDots({ move, layout }) {
   if (!move.path || move.path.length < 2) return null;
   return move.path.slice(0, -1).map((cell, i) => {
-    const p = worldOf(move.seat, cell, move.marble);
+    const p = worldOf(move.seat, cell, move.marble, layout);
     return (
       <mesh key={i} position={[p.x, 0.06, p.z]}>
         <sphereGeometry args={[0.07, 10, 8]} />
@@ -244,10 +245,10 @@ function PathDots({ move }) {
   });
 }
 
-export default function Marbles({ board, skins = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1 }) {
+export default function Marbles({ board, skins = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
-  const plans = useMemo(() => planMove(board.lastMove, board), [board.lastMove]); // eslint-disable-line react-hooks/exhaustive-deps
+  const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = board.lastMove?.t;
   const focus = selected || hovered;
   const focusMoves = focus ? movesForMarble(moves, focus.seat, focus.marble, board.marbles[focus.seat][focus.marble]) : [];
@@ -273,7 +274,7 @@ export default function Marbles({ board, skins = [], moves, selected, setSelecte
             <Marble
               key={key}
               seat={seat}
-              target={worldOf(seat, pos, marble)}
+              target={worldOf(seat, pos, marble, layout)}
               plan={plans[key]}
               planKey={planKey}
               material={materials[seat].material}
@@ -294,8 +295,9 @@ export default function Marbles({ board, skins = [], moves, selected, setSelecte
             strong={!!selected && (!keyMove || keyMove === mv.id)}
             label={keyMove === mv.id ? `${moveLabel(mv)} · Enter` : focusMoves.length > 1 ? moveLabel(mv) : null}
             onMove={onMove}
+            layout={layout}
           />
-          <PathDots move={mv} />
+          <PathDots move={mv} layout={layout} />
         </group>
       ))}
     </group>

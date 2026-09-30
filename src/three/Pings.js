@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { SEAT_COLORS, RING, HOME, BASE, CENTER } from '../game/geometry';
+import { SEAT_COLORS, CENTER, layoutFor } from '../game/geometry';
 import { PING_LIFE_MS } from '../game/moves';
 import { makeLabelTexture } from './textures';
 
@@ -8,11 +8,11 @@ const DEV_COLOR = '#ffffff';
 const DANGER = '#ff3b3b';
 
 // Every hole on the board, in board-local world coords, so pings snap to "this spot"
-const SNAP_SPOTS = [...RING, ...HOME.flat(), ...BASE.flat(), CENTER].map(([r, c]) => [c, r]);
-export function snapToSpot(x, z) {
+const snapSpots = (layout) => [...layout.RING, ...layout.HOME.flat(), ...layout.BASE.flat(), CENTER].map(([r, c]) => [c, r]);
+export function snapToSpot(x, z, layout = layoutFor('classic')) {
   let best = null;
   let bestD = 0.9;
-  SNAP_SPOTS.forEach(([sx, sz]) => {
+  snapSpots(layout).forEach(([sx, sz]) => {
     const d = Math.hypot(sx - x, sz - z);
     if (d < bestD) {
       bestD = d;

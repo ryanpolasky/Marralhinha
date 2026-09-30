@@ -12,10 +12,11 @@ function setup() {
   return { db, accounts, economy };
 }
 
-const fakeGame = ({ winners = [0], captures = [2, 0], home = [5, 1] } = {}) => ({
+const fakeGame = ({ winners = [0], captures = [2, 0], home = [5, 1], variant = 'classic', marbles = 5 } = {}) => ({
+  variant,
   winners,
   stats: captures.map((c) => ({ captures: c })),
-  marbles: home.map((h) => Array.from({ length: 5 }, (_, i) => ({ zone: i < h ? 'home' : 'track', idx: 3 }))),
+  marbles: home.map((h) => Array.from({ length: marbles }, (_, i) => ({ zone: i < h ? 'home' : 'track', idx: 3 }))),
 });
 
 test('guests start with coins and sessions resolve to the user', () => {
@@ -100,6 +101,25 @@ test('match rewards: full for human games, halved and capped for bot games', () 
   assert.match(totals.at(-1)[0].note, /used up/);
   const nextDay = economy.awardGame({ game: fakeGame({ winners: [1] }), players: [{ seat: 0, userId: c.id }], botGame: true, now: now + 86400000 });
   assert.ok(nextDay[0].total > 0, 'cap resets the next day');
+});
+
+test('blitz pays 60% of normal game rewards, never milestone bonuses', () => {
+  const { accounts, economy } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const now = Date.parse('2026-04-01T12:00:00Z');
+  const game = fakeGame({ variant: 'blitz', home: [3, 0], marbles: 3, captures: [2, 0] });
+  const res = economy.awardGame({ game, players: [{ seat: 0, userId: a.id }], botGame: false, now });
+  const expected =
+    Math.floor(REWARDS.finish * 0.6) +
+    Math.floor(REWARDS.win * 0.6) +
+    Math.floor(2 * REWARDS.perCapture * 0.6) +
+    Math.floor(3 * REWARDS.perMarbleHome * 0.6) +
+    REWARDS.firstWinOfDay;
+  assert.equal(res[0].total - (res[0].leveledUp ? res[0].lines.at(-1).amount : 0), expected);
+  assert.equal(res[0].lines.find((l) => l.label === 'First win of the day').amount, REWARDS.firstWinOfDay);
+  assert.match(res[0].note, /Blitz: 60% rewards/);
+  assert.equal(accounts.getUser(a.id).games, 1);
+  assert.equal(accounts.getUser(a.id).marbles_home, 3);
 });
 
 test('bot-carried players (>half their turns) get nothing unless Dev; covered sixes and captures never count', () => {
