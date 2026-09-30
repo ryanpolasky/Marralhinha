@@ -15,24 +15,25 @@ const isEnabled = () => {
 };
 
 const redirectUri = () => `${config().publicUrl}/api/auth/discord/callback`;
+const linkedRoleRedirectUri = () => `${config().publicUrl}/api/auth/discord/linked-role/callback`;
 
-function authorizeUrl(state) {
+function authorizeUrl(state, { scope = 'identify', redirect = redirectUri() } = {}) {
   const params = new URLSearchParams({
     client_id: config().clientId,
     response_type: 'code',
-    redirect_uri: redirectUri(),
-    scope: 'identify',
+    redirect_uri: redirect,
+    scope,
     state,
     prompt: 'none',
   });
   return `https://discord.com/oauth2/authorize?${params}`;
 }
 
-// Activity codes are exchanged without a redirect_uri, website ones need it
-async function exchangeCode(code, { withRedirect }) {
+// Activity codes are exchanged without a redirect_uri, browser flows need the one they started with
+async function exchangeCode(code, { redirect = null } = {}) {
   const { clientId, clientSecret } = config();
   const body = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'authorization_code', code: String(code) });
-  if (withRedirect) body.set('redirect_uri', redirectUri());
+  if (redirect) body.set('redirect_uri', redirect);
   const res = await fetch(`${API}/oauth2/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
   if (!res.ok) throw new Error(`Discord token exchange failed (${res.status})`);
   return res.json();
@@ -76,4 +77,14 @@ async function supporterEntitlement(discordId) {
   return null;
 }
 
-module.exports = { config, isEnabled, authorizeUrl, exchangeCode, fetchUser, supporterConfigured, supporterEntitlement, activeEntitlement };
+// Boolean metadata values are sent as '1'/'0'; Discord rejects 'true'/'false' silently
+async function updateRoleConnection(accessToken, { username, supporter }) {
+  const res = await fetch(`${API}/users/@me/applications/${config().clientId}/role-connection`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform_name: 'Marralhinha Online', platform_username: username, metadata: { supporter: supporter ? '1' : '0' } }),
+  });
+  if (!res.ok) throw new Error(`Role connection update failed (${res.status})`);
+}
+
+module.exports = { config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, supporterConfigured, supporterEntitlement, activeEntitlement };

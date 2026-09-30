@@ -112,7 +112,7 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     try {
       const state = take(`state:${req.query.state}`);
       if (!state || !req.query.code) return back('login_error=cancelled');
-      const tokens = await discord.exchangeCode(req.query.code, { withRedirect: true });
+      const tokens = await discord.exchangeCode(req.query.code, { redirect: discord.redirectUri() });
       const user = accounts.loginDiscord(await discord.fetchUser(tokens.access_token), state.guestId);
       const code = randomKey();
       put(`login:${code}`, accounts.createSession(user.id), 2 * 60 * 1000);
@@ -121,6 +121,32 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     } catch (err) {
       console.error('[discord callback]', err);
       return back('login_error=failed');
+    }
+  });
+
+  // Linked Roles verification: Discord sends users here from a role's Links settings
+  router.get('/auth/discord/linked-role/start', (req, res) => {
+    if (!discord.isEnabled() || !discord.supporterConfigured()) return res.status(404).send('Not configured');
+    const state = randomKey();
+    put(`state:${state}`, { linkedRole: true }, 10 * 60 * 1000);
+    return res.redirect(discord.authorizeUrl(state, { scope: 'identify role_connections.write', redirect: discord.linkedRoleRedirectUri() }));
+  });
+
+  router.get('/auth/discord/linked-role/callback', async (req, res) => {
+    const done = (message) => res.send(`<!doctype html><title>Marralhinha Online</title><body style="font-family:sans-serif;background:#1e1f22;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="text-align:center"><h1 style="margin:0 0 8px">Marralhinha Online</h1><p>${message}</p><p style="opacity:.6">You can close this tab.</p></div>`);
+    try {
+      const state = take(`state:${req.query.state}`);
+      if (!state?.linkedRole || !req.query.code) return done('Verification was cancelled.');
+      const tokens = await discord.exchangeCode(req.query.code, { redirect: discord.linkedRoleRedirectUri() });
+      const me = await discord.fetchUser(tokens.access_token);
+      const entitlementId = await discord.supporterEntitlement(me.id);
+      await discord.updateRoleConnection(tokens.access_token, { username: me.global_name || me.username, supporter: Boolean(entitlementId) });
+      const user = accounts.q.userByDiscord.get(me.id);
+      if (user && accounts.setSupporter(user.id, entitlementId)) onProfileChange(user.id);
+      return done(entitlementId ? 'Supporter Pack verified. Your Discord role is ready to claim.' : 'Verified. No Supporter Pack found on this account yet.');
+    } catch (err) {
+      console.error('[linked role]', err);
+      return done('Something went wrong, please try again.');
     }
   });
 
@@ -140,7 +166,7 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     handle(async (req) => {
       if (!discord.isEnabled()) throw new ApiError('Discord is not configured on this server');
       if (!req.body?.code) throw new ApiError('Missing authorization code');
-      const tokens = await discord.exchangeCode(req.body.code, { withRedirect: false });
+      const tokens = await discord.exchangeCode(req.body.code);
       const user = accounts.loginDiscord(await discord.fetchUser(tokens.access_token));
       try { await syncSupporter(user.id); } catch (err) { console.error('[supporter]', err); }
       return { token: accounts.createSession(user.id), accessToken: tokens.access_token, profile: profileOf(user.id) };
