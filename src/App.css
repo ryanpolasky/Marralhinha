@@ -3532,6 +3532,8 @@ button.room-pill.copied {
 
 .item-grid.featured {
   max-height: none;
+  overflow: visible;
+  padding: 20px 22px 26px;
   grid-template-columns: repeat(auto-fit, minmax(150px, 190px));
   justify-content: center;
 }

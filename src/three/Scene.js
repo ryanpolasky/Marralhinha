@@ -19,6 +19,8 @@ const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 /
 
 const _toCamera = new THREE.Vector3();
 const _homeDir = new THREE.Vector3();
+const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
+const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 
 function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
   const { camera, gl, size } = useThree();
@@ -37,7 +39,7 @@ function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
     const aspect = size.width / size.height;
     const game = mode === 'game';
     const elevation = game ? 0.86 : 0.8;
-    const zoom = Math.max(0.68, layout.spec.halfLength / 8.75);
+    const zoom = framingExtent(layout.spec) / CLASSIC_EXTENT;
     const distance = Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect) * zoom;
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));

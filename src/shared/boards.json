@@ -46,13 +46,13 @@
       [2, 3], [2, 4],
       [2, 5], [1, 5]
     ],
-    "halfWidth": 1.75,
+    "halfWidth": 2.75,
     "halfLength": 5.75,
     "homeRows": [4, 3, 2],
-    "baseCenter": [3.9, 3.9],
+    "baseCenter": [4.5, 4.5],
     "baseOffsets": [[-1.1, 0], [0, 0], [1.1, 0]],
     "dishR": 1.6,
-    "dieSpot": [5.7, 2.7],
+    "dieSpot": [6.7, 3.2],
     "dieThrowFrom": [9.3, 5.6]
   }
 }

@@ -6,6 +6,7 @@ const { Economy } = require('./economy');
 const { Reports } = require('./reports');
 const { Matches } = require('./matches');
 const { Room } = require('./rooms');
+const rules = require('./game/rules');
 
 function setup() {
   const db = openDb(':memory:');
@@ -160,6 +161,49 @@ test('matches: recording feeds match history and leaderboards', () => {
   assert.ok(boards.wins.every((u) => u.id && u.name && u.level !== undefined), 'public mini-cards');
   assert.equal(boards.wins.length, 0, 'wins board needs 5+ games');
   assert.equal(boards.level.length, 3, 'level board has no game minimum');
+});
+
+test('completed games feed profile, public cards and the marbles-home leaderboard', (t) => {
+  const { accounts, economy, matches } = setup();
+  const ana = accounts.createUser({ name: 'Ana' });
+  const rui = accounts.createUser({ name: 'Rui' });
+  const room = new Room('STATS', {
+    onChange: () => {},
+    onGameOver: (finished, { players, botGame }) => {
+      const rewards = economy.awardGame({ game: finished.game, players, botGame });
+      matches.record(finished);
+      return rewards;
+    },
+  });
+  t.after(() => room.dispose());
+  room.join(accounts.publicInfo(ana));
+  room.join(accounts.publicInfo(rui));
+  room.attach(ana.id, 'ana');
+  room.attach(rui.id, 'rui');
+  room.start(ana.id);
+  const game = room.game;
+  game.turn = 0;
+  game.phase = 'move';
+  game.die = 1;
+  game.stats[0].shortcuts = 2;
+  game.stats[0].captured = 3;
+  const ruiSeat = room.findByUser(rui.id).seat;
+  game.stats[ruiSeat].captured = 1;
+  game.marbles[0] = Array.from({ length: game.spec.marbles }, (_, i) => i === 0
+    ? { zone: 'track', idx: rules.idxOf(0, game.spec.lastTrack, game.spec) }
+    : { zone: 'home', slot: i });
+  game.marbles[ruiSeat][0] = { zone: 'home', slot: 0 };
+  game.legalMoves = rules.computeLegalMoves(game);
+  const finalMove = game.legalMoves.find((move) => move.marble === 0 && move.to.zone === 'home');
+  assert.ok(finalMove);
+  room.move(ana.id, finalMove.id);
+  assert.equal(game.phase, 'over');
+  assert.deepEqual(accounts.profile(ana.id).stats, { games: 1, wins: 1, captures: 0, captured: 3, boxes: 0, sixes: 0, shortcuts: 2, home: 5 });
+  assert.equal(accounts.publicCard(accounts.getUser(rui.id)).stats.captured, 1);
+  assert.equal(accounts.publicCard(accounts.getUser(rui.id)).stats.home, 1);
+  assert.deepEqual(matches.leaders().home.map(({ id, home }) => ({ id, home })), [{ id: ana.id, home: 5 }, { id: rui.id, home: 1 }]);
+  room.afterMove();
+  assert.equal(accounts.profile(ana.id).stats.home, 5, 'game completion is awarded only once');
 });
 
 test('reconnect: a disconnected player gets one grace window, then the bot plays at bot speed', (t) => {
