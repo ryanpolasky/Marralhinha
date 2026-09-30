@@ -21,6 +21,7 @@ export const rarityOf = (item) => {
   const base = RARITIES[item.rarity];
   if (!item.tag) return base;
   const tag = TAGS[item.tag];
+  if (item.id === 'dice.lucky') return { ...base, label: 'Reign reward', short: 'Reign reward', color: tag.color };
   return { ...base, label: `${tag.label} exclusive`, short: tag.label, color: tag.color };
 };
 
@@ -31,13 +32,14 @@ export const canUse = (account, itemId) => {
   if (item.rarity === 'default') return true;
   if ((account?.tags || []).includes('dev')) return true;
   if ((account?.inventory || []).includes(itemId)) return true;
+  if (itemId === 'dice.lucky') return !!account?.lucky?.goldenDieUnlocked;
   if (item.tag) return (account?.tags || []).includes(item.tag);
   return false;
 };
 
 // Items that count towards "collected": everything obtainable, plus exclusives you actually have access to
 export const collectible = (account) =>
-  catalog.items.filter((item) => !item.tag || (account?.tags || []).includes('dev') || (account?.tags || []).includes(item.tag) || (account?.inventory || []).includes(item.id));
+  catalog.items.filter((item) => !item.tag || (account?.tags || []).includes('dev') || canUse(account, item.id));
 
 export const skinKey = (id) => (id || '').split('.')[1] || '';
 export const cosmeticsOf = (seat) => ({ ...DEFAULT_COSMETICS, ...(seat?.cosmetics || {}) });

@@ -156,9 +156,6 @@ class Economy {
         this.q.counters.run(today, botGames, wonToday, userId);
         results[seat] = { total, xp: earned, lines, note, level: after, leveledUp: after > before, botCarried };
       }
-      const lucky = this.accounts.refreshLucky();
-      const luckySeat = lucky && players.find((p) => p.userId === lucky.holder)?.seat;
-      if (luckySeat !== undefined && luckySeat !== null && results[luckySeat]) results[luckySeat].luckyTag = true;
     });
     return results;
   }

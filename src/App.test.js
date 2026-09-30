@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
+import { canUse, collectible } from './game/catalog';
 
 // CRA resets jest.fn mocks between tests, so plain functions it is
 jest.mock('./net/socket', () => ({
@@ -31,6 +32,15 @@ jest.mock('./net/auth', () => ({
 }));
 jest.mock('./three/Scene', () => () => null);
 jest.mock('./game/music', () => ({ startMusic: () => {} }));
+
+test('holding Luckiest alone does not unlock the Golden Die', () => {
+  const account = { tags: ['lucky'], inventory: [], lucky: { goldenDieUnlocked: false } };
+  expect(canUse(account, 'dice.lucky')).toBe(false);
+  expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(false);
+  account.lucky.goldenDieUnlocked = true;
+  expect(canUse(account, 'dice.lucky')).toBe(true);
+  expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(true);
+});
 
 test('signs in as a guest and renders the home screen with the account bar', async () => {
   render(<App />);

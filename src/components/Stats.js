@@ -1,5 +1,6 @@
 import React from 'react';
 import { SEAT_COLORS } from '../game/geometry';
+import { TagBadge } from './Economy';
 
 export const ago = (t) => {
   const s = Math.max(0, (Date.now() - t) / 1000);
@@ -32,6 +33,25 @@ export function StatGrid({ stats }) {
           <span>{label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+const duration = (seconds) => `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+
+export function LuckiestPanel({ lucky }) {
+  if (!lucky) return null;
+  const remainingGames = Math.max(0, lucky.requiredGames - lucky.games);
+  const rate = (lucky.rate * 100).toFixed(1);
+  return (
+    <div className={`profile-lucky${lucky.holder ? ' holder' : ''}`}>
+      <TagBadge tag="lucky" small />
+      <div>
+        <div>{remainingGames ? `${remainingGames} more completed ${remainingGames === 1 ? 'game' : 'games'} with recorded rolls for Luckiest eligibility.` : lucky.eligible ? `${lucky.sixes} sixes / ${lucky.rolls} rolls · ${rate}% six rate (expected ${(lucky.expectedRate * 100).toFixed(1)}%).` : 'Complete a game to return to Luckiest eligibility.'}</div>
+        <div className="muted small-text">Last {lucky.games} / {lucky.requiredGames} recorded games · {lucky.holder ? 'Current Luckiest' : lucky.eligible ? `Luck score: ${lucky.score.toFixed(2)}` : 'Not currently eligible'}</div>
+        <div className="muted small-text">Time as Luckiest: {duration(lucky.totalSeconds)} · Longest reign: {duration(lucky.longestSeconds)} · {lucky.reignCount} reigns</div>
+        <div className="muted small-text">{lucky.goldenDieUnlocked ? 'Golden Die permanently unlocked' : `${duration(lucky.goldenDieRemainingSeconds)} until Golden Die unlock`}</div>
+      </div>
     </div>
   );
 }

@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS matches (
   started_at INTEGER NOT NULL,
   ended_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS matches_ended ON matches(ended_at);
 CREATE TABLE IF NOT EXISTS match_players (
   match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL,
@@ -84,6 +85,15 @@ CREATE TABLE IF NOT EXISTS match_players (
   PRIMARY KEY (match_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS match_players_user ON match_players(user_id);
+CREATE TABLE IF NOT EXISTS luckiest_reigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER,
+  duration_seconds INTEGER
+);
+CREATE INDEX IF NOT EXISTS luckiest_reigns_player ON luckiest_reigns(player_id);
+CREATE UNIQUE INDEX IF NOT EXISTS luckiest_reigns_open ON luckiest_reigns ((1)) WHERE ended_at IS NULL;
 `;
 
 // Columns added after the first release; applied to existing databases on startup
@@ -93,6 +103,13 @@ const MIGRATIONS = [
   ['users', 'captured', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'shortcuts', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'marbles_home', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'luckiest_total_seconds', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'luckiest_reign_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'luckiest_longest_reign_seconds', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'golden_die_unlocked', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'golden_die_unlocked_at', 'INTEGER'],
+  ['match_players', 'roll_count', 'INTEGER'],
+  ['match_players', 'six_count', 'INTEGER'],
 ];
 
 function migrate(db) {
@@ -100,6 +117,7 @@ function migrate(db) {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
     if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
+  db.exec("UPDATE users SET golden_die_unlocked = 1 WHERE golden_die_unlocked = 0 AND id IN (SELECT user_id FROM inventory WHERE item_id = 'dice.lucky')");
 }
 
 function openDb(file = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'marralhinha.db')) {
@@ -129,4 +147,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDb, transaction };
+module.exports = { openDb, transaction, migrate };

@@ -380,8 +380,8 @@ class Room {
     this.teamLogs = [[], []];
     this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
-    // disconnected), plus the sixes/captures someone else made for this seat, which never count towards its stats
-    this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
+    // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
+    this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
     this.humansAtStart = humans.length;
     this.changed();
   }
@@ -426,6 +426,7 @@ class Room {
     if (!played) return;
     played.rolls += 1;
     if (kind === 'bot') played.botRolls += 1;
+    if (kind !== 'self') played.coveredRolls += 1;
     if (kind !== 'self' && this.game.lastRoll?.die === 6) played.coveredSixes += 1;
   }
 

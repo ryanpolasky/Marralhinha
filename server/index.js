@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const express = require('express');
 const { Server } = require('socket.io');
-const { openDb } = require('./db');
+const { openDb, transaction } = require('./db');
 const { Accounts } = require('./accounts');
 const { Economy } = require('./economy');
 const { Reports } = require('./reports');
@@ -43,6 +43,20 @@ const emitToSeats = (room, seats, event, payload) => {
   if (ids.length) io.to(ids).emit(event, payload);
 };
 
+const announceLucky = (change) => {
+  if (!change) return;
+  const { holder, previous, reclaimed, unlocked } = change;
+  if (holder !== previous && holder) {
+    const name = accounts.getUser(holder)?.name;
+    if (name) io.emit('luckiest:change', `${name} has ${reclaimed ? 'reclaimed' : 'taken'} Luckiest${previous && !reclaimed ? ` from ${accounts.getUser(previous)?.name || 'the previous holder'}` : ''}!`);
+  }
+  for (const id of unlocked) {
+    const name = accounts.getUser(id)?.name;
+    if (name) io.emit('luckiest:change', `${name} unlocked the Golden Die after reigning as Luckiest for 7 total days!`);
+  }
+  new Set([holder, previous, ...unlocked].filter(Boolean)).forEach(pushProfile);
+};
+
 const rooms = new RoomManager({
   onChange: (room) => io.to(room.code).emit('room:state', room.view()),
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
@@ -50,12 +64,19 @@ const rooms = new RoomManager({
   onPing: (room, ping, seats) => (seats ? emitToSeats(room, seats, 'room:ping', ping) : io.to(room.code).emit('room:ping', ping)),
   onGameOver: (room, { players, botGame }) => {
     try {
-      const luckyBefore = accounts.luckyHolder();
-      const rewards = economy.awardGame({ game: room.game, players, botGame });
-      matches.record(room);
-      const touched = new Set(players.map((p) => p.userId));
-      if (luckyBefore && luckyBefore !== accounts.luckyHolder()) touched.add(luckyBefore);
-      setTimeout(() => touched.forEach((userId) => pushProfile(userId)), 0);
+      const { rewards, lucky } = transaction(db, () => {
+        matches.record(room);
+        const rewards = economy.awardGame({ game: room.game, players, botGame });
+        const lucky = accounts.refreshLucky();
+        const winner = players.find((p) => p.userId === lucky?.holder);
+        if (winner && lucky?.previous !== lucky.holder) rewards[winner.seat].luckyTag = true;
+        for (const player of players) if (lucky?.unlocked.includes(player.userId)) rewards[player.seat].goldenDie = true;
+        return { rewards, lucky };
+      });
+      setTimeout(() => {
+        players.forEach(({ userId }) => pushProfile(userId));
+        announceLucky(lucky);
+      }, 0);
       return rewards;
     } catch (err) {
       console.error('[rewards]', err);
@@ -63,7 +84,15 @@ const rooms = new RoomManager({
     }
   },
 });
-setInterval(() => rooms.sweep(), 60 * 1000).unref();
+announceLucky(accounts.refreshLucky(Date.now(), { inactivityOnly: true }));
+setInterval(() => {
+  rooms.sweep();
+  try {
+    announceLucky(accounts.refreshLucky(Date.now(), { inactivityOnly: true }));
+  } catch (err) {
+    console.error('[luckiest]', err);
+  }
+}, 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
 app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, isAllowedOrigin }));

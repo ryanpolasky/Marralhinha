@@ -138,7 +138,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       <span className="item-name">{item.name}</span>
       <span className="item-rarity">{rarity.short || rarity.label}</span>
       {equipped && <span className="item-badge">Equipped</span>}
-      {!owned && !footer && <span className="item-lock">{item.tag ? `${rarity.short} only` : 'Locked'}</span>}
+      {!owned && !footer && <span className="item-lock">{item.id === 'dice.lucky' ? '7 days as Luckiest' : item.tag ? `${rarity.short} only` : 'Locked'}</span>}
       {footer}
     </button>
   );

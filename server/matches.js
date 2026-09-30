@@ -14,7 +14,7 @@ class Matches {
       insertMatch: db.prepare(
         'INSERT INTO matches (code, mode, players, bots, turns, seats, winners, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
       ),
-      insertPlayer: db.prepare('INSERT OR IGNORE INTO match_players (match_id, user_id, seat, won) VALUES (?, ?, ?, ?)'),
+      insertPlayer: db.prepare('INSERT OR IGNORE INTO match_players (match_id, user_id, seat, won, roll_count, six_count) VALUES (?, ?, ?, ?, ?, ?)'),
       history: db.prepare(
         `SELECT m.*, mp.seat AS my_seat, mp.won AS my_won FROM match_players mp JOIN matches m ON m.id = mp.match_id
          WHERE mp.user_id = ? ORDER BY m.ended_at DESC LIMIT ?`
@@ -29,11 +29,11 @@ class Matches {
   }
 
   // Snapshot a finished game: one match row + one match_players row per human who sat at the table
-  record(room) {
+  record(room, now = Date.now()) {
     const game = room.game;
     const seats = room.seats;
     const humans = seats.filter((p) => p && !p.isBot && p.userId);
-    if (!game || !humans.length) return;
+    if (!game || game.phase !== 'over' || !humans.length || !Array.isArray(game.winners) || !game.winners.length || !game.winners.every((seat) => game.active.includes(seat))) return;
     const winners = game.winners || [];
     const seatRows = game.active.map((seat) => {
       const p = seats[seat];
@@ -60,12 +60,17 @@ class Matches {
         turns,
         JSON.stringify(seatRows),
         JSON.stringify(winners),
-        game.pick?.t || Date.now(),
-        Date.now()
+        game.pick?.t || now,
+        now
       );
       const matchId = info.lastInsertRowid;
       for (const row of seatRows) {
-        if (row.userId) this.q.insertPlayer.run(matchId, row.userId, row.seat, row.won ? 1 : 0);
+        if (!row.userId) continue;
+        const stats = game.stats?.[row.seat];
+        const played = game.played?.[row.seat];
+        const rolls = stats?.rolls == null ? null : Math.max(0, stats.rolls - (played?.coveredRolls || 0));
+        const sixes = stats?.sixes == null ? null : Math.max(0, stats.sixes - (played?.coveredSixes || 0));
+        this.q.insertPlayer.run(matchId, row.userId, row.seat, row.won ? 1 : 0, rolls, sixes);
       }
     });
   }

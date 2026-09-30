@@ -227,11 +227,13 @@ const App = () => {
     };
     const onTeamChat = (entry) => setTeamLog((log) => ({ ...log, entries: [...log.entries, entry].slice(-60) }));
     const onTeamLog = ({ code, entries }) => setTeamLog({ code, entries });
+    const onLuckyChange = (message) => notify(message, 'good');
     socket.on('room:ping', onPing);
     socket.on('room:teamChat', onTeamChat);
     socket.on('room:teamLog', onTeamLog);
     socket.on('room:left', onRoomLeft);
     socket.on('account:update', setAccount);
+    socket.on('luckiest:change', onLuckyChange);
 
     bootstrapAuth()
       .then(({ profile, notice, instanceId }) => {
@@ -257,6 +259,7 @@ const App = () => {
       socket.off('room:teamChat', onTeamChat);
       socket.off('room:teamLog', onTeamLog);
       socket.off('account:update', setAccount);
+      socket.off('luckiest:change', onLuckyChange);
       socket.disconnect();
     };
   }, [enter, saveSession, notify]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -502,7 +502,7 @@ function Rewards({ reward, onRevealed }) {
   useEffect(() => {
     if (!done) return undefined;
     onRevealed?.();
-    if (!reward.leveledUp && !reward.luckyTag) return undefined;
+    if (!reward.leveledUp && !reward.luckyTag && !reward.goldenDie) return undefined;
     const t = setTimeout(() => sfx.reveal(reward.luckyTag ? 'legendary' : 'epic'), 150);
     return () => clearTimeout(t);
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -531,8 +531,13 @@ function Rewards({ reward, onRevealed }) {
         <div className="reward-celebrate reward-lucky">
           <TagBadge tag="lucky" small />
           <span>
-            <b>You're the Luckiest!</b> More sixes than anyone, ever. The Fortune die is yours to keep.
+            <b>You're the Luckiest!</b> Your last 20 games have the highest luck score. Hold the title for seven total days to unlock the Golden Die.
           </span>
+        </div>
+      )}
+      {done && reward.goldenDie && (
+        <div className="reward-celebrate reward-lucky">
+          <span><b>Golden Die unlocked!</b> Seven total days as Luckiest. It's yours permanently.</span>
         </div>
       )}
       <div className="reward-total">

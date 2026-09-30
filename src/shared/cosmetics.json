@@ -16,8 +16,8 @@
       "color": "#ffd166",
       "admin": false,
       "auto": true,
-      "blurb": "Most sixes rolled, of all time.",
-      "unlock": "Roll the most sixes of all time to claim the Luckiest tag. The die is yours to keep, even if someone takes the tag."
+      "blurb": "Highest luck score across the last 20 completed games.",
+      "unlock": "Hold Luckiest for seven cumulative days to unlock the Golden Die permanently."
     }
   },
   "slots": {
@@ -90,7 +90,7 @@
     { "id": "dice.holo", "slot": "dice", "name": "Prism", "rarity": "legendary", "desc": "Every roll, a different color." },
     { "id": "dice.beta", "slot": "dice", "name": "Test Build", "rarity": "exclusive", "tag": "beta", "desc": "May contain bugs. Rolls anyway." },
     { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
-    { "id": "dice.lucky", "slot": "dice", "name": "Fortune", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Earned by rolling more sixes than anyone, ever." },
+    { "id": "dice.lucky", "slot": "dice", "name": "Golden Die", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Permanently unlocked after seven cumulative days as Luckiest." },
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },

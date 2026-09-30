@@ -115,6 +115,7 @@ const fakeRoom = ({ winners = [0], mode = 'solo' } = {}) => ({
   code: 'TEST',
   game: {
     mode,
+    phase: 'over',
     winners,
     active: [0, 1],
     pick: { t: Date.now() - 60000 },

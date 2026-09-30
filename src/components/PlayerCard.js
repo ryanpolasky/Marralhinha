@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { ITEMS, SLOT_KEYS, SLOTS } from '../game/catalog';
 import { ItemThumb, Nameplate, TagBadges } from './Economy';
-import { StatGrid, MatchHistory } from './Stats';
+import { StatGrid, MatchHistory, LuckiestPanel } from './Stats';
 import { Close } from './Icons';
 
 // The "peek at another player" card: their look, lifetime stats and recent games.
@@ -54,6 +54,7 @@ export default function PlayerCard({ userId, hint, data, onClose }) {
             {player.createdAt && <p className="profile-xp muted">Level {player.level} · playing since {new Date(player.createdAt).toLocaleDateString()}</p>}
 
             {player.stats && <StatGrid stats={player.stats} />}
+            <LuckiestPanel lucky={player.lucky} />
 
             {player.equipped && (
               <div className="profile-loadout peek">

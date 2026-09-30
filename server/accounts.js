@@ -2,8 +2,12 @@ const { randomBytes, createHash } = require('crypto');
 const { transaction } = require('./db');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
-const LUCKY_KEY = 'lucky_holder';
 const LUCKY_ITEM = 'dice.lucky';
+const LUCK_WINDOW_GAMES = 20;
+const LUCK_ACTIVITY_DAYS = 14;
+const LUCK_EXPECTED_SIX_RATE = 1 / 6;
+const GOLDEN_DIE_REQUIRED_SECONDS = 604800;
+const LUCK_ACTIVITY_MS = LUCK_ACTIVITY_DAYS * 86400000;
 
 const SESSION_TOUCH_MS = 5 * 60 * 1000;
 const MAX_COIN_GRANT = 1000000;
@@ -61,16 +65,28 @@ class Accounts {
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
-        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ?, sixes = sixes + ?, captured = captured + ?, shortcuts = shortcuts + ?, marbles_home = marbles_home + ? WHERE id = ?`
+        `UPDATE users SET coins = coins + ?, xp = xp + ?, games = games + ?, wins = wins + ?, captures = captures + ?, boxes_opened = boxes_opened + ?, sixes = sixes + ?, captured = captured + ?, shortcuts = shortcuts + ?, marbles_home = marbles_home + ?, luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_reign_count = luckiest_reign_count + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?), golden_die_unlocked = MAX(golden_die_unlocked, ?), golden_die_unlocked_at = COALESCE(golden_die_unlocked_at, ?) WHERE id = ?`
       ),
       getMeta: db.prepare('SELECT value FROM meta WHERE key = ?'),
       setMeta: db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
-      luckiest: db.prepare('SELECT id, sixes FROM users WHERE sixes > 0 ORDER BY sixes DESC, created_at ASC LIMIT 1'),
+      luckiest: db.prepare('SELECT * FROM luckiest_reigns WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1'),
+      luckGames: db.prepare(`SELECT mp.roll_count AS rolls, mp.six_count AS sixes, m.ended_at AS endedAt
+        FROM match_players mp JOIN matches m ON m.id = mp.match_id
+        WHERE mp.user_id = ? AND mp.roll_count >= mp.six_count AND mp.six_count >= 0 AND m.ended_at <= ?
+        ORDER BY m.ended_at DESC, m.id DESC LIMIT ?`),
+      luckyCandidates: db.prepare(`SELECT DISTINCT mp.user_id AS id FROM match_players mp JOIN matches m ON m.id = mp.match_id
+        WHERE m.ended_at >= ? AND m.ended_at <= ? AND mp.roll_count >= mp.six_count AND mp.six_count >= 0`),
+      endReign: db.prepare('UPDATE luckiest_reigns SET ended_at = ?, duration_seconds = ? WHERE id = ?'),
+      addReign: db.prepare('INSERT INTO luckiest_reigns (player_id, started_at) VALUES (?, ?)'),
+      reignTime: db.prepare('UPDATE users SET luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?) WHERE id = ?'),
+      reignCount: db.prepare('UPDATE users SET luckiest_reign_count = luckiest_reign_count + 1 WHERE id = ?'),
+      unlockDie: db.prepare('UPDATE users SET golden_die_unlocked = 1, golden_die_unlocked_at = ? WHERE id = ? AND golden_die_unlocked = 0'),
       moveInventory: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?'),
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
       moveReports: db.prepare('UPDATE reports SET user_id = ? WHERE user_id = ?'),
       moveMatchPlayers: db.prepare('UPDATE match_players SET user_id = ? WHERE user_id = ?'),
+      moveReigns: db.prepare('UPDATE luckiest_reigns SET player_id = ? WHERE player_id = ?'),
       deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       addCoins: db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?'),
@@ -137,30 +153,72 @@ class Accounts {
   }
 
   luckyHolder() {
-    return this.q.getMeta.get(LUCKY_KEY)?.value || null;
+    return this.q.luckiest.get()?.player_id || null;
+  }
+
+  luckWindow(userId, now = Date.now()) {
+    const games = this.q.luckGames.all(userId, now, LUCK_WINDOW_GAMES);
+    const rolls = games.reduce((sum, game) => sum + game.rolls, 0);
+    const sixes = games.reduce((sum, game) => sum + game.sixes, 0);
+    const eligible = games.length === LUCK_WINDOW_GAMES && games[0].endedAt >= now - LUCK_ACTIVITY_MS && rolls > 0;
+    const expected = rolls * LUCK_EXPECTED_SIX_RATE;
+    return { games: games.length, rolls, sixes, eligible, lastCompletedAt: games[0]?.endedAt ?? null, rate: rolls ? sixes / rolls : 0,
+      score: eligible ? (sixes - expected) / Math.sqrt(expected * (1 - LUCK_EXPECTED_SIX_RATE)) : null };
   }
 
   // What the profile card needs to show progress towards the Luckiest tag
-  luckyStatus(user) {
-    const holderId = this.luckyHolder();
-    const holder = holderId && this.getUser(holderId);
-    return { holder: holderId === user.id, holderSixes: holder ? holder.sixes : 0 };
+  luckyStatus(user, now = Date.now()) {
+    const reign = this.q.luckiest.get();
+    const window = this.luckWindow(user.id, now);
+    const end = window.lastCompletedAt !== null ? Math.min(now, window.lastCompletedAt + LUCK_ACTIVITY_MS) : now;
+    const activeSeconds = reign?.player_id === user.id ? Math.max(0, Math.floor((end - reign.started_at) / 1000)) : 0;
+    const totalSeconds = user.luckiest_total_seconds + activeSeconds;
+    return { ...window, holder: reign?.player_id === user.id && window.eligible,
+      totalSeconds, longestSeconds: Math.max(user.luckiest_longest_reign_seconds, activeSeconds),
+      reignCount: user.luckiest_reign_count, goldenDieUnlocked: !!user.golden_die_unlocked,
+      goldenDieRemainingSeconds: Math.max(0, GOLDEN_DIE_REQUIRED_SECONDS - totalSeconds),
+      requiredGames: LUCK_WINDOW_GAMES, expectedRate: LUCK_EXPECTED_SIX_RATE };
   }
 
-  // The Luckiest tag moves only when someone strictly passes the holder's all-time sixes.
-  // Every new holder gets the Fortune die for keeps. Returns { holder, previous } when it changes.
-  refreshLucky() {
-    const top = this.q.luckiest.get();
-    const current = this.luckyHolder();
-    const holder = current && this.getUser(current);
-    if (!top || (holder && holder.sixes >= top.sixes)) {
-      if (current && !holder) this.q.setMeta.run(LUCKY_KEY, null);
-      return null;
-    }
-    if (top.id === current) return null;
-    this.q.setMeta.run(LUCKY_KEY, top.id);
-    this.q.addItem.run(top.id, LUCKY_ITEM, Date.now());
-    return { holder: top.id, previous: holder ? current : null };
+  // The Luckiest tag moves only when an eligible player's last 20 completed games have the best score.
+  // Reigns accumulate towards a permanent die, including time from earlier reigns.
+  refreshLucky(now = Date.now(), { inactivityOnly = false } = {}) {
+    return transaction(this.db, () => {
+      const current = this.q.luckiest.get();
+      const holder = current && this.getUser(current.player_id);
+      const unlocked = [];
+      const unlock = (user, seconds) => {
+        if (!user?.golden_die_unlocked && seconds >= GOLDEN_DIE_REQUIRED_SECONDS) {
+          this.q.unlockDie.run(now, user.id);
+          this.q.addItem.run(user.id, LUCKY_ITEM, now);
+          unlocked.push(user.id);
+        }
+      };
+      const holderWindow = holder && this.luckWindow(holder.id, now);
+      const reignEnd = holderWindow?.lastCompletedAt != null ? Math.min(now, holderWindow.lastCompletedAt + LUCK_ACTIVITY_MS) : now;
+      const reignSeconds = current ? Math.max(0, Math.floor((reignEnd - current.started_at) / 1000)) : 0;
+      if (current && holder) unlock(holder, holder.luckiest_total_seconds + reignSeconds);
+      if (inactivityOnly && (!current || (holder && holderWindow.eligible))) {
+        return unlocked.length ? { holder: current?.player_id || null, previous: current?.player_id || null, unlocked } : null;
+      }
+      const candidates = this.q.luckyCandidates.all(now - LUCK_ACTIVITY_MS, now)
+        .map(({ id }) => ({ id, ...this.luckWindow(id, now) }))
+        .filter((entry) => entry.eligible)
+        .sort((a, b) => b.score - a.score || (a.id === current?.player_id ? -1 : b.id === current?.player_id ? 1 : a.id.localeCompare(b.id)));
+      const next = candidates[0]?.id || null;
+      if (next === (current?.player_id || null)) return unlocked.length ? { holder: next, previous: next, unlocked } : null;
+      if (current) {
+        const seconds = reignSeconds;
+        this.q.endReign.run(reignEnd, seconds, current.id);
+        if (holder) this.q.reignTime.run(seconds, seconds, holder.id);
+      }
+      const nextUser = next && this.getUser(next);
+      if (nextUser) {
+        this.q.addReign.run(next, now);
+        this.q.reignCount.run(next);
+      }
+      return { holder: next, previous: current?.player_id || null, reclaimed: !!nextUser?.luckiest_reign_count, unlocked };
+    });
   }
 
   isAdmin(user) {
@@ -176,6 +234,7 @@ class Accounts {
     const tags = this.tags(user);
     if (tags.includes('dev')) return true;
     if (this.inventory(user.id).includes(itemId)) return true;
+    if (itemId === LUCKY_ITEM) return !!user.golden_die_unlocked;
     if (item.tag) return tags.includes(item.tag);
     return false;
   }
@@ -186,7 +245,7 @@ class Accounts {
     const inv = this.inventory(user.id);
     const valid = (slot, id) => {
       const item = ITEMS.get(id);
-      return item && item.slot === slot && (tags.includes('dev') || !item.tag || tags.includes(item.tag) || inv.includes(id));
+      return item && item.slot === slot && (tags.includes('dev') || !item.tag || (id !== LUCKY_ITEM && tags.includes(item.tag)) || inv.includes(id) || (id === LUCKY_ITEM && user.golden_die_unlocked));
     };
     return Object.fromEntries(SLOTS.map((slot) => [slot, valid(slot, stored[slot]) ? stored[slot] : DEFAULTS[slot]]));
   }
@@ -261,16 +320,15 @@ class Accounts {
 
   mergeGuest(guest, intoId) {
     const into = this.getUser(intoId);
-    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, guest.sixes || 0, guest.captured || 0, guest.shortcuts || 0, guest.marbles_home || 0, intoId);
+    this.q.mergeInto.run(guest.coins, guest.xp, guest.games, guest.wins, guest.captures, guest.boxes_opened, guest.sixes || 0, guest.captured || 0, guest.shortcuts || 0, guest.marbles_home || 0, guest.luckiest_total_seconds, guest.luckiest_reign_count, guest.luckiest_longest_reign_seconds, guest.golden_die_unlocked, guest.golden_die_unlocked_at, intoId);
     this.q.moveInventory.run(intoId, guest.id);
     this.q.moveSessions.run(intoId, guest.id);
     this.q.moveLedger.run(intoId, guest.id);
     this.q.moveReports.run(intoId, guest.id);
     this.q.moveMatchPlayers.run(intoId, guest.id);
+    this.q.moveReigns.run(intoId, guest.id);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
-    if (this.luckyHolder() === guest.id) this.q.setMeta.run(LUCKY_KEY, intoId);
     this.q.deleteUser.run(guest.id);
-    this.refreshLucky();
   }
 
   search(query, limit = 40, { guests = true } = {}) {
@@ -348,6 +406,7 @@ class Accounts {
       level: levelInfo(user.xp).level,
       tags: this.tags(user),
       stats: this.statLine(user),
+      lucky: this.luckyStatus(user),
       createdAt: user.created_at,
     };
   }

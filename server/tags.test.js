@@ -1,14 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { openDb } = require('./db');
+const { DatabaseSync } = require('node:sqlite');
+const { openDb, migrate } = require('./db');
 const { Accounts } = require('./accounts');
 const { Economy, featuredFor, utcDay, botCosmetics } = require('./economy');
 const { catalog, DROPPABLE, BOXES } = require('./catalog');
+const { Matches } = require('./matches');
 
 const setup = () => {
   const db = openDb(':memory:');
   const accounts = new Accounts(db);
-  return { db, accounts, economy: new Economy(db, accounts) };
+  return { db, accounts, economy: new Economy(db, accounts), matches: new Matches(db, accounts) };
 };
 
 test('tags are stored, normalized and drive the admin flag', () => {
@@ -67,34 +69,136 @@ test('tag-exclusive cosmetics are owned through the tag, never dropped or sold',
   }
 });
 
-test('the Luckiest tag follows the all-time sixes leader, and the Fortune die stays with everyone who held it', () => {
-  const { accounts, economy } = setup();
+function recordLuckyGame(matches, user, rolls, sixes, now, played = {}) {
+  matches.record({ code: 'LUCK', seats: [{ name: user.name, userId: user.id }, { name: 'Bot', isBot: true }], game: {
+    phase: 'over', mode: 'solo', winners: [0], active: [0, 1], marbles: [[], []],
+    stats: [{ rolls, sixes, captures: 0 }, { rolls: 0, sixes: 0 }], played: [played, {}],
+  } }, now);
+}
+
+test('Luckiest uses 20 recorded games, z-scores, completed-game updates, and cumulative reign time', () => {
+  const { db, accounts, matches } = setup();
   const a = accounts.createUser({ name: 'A' });
   const b = accounts.createUser({ name: 'B' });
-  const game = (sixes) => ({ winners: [0], stats: sixes.map((s) => ({ captures: 0, sixes: s })), marbles: sixes.map(() => []) });
-  const players = [{ seat: 0, userId: a.id }, { seat: 1, userId: b.id }];
-
+  const day = 86400000;
+  const start = Date.parse('2026-04-01T12:00:00Z');
+  for (let i = 0; i < 19; i++) {
+    recordLuckyGame(matches, a, 60, 14, start + i);
+    recordLuckyGame(matches, b, 6, 2, start + i);
+  }
+  assert.equal(accounts.refreshLucky(start + 19), null);
   assert.equal(accounts.luckyHolder(), null);
-  const first = economy.awardGame({ game: game([5, 3]), players, botGame: false });
-  assert.equal(first[0].luckyTag, true);
+  recordLuckyGame(matches, a, 60, 14, start + 20);
+  recordLuckyGame(matches, b, 6, 2, start + 20);
+  assert.ok(accounts.luckWindow(a.id, start + 20).score > accounts.luckWindow(b.id, start + 20).score);
+  assert.ok(accounts.luckWindow(a.id, start + 20).rate < accounts.luckWindow(b.id, start + 20).rate);
+  assert.equal(accounts.refreshLucky(start + 20).holder, a.id);
   assert.equal(accounts.luckyHolder(), a.id);
   assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['lucky']);
+  assert.equal(accounts.owns(a.id, 'dice.lucky'), false, 'holding the title does not grant the die');
+  recordLuckyGame(matches, b, 6, 6, start + 2 * day);
+  assert.equal(accounts.luckyHolder(), a.id, 'a completed game changes nothing before recalculation');
+  assert.equal(accounts.refreshLucky(start + 2 * day), null);
+  recordLuckyGame(matches, b, 6, 6, start + 2 * day + 1);
+  assert.equal(accounts.refreshLucky(start + 2 * day + 1).holder, b.id);
+  assert.equal(accounts.getUser(a.id).luckiest_total_seconds, 2 * 86400 - 1);
+  assert.equal(accounts.getUser(a.id).luckiest_reign_count, 1);
+  assert.equal(db.prepare('SELECT duration_seconds FROM luckiest_reigns WHERE player_id = ?').get(a.id).duration_seconds, 2 * 86400 - 1);
+  recordLuckyGame(matches, a, 60, 60, start + 3 * day);
+  assert.equal(accounts.refreshLucky(start + 3 * day).reclaimed, true);
+  assert.equal(accounts.luckyHolder(), a.id);
+  assert.equal(accounts.refreshLucky(start + 8 * day - 1000, { inactivityOnly: true }), null);
+  const unlock = accounts.refreshLucky(start + 8 * day + 1000, { inactivityOnly: true });
+  assert.deepEqual(unlock.unlocked, [a.id]);
+  assert.equal(accounts.profile(a.id).lucky.goldenDieUnlocked, true);
+  assert.equal(accounts.getUser(a.id).luckiest_reign_count, 2);
+  assert.equal(accounts.profile(a.id).lucky.totalSeconds >= 7 * 86400, true);
   assert.ok(accounts.owns(a.id, 'dice.lucky'));
-  assert.equal(accounts.owns(b.id, 'dice.lucky'), false);
-
-  economy.awardGame({ game: game([0, 2]), players, botGame: false });
-  assert.equal(accounts.luckyHolder(), a.id, 'a tie keeps the current holder');
-
-  economy.awardGame({ game: game([0, 1]), players, botGame: false });
-  assert.equal(accounts.luckyHolder(), b.id);
-  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), [], 'the old holder loses the tag');
-  assert.ok(accounts.owns(a.id, 'dice.lucky'), 'but keeps the die');
   accounts.equip(a.id, 'dice', 'dice.lucky');
-  assert.equal(accounts.equipped(accounts.getUser(a.id)).dice, 'dice.lucky');
-
+  recordLuckyGame(matches, b, 600, 600, start + 9 * day);
+  accounts.refreshLucky(start + 9 * day);
+  assert.equal(accounts.equipped(accounts.getUser(a.id)).dice, 'dice.lucky', 'the die is permanent after losing the tag');
   accounts.setTags(a.id, ['lucky', 'beta']);
-  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['beta'], 'admins cannot hand out the Luckiest tag');
+  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['beta']);
   assert.throws(() => accounts.grantItem(a.id, 'dice.lucky'), /Luckiest tag/);
+});
+
+test('Golden Die unlocks at exactly seven active days, once', () => {
+  const { accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const start = Date.parse('2026-06-01T12:00:00Z');
+  for (let i = 0; i < 20; i++) recordLuckyGame(matches, a, 12, 3, start - 20 + i);
+  assert.equal(accounts.refreshLucky(start).holder, a.id);
+  assert.equal(accounts.refreshLucky(start + 604799000, { inactivityOnly: true }), null);
+  assert.deepEqual(accounts.refreshLucky(start + 604800000, { inactivityOnly: true }).unlocked, [a.id]);
+  assert.equal(accounts.getUser(a.id).golden_die_unlocked_at, start + 604800000);
+  assert.equal(accounts.refreshLucky(start + 604801000, { inactivityOnly: true }), null);
+});
+
+test('inactive holders relinquish Luckiest, while legacy games and bot turns do not fabricate a luck score', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const day = 86400000;
+  const start = Date.parse('2026-05-01T12:00:00Z');
+  db.prepare('INSERT INTO matches (code, mode, players, bots, turns, seats, winners, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('OLD', 'solo', 1, 1, 10, '[]', '[0]', start, start);
+  db.prepare('INSERT INTO match_players (match_id, user_id, seat, won) VALUES (1, ?, 0, 1)').run(a.id);
+  for (let i = 0; i < 20; i++) {
+    recordLuckyGame(matches, a, 60, 14, start + i + 1);
+    recordLuckyGame(matches, b, 6, 1, start + day + i);
+  }
+  assert.equal(accounts.luckWindow(a.id, start + day + 20).games, 20, 'unknown legacy roll totals are excluded');
+  assert.equal(accounts.refreshLucky(start + day + 20).holder, a.id);
+  assert.equal(accounts.refreshLucky(start + 14 * day + 60000, { inactivityOnly: true }).holder, b.id);
+  assert.equal(accounts.getUser(a.id).luckiest_total_seconds, 13 * 86400);
+  assert.equal(db.prepare('SELECT ended_at FROM luckiest_reigns WHERE player_id = ?').get(a.id).ended_at, start + 14 * day + 20);
+  assert.equal(accounts.refreshLucky(start + 15 * day + 20, { inactivityOnly: true }).holder, null);
+  const c = accounts.createUser({ name: 'C' });
+  for (let i = 0; i < 20; i++) recordLuckyGame(matches, c, 9, 3, start + 16 * day + i, { coveredRolls: 9, coveredSixes: 3 });
+  assert.equal(accounts.luckWindow(c.id, start + 16 * day + 20).games, 20);
+  assert.equal(accounts.luckWindow(c.id, start + 16 * day + 20).eligible, false, 'no personally rolled dice means no measurable score');
+  assert.equal(accounts.refreshLucky(start + 16 * day + 20), null);
+});
+
+test('only completed games store human-rolled dice, excluding bot and partner coverage', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const room = { code: 'REAL', seats: [{ name: 'A', userId: a.id }, { name: 'Bot', isBot: true }], game: {
+    phase: 'move', mode: 'solo', winners: [0], active: [0, 1], marbles: [[], []],
+    stats: [{ rolls: 12, sixes: 4, captures: 0 }, { rolls: 0, sixes: 0 }],
+    played: [{ coveredRolls: 5, coveredSixes: 2 }, {}],
+  } };
+  matches.record(room);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM matches').get().n, 0);
+  room.game.phase = 'over';
+  matches.record(room);
+  assert.deepEqual({ ...db.prepare('SELECT roll_count, six_count FROM match_players').get() }, { roll_count: 7, six_count: 2 });
+});
+
+test('linking a guest preserves an active reign and its recorded games', () => {
+  const { accounts, matches } = setup();
+  const guest = accounts.createUser({ name: 'Guest' });
+  const account = accounts.loginDiscord({ id: 'lucky-merge', username: 'Saved' });
+  const now = Date.now();
+  for (let i = 0; i < 20; i++) recordLuckyGame(matches, guest, 12, 5, now - 100 + i);
+  assert.equal(accounts.refreshLucky(now).holder, guest.id);
+  const merged = accounts.loginDiscord({ id: 'lucky-merge', username: 'Saved' }, guest.id);
+  assert.equal(merged.id, account.id);
+  assert.equal(accounts.luckyHolder(), account.id);
+  assert.equal(accounts.luckWindow(account.id, now).games, 20);
+  assert.equal(accounts.getUser(account.id).luckiest_reign_count, 1);
+  assert.deepEqual(accounts.tags(accounts.getUser(account.id)), ['lucky']);
+});
+
+test('migration preserves previously earned Fortune dice without inventing old game rolls', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec("CREATE TABLE users (id TEXT PRIMARY KEY); CREATE TABLE inventory (user_id TEXT, item_id TEXT); CREATE TABLE match_players (match_id INTEGER, user_id TEXT, seat INTEGER, won INTEGER); INSERT INTO users (id) VALUES ('old'), ('new'); INSERT INTO inventory VALUES ('old', 'dice.lucky'); INSERT INTO match_players VALUES (1, 'old', 0, 1)");
+  migrate(db);
+  migrate(db);
+  assert.equal(db.prepare("SELECT golden_die_unlocked FROM users WHERE id = 'old'").get().golden_die_unlocked, 1);
+  assert.equal(db.prepare("SELECT golden_die_unlocked FROM users WHERE id = 'new'").get().golden_die_unlocked, 0);
+  assert.deepEqual({ ...db.prepare('SELECT roll_count, six_count FROM match_players').get() }, { roll_count: null, six_count: null });
+  db.close();
 });
 
 test('admin grants: coins, items, names', () => {

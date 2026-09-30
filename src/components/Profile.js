@@ -1,16 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { ITEMS, SLOTS, SLOT_KEYS, canUse, collectible } from '../game/catalog';
-import { ItemThumb, Nameplate, TagBadge, TagBadges } from './Economy';
-import { StatGrid, MatchHistory } from './Stats';
+import { ItemThumb, Nameplate, TagBadges } from './Economy';
+import { StatGrid, MatchHistory, LuckiestPanel } from './Stats';
 import { Close } from './Icons';
-
-function luckyLine({ lucky, stats }) {
-  if (lucky?.holder) return "You've rolled more sixes than anyone, ever. The tag is yours until someone passes you.";
-  if (!lucky?.holderSixes) return 'Roll a six in any game to claim the Luckiest tag.';
-  const needed = lucky.holderSixes - (stats.sixes || 0) + 1;
-  return `${needed.toLocaleString()} more six${needed === 1 ? '' : 'es'} to take the Luckiest tag.`;
-}
 
 export default function Profile({ account, onClose, onLocker, onReport, history }) {
   const [matches, setMatches] = useState(history || null);
@@ -65,10 +58,7 @@ export default function Profile({ account, onClose, onLocker, onReport, history 
 
         <StatGrid stats={stats} />
 
-        <div className={`profile-lucky${account.lucky?.holder ? ' holder' : ''}`}>
-          <TagBadge tag="lucky" small />
-          <span>{luckyLine(account)}</span>
-        </div>
+        <LuckiestPanel lucky={account.lucky} />
 
         <h3 className="profile-section">Match history</h3>
         <MatchHistory matches={matches} meId={account.id} />
