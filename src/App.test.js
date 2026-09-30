@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 
 // CRA resets jest.fn mocks between tests, so plain functions it is
@@ -7,7 +7,7 @@ jest.mock('./net/socket', () => ({
   request: () => Promise.resolve({}),
 }));
 jest.mock('./net/api', () => ({
-  api: () => Promise.resolve({ discord: false }),
+  api: (path) => Promise.resolve(path === '/reports' ? { reports: [{ id: 1, kind: 'bug', status: 'open', text: 'Example report', createdAt: Date.now() }] } : { discord: false }),
   post: () => Promise.resolve({}),
   setToken: () => {},
 }));
@@ -30,6 +30,7 @@ jest.mock('./net/auth', () => ({
   startDiscordLogin: () => Promise.resolve(),
 }));
 jest.mock('./three/Scene', () => () => null);
+jest.mock('./game/music', () => ({ startMusic: () => {} }));
 
 test('signs in as a guest and renders the home screen with the account bar', async () => {
   render(<App />);
@@ -37,4 +38,8 @@ test('signs in as a guest and renders the home screen with the account bar', asy
   expect(screen.getByLabelText(/room code/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /shop/i })).toBeInTheDocument();
   expect(screen.getByText('Tester')).toBeInTheDocument();
+  expect(document.querySelector('.account-actions .report-btn')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Report & ideas' }));
+  expect(screen.getByRole('dialog', { name: /report/i })).toBeInTheDocument();
+  expect(await screen.findByText('Example report')).toBeInTheDocument();
 });

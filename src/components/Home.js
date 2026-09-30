@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
 import { randomNickname } from '../game/fun';
 import RulesButton from './Rules';
-import { DieIcon } from './Icons';
+import { Bug, DieIcon } from './Icons';
 import { Credit, LegalLinks } from './About';
 
 export function Logo() {
@@ -62,7 +62,7 @@ export function Pronunciation() {
   );
 }
 
-export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin }) {
+export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin, onReport }) {
   const [code, setCode] = useState(initialCode || '');
   const [spin, setSpin] = useState(0);
   const nameOk = name.trim().length > 0;
@@ -158,6 +158,9 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
           <LegalLinks className="inline" />
         </div>
       </div>
+      <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
+        <Bug /> Report & ideas
+      </button>
       <Credit className="corner" />
     </div>
   );

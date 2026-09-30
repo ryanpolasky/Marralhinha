@@ -3948,6 +3948,29 @@ button.room-pill.copied {
   align-self: center;
 }
 
+.home-report {
+  position: absolute;
+  right: 16px;
+  bottom: 54px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.home-report:hover {
+  background: rgba(40, 70, 76, 0.9);
+}
+
 .credit.corner {
   position: absolute;
   right: 16px;
@@ -3960,7 +3983,19 @@ button.room-pill.copied {
 }
 
 @media (max-width: 560px) {
-  .screen:has(.credit.corner) {
+  .screen:has(.home-report) {
+    padding-bottom: 108px;
+  }
+
+  .home-report {
+    position: fixed;
+    right: 50%;
+    bottom: 54px;
+    transform: translateX(50%);
+    white-space: nowrap;
+  }
+
+  .screen:has(.credit.corner):not(:has(.home-report)) {
     padding-bottom: 56px;
   }
 
@@ -5151,7 +5186,8 @@ select.admin-input optgroup {
     margin: auto 0;
   }
 
-  .credit.corner {
+  .credit.corner,
+  .home-report {
     position: fixed;
   }
 

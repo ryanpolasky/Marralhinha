@@ -68,7 +68,7 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           </button>
         )}
         {onReport && (
-          <button className="bar-btn report" onClick={onReport} title="Report a bug or suggest a feature">
+          <button className="bar-btn report-btn" onClick={onReport} title="Report a bug or suggest a feature">
             <Bug />
             <span>Report</span>
           </button>

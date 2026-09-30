@@ -429,7 +429,7 @@ const App = () => {
       onProfile={() => setModal('profile')}
       onAdmin={() => setModal('admin')}
       onBoards={() => setModal('boards')}
-      onReport={() => setModal('report')}
+      onReport={inRoom && !game ? () => setModal('report') : undefined}
       onMail={account?.replies?.length ? () => setModal('replies') : undefined}
       onDaily={claimDaily}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
@@ -484,6 +484,7 @@ const App = () => {
             enter(await request('room:quickPlay', { prefer: favorite() }));
           })
         }
+        onReport={() => setModal('report')}
         onJoin={(code) =>
           run(async () => {
             await ensureName();
@@ -518,6 +519,7 @@ const App = () => {
           setResetKey((k) => k + 1);
         }}
         onShop={() => setModal('shop')}
+        onReport={() => setModal('report')}
         onPlayerStats={(p) => p?.userId && setPeek(p)}
         coins={account.coins}
       />

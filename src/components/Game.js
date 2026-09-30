@@ -6,7 +6,7 @@ import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee, Bug } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
@@ -543,7 +543,7 @@ function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onReport, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
@@ -673,6 +673,11 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         <div className="hud-buttons">
           {isAdmin && <BoardPicker current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null} onPick={(item) => onAction('game:setBoard', { item })} />}
           <SettingsButton />
+          {onReport && (
+            <button className="icon-btn" onClick={onReport} aria-label="Report a bug or suggest a feature" title="Report a bug or suggest a feature">
+              <Bug />
+            </button>
+          )}
           <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
             <Camera />
           </button>
