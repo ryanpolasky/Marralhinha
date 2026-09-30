@@ -93,7 +93,7 @@ export function ReportModal({ onClose, notify, reports }) {
             aria-label={kind === 'bug' ? 'Describe the bug' : 'Describe your idea'}
           />
           <div className="report-form-foot">
-            <span className="muted small-text">Devs can reply here — you'll see it next time you log in.</span>
+            <span className="muted small-text">Ryan can reply here - you'll see it next time you log in.</span>
             <button className="btn primary" type="submit" disabled={busy || text.trim().length < 5}>
               Send
             </button>
