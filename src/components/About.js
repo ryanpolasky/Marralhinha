@@ -92,14 +92,14 @@ export function AboutModal({ onClose }) {
           <div className="about-story">
             <p>
               Hi, I'm <b>{AUTHOR.name}</b>! I played Marralhinha a ton with my mom, who was born in the Açores. It's the kind of game that turns a quiet evening
-              into hours of lucky sixes, groans and marbles getting sent back home.
+              into hours of lucky sixes, groans, and marbles getting sent back home.
             </p>
             <p>
               I built Marralhinha Online to eternalize the game we love and share it with everyone, whether you grew up playing it on Terceira or you're
               discovering it for the very first time.
             </p>
             <p className="about-dedication">
-              <Heart /> For my mom.
+              <Heart /> For my mom :)
             </p>
           </div>
           <div className="about-contact">
