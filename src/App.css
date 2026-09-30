@@ -1587,6 +1587,35 @@ button.room-pill.copied {
   z-index: 1;
 }
 
+.win-intro,
+.win-payout,
+.win-social { display: contents; }
+
+.win-screen.activity-win-screen { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.win-card.activity-win-card {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  align-items: start;
+}
+.activity-win-card .win-intro,
+.activity-win-card .win-payout,
+.activity-win-card .win-social { display: block; min-width: 0; }
+.activity-win-card .win-intro { grid-column: 1; grid-row: 1; }
+.activity-win-card .win-payout { grid-column: 2; grid-row: 1; }
+.activity-win-card .win-social { grid-column: 1; grid-row: 2; }
+.activity-win-card .win-actions { grid-column: 2; grid-row: 2; }
+.activity-win-card h2 { font-size: 28px; }
+.activity-win-card .win-marbles { margin-bottom: 0; }
+.activity-win-card .awards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 8px; }
+.activity-win-card .win-players { margin: 0; }
+.activity-win-card .win-player { padding: 5px 9px; }
+.activity-win-card .rewards { margin-bottom: 0; }
+.activity-win-card .btn.big { font-size: 17px; padding: 10px 18px; }
+
 .win-kicker {
   font-size: 16px;
   text-transform: uppercase;

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import Shop from './components/Shop';
 import Lobby from './components/Lobby';
+import Game from './components/Game';
 import { LuckiestPanel } from './components/Stats';
 import { canUse, collectible, itemsForSlot } from './game/catalog';
 
@@ -96,6 +97,21 @@ test('Discord lobby keeps seats and controls in a fitted two-column panel', () =
   expect(panel.querySelector('.lobby-table .seats')).toBeInTheDocument();
   expect(panel.querySelector('.lobby-controls')).toContainElement(screen.getByRole('button', { name: 'Start game' }));
   expect(panel.querySelector('.lobby-controls')).toContainElement(screen.getByRole('slider', { name: 'Turn timer' }));
+});
+
+test('end-game player markers have both colors and open the other player card', () => {
+  const onPlayerStats = jest.fn();
+  const room = { activity: true, code: 'TEST', hostId: 'p1', spectators: [], seats: [{ id: 'p1', name: 'Ana', userId: 'a', connected: true }, { id: 'p2', name: 'Rui', userId: 'b', connected: true }, null, null], game: {
+    phase: 'over', mode: 'solo', turn: 0, active: [0, 1], winners: [1], marbles: [[], [], [], []], log: [], rewards: {},
+  } };
+  const { container } = render(<Game room={room} playerId="p1" onAction={() => {}} onPlayerStats={onPlayerStats} onShop={() => {}} onResetView={() => {}} />);
+  const row = container.querySelector('.win-player:not(.quiet)');
+  expect(container.querySelector('.activity-win-card .win-social')).toContainElement(row);
+  expect(container.querySelector('.activity-win-card .win-actions')).toContainElement(screen.getByRole('button', { name: 'Play again' }));
+  expect(row.style.getPropertyValue('--seat')).toBe('#2f7de1');
+  expect(row.style.getPropertyValue('--seat-light')).toBe('#8cc2ff');
+  fireEvent.click(row);
+  expect(onPlayerStats).toHaveBeenCalledWith(room.seats[1]);
 });
 
 test('signs in as a guest and renders the home screen with the account bar', async () => {

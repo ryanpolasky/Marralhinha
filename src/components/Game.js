@@ -12,6 +12,7 @@ import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { useSettings, updateSettings } from '../game/settings';
+import useFitPanel from './useFitPanel';
 
 const BOX_PRICE = BOXES[0].price;
 
@@ -556,6 +557,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const [feedOpen, setFeedOpen] = useState(false);
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
   const [showOver, setShowOver] = useState(game.phase === 'over');
+  const [winScreenRef, winCardRef] = useFitPanel(room.activity && showOver, room, { maxWidth: 920 });
 
   const nameOf = useCallback((s) => (s === mySeat ? 'You' : seats[s]?.name || SEAT_COLORS[s].name), [mySeat, seats]);
   const announcements = useAnnouncements(game, mySeat, nameOf);
@@ -773,9 +775,10 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       )}
 
       {showOver && (
-        <div className="win-screen">
+        <div ref={winScreenRef} className={`win-screen${room.activity ? ' activity-win-screen' : ''}`}>
           {iWon && <Confetti />}
-          <div className={`panel win-card${iWon ? ' won' : ''}`}>
+          <div ref={winCardRef} className={`panel win-card${iWon ? ' won' : ''}${room.activity ? ' activity-win-card' : ''}`}>
+            <div className="win-intro">
             <div className="win-kicker">{iWon ? 'Victory!' : 'Game over'}</div>
             <h2>{iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`}</h2>
             <div className="win-marbles">
@@ -783,7 +786,9 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
                 <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />
               ))}
             </div>
-            <Rewards reward={myReward} onRevealed={() => setRevealed(true)} />
+            </div>
+            <div className="win-payout"><Rewards reward={myReward} onRevealed={() => setRevealed(true)} /></div>
+            <div className="win-social">
             <Awards game={game} nameOf={nameOf} />
             {onPlayerStats && (
               <div className="win-players">
@@ -795,7 +800,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
                       key={s}
                       type="button"
                       className={`win-player${human ? '' : ' quiet'}`}
-                      style={{ '--seat': SEAT_COLORS[s].main }}
+                      style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }}
                       disabled={!human}
                       onClick={() => human && onPlayerStats(p)}
                       title={human ? `See ${p.name}'s stats` : undefined}
@@ -810,6 +815,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
                 })}
               </div>
             )}
+            </div>
             <div className="win-actions">
               {isHost ? (
                 <button className="btn primary big block play-btn" onClick={() => onAction('game:rematch')}>

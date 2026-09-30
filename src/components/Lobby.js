@@ -1,4 +1,5 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import useFitPanel from './useFitPanel';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
@@ -74,8 +75,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
   const [busy, setBusy] = useState(false);
-  const screenRef = useRef(null);
-  const panelRef = useRef(null);
+  const [screenRef, panelRef] = useFitPanel(room.activity, room, { reserveBar: true, bottom: 28 });
   const events = useSeatEvents(room, playerId);
   const act = async (fn) => {
     if (busy) return;
@@ -93,35 +93,6 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
   const offered = room.swapOffers?.find((offer) => offer.fromId === playerId);
   const incoming = room.swapOffers?.filter((offer) => offer.toId === playerId) || [];
   const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${room.code}`;
-
-  useLayoutEffect(() => {
-    if (!room.activity) return undefined;
-    const measure = () => {
-      const screen = screenRef.current;
-      const panel = panelRef.current;
-      if (!screen || !panel) return;
-      const bar = document.querySelector('.account-bar');
-      const top = Math.max(72, Math.ceil(bar?.getBoundingClientRect().bottom || 64) + 8);
-      const bottom = window.innerWidth <= 560 ? 72 : 28;
-      screen.style.paddingTop = `${top}px`;
-      screen.style.paddingBottom = `${bottom}px`;
-      const width = Math.max(1, window.innerWidth - 28);
-      const height = Math.max(1, window.innerHeight - top - bottom);
-      panel.style.zoom = '1';
-      panel.style.width = `${Math.min(880, width)}px`;
-      let scale = Math.min(1, height / Math.max(1, panel.scrollHeight));
-      panel.style.width = `${Math.min(880, width / scale)}px`;
-      scale = Math.min(1, height / Math.max(1, panel.scrollHeight));
-      panel.style.width = `${Math.min(880, width / scale)}px`;
-      panel.style.zoom = String(scale);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    const bar = document.querySelector('.account-bar');
-    if (bar) observer?.observe(bar);
-    return () => { window.removeEventListener('resize', measure); observer?.disconnect(); };
-  }, [room, busy, swapFrom]);
 
   const copy = async () => {
     try {
