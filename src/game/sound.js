@@ -141,9 +141,13 @@ export const sfx = {
     tone({ freq: 220, to: 880, type: 'sawtooth', dur: 1.2, vol: 0.03 });
   },
   reveal: (rarity) => {
-    const notes = { common: [523, 659], rare: [523, 659, 784], epic: [523, 659, 784, 1047], legendary: [523, 659, 784, 1047, 1319, 1568] }[rarity] || [523];
+    const notes = { common: [523, 659], rare: [523, 659, 784], epic: [523, 659, 784, 1047], legendary: [523, 659, 784, 1047, 1319, 1568], mythic: [392, 523, 659, 784, 1047, 1319, 1568, 2093] }[rarity] || [523];
     noise({ dur: 0.35, vol: 0.2, freq: 2500, to: 600, q: 0.7 });
     notes.forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.4, vol: 0.14, delay: 0.05 + i * 0.09 }));
-    if (rarity === 'legendary' || rarity === 'epic') notes.forEach((f) => tone({ freq: f / 2, type: 'sine', dur: 1.6, vol: 0.06, delay: 0.5 }));
+    if (['epic', 'legendary', 'mythic'].includes(rarity)) notes.forEach((f) => tone({ freq: f / 2, type: 'sine', dur: 1.6, vol: 0.06, delay: 0.5 }));
+    if (rarity === 'mythic') {
+      tone({ freq: 65, to: 98, type: 'sawtooth', dur: 2.2, vol: 0.05, delay: 0.1 });
+      [1047, 1319, 1568, 2093].forEach((f, i) => tone({ freq: f, type: 'sine', dur: 1.2, vol: 0.05, delay: 1.0 + i * 0.12 }));
+    }
   },
 };

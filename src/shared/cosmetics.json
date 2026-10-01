@@ -6,6 +6,7 @@
     "rare": { "label": "Rare", "color": "#3fa9f5", "dupe": 60 },
     "epic": { "label": "Epic", "color": "#b36bff", "dupe": 150 },
     "legendary": { "label": "Legendary", "color": "#ffb627", "dupe": 500 },
+    "mythic": { "label": "Mythic", "color": "#ff5f3a", "dupe": 1500 },
     "exclusive": { "label": "Exclusive", "color": "#ff4fd8", "dupe": 0 }
   },
   "tags": {
@@ -48,7 +49,7 @@
     { "id": "marble.holo", "slot": "marble", "name": "Holo", "rarity": "legendary", "desc": "Shifts color as it rolls." },
     { "id": "marble.storm", "slot": "marble", "name": "Tempest", "rarity": "legendary", "desc": "A storm that never stops spinning." },
     { "id": "marble.eye", "slot": "marble", "name": "Dragon Eye", "rarity": "legendary", "desc": "It's watching your opponents. Always." },
-    { "id": "marble.sol", "slot": "marble", "name": "Sol", "rarity": "legendary", "desc": "A whole star, somehow." },
+    { "id": "marble.sol", "slot": "marble", "name": "Sol", "rarity": "mythic", "desc": "A whole star, somehow." },
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
@@ -134,7 +135,7 @@
       "name": "Golden Chest",
       "blurb": "Better odds. Shinier chest. Guaranteed Rare or better.",
       "price": 450,
-      "weights": { "common": 0, "rare": 70, "epic": 24, "legendary": 6 },
+      "weights": { "common": 0, "rare": 69.7, "epic": 24, "legendary": 6, "mythic": 0.3 },
       "pity": { "epic": 5, "legendary": 25 }
     }
   ],

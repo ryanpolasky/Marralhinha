@@ -1,7 +1,7 @@
 const { randomInt, createHash } = require('crypto');
 const { transaction } = require('./db');
 const { levelInfo } = require('./accounts');
-const { catalog, ITEMS, BOXES, DROPPABLE, itemsOfRarity, REWARDS } = require('./catalog');
+const { catalog, ITEMS, BOXES, DROPPABLE, RARITY_ORDER, itemsOfRarity, REWARDS } = require('./catalog');
 
 class EconomyError extends Error {}
 
@@ -33,7 +33,8 @@ function featuredFor(day) {
     seed = (seed * 1103515245 + 12345) % 2147483648;
     return seed % n;
   };
-  const pool = [...DROPPABLE];
+  // Mythics are chest-only, never for sale
+  const pool = DROPPABLE.filter((i) => catalog.featured.prices[i.rarity]);
   const picks = [];
   const fancy = pool.filter((i) => i.rarity === 'epic' || i.rarity === 'legendary');
   picks.push(fancy[rand(fancy.length)]);
@@ -168,13 +169,14 @@ class Economy {
     const sinceLegendary = counters.legendary + 1;
 
     let rarity;
-    if (sinceLegendary >= box.pity.legendary) rarity = 'legendary';
-    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary }, rand);
+    const mythic = box.weights.mythic || 0;
+    if (sinceLegendary >= box.pity.legendary) rarity = weightedPick({ legendary: box.weights.legendary, mythic }, rand);
+    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary, mythic }, rand);
     else rarity = weightedPick(box.weights, rand);
 
     pity[box.id] = {
-      epic: rarity === 'epic' || rarity === 'legendary' ? 0 : sinceEpic,
-      legendary: rarity === 'legendary' ? 0 : sinceLegendary,
+      epic: RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('epic') ? 0 : sinceEpic,
+      legendary: RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('legendary') ? 0 : sinceLegendary,
     };
     this.q.pity.run(JSON.stringify(pity), user.id);
 

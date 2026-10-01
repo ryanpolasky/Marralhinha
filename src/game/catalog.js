@@ -10,8 +10,8 @@ export const SLOT_KEYS = Object.keys(catalog.slots);
 export const ITEMS = Object.fromEntries(catalog.items.map((item) => [item.id, item]));
 export const BOXES = catalog.boxes;
 export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slot, catalog.slots[slot].default]));
-export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'exclusive'];
-const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'lucky', 'supporter', 'beta', 'dev'];
+export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
+const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag);
 
 export const itemsForSlot = (slot) =>

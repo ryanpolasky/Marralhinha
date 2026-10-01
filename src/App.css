@@ -3582,6 +3582,36 @@ button.room-pill.copied {
   }
 }
 
+.reveal-card.rarity-mythic {
+  border-color: #ffd36a;
+  animation: reveal-pop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1) both, mythic-pulse 1.2s ease-in-out 0.7s infinite;
+}
+
+@keyframes mythic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 70px rgba(255, 95, 58, 0.7), 0 0 0 2px rgba(255, 211, 106, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 140px rgba(255, 140, 50, 0.95), 0 0 40px rgba(255, 230, 160, 0.8), 0 0 0 3px #ffd36a;
+  }
+}
+
+.reveal-card.rarity-mythic .reveal-name {
+  background: linear-gradient(100deg, #ff3d2e, #ffd36a 45%, #fff3c4 55%, #ff7a2a);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mythic-flow 2.4s linear infinite;
+}
+
+@keyframes mythic-flow {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .reveal-name {
   margin: 8px 0 2px;
   font-size: 32px;
@@ -3818,6 +3848,32 @@ button.room-pill.copied {
 
 .item-card.locked .item-name {
   opacity: 0.6;
+}
+
+.item-card.rarity-mythic:not(.locked) {
+  border-color: #ff8a3a;
+  box-shadow: 0 0 20px rgba(255, 95, 58, 0.45), inset 0 0 18px rgba(255, 140, 50, 0.12);
+}
+
+.item-card.rarity-mythic:not(.locked)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  --flow-to: 150% 0;
+  background: linear-gradient(120deg, transparent 35%, rgba(255, 120, 50, 0.35) 45%, rgba(255, 240, 190, 0.5) 50%, rgba(255, 120, 50, 0.35) 55%, transparent 65%);
+  background-size: 300% 100%;
+  animation: plate-flow 2s linear infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.rarity-tag.rarity-mythic {
+  color: #fff8ec;
+  background: linear-gradient(100deg, #c4161e, #ff5f3a 35%, #ffb43c 60%, #ff5f3a 85%, #c4161e);
+  background-size: 200% 100%;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  animation: mythic-flow 3s linear infinite;
 }
 
 .item-card.rarity-legendary:not(.locked)::before {
@@ -5074,16 +5130,23 @@ button.room-pill.copied {
 }
 
 .thumb-marble.skin-sol {
-  background: radial-gradient(circle at 58% 40%, #fff3c4 0 4%, transparent 7%), radial-gradient(circle at 38% 66%, #ffc454 0 5%, transparent 8%), radial-gradient(circle at 66% 68%, rgba(10, 2, 0, 0.9) 0 8%, transparent 12%),
-    radial-gradient(circle at 42% 36%, #ffb63c 0 6%, transparent 10%), radial-gradient(circle at 50% 50%, #b3540e 0 34%, #571600 62%, #170400 88%);
-  box-shadow: 0 0 16px rgba(255, 150, 40, 0.7), 0 0 6px rgba(255, 210, 120, 0.5), 0 6px 12px rgba(0, 0, 0, 0.45), inset 0 0 10px rgba(255, 190, 90, 0.35);
+  --sol-core: color-mix(in srgb, var(--seat-light) 35%, #fffbe8);
+  background: radial-gradient(circle at 33% 29%, rgba(255, 255, 255, 0.7) 0 4%, transparent 11%),
+    radial-gradient(ellipse 7% 5% at 66% 62%, color-mix(in srgb, var(--seat-dark) 70%, #000) 0 45%, color-mix(in srgb, var(--seat-dark) 60%, transparent) 70%, transparent 100%),
+    radial-gradient(ellipse 4% 3% at 74% 56%, color-mix(in srgb, var(--seat-dark) 70%, #000) 0 40%, transparent 100%),
+    radial-gradient(ellipse 22% 16% at 30% 64%, color-mix(in srgb, var(--sol-core) 45%, transparent), transparent 70%),
+    radial-gradient(ellipse 26% 14% at 62% 30%, color-mix(in srgb, var(--seat-dark) 30%, transparent), transparent 70%),
+    radial-gradient(circle, color-mix(in srgb, var(--sol-core) 35%, transparent) 0 1px, transparent 2.4px) 0 0 / 5px 6px,
+    radial-gradient(circle, color-mix(in srgb, var(--seat-dark) 25%, transparent) 0 1px, transparent 2.4px) 2px 3px / 7px 5px,
+    radial-gradient(circle at 50% 50%, var(--sol-core) 0 16%, var(--seat-light) 38%, var(--seat) 64%, var(--seat-dark) 86%, color-mix(in srgb, var(--seat-dark) 60%, #000) 100%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--seat-light) 85%, transparent), 0 0 30px color-mix(in srgb, var(--seat) 55%, transparent), 0 6px 12px rgba(0, 0, 0, 0.45);
   animation: sol-flare 3.4s ease-in-out infinite;
 }
 
 @keyframes sol-flare {
   50% {
-    box-shadow: 0 0 28px rgba(255, 190, 80, 0.95), 0 6px 12px rgba(0, 0, 0, 0.45);
-    filter: brightness(1.14);
+    box-shadow: 0 0 22px var(--seat-light), 0 0 44px color-mix(in srgb, var(--seat) 75%, transparent), 0 6px 12px rgba(0, 0, 0, 0.45);
+    filter: brightness(1.12) saturate(1.1);
   }
 }
 

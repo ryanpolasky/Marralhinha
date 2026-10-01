@@ -472,126 +472,107 @@ const MARBLES = {
       animate: (m, t) => (m.emissiveIntensity = 0.45 + Math.max(0, Math.sin(t * 1.3 + seat)) ** 8 * 0.9),
     };
   },
+  // The star takes the seat color, so yellow is literally the Sun and blue burns like a hot young star
   sol: (c, seat) => {
-    const rand = seeded(280 + seat);
-    const [canvas, ctx] = makeCanvas(512, 256);
-    const [glow, gctx] = makeCanvas(512, 256);
-    // dark ember field: near-black poles, burnt orange at the equator
-    const photosphere = ctx.createLinearGradient(0, 0, 0, 256);
-    photosphere.addColorStop(0, '#170400');
-    photosphere.addColorStop(0.3, '#3d0e00');
-    photosphere.addColorStop(0.5, '#571600');
-    photosphere.addColorStop(0.7, '#3d0e00');
-    photosphere.addColorStop(1, '#170400');
-    ctx.fillStyle = photosphere;
-    ctx.fillRect(0, 0, 512, 256);
-    gctx.fillStyle = '#0d0200';
-    gctx.fillRect(0, 0, 512, 256);
-    const blob = (x, y, r, inner, mid) => {
-      for (const dx of [-512, 0, 512]) {
-        const g = ctx.createRadialGradient(x + dx, y, 0, x + dx, y, r);
-        g.addColorStop(0, inner);
-        g.addColorStop(0.55, mid);
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = g;
-        ctx.fillRect(x + dx - r, y - r, r * 2, r * 2);
-        const e = gctx.createRadialGradient(x + dx, y, 0, x + dx, y, r);
-        e.addColorStop(0, inner);
-        e.addColorStop(0.6, mid);
-        e.addColorStop(1, 'rgba(0,0,0,0)');
-        gctx.fillStyle = e;
-        gctx.fillRect(x + dx - r, y - r, r * 2, r * 2);
-      }
+    const uniforms = {
+      uTime: { value: 0 },
+      uFlare: { value: 0 },
+      uHot: { value: new THREE.Color(mix(c.light, '#fff6e0', 0.35)) },
+      uMid: { value: new THREE.Color(c.main) },
+      uCool: { value: new THREE.Color(mix(c.dark, '#000000', 0.4)) },
     };
-    // granulation: bright cells packed over the dark field, gaps read as convection lanes
-    gctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 430; i++) {
-      const y = rand() * 256;
-      const eq = Math.sin((y / 256) * Math.PI);
-      const r = 4 + rand() * 11;
-      const roll = rand();
-      const a = (0.5 + rand() * 0.5) * (0.3 + eq * 0.7);
-      const inner = roll < 0.18 ? `rgba(255,246,208,${a})` : roll < 0.68 ? `rgba(255,196,84,${a})` : `rgba(255,132,26,${a})`;
-      blob(rand() * 512, y, r, inner, `rgba(190,70,8,${a * 0.55})`);
-    }
-    gctx.globalCompositeOperation = 'source-over';
-    // sunspots: quiet dark pools sunk into the glow
-    for (let i = 0; i < 5; i++) {
-      const x = rand() * 512;
-      const y = 62 + rand() * 132;
-      const r = 6 + rand() * 12;
-      for (const dx of [-512, 0, 512]) {
-        const spot = ctx.createRadialGradient(x + dx, y, r * 0.2, x + dx, y, r * 1.9);
-        spot.addColorStop(0, 'rgba(10,2,0,0.95)');
-        spot.addColorStop(0.5, 'rgba(26,6,0,0.7)');
-        spot.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = spot;
-        ctx.fillRect(x + dx - r * 2, y - r * 2, r * 4, r * 4);
-        const dim = gctx.createRadialGradient(x + dx, y, 0, x + dx, y, r * 1.9);
-        dim.addColorStop(0, 'rgba(0,0,0,0.9)');
-        dim.addColorStop(1, 'rgba(0,0,0,0)');
-        gctx.fillStyle = dim;
-        gctx.fillRect(x + dx - r * 2, y - r * 2, r * 4, r * 4);
-      }
-    }
-    // filaments: arcs of plasma with a white-hot spine, mirrored into the glow map
-    for (const [fx, a, w] of [[ctx, 0.5, 3.5], [gctx, 0.9, 1.6]]) {
-      const fr = seeded(300 + seat);
-      fx.shadowColor = '#ff9a2a';
-      fx.shadowBlur = 10;
-      for (let i = 0; i < 13; i++) {
-        wavyLine(fx, { y0: 60 + fr() * 136, amp: 10 + fr() * 26, k: 1 + Math.floor(fr() * 2), phase: fr() * TAU, width: w * (0.6 + fr()), color: i % 3 ? '#ffb63c' : '#fff3c4', alpha: a * (0.5 + fr() * 0.5) });
-      }
-      fx.shadowBlur = 0;
-    }
-    const map = finishMarble(canvas);
-    const emissiveMap = finishMarble(glow);
-    const uniforms = { uTime: { value: 0 }, uFlare: { value: 0 }, uCorona: { value: new THREE.Color(mix('#ffc95c', c.light, 0.3)) } };
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    // the equator shears faster than the poles, cells flicker, the limb burns and shimmers
     const onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vSolPosition;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSolPosition = normalize(position);');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uFlare;\nuniform vec3 uCorona;\nvarying vec3 vSolPosition;\nfloat solHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }')
+        .replace(
+          '#include <common>',
+          `#include <common>
+          uniform float uTime;
+          uniform float uFlare;
+          uniform vec3 uHot;
+          uniform vec3 uMid;
+          uniform vec3 uCool;
+          varying vec3 vSolPosition;
+          vec3 solHash3(vec3 p) { p = fract(p * vec3(0.1031, 0.103, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
+          float solNoise(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(mix(solHash3(i).x, solHash3(i + vec3(1.0, 0.0, 0.0)).x, f.x), mix(solHash3(i + vec3(0.0, 1.0, 0.0)).x, solHash3(i + vec3(1.0, 1.0, 0.0)).x, f.x), f.y),
+              mix(mix(solHash3(i + vec3(0.0, 0.0, 1.0)).x, solHash3(i + vec3(1.0, 0.0, 1.0)).x, f.x), mix(solHash3(i + vec3(0.0, 1.0, 1.0)).x, solHash3(i + vec3(1.0, 1.0, 1.0)).x, f.x), f.y),
+              f.z);
+          }
+          float solFbm(vec3 p) {
+            float v = 0.0;
+            float a = 0.5;
+            for (int i = 0; i < 4; i++) { v += a * solNoise(p); p = p * 2.07 + 13.7; a *= 0.5; }
+            return v;
+          }
+          vec2 solCells(vec3 p, float t) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            float f1 = 8.0;
+            float f2 = 8.0;
+            for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+              vec3 g = vec3(float(x), float(y), float(z));
+              vec3 h = solHash3(i + g);
+              float d = length(g + 0.5 + 0.38 * sin(t * (0.5 + h * 0.9) + h * 6.2831) - f);
+              if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+            }
+            return vec2(f1, f2);
+          }`
+        )
         .replace(
           '#include <emissivemap_fragment>',
           `{
-            vec2 uv = vEmissiveMapUv;
-            vec3 p = normalize( vSolPosition );
-            float eq = sin( uv.y * 3.14159 );
-            vec3 slow = texture2D( emissiveMap, vec2( uv.x + uTime * 0.012, uv.y ) ).rgb;
-            vec3 fast = texture2D( emissiveMap, vec2( uv.x + uTime * 0.04, uv.y ) ).rgb;
-            vec3 plasma = mix( slow, fast, eq * eq );
-            plasma = pow( plasma, vec3( 1.35 ) ) * 1.8;
-            plasma *= 0.8 + solHash( floor( uv * vec2( 96.0, 48.0 ) ) + floor( uTime * 1.5 ) ) * 0.45;
-            float facing = max( dot( normalize( normal ), normalize( vViewPosition ) ), 0.0 );
-            float rim = pow( 1.0 - facing, 1.7 );
-            float lick = 0.75 + 0.25 * sin( atan( p.y, p.x ) * 24.0 + uTime * 3.0 );
-            diffuseColor.rgb *= 0.5 + 0.5 * pow( facing, 0.55 );
-            totalEmissiveRadiance = plasma * ( 1.2 + uFlare * 1.0 )
-              + uCorona * rim * lick * ( 0.9 + uFlare * 1.6 )
-              + vec3( 1.0, 0.72, 0.3 ) * exp( -abs( p.y ) * 7.0 ) * uFlare * 0.8;
+            vec3 p = normalize(vSolPosition);
+            float spin = uTime * (0.14 - 0.05 * p.y * p.y);
+            vec3 q = vec3(cos(spin) * p.x - sin(spin) * p.z, p.y, sin(spin) * p.x + cos(spin) * p.z);
+            float convect = solFbm(q * 2.4 + vec3(0.0, uTime * 0.025, 0.0));
+            vec3 warped = q * 15.0 + (vec3(solFbm(q * 4.0), solFbm(q * 4.0 + 5.2), solFbm(q * 4.0 + 9.7)) - 0.5) * 1.6;
+            vec2 cells = solCells(warped, uTime * 0.9);
+            float gran = (1.0 - smoothstep(0.1, 0.95, cells.x)) * smoothstep(0.0, 0.4, cells.y - cells.x);
+            gran = 0.5 + 0.5 * gran * (0.8 + 0.4 * solNoise(q * 34.0 + uTime * 0.4));
+            float belt = 1.0 - smoothstep(0.12, 0.3, abs(abs(p.y) - 0.32));
+            float region = solFbm(q * 3.2 + 7.3);
+            float umbra = smoothstep(0.64, 0.69, region) * belt;
+            float penumbra = smoothstep(0.57, 0.64, region) * belt;
+            float faculae = smoothstep(0.5, 0.57, region) * (1.0 - penumbra) * belt;
+            vec3 flareAt = normalize(vec3(0.55, 0.33, 0.77));
+            float flare = exp(-dot(q - flareAt, q - flareAt) / 0.012) * uFlare;
+            float facing = max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+            float limb = 0.3 + 0.7 * pow(facing, 0.9);
+            float heat = gran * (0.55 + 0.75 * convect);
+            heat = heat * (1.0 - penumbra * 0.45 - umbra * 0.5) + faculae * 0.18 + flare * 0.9;
+            heat *= limb;
+            vec3 col = mix(uCool, uMid, smoothstep(0.1, 0.6, heat));
+            col = mix(col, uHot, smoothstep(0.85, 1.2, heat));
+            float rim = pow(1.0 - facing, 3.5);
+            float licks = solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0));
+            diffuseColor.rgb = col * 0.08;
+            totalEmissiveRadiance = col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8);
           }`
         );
     };
     return {
-      map,
-      emissiveMap,
+      color: '#ffffff',
       emissive: '#ffffff',
       emissiveIntensity: 1,
-      roughness: 0.3,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
+      roughness: 0.4,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.15,
       onBeforeCompile,
-      customProgramCacheKey: () => 'marble-sol-photosphere',
+      customProgramCacheKey: () => 'marble-sol-star',
       animate: (m, t) => {
         const frozen = reducedMotion?.matches;
         uniforms.uTime.value = frozen ? 0 : t + seat * 1.9;
-        const phase = (t * 0.2 + seat * 0.3) % 1;
-        uniforms.uFlare.value = frozen ? 0 : phase < 0.05 ? phase / 0.05 : Math.max(0, 1 - (phase - 0.05) / 0.4);
+        const phase = (t * 0.12 + seat * 0.3) % 1;
+        uniforms.uFlare.value = frozen ? 0 : phase < 0.04 ? phase / 0.04 : Math.max(0, 1 - (phase - 0.04) / 0.35);
       },
     };
   },
