@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import './App.css';
 import { socket, request } from './net/socket';
 import { api, post, setToken } from './net/api';
-import { bootstrapAuth, startDiscordLogin, logout } from './net/auth';
+import { bootstrapAuth, startDiscordLogin, logout, onPreviewMode } from './net/auth';
 import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
 import { getSettings } from './game/settings';
@@ -130,6 +130,7 @@ const App = () => {
   const [reactions, setReactions] = useState([]);
   const [pings, setPings] = useState([]);
   const [pingMenu, setPingMenu] = useState(null);
+  const [preview, setPreview] = useState(false);
   // Team chat arrives on its own channel (never in the shared room state), tagged with the room it belongs to
   const [teamLog, setTeamLog] = useState({ code: null, entries: [] });
   const mySeatRef = useRef(-1);
@@ -157,6 +158,7 @@ const App = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let unPreview = () => {};
     const resume = async () => {
       try {
         if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current, prefer: favorite() }));
@@ -254,6 +256,7 @@ const App = () => {
         setAccount(profile);
         setName(profile.name);
         if (notice) notify(notice, 'good');
+        unPreview = onPreviewMode(setPreview);
         socket.connect();
       })
       .catch((err) => !cancelled && setAuthError(err.message));
@@ -261,6 +264,7 @@ const App = () => {
 
     return () => {
       cancelled = true;
+      unPreview();
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
@@ -387,6 +391,11 @@ const App = () => {
   const [viewOverride, setViewOverride] = useState(null);
   const gameKey = game ? `${room.code}:${game.pick?.t}` : null;
   useEffect(() => setViewOverride(null), [gameKey]);
+
+  useEffect(() => {
+    document.body.classList.toggle('preview', preview);
+    return () => document.body.classList.remove('preview');
+  }, [preview]);
   const rollPending = useRollPending(game?.lastRoll);
   const [startPending, dismissStart] = useStartPending(game);
   // The server chooses one board for everyone once a game starts; before that everyone previews their own
@@ -552,6 +561,7 @@ const App = () => {
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>
             <Scene
               {...sceneProps}
+              preview={preview}
               mySeat={inRoom ? mySeat : -1}
               boardSkinId={boardSkinId}
               onRoll={sceneRoll}

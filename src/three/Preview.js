@@ -42,7 +42,7 @@ function BoardPreview({ itemId }) {
   return (
     <group scale={0.19} rotation-x={0.75}>
       <Spinner speed={0.3} tilt={0}>
-        <Board active={[]} names={[]} turn={null} skin={itemId} table={false} />
+        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} table={false} />
       </Spinner>
     </group>
   );
@@ -51,7 +51,7 @@ function BoardPreview({ itemId }) {
 export default function ItemPreview({ itemId, seat = 0 }) {
   const slot = ITEMS[itemId]?.slot;
   return (
-    <Canvas dpr={[1, 2]} camera={{ fov: 32, position: [0, 0.4, 6.2] }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }}>
+    <Canvas dpr={[1, 2]} camera={{ fov: 32, position: [0, 0.4, 6.2] }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <Lights shadowSize={512} extent={4} />
       <group key={`${itemId}-${seat}`}>
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}

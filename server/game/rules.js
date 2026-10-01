@@ -51,6 +51,7 @@ function createGame(seats, { rng = rollDie, teams = false, starter = null, board
     lastMove: null,
     legalMoves: [],
     winners: null,
+    startedAt: Date.now(),
     log: [],
     stats: [0, 1, 2, 3].map(() => ({ rolls: 0, pips: 0, sixes: 0, captures: 0, captured: 0, shortcuts: 0 })),
     pick: null,

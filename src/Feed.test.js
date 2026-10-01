@@ -20,7 +20,7 @@ test('chat entries separate the name from the message with a real space', () => 
   expect(all.textContent).toBe('Ana hello everyone');
   expect(team.textContent).toBe('TeamRui team only');
   expect(team.querySelector('.chat-team-tag').textContent).toBe('Team');
-  expect(watching.textContent).toBe('Zé · watching watching you');
+  expect(watching.textContent).toBe('👻 Zé watching you');
 });
 
 test('the logs toggle reflects and reports its state', () => {

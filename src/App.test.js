@@ -33,6 +33,7 @@ jest.mock('./net/auth', () => ({
       },
     }),
   startDiscordLogin: () => Promise.resolve(),
+  onPreviewMode: () => () => {},
 }));
 jest.mock('./three/Scene', () => () => null);
 jest.mock('./game/music', () => ({ startMusic: () => {} }));

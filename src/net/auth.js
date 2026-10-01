@@ -65,6 +65,14 @@ export async function purchaseDiscordSku(clientId, skuId) {
   return false;
 }
 
+// PIP and GRID are Discord's little preview layouts; only a FOCUSED window deserves the full UI
+export function onPreviewMode(cb) {
+  if (!discordSdk) return () => {};
+  const handler = ({ layout_mode }) => cb(layout_mode > 0);
+  discordSdk.subscribe('ACTIVITY_LAYOUT_MODE_UPDATE', handler).catch(() => {});
+  return () => discordSdk.unsubscribe('ACTIVITY_LAYOUT_MODE_UPDATE', handler).catch(() => {});
+}
+
 // Discord's sandbox blocks normal new-tab links, so Activities have to ask the SDK
 export function openExternal(url) {
   if (discordSdk) discordSdk.commands.openExternalLink({ url }).catch(() => {});

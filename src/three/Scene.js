@@ -252,7 +252,7 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false }) {
   const layout = layoutFor(board.variant);
   const pointer = useRef(null);
   usePingKeys(pointer, canPing, onPing, layout);
@@ -305,7 +305,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} spinning={mode === 'game' && board.phase === 'over'} onOffView={onCameraOffView} layout={layout} />
+      <CameraRig mode={mode} resetKey={resetKey} spinning={preview || (mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
     </Canvas>
   );
 }

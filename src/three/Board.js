@@ -72,30 +72,35 @@ function buildDishGeometry(seat, layout) {
 
 function buildHomeStripGeometry(layout) {
   const rows = layout.spec.homeRows;
-  const end = rows[0] + 0.6;
-  const start = rows[rows.length - 1] - 0.55;
+  const edge = HOLE_R + 0.09;
+  const end = rows[0] + edge;
+  const start = rows[rows.length - 1] - edge;
   const shape = new THREE.Shape();
-  roundedPolygon(shape, [[-0.52, -start], [0.52, -start], [0.52, -end], [-0.52, -end]], 0.4);
+  roundedPolygon(shape, [[-edge, -start], [edge, -start], [edge, -end], [-edge, -end]], 0.4);
   rows.forEach((r) => shape.holes.push(holePath([0, -r], HOLE_R + 0.03)));
   return new THREE.ShapeGeometry(shape, 24).rotateX(-Math.PI / 2);
 }
 
-function Cups({ material, layout }) {
+// The seat color follows the bevel into the hole; neutral holes keep their original bowls
+const DIVOT_LIPPED_GEO = new THREE.LatheGeometry([
+  [0.405, 0.007], [0.368, 0.007], [0.36, -0.002], [0.316, -0.015],
+  [0.284, -0.058], [0.273, -0.119], [0.27, -0.17], [0.25, -0.24],
+  [0.23, -0.287],
+].map(([x, y]) => new THREE.Vector2(x, y)), 28);
+const DIVOT_PLAIN_GEO = new THREE.SphereGeometry(HOLE_R - 0.08, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+
+// One instanced mesh per hole set
+function Divots({ points, geometry, material, color, y = 0 }) {
   const ref = useRef();
-  const points = useMemo(() => [...layout.RING, ...layout.HOME.flat(), ...layout.BASE.flat()], [layout]);
-  const geometry = useMemo(() => new THREE.SphereGeometry(HOLE_R - 0.08, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), []);
   useLayoutEffect(() => {
     const m = new THREE.Matrix4();
-    points.forEach(([r, c], i) => ref.current.setMatrixAt(i, m.makeTranslation(c, -BEVEL * 0.9, r)));
+    points.forEach(([r, c], i) => ref.current.setMatrixAt(i, m.makeTranslation(c, y, r)));
     ref.current.instanceMatrix.needsUpdate = true;
-  }, [points]);
+  }, [points, y]);
   return (
-    <group>
-      <instancedMesh key={points.length} ref={ref} args={[geometry, null, points.length]} material={material} receiveShadow />
-      <mesh position={[0, -BEVEL * 0.9, 0]} material={material} receiveShadow>
-        <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-      </mesh>
-    </group>
+    <instancedMesh key={points.length} ref={ref} args={[geometry, null, points.length]} {...(material ? { material } : {})} receiveShadow>
+      {!material && <meshStandardMaterial color={color} roughness={0.8} side={THREE.DoubleSide} />}
+    </instancedMesh>
   );
 }
 
@@ -269,6 +274,14 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
   const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
   const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);
+  const seatHoles = useMemo(
+    () => SEATS.map((s) => [[...layout.RING[entryIdx(s, layout)]], ...layout.HOME[s], ...layout.BASE[s]]),
+    [layout]
+  );
+  const plainHoles = useMemo(() => {
+    const entries = new Set(SEATS.map((s) => entryIdx(s, layout)));
+    return layout.RING.filter((_, i) => !entries.has(i));
+  }, [layout]);
   useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
   useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
   useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
@@ -277,16 +290,21 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
     <group>
       {table && <Table texture={materials.felt} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
-      <Cups material={materials.cup} layout={layout} />
+      <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
+      <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.cup} receiveShadow>
+        <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+      </mesh>
 
       {SEATS.map((s) => {
         const seated = active.includes(s);
         return (
           <group key={s}>
+            <Divots points={seatHoles[s]} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
+            <Divots points={seatHoles[s]} geometry={DIVOT_LIPPED_GEO} color={seatColor(s, seated)} />
             <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
               <meshStandardMaterial color={seatColor(s, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
             </mesh>
-            <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.15} color={seatColor(s, seated)} />
+            <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.09} color={seatColor(s, seated)} />
             <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
           </group>
         );

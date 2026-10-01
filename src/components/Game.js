@@ -8,7 +8,7 @@ import { RulesModal } from './Rules';
 import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee, Bug } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
-import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
+import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { useSettings, updateSettings, getSettings } from '../game/settings';
@@ -275,34 +275,83 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
   );
 }
 
-// Dev-only: swap the whole table's board mid-game
-function BoardPicker({ current, onPick }) {
+// Dev-only: swap the whole table's board, or force anyone's marble and dice skins mid-game
+function BoardPicker({ current, seats, onPick, onSkin }) {
   const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState(null);
   const boards = itemsForSlot('board');
+  const items = edit ? itemsForSlot(edit.slot) : [];
+  const victim = edit && seats[edit.seat];
+  const slotLabel = edit?.slot === 'dice' ? 'dice' : 'marbles';
+  const worn = victim ? cosmeticsOf(victim)[edit.slot] : null;
   return (
     <div className="board-picker">
-      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Change the table board (Dev)" title="Change the table board (Dev)" aria-expanded={open}>
+      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Dev tools: board and skins" title="Dev tools: board and skins" aria-expanded={open}>
         <BoardIcon />
       </button>
       {open && (
         <>
           <div className="board-picker-backdrop" onClick={() => setOpen(false)} />
-          <div className="board-picker-pop" role="menu" aria-label="Table board">
-            <div className="board-picker-head">
-              <span>Table board</span>
-              <TagBadge tag="dev" small />
-            </div>
-            <div className="board-picker-grid">
-              {boards.map((b) => (
-                <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} title={b.desc}>
-                  <ItemThumb itemId={b.id} />
-                  <span>{b.name}</span>
+          <div className="board-picker-pop" role="menu" aria-label="Dev tools">
+            {edit ? (
+              <>
+                <div className="board-picker-head">
+                  <span>
+                    {victim?.name}'s {slotLabel}
+                  </span>
+                  <TagBadge tag="dev" small />
+                </div>
+                <div className="board-picker-grid">
+                  {items.map((b) => (
+                    <button key={b.id} role="menuitemradio" aria-checked={worn === b.id} className={`board-option${worn === b.id ? ' on' : ''}`} onClick={() => onSkin(edit.seat, edit.slot, b.id)} title={b.desc}>
+                      <ItemThumb itemId={b.id} seat={edit.seat} />
+                      <span>{b.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="troll-actions">
+                  <button className="btn tiny ghost" onClick={() => setEdit(null)}>
+                    Back
+                  </button>
+                  <button className="btn tiny ghost" onClick={() => onSkin(edit.seat, edit.slot, null)}>
+                    Their own {slotLabel}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="board-picker-head">
+                  <span>Table board</span>
+                  <TagBadge tag="dev" small />
+                </div>
+                <div className="board-picker-grid">
+                  {boards.map((b) => (
+                    <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} title={b.desc}>
+                      <ItemThumb itemId={b.id} />
+                      <span>{b.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <button className="btn tiny ghost block" onClick={() => onPick(null)}>
+                  Back to the starter's board
                 </button>
-              ))}
-            </div>
-            <button className="btn tiny ghost block" onClick={() => onPick(null)}>
-              Back to the starter's board
-            </button>
+                <div className="board-picker-head">
+                  <span>Dress the table</span>
+                </div>
+                {seats.map((p, s) =>
+                  p ? (
+                    <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
+                      <span className="troll-name">{p.name}</span>
+                      {['marble', 'dice'].map((slot) => (
+                        <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${slot === 'dice' ? 'dice' : 'marbles'}`} title={slot === 'dice' ? `${p.name}'s dice` : `${p.name}'s marbles`} onClick={() => setEdit({ seat: s, slot })}>
+                          <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null
+                )}
+              </>
+            )}
           </div>
         </>
       )}
@@ -425,8 +474,9 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
             {entry.chat && (
               <b className="chat-name">
                 {entry.team && <span className="chat-team-tag">Team</span>}
+                {entry.spectator && '👻 '}
                 {isMine(entry) ? 'You' : entry.name}
-                {entry.spectator && <span className="chat-watching"> · watching</span>}{' '}
+                {' '}
               </b>
             )}
             {entry.text}
@@ -813,7 +863,14 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         </div>
 
         <div className="hud-buttons">
-          {isAdmin && <BoardPicker current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null} onPick={(item) => onAction('game:setBoard', { item })} />}
+          {isAdmin && (
+            <BoardPicker
+              current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null}
+              seats={seats}
+              onPick={(item) => onAction('game:setBoard', { item })}
+              onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
+            />
+          )}
           <SettingsButton />
           {onReport && (
             <button className="icon-btn" onClick={onReport} aria-label="Report a bug or suggest a feature" title="Report a bug or suggest a feature">

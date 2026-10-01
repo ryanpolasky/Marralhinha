@@ -410,6 +410,23 @@ class Room {
     this.changed();
   }
 
+  // Dev-only (checked by the caller): dress a seat's marbles or dice in anything, null hands back their own
+  setSkin(userId, { seat, slot, item }) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (!['marble', 'dice'].includes(slot)) throw new UserError('Pick marbles or dice');
+    const target = this.seats[seat];
+    if (!target) throw new UserError('That seat is empty');
+    const entry = item == null ? null : ITEMS.get(item);
+    if (item != null && (!entry || entry.slot !== slot)) throw new UserError('Unknown item for that slot');
+    const troll = { ...(target.troll || {}) };
+    if (entry) troll[slot] = entry.id;
+    else delete troll[slot];
+    if (Object.keys(troll).length) target.troll = troll;
+    else delete target.troll;
+    if (this.game) rules.addLog(this.game, entry ? `Dev gave ${target.name} the ${entry.name}` : `${target.name} is back to their own look`, null);
+    this.changed();
+  }
+
   setTurnTime(userId, seconds) {
     this.requireHost(userId);
     this.requireLobby();
@@ -790,7 +807,7 @@ class Room {
         idle: !!p.idle,
         away: !!p.away,
         devices: p.sockets?.size || 0,
-        cosmetics: p.cosmetics,
+        cosmetics: p.troll ? { ...p.cosmetics, ...p.troll } : p.cosmetics,
         level: p.level,
         tags: p.tags || [],
       }),
@@ -815,6 +832,7 @@ class Room {
       players: this.seats.map((p, seat) => p && { seat, name: p.name, isBot: !!p.isBot, away: !p.isBot && (!p.connected || !!p.idle || !!p.away), home: game ? game.marbles[seat]?.filter((m) => m.zone === 'home').length ?? 0 : 0 }).filter(Boolean),
       spectators: this.spectators.size,
       lastActive: this.lastActive,
+      startedAt: game?.startedAt ?? null,
     };
   }
 }

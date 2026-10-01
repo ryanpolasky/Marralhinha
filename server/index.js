@@ -265,6 +265,10 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can change the table board');
     current().setBoard(userId, typeof item === 'string' ? item : null);
   });
+  handle('game:setSkin', ({ seat, slot, item }) => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can restyle the table');
+    current().setSkin(userId, { seat, slot, item: typeof item === 'string' ? item : null });
+  });
   handle('game:ping', (payload) => current().ping(userId, payload, { admin: accounts.isAdmin(accounts.getUser(userId) || {}) }));
   handle('game:rematch', () => current().rematch(userId));
 

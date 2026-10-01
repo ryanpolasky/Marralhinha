@@ -6,6 +6,7 @@ import { Coin, Coins, TagBadges } from './Economy';
 import { Close, Search, DiscordMark, Bug } from './Icons';
 import { giftLabel, KIND_LABEL, StatusPill } from './Reports';
 import { SEAT_COLORS } from '../game/geometry';
+import BOARDS from '../shared/boards.json';
 
 const ago = (t) => {
   const s = Math.max(0, (Date.now() - t) / 1000);
@@ -13,6 +14,13 @@ const ago = (t) => {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+};
+
+const dur = (t) => {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 };
 
 const LinkBadge = ({ user }) =>
@@ -56,11 +64,13 @@ function ActiveGames({ currentCode, onSpectate, notify }) {
           <div key={r.code} className={`admin-game phase-${r.phase}`}>
             <div className="admin-game-head">
               <span className="room-pill">{r.code}</span>
-              <span className={`admin-game-phase ${r.phase}`}>{PHASE_LABEL[r.phase]}</span>
+              <span className={`admin-game-phase is-${r.phase}`}>{PHASE_LABEL[r.phase]}</span>
               {r.activity && <span className="badge">Discord</span>}
               {r.teams && <span className="badge">2v2</span>}
+              {r.variant && <span className="badge">{BOARDS[r.variant]?.label || r.variant}</span>}
               <span className="muted small-text">
                 {r.spectators ? `${r.spectators} watching · ` : ''}
+                {r.startedAt ? `${dur(r.startedAt)} · ` : ''}
                 {ago(r.lastActive)}
               </span>
             </div>
@@ -70,7 +80,7 @@ function ActiveGames({ currentCode, onSpectate, notify }) {
                   <span className="admin-game-dot" />
                   {p.name}
                   {p.isBot && <span className="muted"> (bot)</span>}
-                  {r.phase !== 'lobby' && <span className="muted"> {p.home}/5</span>}
+                  {r.phase !== 'lobby' && <span className="muted"> {p.home}/{BOARDS[r.variant]?.marbles || 5}</span>}
                 </span>
               ))}
             </div>

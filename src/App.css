@@ -91,6 +91,13 @@ input {
   background: radial-gradient(ellipse at center, rgba(5, 15, 18, 0.35) 0%, rgba(0, 0, 0, 0.7) 100%);
 }
 
+/* Discord's preview tile gets the bare board */
+body.preview .app > :not(.scene-layer):not(.vignette),
+body.preview > .modal-backdrop,
+body.preview > .floating {
+  display: none;
+}
+
 .scene-error {
   position: absolute;
   bottom: 20px;
@@ -776,7 +783,9 @@ button.pronounce:hover {
 .hud button,
 .hud .feed,
 .hud .panel,
-.hud .chip {
+.hud .chip,
+.hud .board-picker-pop,
+.hud .board-picker-backdrop {
   pointer-events: auto;
 }
 
@@ -1398,6 +1407,47 @@ button.room-pill.copied {
 
 .board-option:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.troll-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+}
+
+.troll-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--seat);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.troll-slot {
+  width: 34px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.troll-slot:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.troll-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.troll-actions .btn {
+  flex: 1;
 }
 
 .board-option.on {
@@ -5653,6 +5703,25 @@ select.admin-input optgroup {
 .lobby-table,
 .lobby-controls { display: contents; }
 
+/* Desktop web gets the activity lobby's split: seats on the left, table settings on the right */
+@media (min-width: 901px) {
+  .lobby:not(.activity-lobby) {
+    max-width: 880px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 14px 26px;
+    align-items: start;
+  }
+
+  .lobby:not(.activity-lobby) > .lobby-table,
+  .lobby:not(.activity-lobby) > .lobby-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+}
+
 .screen.activity-lobby-screen {
   align-items: center;
   justify-content: center;
@@ -6279,7 +6348,7 @@ select.admin-input optgroup {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.admin-game-phase.playing {
+.admin-game-phase.is-playing {
   background: #2e9e55;
   color: #fff;
 }
@@ -6313,12 +6382,6 @@ select.admin-input optgroup {
 .admin-game > .small-text {
   grid-column: 2;
   grid-row: 1 / span 2;
-}
-
-.chat-watching {
-  font-weight: 500;
-  font-size: 0.85em;
-  color: var(--ink-dim);
 }
 
 /* ---------- Lobby: join / leave notices ---------- */
@@ -7139,4 +7202,124 @@ textarea.report-text {
   margin: 14px 0 0;
   font-size: 12px;
   color: var(--ink-dim);
+}
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  max-width: 1200px;
+  margin-bottom: 28px;
+}
+
+.skin-cell {
+  border-radius: 16px;
+  border: 1px solid var(--glass-line);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  cursor: zoom-in;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.skin-cell:hover {
+  border-color: var(--gold);
+}
+
+.skin-cell-canvas {
+  height: 130px;
+  display: grid;
+  place-items: center;
+}
+
+.skin-cell-canvas .thumb {
+  transform: scale(1.5);
+}
+
+.skin-cell-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.skin-cell-label span {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.skin-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(4, 10, 12, 0.86);
+  backdrop-filter: blur(6px);
+}
+
+.skin-viewer-stage {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(960px, 94vw);
+}
+
+.skin-viewer-canvas {
+  flex: 1;
+  height: min(62vh, 560px);
+  border-radius: 22px;
+  border: 1px solid var(--glass-line);
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.skin-nav {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.skin-nav:hover {
+  border-color: var(--gold);
+}
+
+.skin-viewer-meta {
+  text-align: center;
+}
+
+.skin-seats {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.skin-seat {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--seat);
+  cursor: pointer;
+}
+
+.skin-seat.on {
+  border-color: #fff;
 }

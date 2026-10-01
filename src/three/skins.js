@@ -1009,9 +1009,9 @@ function corkCanvas() {
 function terrazzoCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
   const rand = seeded(23);
-  ctx.fillStyle = '#efe9df';
+  ctx.fillStyle = '#cfc5b3';
   ctx.fillRect(0, 0, 1024, 1024);
-  const chips = ['#e03a3e', '#2a6fcf', '#f0b428', '#3e9b62', '#2b2b2b', '#b36bff', '#ff8a3d', '#ffffff'];
+  const chips = ['#e03a3e', '#2a6fcf', '#f0b428', '#3e9b62', '#2b2b2b', '#b36bff', '#ff8a3d', '#eee8dc'];
   for (let i = 0; i < 700; i++) {
     const x = rand() * 1024;
     const y = rand() * 1024;
@@ -1212,7 +1212,7 @@ function azulejoCanvas() {
     for (let tx = 0; tx < 8; tx++) {
       const x = tx * T;
       const y = ty * T;
-      ctx.fillStyle = '#f4f1e8';
+      ctx.fillStyle = '#d7d0bd';
       ctx.fillRect(x, y, T, T);
       ctx.strokeStyle = '#1f4f9a';
       ctx.fillStyle = '#2a63b8';
@@ -1230,7 +1230,7 @@ function azulejoCanvas() {
         ctx.lineTo(-44, -44);
         ctx.fill();
       }
-      ctx.fillStyle = '#f4c542';
+      ctx.fillStyle = '#e5b63c';
       ctx.beginPath();
       ctx.arc(0, 0, 10, 0, TAU);
       ctx.fill();
@@ -1283,9 +1283,9 @@ function neonCanvases() {
 
 const SPECIAL_BOARDS = {
   bamboo: () => ({ canvas: bambooCanvas(), repeat: 0.07, roughness: 0.45, dish: '#a8984c', felt: '#23443a', cup: '#3d3212' }),
-  azulejo: () => ({ canvas: azulejoCanvas(), repeat: 0.11, roughness: 0.18, clearcoat: 1, dish: '#2a63b8', felt: '#102a4a', cup: '#16335e' }),
+  azulejo: () => ({ canvas: azulejoCanvas(), repeat: 1 / 8, offset: 9 / 16, roughness: 0.38, clearcoat: 0.35, dish: '#2a63b8', felt: '#102a4a', cup: '#0e2046' }),
   basalt: () => ({ canvas: stoneCanvas({ base: '#2c2b2d', vein: '#4a4648', count: 6, seed: 9, dots: 900 }), repeat: 0.06, roughness: 0.92, dish: '#3a3638', felt: '#2b1d17', cup: '#0e0d0e' }),
-  stone: () => ({ canvas: stoneCanvas({ base: '#ecebe8', vein: '#8d8d95', count: 26, seed: 21 }), repeat: 0.05, roughness: 0.14, clearcoat: 0.7, dish: '#d8d6d1', felt: '#233139', cup: '#5c5c62' }),
+  stone: () => ({ canvas: stoneCanvas({ base: '#d5d0c6', vein: '#8d8d95', count: 26, seed: 21 }), repeat: 0.05, roughness: 0.3, clearcoat: 0.4, dish: '#c3beb5', felt: '#233139', cup: '#54545a' }),
   lacquer: () => ({ color: '#121014', roughness: 0.12, clearcoat: 1, dish: '#1b1719', felt: '#4a0f16', cup: '#050405', accent: { color: '#ffcf5a', metalness: 1, roughness: 0.18 } }),
   neon: () => {
     const [base, glow] = neonCanvases();
@@ -1293,7 +1293,7 @@ const SPECIAL_BOARDS = {
   },
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
-  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.2, clearcoat: 0.6, dish: '#e4ddd0', felt: '#2b3a44', cup: '#6b655c', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
+  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.38, clearcoat: 0.25, dish: '#c9bfaa', felt: '#2b3a44', cup: '#5f594f', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
   ocean: () => {
     const [base, glow] = oceanCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 0.55, repeat: 0.05, roughness: 0.08, clearcoat: 1, dish: '#0b3d6b', felt: '#061c33', cup: '#031424', accent: { color: '#8fe3ff', emissive: '#3fc1b0', emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.25 } };
@@ -1324,7 +1324,7 @@ export function boardSkin(itemId) {
     if (spec.canvas) {
       const map = finish(spec.canvas);
       map.repeat.set(spec.repeat, spec.repeat);
-      map.offset.set(0.5, 0.5);
+      map.offset.set(spec.offset ?? 0.5, spec.offset ?? 0.5);
       boardParams.map = map;
     } else boardParams.color = spec.color;
     if (spec.glowCanvas) {
