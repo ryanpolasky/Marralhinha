@@ -77,7 +77,110 @@ function nebula(ctx, rand, { colors, count, w, h, alpha = 0.35 }) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+const crisp = (tex) => {
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.anisotropy = 1;
+  return tex;
+};
+
+// 8-bit post step: 2px ordered dither plus a 6-level-per-channel palette, run on the final pixel color
+const ARCADE_GLSL = `
+float arcadeBayer(vec2 p) {
+  p = mod(floor(p), 4.0);
+  vec2 lo = mod(p, 2.0);
+  vec2 hi = floor(p / 2.0);
+  return (4.0 * mod(2.0 * lo.x + 3.0 * lo.y, 4.0) + mod(2.0 * hi.x + 3.0 * hi.y, 4.0)) / 16.0;
+}
+vec3 arcadeQuant(vec3 c) {
+  float d = arcadeBayer(gl_FragCoord.xy * 0.5) - 0.5;
+  return floor(clamp(c, 0.0, 1.0) * 5.0 + d * 0.85 + 0.5) / 5.0;
+}`;
+const ARCADE_POST = '#include <dithering_fragment>\ngl_FragColor.rgb = arcadeQuant(gl_FragColor.rgb);';
+
+const HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
+const STAR = ['0001000', '0001000', '1111111', '0111110', '0011100', '0110110', '1100011'];
+const COIN = ['00111100', '01111110', '11110011', '11110011', '11110011', '11110011', '01111110', '00111100'];
+
+function pixelRows(ctx, rows, x0, y0, color) {
+  ctx.fillStyle = color;
+  rows.forEach((row, y) => [...row].forEach((bit, x) => bit === '1' && ctx.fillRect(x0 + x, y0 + y, 1, 1)));
+}
+
+function arcadeMarbleCanvases(c, seat) {
+  const [base, bctx] = makeCanvas(64, 32);
+  const [glow, gctx] = makeCanvas(64, 32);
+  const rand = seeded(88 + seat);
+  for (let y = 0; y < 32; y += 4) for (let x = 0; x < 64; x += 4) {
+    bctx.fillStyle = (x + y) % 8 ? '#150a30' : '#1d1042';
+    bctx.fillRect(x, y, 4, 4);
+  }
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 64, 32);
+  for (let x = 0; x < 64; x++) {
+    const y = 14 + Math.round(Math.sin((x / 64) * TAU * 2) * 5);
+    [[-1, c.light], [0, c.main], [1, c.main], [2, c.dark]].forEach(([dy, color]) => {
+      bctx.fillStyle = color;
+      bctx.fillRect(x, y + dy, 1, 1);
+    });
+    gctx.fillStyle = c.light;
+    gctx.fillRect(x, y - 1, 1, 1);
+    gctx.fillStyle = c.main;
+    gctx.fillRect(x, y, 1, 1);
+  }
+  [4, 36].forEach((x, i) => {
+    [[bctx, '#150a30'], [gctx, '#000']].forEach(([ctx, bg]) => {
+      ctx.fillStyle = bg;
+      ctx.fillRect(x - 1, 9 + i * 2, 10, 10);
+      pixelRows(ctx, i ? STAR : HEART, x + 1, 10 + i * 2, i ? '#ffe94d' : '#ffffff');
+    });
+  });
+  for (let i = 0; i < 40; i++) {
+    const x = Math.floor(rand() * 64);
+    const y = Math.floor(rand() * 32);
+    [bctx, gctx].forEach((ctx) => {
+      ctx.fillStyle = rand() > 0.5 ? '#ffffff' : '#2fe6ff';
+      ctx.fillRect(x, y, 1, 1);
+    });
+  }
+  return [base, glow];
+}
+
 const MARBLES = {
+  arcade: (c, seat) => {
+    const [base, glow] = arcadeMarbleCanvases(c, seat);
+    const map = crisp(finishMarble(base));
+    const emissiveMap = crisp(finishMarble(glow));
+    const uniforms = { uTime: { value: 0 }, uRim: { value: new THREE.Color(c.light) } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform vec3 uRim;\n${ARCADE_GLSL}`)
+        .replace('#include <emissivemap_fragment>', `{
+          vec2 uv = vEmissiveMapUv;
+          vec3 lit = texture2D(emissiveMap, uv).rgb;
+          float tick = floor(uTime * 6.0);
+          float blink = mod(tick + floor(uv.x * 8.0), 4.0) < 1.0 ? 0.3 : 1.0;
+          float scan = step(0.5, fract(uv.y * 16.0 - tick / 16.0));
+          float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 3.0);
+          totalEmissiveRadiance = lit * blink * (0.7 + 0.5 * scan) + uRim * floor(rim * 3.0) / 3.0 * 0.7;
+        }`)
+        .replace('#include <dithering_fragment>', ARCADE_POST);
+    };
+    return {
+      map,
+      emissiveMap,
+      emissive: '#ffffff',
+      emissiveIntensity: 1,
+      roughness: 0.35,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.2,
+      onBeforeCompile,
+      customProgramCacheKey: () => 'marble-arcade-8bit',
+      animate: (m, t) => (uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 0.7),
+    };
+  },
   classic: (c, seat) => ({ map: finishMarble(makeSwirlCanvas(c, 11 + seat * 7)), roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.04 }),
   gloss: (c) => {
     const [canvas, ctx] = makeCanvas(256, 128);
@@ -870,10 +973,11 @@ const DICE = {
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
   supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
+  arcade: { bg: 'arcade', pip: '#ffe94d', one: '#ff4fd8', roughness: 0.4, clearcoat: 0.3 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade'];
 
 function grid(ctx, size, step, color, width = 1) {
   ctx.strokeStyle = color;
@@ -927,6 +1031,14 @@ function dieBackground(ctx, style, size, value) {
       ctx.lineTo(i + size, size);
       ctx.closePath();
       ctx.fill();
+    }
+  } else if (style === 'arcade') {
+    const px = size / 32;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const ring = Math.min(x, y, 31 - x, 31 - y);
+      const corner = (x < 4 || x > 27) && (y < 4 || y > 27);
+      ctx.fillStyle = ring === 2 || ring === 3 ? (corner ? '#ff4fd8' : '#2fe6ff') : ring < 2 ? '#0a0520' : (x + y) % 2 ? '#140a2e' : '#1b0f40';
+      ctx.fillRect(x * px, y * px, px, px);
     }
   } else if (style === 'dev') {
     // Obsidian with a thin molten frame; the pips do the glowing
@@ -1021,6 +1133,25 @@ function drawPips(ctx, value, size, color) {
   });
 }
 
+function blockPips(ctx, value, size, color, lit = true) {
+  const step = size / 32;
+  const r = value === 1 ? 32 : 24;
+  PIPS[value].forEach(([x, y]) => {
+    const x0 = Math.round((x * size - r) / step) * step;
+    const y0 = Math.round((y * size - r) / step) * step;
+    const w = Math.round((r * 2) / step) * step;
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, y0, w, w);
+    if (!lit) return;
+    ctx.fillStyle = mix(color, '#ffffff', 0.55);
+    ctx.fillRect(x0, y0, w, step);
+    ctx.fillRect(x0, y0, step, w);
+    ctx.fillStyle = mix(color, '#000000', 0.4);
+    ctx.fillRect(x0, y0 + w - step, w, step);
+    ctx.fillRect(x0 + w - step, y0, step, w);
+  });
+}
+
 const DIE_FACE_ORDER = [2, 5, 1, 6, 3, 4];
 
 export function diceSkin(itemId) {
@@ -1032,10 +1163,11 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      drawPips(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      (key === 'arcade' ? blockPips : drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
+      if (key === 'arcade') crisp(map);
       const params = { map, roughness: spec.roughness, metalness: spec.metalness || 0, clearcoat: spec.clearcoat || 0, ...(spec.extra || {}) };
       if (spec.glow) {
         const [glow, gctx] = makeCanvas(size, size);
@@ -1050,7 +1182,8 @@ export function diceSkin(itemId) {
         mctx.fillStyle = '#000';
         mctx.fillRect(0, 0, size, size);
         mctx.fillStyle = '#fff';
-        PIPS[value].forEach(([x, y]) => {
+        if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
+        else PIPS[value].forEach(([x, y]) => {
           mctx.beginPath();
           mctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
           mctx.fill();
@@ -1063,14 +1196,26 @@ export function diceSkin(itemId) {
       const material = new THREE.MeshPhysicalMaterial(params);
       if (ANIMATED_DICE.includes(key)) {
         material.userData.skinTime = time;
-        if (key === 'supporter') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (key === 'supporter' || key === 'arcade') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
         material.customProgramCacheKey = () => `dice-${key}-animated`;
         material.onBeforeCompile = (shader) => {
           shader.uniforms.uSkinTime = time;
           shader.uniforms.uFacePhase = { value: value * 0.73 };
           shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', '#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;')
-            .replace('#include <emissivemap_fragment>', key === 'supporter' ? `{
+            .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : ''}`)
+            .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
+            .replace('#include <emissivemap_fragment>', key === 'arcade' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              vec2 p = uv - 0.5;
+              float edge = max(abs(p.x), abs(p.y));
+              float rail = step(abs(edge - 0.406), 0.031);
+              float seg = floor((atan(p.y, p.x) / 6.283185 + 0.5) * 16.0);
+              float chase = mod(seg - floor(uSkinTime * 8.0), 16.0) < 4.0 ? 1.0 : 0.0;
+              vec3 pipColor = mod(floor(uSkinTime * 2.0 + uFacePhase), 2.0) < 1.0 ? vec3(1.0, 0.91, 0.3) : vec3(1.0, 1.0, 0.85);
+              totalEmissiveRadiance = (1.0 - pip) * rail * mix(vec3(1.0, 0.31, 0.85) * 0.25, vec3(0.18, 0.9, 1.0) * 2.2, chase)
+                + pip * pipColor * 0.9;
+            }` : key === 'supporter' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               vec2 p = uv - 0.5;
@@ -2586,7 +2731,163 @@ function neonCanvases() {
   return [base, glow];
 }
 
+const ARCADE_SHAPES = [
+  ['11111', '10001', '10001', '10001', '11111'],
+  ['00100', '01110', '11111'],
+  ['1000001', '0100010', '0010100', '0001000'],
+  ['00100', '00100', '11111', '00100', '00100'],
+  ['00100', '01110', '11111', '01110', '00100'],
+  ['11', '11'],
+  STAR,
+  COIN,
+];
+
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => v / 16);
+const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+function pixelCanvas(S, paint) {
+  const [canvas, ctx] = makeCanvas(S, S);
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = (y * S + x) * 4;
+    img.data.set([...paint(x, y), 255], i);
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+const ditherBand = (bands, v, x, y) => bands[Math.max(0, Math.min(bands.length - 1, Math.floor(v + BAYER4[(y & 3) * 4 + (x & 3)] - 0.5)))];
+
+// 8 texels per board unit so every hole sits in its own 8x8 tile. Data: red = track tile, green = track order, blue = tile frame
+function arcadeBoard(layout) {
+  const S = 160;
+  const C = S / 2;
+  const k = BOARD_R * S;
+  const ring = new Map(layout.RING.map(([r, c], i) => [`${r},${c}`, i]));
+  const bands = ['#2a1160', '#1f0c4a', '#170838', '#10052a', '#0a031d'].map(hexRgb);
+  const [line, dot, fill, frame] = ['#160a3a', '#4a2aa0', '#140a36', '#1f6f8a'].map(hexRgb);
+  const at = (x, y) => {
+    const c = (x + 0.5 - C) / k;
+    const r = (y + 0.5 - C) / k;
+    const i = ring.get(`${Math.round(r)},${Math.round(c)}`);
+    return { c, r, i, edge: Math.max(Math.abs(c - Math.round(c)), Math.abs(r - Math.round(r))) > 0.375 };
+  };
+  const base = pixelCanvas(S, (x, y) => {
+    const { c, r, i, edge } = at(x, y);
+    if (i !== undefined) return edge ? frame : fill;
+    const gx = (((x - C) % 8) + 8) % 8 === 4;
+    const gy = (((y - C) % 8) + 8) % 8 === 4;
+    if (gx && gy) return dot;
+    if (gx || gy) return line;
+    return ditherBand(bands, Math.hypot(c, r) / 2.2, x, y);
+  });
+  const data = pixelCanvas(S, (x, y) => {
+    const { i, edge } = at(x, y);
+    return i === undefined ? [0, 0, 0] : [255, Math.round((i / layout.RING.length) * 255), edge ? 255 : 0];
+  });
+  return [base, data];
+}
+
+function arcadeDish(layout) {
+  const { dishR } = layout.spec;
+  const S = Math.ceil(16 * (dishR + 0.1));
+  const C = S / 2;
+  const bands = ['#3a1470', '#2a0f5c', '#1d0a45', '#140733', '#0d0526'].map(hexRgb);
+  const base = pixelCanvas(S, (x, y) => ditherBand(bands, (Math.hypot(x + 0.5 - C, y + 0.5 - C) / 8 / dishR) * 4, x, y));
+  const [glow, g] = makeCanvas(4, 4);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, 4, 4);
+  return [base, glow, 8 / S];
+}
+
+function arcadeCarpetCanvas() {
+  const S = 256;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(404);
+  ctx.fillStyle = '#0a0520';
+  ctx.fillRect(0, 0, S, S);
+  const colors = ['#2fe6ff', '#ff4fd8', '#ffe94d', '#ff8a3d', '#8a6bff'];
+  for (let i = 0; i < 80; i++) {
+    const shape = ARCADE_SHAPES[Math.floor(rand() * ARCADE_SHAPES.length)];
+    ctx.setTransform(2, 0, 0, 2, Math.floor(rand() * (S - 20)), Math.floor(rand() * (S - 20)));
+    pixelRows(ctx, shape, 0, 0, mix(colors[Math.floor(rand() * colors.length)], '#0a0520', 0.4));
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+const ARCADE_PAL_GLSL = `
+vec3 arcadePal(float i) {
+  i = mod(floor(i), 4.0);
+  return i < 1.0 ? vec3(0.18, 0.9, 1.0) : i < 2.0 ? vec3(1.0, 0.31, 0.85) : i < 3.0 ? vec3(1.0, 0.91, 0.3) : vec3(0.55, 0.42, 1.0);
+}`;
+
+const ARCADE_BOARD_SHADER = `{
+  vec2 uvB = vEmissiveMapUv;
+  vec2 q = (uvB - 0.5) / ${BOARD_R};
+  q.y = -q.y;
+  vec2 px = (floor(q * 8.0) + 0.5) / 8.0;
+  float t = uSkinTime;
+  float tick = floor(t * 12.0) / 12.0;
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  vec4 dat = texture2D(emissiveMap, uvB);
+  float tile = step(0.5, dat.r);
+  float frame = step(0.5, dat.b);
+  float run = dat.g * 4.0 - tick * 0.35;
+  float tail = floor(pow(1.0 - fract(run), 3.0) * 4.0) / 4.0;
+  vec3 lane = vec3(0.1, 0.55, 0.75) * (0.02 + frame * 0.14) + arcadePal(floor(run)) * tail * tail * (0.1 + frame * 0.5);
+  float sunR = 1.45;
+  float d = length(px);
+  float cut = px.y > 0.0 ? step(0.25 + px.y * 0.25, fract(px.y * 2.5 - tick * 0.6)) : 1.0;
+  float sy = smoothstep(-sunR, sunR, px.y);
+  vec3 sun = step(d, sunR) * cut * mix(mix(vec3(1.0, 0.75, 0.05), vec3(1.0, 0.1, 0.4), smoothstep(0.0, 0.6, sy)), vec3(0.45, 0.05, 0.6), smoothstep(0.6, 1.0, sy));
+  float halo = step(d, sunR + 0.25) * step(sunR, d) * (0.5 + 0.5 * step(0.5, fract(t * 1.5)));
+  float cheb = max(abs(px.x), abs(px.y));
+  float w = fract(t * 0.16);
+  float pulse = step(abs(cheb - (sunR + 0.4 + w * 8.0)), 0.07) * (1.0 - w);
+  vec2 gp = fract(px);
+  vec2 gl = step(abs(gp - 0.5625), vec2(0.01));
+  float grid = max(gl.x, gl.y);
+  float node = gl.x * gl.y;
+  float h = fract(sin(dot(floor(q * 8.0), vec2(12.9898, 78.233))) * 43758.5453);
+  float star = step(0.995, h) * step(0.6, fract(t * (0.4 + h) + h * 9.0)) * (1.0 - grid);
+  vec3 field = sun * 0.5 + vec3(1.0, 0.2, 0.7) * halo * 0.2 + arcadePal(floor(t * 0.16) + 1.0) * pulse * 0.7
+    + vec3(0.35, 0.18, 0.9) * (node * 0.25 + grid * pulse * 0.6) + vec3(0.7, 0.8, 1.0) * star * 0.6;
+  totalEmissiveRadiance = mix(vec3(1.0, 0.31, 0.85) * 0.4, mix(field, lane, tile), top);
+}`;
+
+const arcadeDishShader = (R, dishR) => `{
+  vec2 q = (vEmissiveMapUv - 0.5) / ${R.toFixed(5)};
+  vec2 px = (floor(q * 8.0) + 0.5) / 8.0;
+  float t = uSkinTime;
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  float slot = floor((atan(px.y, px.x) / 6.2831853 + 0.5) * 16.0);
+  float sa = (slot + 0.5) / 16.0 * 6.2831853 - 3.14159265;
+  float bulb = step(length(px - vec2(cos(sa), sin(sa)) * ${(dishR - 0.3).toFixed(3)}), 0.12);
+  float lit = mod(slot - floor(t * 8.0), 4.0) < 1.0 ? 1.0 : 0.12;
+  float w = fract(t * 0.4);
+  float wave = step(abs(length(px) - w * ${(dishR - 0.5).toFixed(3)}), 0.07) * (1.0 - w);
+  totalEmissiveRadiance = (arcadePal(slot) * bulb * lit * 1.6 + vec3(0.18, 0.9, 1.0) * wave * 0.6) * top;
+}`;
+
 const SPECIAL_BOARDS = {
+  arcade: (layout) => {
+    const [base, data] = arcadeBoard(layout);
+    const [dishBase, dishGlow, dishRepeat] = arcadeDish(layout);
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const cores = ['#2fe6ff', '#ff4fd8', '#ffe94d', '#8a6bff'].map((c) => new THREE.Color(c));
+    return {
+      canvas: base, glowCanvas: data, glowData: true, repeat: BOARD_R, pixel: true, roughness: 0.55, clearcoat: 0.35,
+      dishCanvas: dishBase, dishGlowCanvas: dishGlow, dishRepeat,
+      dish: '#1d0a45', feltCanvas: arcadeCarpetCanvas(), cup: '#07021a', core: '#2fe6ff',
+      accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 0.9, metalness: 0.3, roughness: 0.4 },
+      shaderCommon: ARCADE_GLSL + ARCADE_PAL_GLSL,
+      shader: ARCADE_BOARD_SHADER,
+      dishShader: arcadeDishShader(dishRepeat, layout.spec.dishR),
+      post: true,
+      animate: (mats, t) => mats.core.color.copy(cores[Math.floor((still?.matches ? 0 : t) * 2) % 4]),
+    };
+  },
   bamboo: () => ({ canvas: bambooCanvas(), repeat: 0.07, roughness: 0.45, dish: '#a8984c', felt: '#23443a', cup: '#3d3212' }),
   azulejo: () => ({ canvas: azulejoCanvas(), repeat: 1 / 8, offset: 9 / 16, roughness: 0.38, clearcoat: 0.35, dish: '#2a63b8', felt: '#102a4a', cup: '#0e2046' }),
   basalt: () => ({ canvas: stoneCanvas({ base: '#2c2b2d', vein: '#4a4648', count: 6, seed: 9, dots: 900 }), repeat: 0.06, roughness: 0.92, dish: '#3a3638', felt: '#2b1d17', cup: '#0e0d0e' }),
@@ -2666,9 +2967,9 @@ const SPECIAL_BOARDS = {
   },
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade']);
 
-function patchSkinShader(material, { body, common = '', uniforms = {}, key }) {
+function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
   material.userData.skinTime = time;
   material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -2680,12 +2981,14 @@ function patchSkinShader(material, { body, common = '', uniforms = {}, key }) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSkinTop = normal.y;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nvarying float vSkinTop;\n${common}`)
-      .replace('#include <emissivemap_fragment>', body);
+      .replace('#include <emissivemap_fragment>', body)
+      .replace('#include <dithering_fragment>', post ? ARCADE_POST : '#include <dithering_fragment>');
   };
 }
 
-function glowTexture(canvas, repeat, data) {
+function glowTexture(canvas, repeat, data, pixel) {
   const tex = finish(canvas);
+  if (pixel) crisp(tex);
   tex.repeat.set(repeat, repeat);
   tex.offset.set(0.5, 0.5);
   if (data) {
@@ -2705,11 +3008,12 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
     const boardParams = { roughness: spec.roughness, clearcoat: spec.clearcoat || 0, metalness: 0.02, ...spec.params };
     if (spec.canvas) {
       const map = finish(spec.canvas);
+      if (spec.pixel) crisp(map);
       map.repeat.set(spec.repeat, spec.repeat);
       map.offset.set(spec.offset ?? 0.5, spec.offset ?? 0.5);
       boardParams.map = map;
     } else boardParams.color = spec.color;
-    if (spec.glowCanvas) Object.assign(boardParams, { emissiveMap: glowTexture(spec.glowCanvas, spec.repeat, spec.glowData), emissive: '#ffffff', emissiveIntensity: spec.glowIntensity ?? 0.9 });
+    if (spec.glowCanvas) Object.assign(boardParams, { emissiveMap: glowTexture(spec.glowCanvas, spec.repeat, spec.glowData, spec.pixel), emissive: '#ffffff', emissiveIntensity: spec.glowIntensity ?? 0.9 });
     const dishParams = { color: spec.dish, roughness: 0.5, clearcoat: spec.clearcoat || 0 };
     if (wood) {
       const dishMap = finish(makeWoodCanvas({ base: spec.dish, grain: '40,25,15', seed: 21 }));
@@ -2717,13 +3021,13 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       dishMap.offset.set(0.5, 0.5);
       Object.assign(dishParams, { map: dishMap, color: '#ffffff' });
     } else if (spec.dishCanvas) {
-      Object.assign(dishParams, { map: glowTexture(spec.dishCanvas, spec.dishRepeat), color: '#ffffff' });
+      Object.assign(dishParams, { map: glowTexture(spec.dishCanvas, spec.dishRepeat, false, spec.pixel), color: '#ffffff' });
       if (spec.dishGlowCanvas) Object.assign(dishParams, { emissiveMap: glowTexture(spec.dishGlowCanvas, spec.dishRepeat, spec.dishGlowData), emissive: '#ffffff', emissiveIntensity: 1 });
     }
     const board = new THREE.MeshPhysicalMaterial(boardParams);
-    if (spec.shader) patchSkinShader(board, { body: spec.shader, common: spec.shaderCommon, uniforms: spec.uniforms, key: `board-${resolved}${variant}-animated` });
+    if (spec.shader) patchSkinShader(board, { body: spec.shader, common: spec.shaderCommon, uniforms: spec.uniforms, post: spec.post, key: `board-${resolved}${variant}-animated` });
     const dish = new THREE.MeshPhysicalMaterial(dishParams);
-    if (spec.dishShader) patchSkinShader(dish, { body: spec.dishShader, common: spec.shaderCommon, uniforms: spec.dishUniforms, key: `dish-${resolved}${variant}-animated` });
+    if (spec.dishShader) patchSkinShader(dish, { body: spec.dishShader, common: spec.shaderCommon, uniforms: spec.dishUniforms, post: spec.post, key: `dish-${resolved}${variant}-animated` });
     const mats = {
       board,
       dish,

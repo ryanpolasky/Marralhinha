@@ -50,6 +50,7 @@
     { "id": "marble.storm", "slot": "marble", "name": "Tempest", "rarity": "legendary", "desc": "A storm that never stops spinning." },
     { "id": "marble.eye", "slot": "marble", "name": "Dragon Eye", "rarity": "legendary", "desc": "It's watching your opponents. Always." },
     { "id": "marble.sol", "slot": "marble", "name": "Sol", "rarity": "legendary", "desc": "A whole star, somehow." },
+    { "id": "marble.arcade", "slot": "marble", "name": "1-UP", "rarity": "mythic", "desc": "Sixty-four pixels of pure arcade. Extra life not included." },
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
@@ -72,6 +73,7 @@
     { "id": "board.lacquer", "slot": "board", "name": "Black & Gold", "rarity": "legendary", "desc": "Lacquered ebony with gold trim." },
     { "id": "board.neon", "slot": "board", "name": "Neon Night", "rarity": "legendary", "desc": "The board after dark." },
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
+    { "id": "board.arcade", "slot": "board", "name": "Attract Mode", "rarity": "mythic", "desc": "Neon confetti on a dark arcade carpet, dithered down to a handful of colors." },
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
@@ -93,6 +95,7 @@
     { "id": "dice.gold", "slot": "dice", "name": "Solid Gold", "rarity": "legendary", "desc": "Heavy. Shiny. Lucky?" },
     { "id": "dice.galaxy", "slot": "dice", "name": "Cosmic", "rarity": "legendary", "desc": "Rolled by the stars." },
     { "id": "dice.holo", "slot": "dice", "name": "Prism", "rarity": "legendary", "desc": "Every roll, a different color." },
+    { "id": "dice.arcade", "slot": "dice", "name": "Continue?", "rarity": "mythic", "desc": "Blocky pips and a marquee border chasing its own tail. Just as fair as every other die." },
     { "id": "dice.beta", "slot": "dice", "name": "Test Build", "rarity": "exclusive", "tag": "beta", "desc": "May contain bugs. Rolls anyway." },
     { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
     { "id": "dice.supporter", "slot": "dice", "name": "Beacon", "rarity": "exclusive", "tag": "supporter", "desc": "Brushed midnight metal with luminous porcelain faces and crisp turquoise pips. Just as fair as every other die." },
@@ -117,6 +120,7 @@
     { "id": "plate.royal", "slot": "nameplate", "name": "Royal Gold", "rarity": "legendary", "desc": "For marralhinha royalty." },
     { "id": "plate.holo", "slot": "nameplate", "name": "Prism", "rarity": "legendary", "desc": "Every color at once." },
     { "id": "plate.diamond", "slot": "nameplate", "name": "Diamond", "rarity": "legendary", "desc": "Sparkles. Constantly. Unapologetically." },
+    { "id": "plate.arcade", "slot": "nameplate", "name": "Insert Coin", "rarity": "mythic", "desc": "Pixel borders, blinking lights, and a very loud cabinet." },
     { "id": "plate.beta", "slot": "nameplate", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Drafted by an early tester." },
     { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" },
     { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." }
@@ -135,7 +139,7 @@
       "name": "Golden Chest",
       "blurb": "Better odds. Shinier chest. Guaranteed Rare or better.",
       "price": 450,
-      "weights": { "common": 0, "rare": 70, "epic": 24, "legendary": 6 },
+      "weights": { "common": 0, "rare": 70, "epic": 24, "legendary": 6, "mythic": 0.5 },
       "pity": { "epic": 5, "legendary": 25 }
     }
   ],
