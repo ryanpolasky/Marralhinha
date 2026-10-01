@@ -48,7 +48,8 @@
     { "id": "marble.holo", "slot": "marble", "name": "Holo", "rarity": "legendary", "desc": "Shifts color as it rolls." },
     { "id": "marble.storm", "slot": "marble", "name": "Tempest", "rarity": "legendary", "desc": "A storm that never stops spinning." },
     { "id": "marble.eye", "slot": "marble", "name": "Dragon Eye", "rarity": "legendary", "desc": "It's watching your opponents. Always." },
-    { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board." },
+    { "id": "marble.sol", "slot": "marble", "name": "Sol", "rarity": "legendary", "desc": "A whole star, somehow." },
+    { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
 
@@ -70,8 +71,8 @@
     { "id": "board.lacquer", "slot": "board", "name": "Black & Gold", "rarity": "legendary", "desc": "Lacquered ebony with gold trim." },
     { "id": "board.neon", "slot": "board", "name": "Neon Night", "rarity": "legendary", "desc": "The board after dark." },
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
-    { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Still on the drafting table." },
-    { "id": "board.dev", "slot": "board", "name": "Mainframe", "rarity": "exclusive", "tag": "dev", "desc": "Black glass, molten traces. The table the game runs on." },
+    { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
+    { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "Midnight-blue lacquer, fine silver tide lines and a soft sea-glass glow around every turn." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },

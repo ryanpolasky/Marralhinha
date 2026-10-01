@@ -5073,6 +5073,20 @@ button.room-pill.copied {
   box-shadow: 0 0 14px var(--seat), 0 6px 12px rgba(0, 0, 0, 0.45);
 }
 
+.thumb-marble.skin-sol {
+  background: radial-gradient(circle at 58% 40%, #fff3c4 0 4%, transparent 7%), radial-gradient(circle at 38% 66%, #ffc454 0 5%, transparent 8%), radial-gradient(circle at 66% 68%, rgba(10, 2, 0, 0.9) 0 8%, transparent 12%),
+    radial-gradient(circle at 42% 36%, #ffb63c 0 6%, transparent 10%), radial-gradient(circle at 50% 50%, #b3540e 0 34%, #571600 62%, #170400 88%);
+  box-shadow: 0 0 16px rgba(255, 150, 40, 0.7), 0 0 6px rgba(255, 210, 120, 0.5), 0 6px 12px rgba(0, 0, 0, 0.45), inset 0 0 10px rgba(255, 190, 90, 0.35);
+  animation: sol-flare 3.4s ease-in-out infinite;
+}
+
+@keyframes sol-flare {
+  50% {
+    box-shadow: 0 0 28px rgba(255, 190, 80, 0.95), 0 6px 12px rgba(0, 0, 0, 0.45);
+    filter: brightness(1.14);
+  }
+}
+
 .thumb-marble.skin-dev {
   background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55) 0 5%, transparent 13%),
     linear-gradient(28deg, transparent 0 44%, var(--seat-light) 45% 47%, transparent 48%), linear-gradient(-40deg, transparent 0 58%, var(--seat-light) 59% 60.5%, transparent 62%),
@@ -5136,12 +5150,35 @@ button.room-pill.copied {
   background: linear-gradient(160deg, transparent 25%, rgba(47, 210, 160, 0.7) 32% 40%, transparent 47%), linear-gradient(160deg, transparent 50%, rgba(106, 60, 255, 0.7) 57% 65%, transparent 72%), #070a1e;
   filter: drop-shadow(0 0 6px #2fd2a0);
 }
+@property --eh-spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .thumb-board.skin-dev {
-  background: linear-gradient(90deg, transparent 0 22%, rgba(255, 74, 90, 0.75) 22% 60%, transparent 60%) 0 30% / 100% 2px no-repeat,
-    linear-gradient(0deg, transparent 0 30%, rgba(255, 74, 90, 0.75) 30% 72%, transparent 72%) 60% 0 / 2px 100% no-repeat,
-    linear-gradient(90deg, transparent 0 60%, rgba(255, 74, 90, 0.75) 60% 85%, transparent 85%) 0 72% / 100% 2px no-repeat,
-    radial-gradient(circle at 22% 30%, #ffd166 0 2px, transparent 3px), radial-gradient(circle at 85% 72%, #ffd166 0 2px, transparent 3px), linear-gradient(135deg, #14101a, #0b090c 60%);
-  filter: drop-shadow(0 0 6px #ff4a5a);
+  position: relative;
+  background: radial-gradient(circle at 18% 44%, #fff 0 0.8px, transparent 1.4px), radial-gradient(circle at 82% 58%, #ffe2c8 0 0.8px, transparent 1.4px), radial-gradient(circle at 44% 10%, #fff 0 0.7px, transparent 1.3px),
+    radial-gradient(circle at 58% 90%, #fff 0 0.7px, transparent 1.3px), radial-gradient(circle at 90% 40%, #ffd0b0 0 0.6px, transparent 1.2px), radial-gradient(circle at 8% 60%, #fff 0 0.6px, transparent 1.2px),
+    radial-gradient(circle at 50% 50%, rgba(255, 110, 50, 0.55) 0 16%, rgba(180, 20, 24, 0.45) 32%, transparent 60%), linear-gradient(135deg, #2a0608, #060102 60%);
+  filter: drop-shadow(0 0 6px #ff4a2a);
+}
+.thumb-board.skin-dev::before {
+  content: '';
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #000 0 28%, #ffe6b8 30% 33%, transparent 36%),
+    conic-gradient(from var(--eh-spin), #ffb35a, rgba(220, 30, 24, 0.35), #ffd28a 30%, rgba(160, 10, 16, 0.3) 45%, #ff8a3a 60%, rgba(200, 20, 20, 0.35) 78%, #ffb35a);
+  -webkit-mask: radial-gradient(circle, #000 0 62%, transparent 71%);
+  mask: radial-gradient(circle, #000 0 62%, transparent 71%);
+  animation: eh-spin 4s linear infinite;
+}
+
+@keyframes eh-spin {
+  to {
+    --eh-spin: 360deg;
+  }
 }
 .thumb-board.skin-supporter {
   background: repeating-linear-gradient(-16deg, transparent 0 8px, rgba(172, 236, 219, 0.28) 9px 10px, transparent 12px 21px), linear-gradient(135deg, #071f32, #225365 55%, #082537);

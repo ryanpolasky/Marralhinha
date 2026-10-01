@@ -270,7 +270,7 @@ function useSkinTransition(skin, animate) {
 
 export default function Board({ active, names, turn, showNames, skin, table = true, layout = CLASSIC_LAYOUT }) {
   const [shownSkin, wave] = useSkinTransition(skin, table);
-  const materials = boardSkin(shownSkin);
+  const materials = boardSkin(shownSkin, layout);
   useFrame(({ clock }) => animateBoardSkin(materials, clock.elapsedTime));
   const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
   const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
@@ -283,6 +283,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
     const entries = new Set(SEATS.map((s) => entryIdx(s, layout)));
     return layout.RING.filter((_, i) => !entries.has(i));
   }, [layout]);
+  const accentHoles = useMemo(() => [...layout.INNER_CORNERS.map((i) => layout.RING[i]), CENTER], [layout]);
   useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
   useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
   useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
@@ -292,7 +293,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
       {table && <Table texture={materials.felt} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
-      <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.cup} receiveShadow>
+      <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.core || materials.cup} receiveShadow>
         <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
       </mesh>
 
@@ -311,6 +312,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
         );
       })}
 
+      <Divots points={accentHoles} geometry={DIVOT_LIPPED_GEO} material={materials.brass} />
       {layout.INNER_CORNERS.map((i) => {
         const [r, c] = layout.RING[i];
         return (
