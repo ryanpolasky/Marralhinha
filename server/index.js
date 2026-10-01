@@ -226,7 +226,7 @@ io.on('connection', (socket) => {
   // One round trip for "Quick play vs bots": a lobby with bots in every other seat, so you can still
   // swap colours, switch on teams or change the timer before hitting Start
   handle('room:quickPlay', (payload) => {
-    const res = enter(() => rooms.create(), { prefer: preferOf(payload) });
+    const res = enter(() => rooms.create({ quickPlay: true }), { prefer: preferOf(payload) });
     const room = rooms.get(res.code);
     [0, 1, 2, 3].filter((seat) => !room.seats[seat]).forEach((seat) => room.addBot(userId, seat));
     return res;

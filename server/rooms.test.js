@@ -164,6 +164,28 @@ test('rooms with only bots are swept after the last human leaves', () => {
   assert.strictEqual(manager.rooms.size, 0);
 });
 
+test('quick play rooms with nobody connected are swept after minutes, other rooms keep their grace', () => {
+  const manager = new RoomManager({ onChange: () => {} });
+  const make = (options) => {
+    const room = manager.create(options);
+    room.join({ userId: 'u1', name: 'Ana' });
+    room.attach('u1', 's1');
+    room.addBot('u1', 1);
+    room.start('u1');
+    room.detach('u1', 's1');
+    return room;
+  };
+  const quick = make({ quickPlay: true });
+  const normal = make();
+  const later = Date.now() + 5 * 60 * 1000;
+  assert.strictEqual(quick.summary().empty, true);
+  assert.strictEqual(quick.isAbandoned(), false);
+  assert.strictEqual(quick.isAbandoned(later), true);
+  assert.strictEqual(normal.isAbandoned(later), false);
+  quick.dispose();
+  normal.dispose();
+});
+
 test('seat swaps require acceptance and force swaps work only before the game', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());

@@ -66,6 +66,7 @@ function ActiveGames({ currentCode, onSpectate, notify }) {
               <span className="room-pill">{r.code}</span>
               <span className={`admin-game-phase is-${r.phase}`}>{PHASE_LABEL[r.phase]}</span>
               {r.activity && <span className="badge">Discord</span>}
+              {r.empty && <span className="badge warn">no one connected</span>}
               {r.teams && <span className="badge">2v2</span>}
               {r.variant && <span className="badge">{BOARDS[r.variant]?.label || r.variant}</span>}
               <span className="muted small-text">

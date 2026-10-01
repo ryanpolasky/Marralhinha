@@ -23,7 +23,8 @@ const IDLE_MISSES = 2;
 const IDLE_DELAY_MS = 2500;
 // A disconnected host hands the host role to the next connected player after this long
 const HOST_HANDOFF_MS = 15000;
-const ROOM_TTL_MS = 30 * 60 * 1000;
+const ROOM_TTL_MS = 15 * 60 * 1000;
+const QUICK_PLAY_TTL_MS = 4 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
 const CHAT_MAX = 280;
@@ -64,10 +65,11 @@ function animationMs(game, now = Date.now()) {
 }
 
 class Room {
-  constructor(code, hooks, { instanceId = null } = {}) {
+  constructor(code, hooks, { instanceId = null, quickPlay = false } = {}) {
     this.code = code;
     this.hooks = hooks;
     this.instanceId = instanceId;
+    this.quickPlay = quickPlay;
     this.seats = [null, null, null, null];
     this.spectators = new Map();
     this.swapOffers = [];
@@ -789,7 +791,7 @@ class Room {
     if (!this.hasHumans()) return true;
     if (this.anyoneConnected()) return false;
     // Everyone's gone: the room dies ROOM_TTL_MS after the last human left, even if bots keep moving marbles
-    return now - (this.emptyAt ?? this.lastActive) > ROOM_TTL_MS;
+    return now - (this.emptyAt ?? this.lastActive) > (this.quickPlay ? QUICK_PLAY_TTL_MS : ROOM_TTL_MS);
   }
 
   dispose() {
@@ -838,6 +840,7 @@ class Room {
     return {
       code: this.code,
       activity: !!this.instanceId,
+      empty: !this.anyoneConnected(),
       phase: !game ? 'lobby' : game.phase === 'over' ? 'over' : 'playing',
       teams: this.teams,
       variant: game?.variant || this.variant,
