@@ -5243,9 +5243,37 @@ button.room-pill.copied {
     --eh-spin: 360deg;
   }
 }
+@property --mw-spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .thumb-board.skin-supporter {
-  background: repeating-linear-gradient(-16deg, transparent 0 8px, rgba(172, 236, 219, 0.28) 9px 10px, transparent 12px 21px), linear-gradient(135deg, #071f32, #225365 55%, #082537);
+  position: relative;
+  background: radial-gradient(circle at 50% 50%, #eafff8 0 7%, rgba(150, 235, 220, 0.55) 13%, transparent 38%),
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 7px, rgba(172, 236, 219, 0.22) 7px 8px),
+    radial-gradient(circle at 20% 24%, #fff 0 0.7px, transparent 1.3px), radial-gradient(circle at 80% 70%, #d8fff4 0 0.7px, transparent 1.3px), radial-gradient(circle at 66% 14%, #fff 0 0.6px, transparent 1.2px),
+    linear-gradient(135deg, #04141f, #0d4858 55%, #061f30);
   filter: drop-shadow(0 0 6px #83cdb9);
+}
+.thumb-board.skin-supporter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from var(--mw-spin), rgba(220, 255, 246, 0.8), transparent 9%, transparent 46%, rgba(220, 255, 246, 0.4) 52%, transparent 59%);
+  -webkit-mask: radial-gradient(circle, transparent 0 12%, #000 18%, #000 60%, transparent 78%);
+  mask: radial-gradient(circle, transparent 0 12%, #000 18%, #000 60%, transparent 78%);
+  animation: mw-spin 6s linear infinite;
+}
+.item-card.locked .thumb-board.skin-supporter::before {
+  animation: none;
+}
+
+@keyframes mw-spin {
+  to {
+    --mw-spin: 360deg;
+  }
 }
 
 .thumb-board.skin-beta {

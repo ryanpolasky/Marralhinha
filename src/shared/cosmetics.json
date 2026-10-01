@@ -74,7 +74,7 @@
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
-    { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "Midnight-blue lacquer, fine silver tide lines and a soft sea-glass glow around every turn." },
+    { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },

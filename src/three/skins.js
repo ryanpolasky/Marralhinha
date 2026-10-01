@@ -1211,32 +1211,6 @@ function oceanCanvases() {
   return [base, glow];
 }
 
-function moonwakeCanvases() {
-  const [base, bctx] = makeCanvas(1024, 1024);
-  const [glow, gctx] = makeCanvas(1024, 1024);
-  const rand = seeded(359);
-  const bg = bctx.createLinearGradient(0, 0, 1024, 1024);
-  bg.addColorStop(0, '#071f32');
-  bg.addColorStop(0.5, '#164557');
-  bg.addColorStop(1, '#082537');
-  bctx.fillStyle = bg;
-  bctx.fillRect(0, 0, 1024, 1024);
-  gctx.fillStyle = '#000';
-  gctx.fillRect(0, 0, 1024, 1024);
-  for (let i = 0; i < 34; i++) {
-    const line = { y0: i * 34 - 42, amp: 11 + rand() * 28, k: 1 + Math.floor(rand() * 3), phase: rand() * TAU, w: 1024 };
-    wavyLine(bctx, { ...line, color: i % 4 ? '#82c9c8' : '#e1f3df', width: 1.6 + rand() * 2.2, alpha: 0.16 + rand() * 0.16 });
-    if (i % 4 === 0) wavyLine(gctx, { ...line, color: '#8ee8d6', width: 2.2, alpha: 0.3 });
-  }
-  for (let i = 0; i < 240; i++) {
-    bctx.fillStyle = rand() > 0.85 ? 'rgba(242,255,240,0.6)' : 'rgba(171,231,220,0.18)';
-    bctx.beginPath();
-    bctx.arc(rand() * 1024, rand() * 1024, 0.4 + rand() * 1.3, 0, TAU);
-    bctx.fill();
-  }
-  return [base, glow];
-}
-
 function auroraCanvases() {
   const [base, bctx] = makeCanvas(1024, 1024);
   const [glow, gctx] = makeCanvas(1024, 1024);
@@ -2103,6 +2077,420 @@ function cuttingMatCanvas() {
   return canvas;
 }
 
+const TRACK_HOLE_R = 0.37;
+
+function roundRectPath(ctx, x0, y0, x1, y1, r) {
+  ctx.beginPath();
+  ctx.moveTo(x0 + r, y0);
+  ctx.arcTo(x1, y0, x1, y1, r);
+  ctx.arcTo(x1, y1, x0, y1, r);
+  ctx.arcTo(x0, y1, x0, y0, r);
+  ctx.arcTo(x0, y0, x1, y0, r);
+  ctx.closePath();
+}
+
+function moonLitPath(ctx, r, f) {
+  ctx.beginPath();
+  if (f > 0.97) ctx.arc(0, 0, r, 0, TAU);
+  else {
+    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
+    if (f < 0.5) ctx.ellipse(0, 0, Math.max(r * (1 - 2 * f), 0.001), r, 0, Math.PI / 2, -Math.PI / 2, true);
+    else ctx.ellipse(0, 0, Math.max(r * (2 * f - 1), 0.001), r, 0, Math.PI / 2, Math.PI * 1.5, false);
+  }
+  ctx.closePath();
+}
+
+function drawMoonPhase(ctx, data, x, y, r, f, rand) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (!data) {
+    softBlob(ctx, 0, 0, r * 2.8, '#8fe0d6', 0.1 + f * 0.2);
+    ctx.fillStyle = '#071d2c';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fill();
+  }
+  if (f > 0.03) {
+    moonLitPath(ctx, r, f);
+    if (data) {
+      ctx.fillStyle = 'rgba(0,0,255,0.85)';
+      ctx.fill();
+    } else {
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r * 1.1);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(1, '#9fd8da');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.save();
+      moonLitPath(ctx, r, f);
+      ctx.clip();
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = 'rgba(70,130,150,0.3)';
+        ctx.beginPath();
+        ctx.arc((rand() - 0.5) * r * 1.5, (rand() - 0.5) * r * 1.5, r * (0.07 + rand() * 0.13), 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.strokeStyle = data ? 'rgba(0,0,255,0.6)' : 'rgba(205,244,238,0.75)';
+  ctx.lineWidth = 0.022;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function resampleLoop(pts, step) {
+  const out = [];
+  let need = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1];
+    const [bx, by] = pts[i];
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 1e-6) continue;
+    const tx = (bx - ax) / len;
+    const ty = (by - ay) / len;
+    let d = need;
+    for (; d < len; d += step) out.push({ x: ax + tx * d, y: ay + ty * d, tx, ty });
+    need = d - len;
+  }
+  return out;
+}
+
+function scallopEdge(ctx, pts, step, radius) {
+  resampleLoop(pts, step).forEach(({ x, y, tx, ty }) => {
+    let nx = -ty;
+    let ny = tx;
+    if (-nx * x - ny * y < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    const a = Math.atan2(ny, nx);
+    ctx.beginPath();
+    ctx.arc(x, y, radius, a - Math.PI / 2, a + Math.PI / 2);
+    ctx.stroke();
+  });
+}
+
+// Overlapping concentric circles drawn top to bottom leave only the upper arcs showing, which is the classic wave scale
+function seigaiha(ctx, data, x0, x1, y0, y1, r) {
+  const rows = Math.ceil((y1 - y0) / (r / 2)) + 3;
+  for (let j = -1; j < rows; j++) {
+    const cy = y0 + (j * r) / 2;
+    const off = j % 2 ? r : 0;
+    for (let cx = x0 - 2 * r + off; cx < x1 + 2 * r; cx += 2 * r) {
+      [1, 0.68, 0.36].forEach((s, i) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * s, 0, TAU);
+        if (data) {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.fillStyle = i % 2 ? '#0d4457' : '#08293a';
+          ctx.fill();
+        }
+        ctx.strokeStyle = data ? 'rgba(0,0,255,0.5)' : 'rgba(190,236,229,0.32)';
+        ctx.lineWidth = 0.014;
+        ctx.stroke();
+      });
+    }
+  }
+}
+
+function paintMoonInlay(ctx, data, layout, rand) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const silver = (a) => (data ? `rgba(0,0,255,${a})` : `rgba(208,245,239,${a})`);
+  const { halfWidth: W, halfLength: L, homeRows } = layout.spec;
+  ctx.save();
+  ctx.setTransform(k, 0, 0, k, S / 2, S / 2);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  const hull = roundedCross(W - 0.1, L - 0.1, 0.5);
+  ctx.strokeStyle = silver(0.9);
+  ctx.lineWidth = 0.04;
+  ctx.beginPath();
+  hull.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  ctx.strokeStyle = silver(data ? 0.5 : 0.6);
+  ctx.lineWidth = 0.018;
+  scallopEdge(ctx, hull, 0.24, 0.12);
+
+  [[0.82, [0.07, 0.05]], [1.42, []]].forEach(([rad, dash]) => {
+    ctx.setLineDash(dash);
+    ctx.strokeStyle = silver(0.55);
+    ctx.lineWidth = dash.length ? 0.016 : 0.022;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad, 0, TAU);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.strokeStyle = silver(0.6);
+  ctx.lineWidth = 0.012;
+  for (let i = 0; i < 96; i++) {
+    const a = (i * TAU) / 96;
+    const out = 1.42 + (i % 12 === 0 ? 0.17 : i % 4 === 0 ? 0.1 : 0.05);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 1.42, Math.sin(a) * 1.42);
+    ctx.lineTo(Math.cos(a) * out, Math.sin(a) * out);
+    ctx.stroke();
+  }
+  [false, true].forEach((major) => {
+    for (let i = major ? 0 : 1; i < 8; i += 2) {
+      const a = (i * Math.PI) / 4;
+      const len = major ? 2.05 : 1.2;
+      const rb = major ? 0.62 : 0.5;
+      const spread = major ? 0.3 : 0.26;
+      const tip = [Math.cos(a) * len, Math.sin(a) * len];
+      [[a + spread, '#c6ece7', 0.55], [a - spread, '#0c4556', 0.9]].forEach(([b, fill, alpha], side) => {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(tip[0], tip[1]);
+        ctx.lineTo(Math.cos(b) * rb, Math.sin(b) * rb);
+        ctx.closePath();
+        if (!data || !side) {
+          ctx.fillStyle = data ? 'rgba(0,0,255,0.45)' : fill;
+          ctx.globalAlpha = data ? 1 : alpha;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = silver(0.55);
+        ctx.lineWidth = 0.012;
+        ctx.stroke();
+      });
+    }
+  });
+
+  const uLo = Math.min(...homeRows) - 0.35;
+  const uHi = L - 1.4;
+  for (let seat = 0; seat < 4; seat++) {
+    ctx.save();
+    ctx.rotate((-seat * Math.PI) / 2);
+    [1, -1].forEach((side) => {
+      const x0 = side > 0 ? 0.68 : -1.38;
+      const x1 = side > 0 ? 1.38 : -0.68;
+      ctx.save();
+      roundRectPath(ctx, x0, uLo, x1, uHi, 0.12);
+      ctx.clip();
+      if (!data) {
+        ctx.fillStyle = '#06222f';
+        ctx.fillRect(x0, uLo, x1 - x0, uHi - uLo);
+      }
+      seigaiha(ctx, data, x0, x1, uLo, uHi, 0.14);
+      ctx.restore();
+      roundRectPath(ctx, x0, uLo, x1, uHi, 0.12);
+      ctx.strokeStyle = silver(0.75);
+      ctx.lineWidth = 0.022;
+      ctx.stroke();
+      homeRows.forEach((row, i) => {
+        drawMoonPhase(ctx, data, side * 1.03, row, 0.24, i / (homeRows.length - 1), rand);
+        if (i < homeRows.length - 1) {
+          const y = row - 0.5;
+          const x = side * 1.03;
+          ctx.fillStyle = silver(0.85);
+          ctx.beginPath();
+          ctx.moveTo(x, y - 0.075);
+          ctx.lineTo(x + 0.028, y);
+          ctx.lineTo(x, y + 0.075);
+          ctx.lineTo(x - 0.028, y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+    });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Data texture: red is a halo around each hole (green its id), blue is anything the shader should make shimmer
+function moonwakeBoard(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [base, b] = makeCanvas(S, S);
+  const [data, d] = makeCanvas(S, S);
+  const rand = seeded(359);
+  const sea = b.createRadialGradient(C, C, 0, C, C, 9.5 * k);
+  sea.addColorStop(0, '#11586a');
+  sea.addColorStop(0.35, '#0a3a4e');
+  sea.addColorStop(0.75, '#072638');
+  sea.addColorStop(1, '#04141f');
+  b.fillStyle = sea;
+  b.fillRect(0, 0, S, S);
+  for (let i = 0; i < 50; i++) softBlob(b, rand() * S, rand() * S, (1.5 + rand() * 3.5) * k, i % 3 ? '#0b3447' : '#03101d', 0.3);
+  for (let i = 0; i < 26; i++) wavyLine(b, { y0: rand() * S, amp: 14 + rand() * 34, k: 1 + Math.floor(rand() * 3), phase: rand() * TAU, width: 1.4 + rand() * 2, color: '#8fd8d0', alpha: 0.05 + rand() * 0.07, w: S });
+  softBlob(b, C, C, 2.6 * k, '#6fc9c4', 0.22);
+
+  const holes = [...layout.RING, ...layout.HOME.flat()];
+  b.save();
+  b.setTransform(k, 0, 0, k, C, C);
+  holes.forEach(([r, c]) => {
+    b.strokeStyle = 'rgba(150,235,220,0.34)';
+    b.lineWidth = 0.028;
+    b.beginPath();
+    b.arc(c, r, TRACK_HOLE_R + 0.07, 0, TAU);
+    b.stroke();
+    b.strokeStyle = 'rgba(150,235,220,0.26)';
+    b.lineWidth = 0.012;
+    b.beginPath();
+    b.arc(c, r, TRACK_HOLE_R + 0.15, 0, TAU);
+    b.stroke();
+  });
+  b.restore();
+
+  holes.forEach(([r, c], i) => {
+    const x = C + c * k;
+    const y = C + r * k;
+    const color = `255,${(i * 37) % 256},0`;
+    const g = d.createRadialGradient(x, y, 0.36 * k, x, y, 0.58 * k);
+    g.addColorStop(0, `rgba(${color},1)`);
+    g.addColorStop(0.3, `rgba(${color},0.8)`);
+    g.addColorStop(1, `rgba(${color},0)`);
+    d.fillStyle = g;
+    d.beginPath();
+    d.arc(x, y, 0.58 * k, 0, TAU);
+    d.fill();
+  });
+  paintMoonInlay(b, false, layout, rand);
+  paintMoonInlay(d, true, layout, rand);
+  return [base, data];
+}
+
+function moonDish(layout) {
+  const S = 512;
+  const { dishR } = layout.spec;
+  const R = 0.5 / (dishR + 0.1);
+  const k = R * S;
+  const C = S / 2;
+  const [base, b] = makeCanvas(S, S);
+  const [glow, g] = makeCanvas(S, S);
+  const rand = seeded(113);
+  const bowl = b.createRadialGradient(C, C, 0, C, C, (dishR + 0.1) * k);
+  bowl.addColorStop(0, '#1d6c78');
+  bowl.addColorStop(0.6, '#0e4455');
+  bowl.addColorStop(1, '#07242f');
+  b.fillStyle = bowl;
+  b.fillRect(0, 0, S, S);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 10; i++) softBlob(b, C + (rand() - 0.5) * 2 * dishR * k, C + (rand() - 0.5) * 2 * dishR * k, (0.5 + rand() * 0.8) * k, '#0a2f3d', 0.4);
+  [[b, 0.16], [g, 0.55]].forEach(([ctx, strength]) => {
+    const r2 = seeded(114);
+    ctx.save();
+    ctx.setTransform(k, 0, 0, k, C, C);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 10; i++) {
+      const rr = 0.3 + i * 0.18;
+      for (let s = 0; s < 2 + Math.floor(r2() * 3); s++) {
+        const a0 = r2() * TAU;
+        ctx.strokeStyle = `rgba(165,238,226,${strength * (1 - i * 0.05)})`;
+        ctx.lineWidth = 0.018 + r2() * 0.012;
+        ctx.beginPath();
+        ctx.arc(0, 0, rr, a0, a0 + 0.7 + r2() * 1.4);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = `rgba(208,245,239,${strength * 2})`;
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.arc(0, 0, dishR - 0.28, 0, TAU);
+    ctx.stroke();
+    for (let i = 0; i < 12; i++) {
+      const x = (r2() - 0.5) * 2 * dishR;
+      const y = (r2() - 0.5) * 2 * dishR;
+      if (Math.hypot(x, y) > dishR - 0.4) continue;
+      ctx.fillStyle = `rgba(225,255,250,${strength * 3})`;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 0.06);
+      ctx.lineTo(x + 0.02, y);
+      ctx.lineTo(x, y + 0.06);
+      ctx.lineTo(x - 0.02, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+  return [base, glow, R];
+}
+
+function moonFeltCanvas() {
+  const S = 1024;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(367);
+  ctx.fillStyle = '#04111d';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 90 + rand() * 230;
+    const color = ['#0a2c3b', '#06202e', '#0b3a46'][i % 3];
+    [-S, 0, S].forEach((dx) => [-S, 0, S].forEach((dy) => softBlob(ctx, x + dx, y + dy, r, color, 0.32)));
+  }
+  for (let i = 0; i < 22; i++) {
+    const line = { y0: rand() * S, amp: 10 + rand() * 26, k: 1 + Math.floor(rand() * 3), phase: rand() * TAU, width: 1.2 + rand() * 1.6, color: '#7fd0cc', alpha: 0.05 + rand() * 0.07, w: S };
+    [-S, 0, S].forEach((dy) => wavyLine(ctx, { ...line, y0: line.y0 + dy }));
+  }
+  for (let i = 0; i < 520; i++) {
+    ctx.fillStyle = `rgba(205,245,238,${rand() * 0.5})`;
+    ctx.fillRect(rand() * S, rand() * S, rand() > 0.9 ? 2 : 1, rand() > 0.9 ? 2 : 1);
+  }
+  return canvas;
+}
+
+// A lighthouse beam sweeps from the center, lighting the tide lines, glints and hole collars as it passes
+const MOONWAKE_SHADER = `{
+  vec2 uvB = vEmissiveMapUv;
+  vec2 q = (uvB - 0.5) / ${BOARD_R};
+  float t = uSkinTime;
+  float r = length(q);
+  float ang = atan(q.y, q.x);
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  vec4 dat = texture2D(emissiveMap, uvB);
+  vec3 dd = dat.rgb / max(dat.a, 0.001);
+  float inlay = dat.a * dd.b;
+  float collar = dat.a * dd.r;
+  float moon = exp(-r * r / 7.0) * 0.6 + exp(-r * r / 45.0) * 0.3;
+  float sweep = t * 0.42;
+  float d1 = abs(mod(ang - sweep + 3.14159265, 6.2831853) - 3.14159265);
+  float d2 = abs(mod(ang - sweep, 6.2831853) - 3.14159265);
+  float beam = exp(-d1 * d1 / 0.02) + 0.45 * exp(-d2 * d2 / 0.02);
+  float reach = smoothstep(0.8, 2.6, r) * (1.0 - smoothstep(8.5, 12.0, r));
+  float haze = 0.7 + 0.3 * skFbm3(vec3(q * 0.7, t * 0.15));
+  float lit = beam * reach * haze;
+  float hgt = dot(q, vec2(0.34, 0.94)) * 0.62 + (skNoise3(vec3(q * 0.17 + 3.1, t * 0.03)) - 0.5) * 3.6 + (skNoise3(vec3(q * 0.36, t * 0.05)) - 0.5) * 0.9 - t * 0.12;
+  float dl = abs(fract(hgt + 0.5) - 0.5);
+  float tide = 1.0 - smoothstep(0.0, max(fwidth(hgt) * 1.3, 0.05), dl);
+  float band = 1.0 - smoothstep(0.0, 0.24, dl);
+  float glints = (skStars(q + vec2(t * 0.1, t * 0.04), 2.6, 0.55, t * 2.2, 0.0).g * 2.0 + skStars(q + 31.7, 1.15, 0.35, t * 1.6, 1.0).g * 1.7) * (0.25 + moon * 1.4 + lit * 1.8) * (0.3 + 0.7 * band);
+  float pk = skStars(q + vec2(77.0, -t * 0.09), 1.7, 0.4, t * 1.3, 0.0).g;
+  vec3 plankton = vec3(0.1, 0.95, 0.78) * pk * 1.7 * smoothstep(2.0, 6.5, r) * (0.55 + lit * 2.2);
+  vec3 water = vec3(0.6, 0.92, 0.92) * tide * (0.07 + moon * 0.26 + lit * 0.6) + vec3(0.85, 1.0, 0.97) * glints + plankton + vec3(0.3, 0.75, 0.8) * (moon * 0.12 + lit * 0.08);
+  float sheen = pow(0.5 + 0.5 * sin(dot(q, vec2(0.7, 0.55)) * 1.3 - t * 0.9), 5.0);
+  vec3 silver = mix(vec3(0.8, 0.97, 0.95), diffuseColor.rgb * 1.7, 0.5);
+  float age = fract(t / 7.0 + dd.g * 3.0);
+  float ripple = exp(-pow((dat.a - (1.0 - age)) / 0.1, 2.0)) * (1.0 - age) * step(0.2, dd.r);
+  vec3 halo = vec3(0.3, 0.95, 0.82) * collar * (0.07 + 0.05 * sin(t * 1.2 + dd.g * 40.0)) + vec3(0.8, 1.0, 0.96) * collar * lit * 1.1 + vec3(0.5, 1.0, 0.9) * ripple * 0.4;
+  vec3 em = water * (1.0 - 0.65 * inlay) + silver * inlay * (0.2 + 0.4 * sheen + lit * 1.5 + moon * 0.5) + halo;
+  totalEmissiveRadiance = em * top;
+}`;
+
+const moonDishShader = (R) => `{
+  vec2 uvB = vEmissiveMapUv;
+  vec2 q = (uvB - 0.5) / ${R.toFixed(5)};
+  float t = uSkinTime;
+  float r = length(q);
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  vec3 etched = texture2D(emissiveMap, uvB).rgb;
+  float rip = pow(0.5 + 0.5 * sin(r * 11.0 - t * 1.5), 8.0) * (1.0 - smoothstep(0.3, 2.3, r));
+  float gl = skStars(q + vec2(t * 0.05, 0.0), 2.6, 0.5, t * 2.0, 0.0).g * 2.0;
+  vec3 em = etched * (0.5 + 0.4 * sin(t * 0.7 + r * 2.5)) + vec3(0.3, 0.8, 0.82) * rip * 0.2 + vec3(0.85, 1.0, 0.96) * gl * (0.3 + 0.7 * rip);
+  totalEmissiveRadiance = em * top;
+}`;
+
 function bambooCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
   const rand = seeded(5);
@@ -2255,24 +2643,30 @@ const SPECIAL_BOARDS = {
       animate: (mats, t) => penAt(draft.keys, still?.matches ? -1 : (t / PLOT_CYCLE) % 1, { board: boardPen, dish: dishPen }),
     };
   },
-  supporter: () => {
-    const [base, glow] = moonwakeCanvases();
+  supporter: (layout) => {
+    const [base, data] = moonwakeBoard(layout);
+    const [dishBase, dishGlow, dishRepeat] = moonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const coreDim = new THREE.Color('#0c3b46');
+    const coreBright = new THREE.Color('#bff3e6');
     return {
-      canvas: base, glowCanvas: glow, glowIntensity: 0.32, repeat: 0.045, roughness: 0.14, clearcoat: 1,
-      dish: '#174b56', felt: '#071f2d', cup: '#061b26',
-      accent: { color: '#b1ebd9', metalness: 0.72, roughness: 0.22, emissive: '#7ac8b7', emissiveIntensity: 0.23 },
-      // Tide lines are pure sine waves, so sliding the glow sideways reads as water flowing
+      canvas: base, glowCanvas: data, glowData: true, repeat: BOARD_R, roughness: 0.5, params: { specularIntensity: 0.22 },
+      dishCanvas: dishBase, dishGlowCanvas: dishGlow, dishRepeat,
+      dish: '#174b56', feltCanvas: moonFeltCanvas(), cup: '#061b26', core: '#0c3b46',
+      accent: { color: '#6fa89f', metalness: 0.4, roughness: 0.5, emissive: '#5fa89b', emissiveIntensity: 0.12 },
+      shaderCommon: SKIN_NOISE_GLSL,
+      shader: MOONWAKE_SHADER,
+      dishShader: moonDishShader(dishRepeat),
       animate: (mats, t) => {
-        const flow = still?.matches ? 0 : t;
-        mats.board.emissiveMap.offset.x = 0.5 + flow * 0.012;
-        mats.board.emissiveIntensity = 0.24 + (0.5 + 0.5 * Math.sin(flow * 0.45)) * 0.14;
+        const time = still?.matches ? 0 : t;
+        mats.core.color.lerpColors(coreDim, coreBright, 0.5 + 0.5 * Math.sin(time * 0.6));
+        mats.brass.emissiveIntensity = 0.14 + 0.08 * Math.sin(time * 0.45);
       },
     };
   },
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key }) {
   const time = { value: 0 };
@@ -2308,7 +2702,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
   return cached(`board:${resolved}${variant}`, () => {
     const wood = WOODS[resolved];
     const spec = wood ? { canvas: makeWoodCanvas(wood), repeat: 0.055, roughness: 0.48, dish: wood.dish, felt: wood.felt, cup: '#3a220f' } : SPECIAL_BOARDS[resolved](layout);
-    const boardParams = { roughness: spec.roughness, clearcoat: spec.clearcoat || 0, metalness: 0.02 };
+    const boardParams = { roughness: spec.roughness, clearcoat: spec.clearcoat || 0, metalness: 0.02, ...spec.params };
     if (spec.canvas) {
       const map = finish(spec.canvas);
       map.repeat.set(spec.repeat, spec.repeat);
