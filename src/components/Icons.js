@@ -19,6 +19,14 @@ export const Close = () => (
   </Icon>
 );
 
+export const Crown = () => (
+  <svg className="host-crown" viewBox="0 0 24 16" role="img" aria-label="Host">
+    <title>Host</title>
+    <path d="M2 13 1 3l6 4.5L12 1l5 6.5L23 3l-1 10z" />
+    <rect x="2" y="13" width="20" height="2.6" rx="1.2" />
+  </svg>
+);
+
 export const Chevron = ({ dir = 'right', size = 20 }) => (
   <Icon size={size}>
     <path d={dir === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} strokeWidth="2.6" />

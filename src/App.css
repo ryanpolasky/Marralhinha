@@ -3180,10 +3180,10 @@ button.room-pill.copied {
 .host-crown {
   position: absolute;
   top: -9px;
-  right: -3px;
+  right: -1px;
   width: 22px;
   height: 15px;
-  transform: rotate(15deg);
+  transform: rotate(24deg);
   transform-origin: 25% 85%;
   fill: #ffd166;
   stroke: #8a6100;
@@ -7754,7 +7754,7 @@ textarea.report-text {
 .shop-carousel {
   position: relative;
   container-type: inline-size;
-  margin: 12px 0 26px;
+  margin: 12px 0 10px;
 }
 
 .carousel-viewport { overflow: hidden; border-radius: 20px; touch-action: pan-y; }
@@ -7795,7 +7795,7 @@ textarea.report-text {
 .carousel-arrow.prev { left: 10px; }
 .carousel-arrow.next { right: 10px; }
 
-.carousel-dots { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.carousel-dots { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
 
 .carousel-dot {
   display: inline-flex;

@@ -4,7 +4,7 @@ import { SEATS, SEAT_COLORS } from '../game/geometry';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
 import RulesButton from './Rules';
-import { Bug, Copy } from './Icons';
+import { Bug, Copy, Crown } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
@@ -163,13 +163,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
               <div key={s} className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}`} style={{ '--seat': color.main, '--seat-light': color.light }}>
                 <span className="seat-dot">
                   <span className="marble-dot" />
-                  {p && p.id === room.hostId && (
-                    <svg className="host-crown" viewBox="0 0 24 16" role="img" aria-label="Host">
-                      <title>Host</title>
-                      <path d="M2 13 1 3l6 4.5L12 1l5 6.5L23 3l-1 10z" />
-                      <rect x="2" y="13" width="20" height="2.6" rx="1.2" />
-                    </svg>
-                  )}
+                  {p && p.id === room.hostId && <Crown />}
                 </span>
                 <div className="seat-info">
                   <div className="seat-color">
