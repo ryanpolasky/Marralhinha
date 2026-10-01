@@ -200,10 +200,15 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
                       {swapFrom === s ? 'Cancel' : swapFrom === null ? 'Select seat' : 'Swap here'}
                     </button>
                   )}
-                  {/* Bots don't need to agree: swap straight into their seat */}
-                  {p && p.isBot && !isAdmin && mySeat >= 0 && (
+                  {/* Bots don't need to agree: swap straight into their seat, or take it outright as a spectator */}
+                  {p && p.isBot && !isAdmin && (
                     <button className="btn tiny secondary" onClick={() => onAction('lobby:takeBotSeat', { seat: s })}>
                       Take seat
+                    </button>
+                  )}
+                  {mine && (
+                    <button className="btn tiny ghost" onClick={() => onAction('lobby:spectate')}>
+                      Spectate
                     </button>
                   )}
                   {p && !mine && mySeat >= 0 && (isAdmin || !p.isBot) && (

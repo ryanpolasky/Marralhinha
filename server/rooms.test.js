@@ -386,6 +386,109 @@ test('a holdout leaving completes a pending rematch vote', (t) => {
   assert.strictEqual(room.game.turn, 2);
 });
 
+test('a closed activity frees the lobby seat and passes the host on the spot', (t) => {
+  const room = new Room('ACTD', { onChange: () => {} }, { instanceId: 'inst-a' });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  const bob = room.join({ userId: 'u2', name: 'Bob' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  room.detach('u1', 's1');
+  assert.strictEqual(room.seats[0], null, 'closing the activity gives the seat back');
+  assert.strictEqual(room.findByUser('u1'), null);
+  assert.strictEqual(room.hostId, bob.id);
+});
+
+test('a dropped activity seat survives the game but clears on the next round', (t) => {
+  const room = new Room('ACTG', { onChange: () => {} }, { instanceId: 'inst-b' });
+  t.after(() => room.dispose());
+  ['u1', 'u2'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.start('u1');
+  room.detach('u2', 's1');
+  assert.ok(room.findByUser('u2'), 'mid-game drops keep the seat for a reconnect');
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.rematch('u1');
+  assert.ok(!room.findByUser('u2'), 'the next round frees the closed seat');
+});
+
+test('dropping during results frees the seat and finishes a pending vote', (t) => {
+  const room = new Room('ACTO', { onChange: () => {} }, { instanceId: 'inst-c' });
+  t.after(() => room.dispose());
+  ['u1', 'u2', 'u3'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.start('u1');
+  room.game.phase = 'over';
+  room.game.winners = [2];
+  room.rematch('u2');
+  assert.strictEqual(room.game.phase, 'over');
+  room.detach('u3', 's2');
+  assert.ok(room.game.phase !== 'over', 'the last vote landing fires the rematch');
+  assert.strictEqual(room.game.turn, 2);
+});
+
+test('web rooms still hold a dropped lobby seat', (t) => {
+  const room = new Room('WEBD', { onChange: () => {} });
+  t.after(() => room.dispose());
+  const ana = room.join({ userId: 'u1', name: 'Ana' });
+  room.join({ userId: 'u2', name: 'Bob' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  room.detach('u1', 's1');
+  assert.strictEqual(room.seats[0]?.id, ana.id);
+  assert.strictEqual(room.hostId, ana.id);
+});
+
+test('spectators can sit, stand back up, and take bot seats', (t) => {
+  const room = new Room('SITS', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  const bob = room.join({ userId: 'u2', name: 'Bob' }, { spectate: true });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  assert.ok(room.spectators.has('u2'));
+
+  room.setSeat('u2', 2);
+  assert.strictEqual(room.seats[2].id, bob.id);
+  assert.ok(!room.spectators.has('u2'));
+
+  room.unseat('u2');
+  assert.strictEqual(room.seats[2], null);
+  assert.ok(room.spectators.has('u2'));
+
+  room.addBot('u1', 3);
+  room.takeBotSeat('u2', 3);
+  assert.strictEqual(room.seats[3].id, bob.id);
+  assert.ok(!room.seats[3].isBot);
+
+  room.unseat('u1');
+  assert.strictEqual(room.hostId, bob.id, 'the crown passes when the host stands');
+});
+
+test('seats open up again while results show, but stay locked mid-game', (t) => {
+  const room = new Room('SEATW', { onChange: () => {} });
+  t.after(() => room.dispose());
+  ['u1', 'u2'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.join({ userId: 'u3', name: 'P2' }, { spectate: true });
+  room.attach('u3', 's3');
+  room.start('u1');
+  assert.throws(() => room.setSeat('u3', 1), /already started/);
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.setSeat('u3', 1);
+  assert.strictEqual(room.seats[1].userId, 'u3');
+  room.unseat('u3');
+  assert.strictEqual(room.seats[1], null);
+});
+
 function teamRoom(t, { botPartner = false } = {}) {
   const sent = [];
   const room = new Room('TEAM', {

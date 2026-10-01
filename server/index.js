@@ -226,7 +226,12 @@ io.on('connection', (socket) => {
     return res;
   });
   handle('room:join', (payload) => enter(rooms.get(payload.code), { spectate: payload.spectate === true, prefer: preferOf(payload) }));
-  handle('room:joinInstance', (payload) => enter(rooms.forInstance(payload.instanceId), { prefer: preferOf(payload) }));
+  // Whoever opens the activity first takes a seat; everyone else lands as a spectator and sits themselves
+  handle('room:joinInstance', (payload) => {
+    const room = rooms.forInstance(payload.instanceId);
+    const taken = room.seats.some((p) => p && !p.isBot);
+    return enter(room, { spectate: taken, prefer: preferOf(payload) });
+  });
   // Lets a second device pick up wherever this account is seated (live games first)
   handle('room:current', () => {
     const seated = rooms.roomsWithUser(userId).filter((room) => room.findByUser(userId));
@@ -235,6 +240,7 @@ io.on('connection', (socket) => {
   });
   handle('room:leave', () => leaveCurrent(true));
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
+  handle('lobby:spectate', () => current().unseat(userId));
   handle('lobby:offerSwap', ({ seat }) => current().offerSwap(userId, seat));
   handle('lobby:takeBotSeat', ({ seat }) => current().takeBotSeat(userId, seat));
   handle('lobby:respondSwap', ({ fromId, accept }) => current().respondSwap(userId, fromId, accept === true));

@@ -11,7 +11,7 @@ import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
-import { useSettings, updateSettings } from '../game/settings';
+import { useSettings, updateSettings, getSettings } from '../game/settings';
 import useFitPanel from './useFitPanel';
 
 const BOX_PRICE = BOXES[0].price;
@@ -531,12 +531,14 @@ export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf
   const title = iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`;
   const nameOfId = (id) => {
     const s = seats.findIndex((p) => p?.id === id);
-    return s === mySeat ? 'You' : s >= 0 ? nameOf(s) : null;
+    return s === mySeat ? 'You' : s >= 0 ? seats[s]?.name : null;
   };
   const voters = (rematch?.voters || []).map(nameOfId).filter(Boolean);
   const pending = (rematch?.pending || []).map(nameOfId).filter(Boolean);
   const needed = voters.length + pending.length;
   const iVoted = !!rematch?.voters?.includes(playerId);
+  const favourite = getSettings().favoriteSeat;
+  const openSeat = Number.isInteger(favourite) && !seats[favourite] ? favourite : seats.findIndex((p) => !p);
   return (
     <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity ? ' activity-win-card' : ''}${reward ? '' : ' no-payout'}`}>
       <div className="win-intro">
@@ -583,6 +585,10 @@ export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf
           >
             {iVoted ? `You're in! (${voters.length}/${needed})` : 'Rematch'}
           </button>
+        ) : openSeat >= 0 ? (
+          <button className="btn primary big block play-btn" onClick={() => onAction('lobby:seat', { seat: openSeat })} title="Grab an open seat and you'll be in the next round">
+            Take a seat
+          </button>
         ) : (
           <div className="waiting">Waiting for the host to start another round…</div>
         )}
@@ -597,6 +603,11 @@ export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf
           <button className="btn ghost" onClick={onViewBoard}>
             View board
           </button>
+          {mySeat >= 0 && (
+            <button className="btn ghost" onClick={() => onAction('lobby:spectate')} title="Step down and just watch the next round">
+              Spectate
+            </button>
+          )}
           {onLeave && (
             <button className="btn ghost" onClick={onLeave}>
               Leave
@@ -684,7 +695,9 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const [showOver, setShowOver] = useState(game.phase === 'over');
   const [winScreenRef, winCardRef] = useFitPanel(room.activity && showOver, room, { maxWidth: 920 });
 
-  const nameOf = useCallback((s) => (s === mySeat ? 'You' : seats[s]?.name || SEAT_COLORS[s].name), [mySeat, seats]);
+  // Results name the players who finished the game, not whoever grabbed a freed seat afterwards
+  const over = game.phase === 'over';
+  const nameOf = useCallback((s) => (s === mySeat ? 'You' : (over ? game.names?.[s] : seats[s]?.name) || SEAT_COLORS[s].name), [mySeat, seats, over, game.names]);
   const announcements = useAnnouncements(game, mySeat, nameOf);
 
   const activeSeat = rollPending ? game.lastRoll.seat : game.turn;
