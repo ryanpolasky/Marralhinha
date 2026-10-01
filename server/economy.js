@@ -169,9 +169,10 @@ class Economy {
     const sinceLegendary = counters.legendary + 1;
 
     let rarity;
-    const mythic = box.weights.mythic || 0;
-    if (sinceLegendary >= box.pity.legendary) rarity = weightedPick({ legendary: box.weights.legendary, mythic }, rand);
-    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary, mythic }, rand);
+    // Mythic tier off for now; fold mythic back into these picks when it returns
+    // const mythic = box.weights.mythic || 0;
+    if (sinceLegendary >= box.pity.legendary) rarity = 'legendary';
+    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary }, rand);
     else rarity = weightedPick(box.weights, rand);
 
     pity[box.id] = {
