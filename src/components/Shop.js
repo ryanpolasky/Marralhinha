@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
-import { Coins, ItemCard, PreviewStage, RarityTag, Coin } from './Economy';
-import { Close } from './Icons';
+import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin } from './Economy';
+import { Chevron, Close } from './Icons';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
+import { IS_ACTIVITY } from '../net/config';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const SHAKE_MS = 1500;
@@ -20,6 +21,36 @@ function useCountdown(target) {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
   return `${h}h ${m}m`;
+}
+
+const PACKS = {
+  supporter: {
+    thanks: 'Thank you for supporting Marralhinha! Your set is ready in the locker.',
+    missing: 'No Supporter purchase found yet. If you just bought it, wait a moment and try again.',
+  },
+  halloween: {
+    thanks: 'Welcome to the séance! Your Haunted set is ready in the locker.',
+    missing: 'No Halloween Pack purchase found yet. If you just bought it, wait a moment and try again.',
+  },
+};
+
+const PACK_SLOTS = ['marble', 'board', 'dice', 'plate'];
+
+function PackItems({ kind }) {
+  return (
+    <div className="pack-items">
+      {PACK_SLOTS.map((slot) => {
+        const item = ITEMS[`${slot}.${kind}`];
+        return (
+          <span key={item.id} className="pack-item">
+            <ItemThumb itemId={item.id} />
+            {item.name}
+            <small>{catalog.slots[item.slot].label.replace(/s$/, '')}</small>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 export function BoxArt({ box, shaking = false, glow }) {
@@ -85,8 +116,12 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [opening, setOpening] = useState(null);
   const [showRates, setShowRates] = useState(null);
   const [buying, setBuying] = useState(null);
-  const [syncingSupporter, setSyncingSupporter] = useState(false);
+  const [syncing, setSyncing] = useState(null);
+  const [slide, setSlide] = useState(0);
+  const swipeStart = useRef(null);
   const refreshIn = useCountdown(shop?.refreshAt);
+  const slides = 2;
+  const go = (next) => setSlide(Math.max(0, Math.min(slides - 1, next)));
 
   useEffect(() => {
     api('/shop')
@@ -133,30 +168,47 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
     }
   };
 
-  const refreshSupporter = async () => {
-    setSyncingSupporter(true);
+  const refreshPack = async (kind) => {
+    setSyncing(kind);
     try {
-      const { profile } = await post('/shop/supporter/refresh');
+      const { profile } = await post(`/shop/${kind}/refresh`);
       onProfile(profile);
-      notify(profile.tags.includes('supporter') ? 'Thank you for supporting Marralhinha! Your set is ready in the locker.' : 'No Supporter purchase found yet. If you just bought it, wait a moment and try again.', 'good');
+      notify(profile.tags.includes(kind) ? PACKS[kind].thanks : PACKS[kind].missing, 'good');
     } catch (err) {
       notify(err.message);
     } finally {
-      setSyncingSupporter(false);
+      setSyncing(null);
     }
   };
 
-  const purchaseSupporter = async () => {
+  const purchasePack = async (kind) => {
     if (!account.discordLinked) return startDiscordLogin().catch((err) => notify(err.message));
-    if (!shop?.supporter) return undefined;
+    const offer = shop?.[kind];
+    if (!offer?.skuId || offer.open === false) return undefined;
     try {
-      const purchasedInActivity = await purchaseDiscordSku(shop.supporter.clientId, shop.supporter.skuId);
-      if (purchasedInActivity) await refreshSupporter();
+      const purchasedInActivity = await purchaseDiscordSku(offer.clientId, offer.skuId);
+      if (purchasedInActivity) await refreshPack(kind);
     } catch (err) {
       notify(err.message);
     }
     return undefined;
   };
+
+  const hasSupporter = account.tags.includes('supporter');
+  const hasHalloween = account.tags.includes('halloween');
+  const halloweenOpen = shop?.halloween?.open;
+  const supporterLabel = !shop?.supporter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support';
+  const halloweenLabel = !shop ? 'Loading…' : !halloweenOpen ? 'Back next October' : !shop.halloween.skuId ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Halloween Pack' : 'Link Discord to get it';
+  const onCarouselKey = (e) => {
+    if (e.key === 'ArrowLeft') go(slide - 1);
+    else if (e.key === 'ArrowRight') go(slide + 1);
+  };
+  const onSwipeEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - swipeStart.current;
+    if (swipeStart.current !== null && Math.abs(dx) > 50) go(slide + (dx < 0 ? 1 : -1));
+    swipeStart.current = null;
+  };
+  const slideProps = (i) => (i === slide ? {} : { 'aria-hidden': true, inert: '' });
 
   return (
     <div className="modal-backdrop shop-backdrop" onClick={opening ? undefined : onClose}>
@@ -249,27 +301,67 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
         </div>
         <p className="muted small-text center">Featured items and chests use {CURRENCY} earned by playing. No pay-to-win.</p>
 
-        <section className="supporter-shop" aria-label="Support the game">
-          <picture>
-            <source media="(prefers-reduced-motion: reduce)" srcSet="/supporter-pack-still.png" />
-            <img className="supporter-art" src="/supporter-pack.gif" alt="The Tideglass marble and Beacon die floating above a moonlit table" width="680" height="240" />
-          </picture>
-          <div className="supporter-shop-body">
-            <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
-            <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, and more to come! Only the look changes; never the gameplay.</p>
-            <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
-            <div className="supporter-actions">
-              {account.tags.includes('supporter') ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
-                <button className="btn primary" disabled={!shop?.supporter || syncingSupporter} onClick={purchaseSupporter}>
-                  {!shop?.supporter ? 'Discord checkout coming soon' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support'}
-                </button>
-              )}
-              {shop?.supporter && account.discordLinked && !account.tags.includes('supporter') && <button className="btn secondary" disabled={syncingSupporter} onClick={refreshSupporter}>{syncingSupporter ? 'Checking…' : 'Already purchased? Check access'}</button>}
-              <span className="supporter-signature">— Ryan :)</span>
+        <div className="shop-carousel" role="group" aria-roledescription="carousel" aria-label="Packs" onKeyDown={onCarouselKey}>
+          <div className="carousel-viewport" onTouchStart={(e) => (swipeStart.current = e.touches[0].clientX)} onTouchEnd={onSwipeEnd}>
+            <div className="carousel-track" style={{ transform: `translateX(-${slide * 100}%)` }}>
+              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Supporter Pack, 1 of 2" {...slideProps(0)}>
+                <section className="supporter-shop" aria-label="Support the game">
+                  <picture>
+                    <source media="(prefers-reduced-motion: reduce)" srcSet="/supporter-pack-still.png" />
+                    <img className="supporter-art" src="/supporter-pack.gif" alt="The Tideglass marble and Beacon die floating above a moonlit table" width="680" height="240" />
+                  </picture>
+                  <div className="supporter-shop-body">
+                    <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
+                    <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, and more to come! Only the look changes; never the gameplay.</p>
+                    <PackItems kind="supporter" />
+                    <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
+                    <div className="supporter-actions">
+                      {hasSupporter ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
+                        <button className="btn primary" disabled={!shop?.supporter || !!syncing} onClick={() => purchasePack('supporter')}>
+                          {supporterLabel}
+                        </button>
+                      )}
+                      {shop?.supporter && account.discordLinked && !hasSupporter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('supporter')}>{syncing === 'supporter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                      <span className="supporter-signature">— Ryan :)</span>
+                    </div>
+                    <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+                  </div>
+                </section>
+              </div>
+
+              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Halloween Pack, 2 of 2" {...slideProps(1)}>
+                <section className="halloween-shop" aria-label="Halloween Pack">
+                  <div className="halloween-art-wrap">
+                    <picture>
+                      <source media="(prefers-reduced-motion: reduce)" srcSet="/halloween-pack-still.png" />
+                      <img className="halloween-art" src="/halloween-pack.gif" alt="A crystal ball and a candlelit die on a séance table under a crescent moon" width="680" height="240" loading="lazy" />
+                    </picture>
+                    <span className={`halloween-ribbon${shop && !halloweenOpen ? ' closed' : ''}`}>{shop && !halloweenOpen ? 'Gone until next October' : 'Only available in October!'}</span>
+                  </div>
+                  <div className="halloween-shop-body">
+                    <div className="halloween-shop-head"><span className="halloween-eyebrow">Pull up a chair</span><h3>Halloween Pack</h3><span className="halloween-price">$3.99 USD · one time</span></div>
+                    <p>The spirits gather round the table, and so do you. A permanent Haunted badge and four candlelit cosmetics. Only the look changes; never the gameplay.</p>
+                    <PackItems kind="halloween" />
+                    <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
+                    <div className="halloween-actions">
+                      {hasHalloween ? <span className="halloween-owned">Your Haunted set is waiting in the locker. Welcome to the séance.</span> : (
+                        <button className="btn primary" disabled={!shop || !halloweenOpen || !shop.halloween.skuId || !!syncing} onClick={() => purchasePack('halloween')}>{halloweenLabel}</button>
+                      )}
+                      {shop?.halloween?.skuId && account.discordLinked && !hasHalloween && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('halloween')}>{syncing === 'halloween' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                    </div>
+                    <span className="small-text halloween-fine">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+                  </div>
+                </section>
+              </div>
             </div>
-            <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
           </div>
-        </section>
+          <button type="button" className="carousel-arrow prev" aria-label="Previous pack" disabled={slide === 0} onClick={() => go(slide - 1)}><Chevron dir="left" /></button>
+          <button type="button" className="carousel-arrow next" aria-label="Next pack" disabled={slide === slides - 1} onClick={() => go(slide + 1)}><Chevron /></button>
+          <div className="carousel-dots">
+            <button type="button" className={`carousel-dot sp${slide === 0 ? ' on' : ''}`} aria-label="Show the Supporter Pack" aria-current={slide === 0 || undefined} onClick={() => go(0)}>Supporter</button>
+            <button type="button" className={`carousel-dot hw${slide === 1 ? ' on' : ''}`} aria-label="Show the Halloween Pack" aria-current={slide === 1 || undefined} onClick={() => go(1)}>Halloween</button>
+          </div>
+        </div>
       </div>
 
       {opening && (

@@ -69,8 +69,8 @@ test('Luckiest starts collapsed with a ten-game bar and reveals readable stats o
   expect(screen.getByText('10 / 10 games')).toBeInTheDocument();
 });
 
-test('locker lists ordinary rarities before Luckiest, Supporter, Beta and Dev', () => {
-  const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'beta', 'dev'];
+test('locker lists ordinary rarities before Luckiest, Supporter, Haunted, Beta and Dev', () => {
+  const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'beta', 'dev'];
   for (const slot of ['marble', 'board', 'dice', 'nameplate']) {
     const order = itemsForSlot(slot).map((item) => item.tag || item.rarity);
     expect(order).toEqual([...order].sort((a, b) => tiers.indexOf(a) - tiers.indexOf(b)));
@@ -90,6 +90,29 @@ test('Supporter pack does not unlock until the profile carries a verified tag', 
   rerender(<Shop account={{ ...account, tags: ['supporter'] }} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
   expect(canUse({ ...account, tags: ['supporter'] }, 'marble.supporter')).toBe(true);
   expect(screen.getByText(/your Supporter set is waiting/i)).toBeInTheDocument();
+});
+
+test('shop carousel starts on the Supporter Pack and flips to the October-only Halloween Pack', () => {
+  const account = { name: 'Tester', coins: 300, pity: {}, tags: [], inventory: [], discordLinked: false };
+  expect(canUse(account, 'marble.halloween')).toBe(false);
+  expect(canUse({ ...account, tags: ['halloween'] }, 'dice.halloween')).toBe(true);
+  expect(canUse({ ...account, tags: ['supporter'] }, 'dice.halloween')).toBe(false);
+  render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
+  const slides = document.querySelectorAll('.carousel-slide');
+  expect(slides).toHaveLength(2);
+  expect(slides[0]).not.toHaveAttribute('aria-hidden');
+  expect(slides[1]).toHaveAttribute('aria-hidden', 'true');
+  expect(screen.getByRole('button', { name: 'Previous pack' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Next pack' }));
+  expect(slides[0]).toHaveAttribute('aria-hidden', 'true');
+  expect(slides[1]).not.toHaveAttribute('aria-hidden');
+  expect(screen.getByRole('button', { name: 'Next pack' })).toBeDisabled();
+  expect(screen.getByText('Only available in October!')).toBeInTheDocument();
+  expect(screen.getByText('$3.99 USD · one time')).toBeInTheDocument();
+  expect(screen.getByText('Crystal Ball')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+  fireEvent.keyDown(document.querySelector('.shop-carousel'), { key: 'ArrowLeft' });
+  expect(slides[0]).not.toHaveAttribute('aria-hidden');
 });
 
 test('Discord lobby keeps seats and controls in a fitted two-column panel', () => {

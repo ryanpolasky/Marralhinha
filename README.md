@@ -37,7 +37,7 @@ Short on humans? Bots fill empty seats, and they take over for players who drop 
 
 Everyone gets a guest account instantly. Play games to earn **Marbucks**, then spend them on chests and daily featured cosmetics: marbles, boards, dice and nameplates. Profiles track match history, player cards and leaderboards, and in-game chat supports team messages and optional event logs.
 
-Everything is cosmetic. Marbucks can't be bought, so nothing purchasable changes the game. The optional one-time **Supporter Pack** helps fund the server and grants a badge plus four exclusive cosmetics. Link your Discord account to keep progress across devices and to launch the game as an Activity inside voice channels, where everyone in the channel lands at the same table automatically.
+Everything is cosmetic. Marbucks can't be bought, so nothing purchasable changes the game. The optional one-time **Supporter Pack** helps fund the server and grants a badge plus four exclusive cosmetics. The seasonal **Halloween Pack** works the same way, but it is only sold during October. Link your Discord account to keep progress across devices and to launch the game as an Activity inside voice channels, where everyone in the channel lands at the same table automatically.
 
 ## Community
 

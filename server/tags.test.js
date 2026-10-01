@@ -37,7 +37,7 @@ test('tags are stored, normalized and drive the admin flag', () => {
 test('Supporter is ordered above Luckiest and cannot be granted as a stored tag', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Supporter' });
-  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky']);
+  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'halloween', 'lucky']);
   assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 4);
   accounts.setTags(id, ['supporter', 'lucky', 'beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
@@ -86,6 +86,57 @@ test('Discord entitlement verification grants and revokes the entire Supporter s
     accounts.setSupporter(id, 'ent-1');
     delete process.env.DISCORD_BOT_TOKEN;
     assert.equal(accounts.owns(id, 'marble.supporter'), false, 'unconfigured verification fails closed');
+  } finally {
+    env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    global.fetch = originalFetch;
+  }
+});
+
+test('Halloween Pack is verified through its own SKU, keeps Supporter separate, and is only sold in October', async () => {
+  const env = ['DISCORD_CLIENT_ID', 'DISCORD_BOT_TOKEN', 'DISCORD_SUPPORTER_SKU_ID', 'DISCORD_HALLOWEEN_SKU_ID'];
+  const previous = env.map((key) => process.env[key]);
+  const originalFetch = global.fetch;
+  const appId = '123456789012345678';
+  const supporterSku = '234567890123456789';
+  const halloweenSku = '567890123456789012';
+  const discordId = '345678901234567890';
+  try {
+    Object.assign(process.env, { DISCORD_CLIENT_ID: appId, DISCORD_BOT_TOKEN: 'test-bot-token', DISCORD_SUPPORTER_SKU_ID: supporterSku, DISCORD_HALLOWEEN_SKU_ID: halloweenSku });
+    const entitlement = (sku, id) => ({ id, application_id: appId, sku_id: sku, user_id: discordId, deleted: false, consumed: false, ends_at: null });
+    global.fetch = async (url) => ({ ok: true, json: async () => [entitlement(url.searchParams.get('sku_ids'), `ent-${url.searchParams.get('sku_ids')}`)] });
+    assert.equal(await discord.halloweenEntitlement(discordId), `ent-${halloweenSku}`);
+    global.fetch = async () => ({ ok: true, json: async () => [entitlement(supporterSku, 'only-supporter')] });
+    assert.equal(await discord.halloweenEntitlement(discordId), null, 'a Supporter entitlement never unlocks Halloween');
+    assert.equal(await discord.supporterEntitlement(discordId), 'only-supporter');
+
+    const { accounts } = setup();
+    const { id } = accounts.createUser({ name: 'H' });
+    const halloweenItems = catalog.items.filter((item) => item.tag === 'halloween');
+    assert.deepEqual(halloweenItems.map((item) => item.slot).sort(), ['board', 'dice', 'marble', 'nameplate']);
+    accounts.setTags(id, ['halloween']);
+    assert.deepEqual(accounts.tags(accounts.getUser(id)), [], 'halloween cannot be a stored tag');
+    assert.throws(() => accounts.grantItem(id, 'marble.halloween'), /Haunted tag/);
+    assert.throws(() => accounts.equip(id, 'marble', 'marble.halloween'), /Haunted only/);
+    assert.equal(accounts.setHalloween(id, 'ent-h'), true);
+    assert.equal(accounts.setHalloween(id, 'ent-h'), false);
+    assert.deepEqual(accounts.tags(accounts.getUser(id)), ['halloween']);
+    halloweenItems.forEach((item) => assert.equal(accounts.owns(id, item.id), true));
+    assert.equal(accounts.owns(id, 'marble.supporter'), false);
+    accounts.equip(id, 'nameplate', 'plate.halloween');
+    assert.equal(accounts.q.purchaserAccounts.all().length, 0, 'unlinked accounts are never re-verified');
+    accounts.q.linkDiscord.run(discordId, null, id);
+    assert.equal(accounts.q.purchaserAccounts.all().length, 1);
+    accounts.setHalloween(id, null);
+    assert.deepEqual(accounts.tags(accounts.getUser(id)), []);
+    assert.equal(accounts.equipped(accounts.getUser(id)).nameplate, 'plate.basic');
+    accounts.setHalloween(id, 'ent-h');
+    delete process.env.DISCORD_HALLOWEEN_SKU_ID;
+    assert.equal(accounts.owns(id, 'dice.halloween'), false, 'unconfigured verification fails closed');
+
+    assert.equal(discord.halloweenOpen(Date.parse('2026-10-01T00:00:00Z')), true);
+    assert.equal(discord.halloweenOpen(Date.parse('2026-10-31T23:59:59Z')), true);
+    assert.equal(discord.halloweenOpen(Date.parse('2026-09-30T23:59:59Z')), false);
+    assert.equal(discord.halloweenOpen(Date.parse('2026-11-01T00:00:00Z')), false);
   } finally {
     env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     global.fetch = originalFetch;

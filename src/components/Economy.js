@@ -71,6 +71,7 @@ export function TagBadge({ tag, small = false, title }) {
     <span className={`tag-badge tag-${tag}${small ? ' small' : ''}`} style={{ '--tag': info.color }} title={title ?? info.blurb}>
       {tag === 'dev' && <svg className="tag-code-icon" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3 1 8l5 5M18 3l5 5-5 5M14 1l-4 14" /></svg>}
       {tag === 'supporter' && <svg className="tag-supporter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-9-5.7-9-11.6a5 5 0 0 1 9-3.1 5 5 0 0 1 9 3.1C21 15.3 12 21 12 21Z" /></svg>}
+      {tag === 'halloween' && <svg className="tag-halloween-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a8 8 0 0 0-8 8v11l2.7-2 2.6 2 2.7-2 2.7 2 2.6-2 2.7 2V10a8 8 0 0 0-8-8Z" /><circle cx="9" cy="10" r="1.7" fill="#2b1100" /><circle cx="15" cy="10" r="1.7" fill="#2b1100" /></svg>}
       {tag === 'lucky' && (
         <svg className="tag-lucky-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />

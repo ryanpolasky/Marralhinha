@@ -25,7 +25,7 @@ The game asks Discord for the `identify` permission only. From that, it stores:
 
 The game does **not** get your email address, friends list, servers or messages. Discord access tokens are only used at login to look up your profile and are never saved on the server. If you log in with Discord after playing as a guest, your guest progress is merged into your Discord-linked account.
 
-If you buy the Supporter Pack, the server asks Discord whether your account has an active entitlement for its SKU and stores the entitlement ID while access is active. The game does not receive or store your payment card details. Discord handles checkout and payment under its own privacy policy.
+If you buy the Supporter Pack or the Halloween Pack, the server asks Discord whether your account has an active entitlement for the pack's SKU and stores the entitlement ID while access is active. The game does not receive or store your payment card details. Discord handles checkout and payment under its own privacy policy.
 
 ### While you play
 - Live game state (the board, rolls, moves, reactions, chat messages and room codes) is kept in the server's memory only while a room is active, and is discarded after the room goes idle. Chat messages are never written to the database.

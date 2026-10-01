@@ -71,7 +71,8 @@ class Accounts {
       setEquipped: db.prepare('UPDATE users SET equipped = ? WHERE id = ?'),
       setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
       setSupporter: db.prepare('UPDATE users SET supporter_entitlement_id = ? WHERE id = ?'),
-      supporterAccounts: db.prepare('SELECT id, discord_id FROM users WHERE supporter_entitlement_id IS NOT NULL AND discord_id IS NOT NULL'),
+      setHalloween: db.prepare('UPDATE users SET halloween_entitlement_id = ? WHERE id = ?'),
+      purchaserAccounts: db.prepare('SELECT id, discord_id FROM users WHERE (supporter_entitlement_id IS NOT NULL OR halloween_entitlement_id IS NOT NULL) AND discord_id IS NOT NULL'),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
@@ -160,7 +161,7 @@ class Accounts {
 
   tags(user) {
     const stored = storableTags(parse(user.tags, []));
-    return normalizeTags([...stored, ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+    return normalizeTags([...stored, ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(user.halloween_entitlement_id && discord.halloweenConfigured() ? ['halloween'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
   }
 
   luckyHolder() {
@@ -299,6 +300,14 @@ class Accounts {
     const verified = entitlementId || null;
     if (user.supporter_entitlement_id === verified) return false;
     this.q.setSupporter.run(verified, userId);
+    return true;
+  }
+
+  setHalloween(userId, entitlementId) {
+    const user = this.requireUser(userId);
+    const verified = entitlementId || null;
+    if (user.halloween_entitlement_id === verified) return false;
+    this.q.setHalloween.run(verified, userId);
     return true;
   }
 

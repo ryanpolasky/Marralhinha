@@ -146,6 +146,18 @@ function arcadeMarbleCanvases(c, seat) {
   return [base, glow];
 }
 
+function ghostFace(ctx, x, y, s, color) {
+  ctx.fillStyle = color;
+  [-1, 1].forEach((side) => {
+    ctx.beginPath();
+    ctx.ellipse(x + side * 0.3 * s, y - 0.1 * s, 0.11 * s, 0.2 * s, 0, 0, TAU);
+    ctx.fill();
+  });
+  ctx.beginPath();
+  ctx.ellipse(x, y + 0.42 * s, 0.1 * s, 0.17 * s, 0, 0, TAU);
+  ctx.fill();
+}
+
 const MARBLES = {
   arcade: (c, seat) => {
     const [base, glow] = arcadeMarbleCanvases(c, seat);
@@ -835,6 +847,71 @@ const MARBLES = {
       onBeforeCompile, customProgramCacheKey: () => 'marble-supporter-tide',
       animate: (m, t) => { uniforms.uTide.value = reducedMotion?.matches ? 0 : t + seat * 1.7; } };
   },
+  // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
+  halloween: (c, seat) => {
+    const W = 512;
+    const H = 256;
+    const [canvas, ctx] = makeCanvas(W, H);
+    const [glow, gctx] = makeCanvas(W, H);
+    const rand = seeded(1031 + seat * 17);
+    const depth = ctx.createLinearGradient(0, 0, 0, H);
+    depth.addColorStop(0, '#12061f');
+    depth.addColorStop(0.5, mix(c.dark, '#1c0a33', 0.7));
+    depth.addColorStop(1, '#12061f');
+    ctx.fillStyle = depth;
+    ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 26; i++) {
+      const x = rand() * W;
+      const y = rand() * H;
+      const color = i % 3 ? mix(c.main, '#4a1a7a', 0.65) : mix(c.light, '#ffb347', 0.5);
+      [x - W, x, x + W].forEach((px) => softBlob(ctx, px, y, 30 + rand() * 70, color, i % 3 ? 0.14 : 0.08));
+    }
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = `rgba(255,214,150,${0.15 + rand() * 0.4})`;
+      ctx.fillRect(rand() * W, rand() * H, 1 + rand(), 1 + rand());
+    }
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 9; i++) wavyLine(gctx, { y0: 20 + i * 26, amp: 8 + rand() * 14, k: 1 + Math.floor(rand() * 2), phase: rand() * TAU, width: 2.5, color: '#ff0000', alpha: 0.6, w: W });
+    [128, 384].forEach((x, i) => ghostFace(gctx, x, 122 + i * 12, 58, '#00ff00'));
+    const uniforms = { uTime: { value: 0 }, uPhase: { value: seat * 0.37 }, uFog: { value: new THREE.Color(c.light) }, uRim: { value: new THREE.Color('#ffb15c') } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uPhase;\nuniform vec3 uFog;\nuniform vec3 uRim;\n${SKIN_NOISE_GLSL}`)
+        .replace('#include <emissivemap_fragment>', `{
+          vec2 uv = vEmissiveMapUv;
+          vec3 mk = texture2D(emissiveMap, uv).rgb;
+          float ndv = max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+          float rim = pow(1.0 - ndv, 2.8);
+          float spin = uv.x * 6.28318530718 + uTime * 0.2;
+          float swirl = skFbm3(vec3(cos(spin) * 1.4, sin(spin) * 1.4, uv.y * 3.2 - uTime * 0.12 + uPhase * 9.0));
+          float fog = smoothstep(0.42, 0.75, swirl);
+          vec3 fogCol = mix(uFog, vec3(0.62, 0.38, 1.0), 0.45);
+          float cycle = fract(uTime * 0.09 + uPhase);
+          float seen = smoothstep(0.0, 0.05, cycle) * (1.0 - smoothstep(0.07, 0.17, cycle));
+          float flick = 0.85 + 0.15 * sin(uTime * 9.0 + uPhase * 7.0) * sin(uTime * 4.3);
+          totalEmissiveRadiance = fogCol * fog * (0.02 + 0.34 * ndv * ndv * ndv)
+            + fogCol * mk.r * (0.1 + 0.08 * sin(uTime * 1.3 + uv.x * 12.0))
+            + vec3(0.8, 1.0, 0.88) * mk.g * seen * 1.6 * flick
+            + uRim * rim * 0.3;
+        }`);
+    };
+    return {
+      map: finishMarble(canvas),
+      emissiveMap: finishMarble(glow),
+      emissive: '#ffffff',
+      emissiveIntensity: 1,
+      roughness: 0.05,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.03,
+      envMapIntensity: 0.6,
+      onBeforeCompile,
+      customProgramCacheKey: () => 'marble-halloween-orb',
+      animate: (m, t) => (uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 1.9),
+    };
+  },
   // Beta set: a blueprint glass sphere drafted in wireframe, with a seat-colored scan ring sweeping it
   beta: (c, seat) => {
     const W = 1024;
@@ -974,10 +1051,11 @@ const DICE = {
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
   supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
   arcade: { bg: 'arcade', pip: '#ffe94d', one: '#ff4fd8', roughness: 0.4, clearcoat: 0.3 },
+  halloween: { bg: 'halloween', pip: '#ffcf80', one: '#ffe2a8', roughness: 0.16, metalness: 0.12, clearcoat: 1, extra: { iridescence: 0.2, envMapIntensity: 1.3 } },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween'];
 
 function grid(ctx, size, step, color, width = 1) {
   ctx.strokeStyle = color;
@@ -1040,6 +1118,31 @@ function dieBackground(ctx, style, size, value) {
       ctx.fillStyle = ring === 2 || ring === 3 ? (corner ? '#ff4fd8' : '#2fe6ff') : ring < 2 ? '#0a0520' : (x + y) % 2 ? '#140a2e' : '#1b0f40';
       ctx.fillRect(x * px, y * px, px, px);
     }
+  } else if (style === 'halloween') {
+    const g = ctx.createLinearGradient(0, 0, size, size);
+    g.addColorStop(0, '#3a1658');
+    g.addColorStop(0.55, '#1f0b33');
+    g.addColorStop(1, '#10051c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    nebula(ctx, rand, { colors: ['#6a3cb0', '#2b1450'], count: 7, w: size, h: size, alpha: 0.28 });
+    stars(ctx, rand, { count: 36, w: size, h: size, color: '#ffd89a' });
+    ctx.strokeStyle = 'rgba(224,176,92,0.9)';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(10, 10, size - 20, size - 20);
+    ctx.strokeStyle = 'rgba(255,225,160,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(19, 19, size - 38, size - 38);
+    ctx.fillStyle = 'rgba(240,196,110,0.95)';
+    [[30, 30], [size - 30, 30], [30, size - 30], [size - 30, size - 30]].forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.moveTo(x, y - 9);
+      ctx.lineTo(x + 9, y);
+      ctx.lineTo(x, y + 9);
+      ctx.lineTo(x - 9, y);
+      ctx.closePath();
+      ctx.fill();
+    });
   } else if (style === 'dev') {
     // Obsidian with a thin molten frame; the pips do the glowing
     ctx.fillStyle = '#0a0709';
@@ -1196,13 +1299,13 @@ export function diceSkin(itemId) {
       const material = new THREE.MeshPhysicalMaterial(params);
       if (ANIMATED_DICE.includes(key)) {
         material.userData.skinTime = time;
-        if (key === 'supporter' || key === 'arcade') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (key === 'supporter' || key === 'arcade' || key === 'halloween') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
         material.customProgramCacheKey = () => `dice-${key}-animated`;
         material.onBeforeCompile = (shader) => {
           shader.uniforms.uSkinTime = time;
           shader.uniforms.uFacePhase = { value: value * 0.73 };
           shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : ''}`)
+            .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
             .replace('#include <emissivemap_fragment>', key === 'arcade' ? `{
               vec2 uv = vEmissiveMapUv;
@@ -1215,6 +1318,19 @@ export function diceSkin(itemId) {
               vec3 pipColor = mod(floor(uSkinTime * 2.0 + uFacePhase), 2.0) < 1.0 ? vec3(1.0, 0.91, 0.3) : vec3(1.0, 1.0, 0.85);
               totalEmissiveRadiance = (1.0 - pip) * rail * mix(vec3(1.0, 0.31, 0.85) * 0.25, vec3(0.18, 0.9, 1.0) * 2.2, chase)
                 + pip * pipColor * 0.9;
+            }` : key === 'halloween' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              vec2 p = uv - 0.5;
+              float edge = max(abs(p.x), abs(p.y));
+              float rail = 1.0 - smoothstep(0.008, 0.026, abs(edge - 0.43));
+              float angle = atan(p.y, p.x);
+              float runner = pow(0.5 + 0.5 * sin(angle * 2.0 - uSkinTime * 1.3 + uFacePhase), 10.0);
+              float flick = 0.8 + 0.2 * sin(uSkinTime * 8.0 + uFacePhase * 5.0) * sin(uSkinTime * 3.3 + uFacePhase);
+              float face = 1.0 - smoothstep(0.26, 0.38, edge);
+              float smoke = smoothstep(0.5, 0.88, skFbm3(vec3(uv * 3.2 + vec2(uSkinTime * 0.05, -uSkinTime * 0.09), uSkinTime * 0.14 + uFacePhase)));
+              totalEmissiveRadiance = (1.0 - pip) * (vec3(1.0, 0.68, 0.24) * rail * (0.22 + runner * 1.5) + vec3(0.55, 0.4, 0.95) * smoke * face * 0.45)
+                + pip * vec3(1.0, 0.76, 0.34) * 1.15 * flick;
             }` : key === 'supporter' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
@@ -2875,7 +2991,318 @@ const arcadeDishShader = (R, dishR) => `{
   totalEmissiveRadiance = (arcadePal(slot) * bulb * lit * 1.6 + vec3(0.18, 0.9, 1.0) * wave * 0.6) * top;
 }`;
 
+const GOLD = (a) => `rgba(222,176,92,${a})`;
+const OUIJA_ARCS = ['ABCDEFG', 'HIJKLM', 'NOPQRST', 'UVWXYZ'];
+
+// Data texture: alpha is the glow mask around each hole and its cord, green the position along the track, blue flags home holes
+function velvetBoard(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [base, b] = makeCanvas(S, S);
+  const [data, d] = makeCanvas(S, S);
+  const rand = seeded(1307);
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  const velvet = b.createRadialGradient(C, C, 0, C, C, 9.5 * k);
+  velvet.addColorStop(0, '#4a1a66');
+  velvet.addColorStop(0.4, '#2c1042');
+  velvet.addColorStop(0.8, '#190a29');
+  velvet.addColorStop(1, '#0c0516');
+  b.fillStyle = velvet;
+  b.fillRect(0, 0, S, S);
+  for (let i = 0; i < 70; i++) softBlob(b, rand() * S, rand() * S, (1.5 + rand() * 3) * k, i % 2 ? '#5c2680' : '#0a0412', 0.22);
+  for (let i = 0; i < 26000; i++) {
+    b.fillStyle = rand() > 0.5 ? `rgba(190,130,255,${rand() * 0.07})` : `rgba(0,0,0,${rand() * 0.16})`;
+    b.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1);
+  }
+
+  b.save();
+  b.setTransform(k, 0, 0, k, C, C);
+  b.lineCap = 'round';
+  b.lineJoin = 'round';
+  b.strokeStyle = GOLD(0.07);
+  b.lineWidth = 0.012;
+  for (let i = -14; i <= 14; i++) {
+    b.beginPath();
+    b.moveTo(i * 0.9 - 14, -14);
+    b.lineTo(i * 0.9 + 14, 14);
+    b.moveTo(i * 0.9 - 14, 14);
+    b.lineTo(i * 0.9 + 14, -14);
+    b.stroke();
+  }
+  b.fillStyle = GOLD(0.12);
+  for (let x = -30; x <= 30; x++) for (let y = -30; y <= 30; y++) {
+    if (Math.abs(x + y) % 2 !== 1) continue;
+    b.beginPath();
+    b.moveTo(x * 0.45, y * 0.45 - 0.07);
+    b.lineTo(x * 0.45 + 0.04, y * 0.45);
+    b.lineTo(x * 0.45, y * 0.45 + 0.07);
+    b.lineTo(x * 0.45 - 0.04, y * 0.45);
+    b.closePath();
+    b.fill();
+  }
+
+  const hull = roundedCross(W - 0.1, L - 0.1, 0.5);
+  const inner = roundedCross(W - 0.3, L - 0.3, 0.4);
+  [[hull, 0.055, 0.92], [inner, 0.016, 0.6]].forEach(([pts, width, alpha]) => {
+    b.strokeStyle = GOLD(alpha);
+    b.lineWidth = width;
+    b.beginPath();
+    pts.forEach(([x, y], i) => (i ? b.lineTo(x, y) : b.moveTo(x, y)));
+    b.stroke();
+  });
+  b.fillStyle = GOLD(0.85);
+  resampleLoop(inner, 0.3).forEach(({ x, y }) => {
+    b.beginPath();
+    b.arc(x, y, 0.028, 0, TAU);
+    b.fill();
+  });
+
+  const ring = layout.RING;
+  b.strokeStyle = GOLD(0.2);
+  b.lineWidth = 0.07;
+  b.beginPath();
+  ring.forEach(([r, c], i) => (i ? b.lineTo(c, r) : b.moveTo(c, r)));
+  b.closePath();
+  b.stroke();
+  [...ring.map((p) => [p, false]), ...layout.HOME.flat().map((p) => [p, true])].forEach(([[r, c], home]) => {
+    b.strokeStyle = home ? 'rgba(190,140,255,0.45)' : GOLD(0.6);
+    b.lineWidth = 0.03;
+    b.beginPath();
+    b.arc(c, r, TRACK_HOLE_R + 0.07, 0, TAU);
+    b.stroke();
+    b.strokeStyle = home ? 'rgba(190,140,255,0.28)' : GOLD(0.34);
+    b.lineWidth = 0.012;
+    b.beginPath();
+    b.arc(c, r, TRACK_HOLE_R + 0.15, 0, TAU);
+    b.stroke();
+  });
+  b.fillStyle = GOLD(0.8);
+  layout.HOME.forEach((col) => {
+    for (let i = 0; i < col.length - 1; i++) {
+      const x = (col[i][1] + col[i + 1][1]) / 2;
+      const y = (col[i][0] + col[i + 1][0]) / 2;
+      b.beginPath();
+      b.moveTo(x, y - 0.1);
+      b.lineTo(x + 0.04, y);
+      b.lineTo(x, y + 0.1);
+      b.lineTo(x - 0.04, y);
+      b.closePath();
+      b.fill();
+    }
+  });
+  b.restore();
+
+  const place = ([r, c]) => [C + c * k, C + r * k];
+  const order = (i) => Math.round((i / ring.length) * 255);
+  d.lineCap = 'round';
+  ring.forEach((p, i) => {
+    const [x, y] = place(p);
+    const [nx, ny] = place(ring[(i + 1) % ring.length]);
+    const line = d.createLinearGradient(x, y, nx, ny);
+    line.addColorStop(0, `rgba(255,${order(i)},0,0.55)`);
+    line.addColorStop(1, `rgba(255,${i === ring.length - 1 ? 255 : order(i + 1)},0,0.55)`);
+    d.strokeStyle = line;
+    d.lineWidth = 0.06 * k;
+    d.beginPath();
+    d.moveTo(x, y);
+    d.lineTo(nx, ny);
+    d.stroke();
+  });
+  [...ring.map((p, i) => [p, `255,${order(i)},0`]), ...layout.HOME.flat().map((p) => [p, '255,0,255'])].forEach(([p, color]) => {
+    const [x, y] = place(p);
+    const g = d.createRadialGradient(x, y, 0.36 * k, x, y, 0.58 * k);
+    g.addColorStop(0, `rgba(${color},1)`);
+    g.addColorStop(0.3, `rgba(${color},0.8)`);
+    g.addColorStop(1, `rgba(${color},0)`);
+    d.fillStyle = g;
+    d.beginPath();
+    d.arc(x, y, 0.58 * k, 0, TAU);
+    d.fill();
+  });
+  return [base, data];
+}
+
+function ouijaDish(layout) {
+  const S = 512;
+  const { dishR, baseOffsets } = layout.spec;
+  const R = 0.5 / (dishR + 0.1);
+  const k = R * S;
+  const C = S / 2;
+  const u = dishR / 2.2;
+  const [base, b] = makeCanvas(S, S);
+  const [glow, g] = makeCanvas(S, S);
+  const rand = seeded(1409);
+  const diagonal = baseOffsets.some(([r, c]) => r && c);
+  const lane = (diagonal ? 0.68 : 0.56) * dishR;
+  const step = (((diagonal ? 56 : 44) / 6) * Math.PI) / 180;
+  const size = Math.min(0.01 * u, step * lane * 0.04);
+  const glyphs = OUIJA_ARCS.flatMap((letters, n) => [...letters].map((ch, i) => {
+    const a = (diagonal ? -Math.PI / 2 : (-3 * Math.PI) / 4) + (n * Math.PI) / 2 + (i - (letters.length - 1) / 2) * step;
+    return { ch, x: Math.cos(a) * lane, y: Math.sin(a) * lane, rot: a + Math.PI / 2 };
+  }));
+  const bowl = b.createRadialGradient(C, C, 0, C, C, (dishR + 0.1) * k);
+  bowl.addColorStop(0, '#3a1658');
+  bowl.addColorStop(0.6, '#241040');
+  bowl.addColorStop(1, '#150826');
+  b.fillStyle = bowl;
+  b.fillRect(0, 0, S, S);
+  for (let i = 0; i < 9; i++) softBlob(b, C + (rand() - 0.5) * 2 * dishR * k, C + (rand() - 0.5) * 2 * dishR * k, (0.5 + rand() * 0.8) * k, '#5c2680', 0.25);
+  [[b, false], [g, true]].forEach(([ctx, data]) => {
+    ctx.save();
+    ctx.setTransform(k, 0, 0, k, C, C);
+    ctx.lineCap = 'round';
+    const line = (a) => (data ? `rgba(0,0,255,${a})` : GOLD(a));
+    [[dishR - 0.18, 0.03, 0.9], [dishR - 0.3, 0.012, 0.6]].forEach(([rad, width, alpha]) => {
+      ctx.strokeStyle = line(alpha);
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, TAU);
+      ctx.stroke();
+    });
+    ctx.strokeStyle = line(0.7);
+    ctx.lineWidth = 0.01;
+    for (let i = 0; i < 72; i++) {
+      const a = (i * TAU) / 72;
+      const r0 = dishR - 0.3;
+      const r1 = r0 - (i % 6 === 0 ? 0.13 : 0.06);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+      ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = line(0.85);
+    ctx.lineWidth = 0.014;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const len = (i % 2 ? 0.3 : 0.6) * u;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.13 * u, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.72 * u, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+    glyphs.forEach(({ ch, x, y, rot }, i) => {
+      ctx.save();
+      ctx.setTransform(k, 0, 0, k, C, C);
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.scale(size, size);
+      ctx.font = '600 26px Georgia, "Times New Roman", serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = data ? `rgba(255,${Math.round((i / glyphs.length) * 255)},0,1)` : GOLD(0.92);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+    });
+  });
+  return [base, glow, R];
+}
+
+function velvetFeltCanvas() {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(1511);
+  ctx.fillStyle = '#12081c';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 20; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 60 + rand() * 160;
+    [-S, 0, S].forEach((dx) => [-S, 0, S].forEach((dy) => softBlob(ctx, x + dx, y + dy, r, i % 2 ? '#1d0e2c' : '#0e0617', 0.35)));
+  }
+  ctx.strokeStyle = GOLD(0.06);
+  ctx.lineWidth = 1.2;
+  for (let n = -4; n <= 8; n++) {
+    ctx.beginPath();
+    ctx.moveTo(n * 128 - S, -S);
+    ctx.lineTo(n * 128 + S, S);
+    ctx.moveTo(n * 128 - S, S);
+    ctx.lineTo(n * 128 + S, -S);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 700; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(190,130,255,${rand() * 0.08})` : `rgba(0,0,0,${rand() * 0.25})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand(), 1 + rand());
+  }
+  return canvas;
+}
+
+// A spirit circles the track leaving a fading trail, candlelight breathes over the velvet, and dust drifts through the glow
+const VELVET_SHADER = `{
+  vec2 uvB = vEmissiveMapUv;
+  vec2 q = (uvB - 0.5) / ${BOARD_R};
+  float t = uSkinTime;
+  float r = length(q);
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  vec4 dat = texture2D(emissiveMap, uvB);
+  vec3 dd = dat.rgb / max(dat.a, 0.001);
+  float cord = dat.a;
+  float home = dd.b;
+  float flick = 0.72 + 0.28 * skNoise3(vec3(q * 0.35, t * 6.0));
+  float spirit = exp(-fract(t * 0.05 - dd.g) * 40.0) * (1.0 - home);
+  float echo = exp(-fract(t * 0.05 + 0.5 - dd.g) * 40.0) * 0.4 * (1.0 - home);
+  vec3 candle = vec3(1.0, 0.62, 0.24);
+  vec3 ecto = vec3(0.55, 1.0, 0.8);
+  vec3 ring = candle * cord * (1.0 - home) * (0.1 + 0.05 * sin(t * 1.6 + dd.g * 60.0)) * flick + ecto * cord * (spirit + echo) * 1.7;
+  vec3 homeGlow = vec3(0.72, 0.4, 1.0) * cord * home * (0.12 + 0.08 * sin(t * 1.2 + dd.g * 30.0 + r));
+  float pool = exp(-r * r / 70.0) * flick;
+  float haze = smoothstep(0.55, 0.9, skFbm3(vec3(q * 0.3 + vec2(t * 0.04, -t * 0.07), t * 0.09)));
+  float dust = skStars(q + vec2(t * 0.05, -t * 0.03), 2.2, 0.42, t * 1.7, 0.0).g * 1.8;
+  vec3 air = candle * pool * 0.09 + ecto * haze * 0.05 * smoothstep(1.5, 5.0, r) + vec3(1.0, 0.85, 0.55) * dust * (0.3 + pool * 1.4);
+  totalEmissiveRadiance = (ring + homeGlow + air) * top;
+}`;
+
+// The planchette spells through the alphabet one glyph at a time
+const ouijaDishShader = (R) => `{
+  vec2 uvB = vEmissiveMapUv;
+  vec2 q = (uvB - 0.5) / ${R.toFixed(5)};
+  float t = uSkinTime;
+  float r = length(q);
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  vec4 dat = texture2D(emissiveMap, uvB);
+  vec3 dd = dat.rgb / max(dat.a, 0.001);
+  float art = dat.a * dd.b;
+  float ink = dat.a * (1.0 - dd.b);
+  float reading = fract(t * 0.06) * 1.2 - 0.1;
+  float lit = exp(-pow((dd.g - reading) / 0.07, 2.0));
+  float flick = 0.8 + 0.2 * skNoise3(vec3(q * 0.9, t * 5.0));
+  float haze = smoothstep(0.5, 0.9, skFbm3(vec3(q * 0.8 + vec2(t * 0.06, -t * 0.05), t * 0.1)));
+  vec3 em = vec3(1.0, 0.7, 0.3) * art * (0.2 + 0.18 * sin(t * 1.1 - r * 3.0)) * flick
+    + vec3(1.0, 0.72, 0.34) * ink * (0.18 + 0.08 * flick) + vec3(0.6, 1.0, 0.82) * ink * lit * 1.8
+    + vec3(0.6, 0.4, 1.0) * haze * 0.07;
+  totalEmissiveRadiance = em * top;
+}`;
+
 const SPECIAL_BOARDS = {
+  halloween: (layout) => {
+    const [base, data] = velvetBoard(layout);
+    const [dishBase, dishGlow, dishRepeat] = ouijaDish(layout);
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const emberDim = new THREE.Color('#7a3410');
+    const emberBright = new THREE.Color('#ffb347');
+    return {
+      canvas: base, glowCanvas: data, glowData: true, repeat: BOARD_R, roughness: 0.9, params: { sheen: 1, sheenRoughness: 0.45, sheenColor: new THREE.Color('#a766e0') },
+      dishCanvas: dishBase, dishGlowCanvas: dishGlow, dishGlowData: true, dishRepeat,
+      dish: '#1b0b2c', feltCanvas: velvetFeltCanvas(), cup: '#0b0414', core: '#7a3410',
+      accent: { color: '#d6a84e', metalness: 0.9, roughness: 0.3, emissive: '#ff9a3c', emissiveIntensity: 0.1 },
+      shaderCommon: SKIN_NOISE_GLSL,
+      shader: VELVET_SHADER,
+      dishShader: ouijaDishShader(dishRepeat),
+      animate: (mats, t) => {
+        const time = still?.matches ? 0 : t;
+        const flame = 0.5 + 0.5 * Math.sin(time * 7.3) * Math.sin(time * 2.9);
+        mats.core.color.lerpColors(emberDim, emberBright, flame);
+        mats.brass.emissiveIntensity = 0.1 + 0.08 * flame;
+      },
+    };
+  },
   arcade: (layout) => {
     const [base, data] = arcadeBoard(layout);
     const [dishBase, dishGlow, dishRepeat] = arcadeDish(layout);
@@ -2972,7 +3399,7 @@ const SPECIAL_BOARDS = {
   },
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

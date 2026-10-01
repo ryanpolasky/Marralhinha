@@ -19,6 +19,12 @@ export const Close = () => (
   </Icon>
 );
 
+export const Chevron = ({ dir = 'right', size = 20 }) => (
+  <Icon size={size}>
+    <path d={dir === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} strokeWidth="2.6" />
+  </Icon>
+);
+
 export const Hanger = () => (
   <Icon>
     <path d="M9.6 6.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8v.7" />

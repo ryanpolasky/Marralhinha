@@ -15,7 +15,7 @@ The game creates a guest account for you automatically, and you can link it to D
 - Marbucks are an in-game currency you earn by playing. They **cannot be bought with real money**, and neither Marbucks nor any in-game item can be sold, traded or exchanged for real money or anything of value outside the game.
 - Lootboxes (chests) are opened with Marbucks only. Their drop rates are shown in the shop.
 - Cosmetics are purely visual and give no gameplay advantage.
-- The optional Supporter Pack is a one-time purchase through Discord. Discord handles payment, checkout, receipts and applicable refunds; the game checks your Discord entitlement to provide access to its badge and cosmetics. If Discord revokes the entitlement, access ends. You must link the purchasing Discord account to use the pack.
+- The optional Supporter Pack is a one-time purchase through Discord. Discord handles payment, checkout, receipts and applicable refunds; the game checks your Discord entitlement to provide access to its badge and cosmetics. If Discord revokes the entitlement, access ends. You must link the purchasing Discord account to use the pack. The optional Halloween Pack is a separate one-time Discord purchase that is only offered during October; it works the same way and, once bought, stays yours unless Discord revokes the entitlement.
 - Marbucks, items and progress are a license to use them in the game, not property you own. I may rebalance, change or remove them, and progress may be reset or lost (for example because of bugs or maintenance).
 
 ## Play fair and be nice

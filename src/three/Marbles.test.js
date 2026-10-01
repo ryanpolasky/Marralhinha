@@ -1,5 +1,6 @@
 import { planMove } from './Marbles';
-import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
+import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin } from './skins';
+import { layoutFor } from '../game/geometry';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -39,6 +40,47 @@ test('Supporter materials animate their accents without animating pip colors und
     animateDiceSkin(dice);
     expect(marbleShader.uniforms.uTide.value).toBe(0);
     expect(dice[0].userData.skinTime.value).toBe(0);
+  } finally {
+    getContext.mockRestore();
+    if (originalMatchMedia) window.matchMedia = originalMatchMedia;
+    else delete window.matchMedia;
+  }
+});
+
+test('Halloween skins build for every slot and keep their motion behind reduced-motion', () => {
+  const gradient = { addColorStop: () => {} };
+  const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+  const originalMatchMedia = window.matchMedia;
+  const motion = { matches: false };
+  window.matchMedia = () => motion;
+  try {
+    const marble = marbleSkin('marble.halloween', 1);
+    const marbleShader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    marble.material.onBeforeCompile(marbleShader);
+    expect(marbleShader.fragmentShader).toContain('skFbm3');
+    expect(marbleShader.fragmentShader).toContain('totalEmissiveRadiance');
+    marble.animate(2);
+    expect(marbleShader.uniforms.uTime.value).toBeGreaterThan(0);
+    motion.matches = true;
+    marble.animate(2);
+    expect(marbleShader.uniforms.uTime.value).toBe(0);
+
+    const dice = diceSkin('dice.halloween');
+    expect(dice).toHaveLength(6);
+    const shader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    dice[0].onBeforeCompile(shader);
+    expect(shader.fragmentShader).toContain('skFbm3');
+    expect(shader.fragmentShader).toContain('1.0 - pip');
+    expect(dice[0].customProgramCacheKey()).toBe('dice-halloween-animated');
+
+    const board = boardSkin('board.halloween', layoutFor('classic'));
+    expect(board.board.map).toBeTruthy();
+    expect(board.board.emissiveMap).toBeTruthy();
+    expect(board.dish.emissiveMap).toBeTruthy();
+    expect(board.core).toBeTruthy();
+    expect(() => animateBoardSkin(board, 3)).not.toThrow();
+    expect(boardSkin('board.halloween', layoutFor('blitz')).board).not.toBe(board.board);
   } finally {
     getContext.mockRestore();
     if (originalMatchMedia) window.matchMedia = originalMatchMedia;

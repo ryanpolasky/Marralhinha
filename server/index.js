@@ -48,12 +48,17 @@ const pushProfile = (userId) => {
   rooms.roomsWithUser(userId).forEach((room) => room.updateUser(accounts.publicInfo(user)));
 };
 
-const syncSupporter = async (userId) => {
+const syncPurchases = async (userId) => {
   const user = accounts.getUser(userId);
-  if (!user?.discord_id || !discord.supporterConfigured()) return false;
-  const entitlementId = await discord.supporterEntitlement(user.discord_id);
-  const changed = accounts.setSupporter(userId, entitlementId);
+  if (!user?.discord_id) return false;
+  const results = await Promise.allSettled([
+    discord.supporterConfigured() && discord.supporterEntitlement(user.discord_id).then((id) => accounts.setSupporter(userId, id)),
+    discord.halloweenConfigured() && discord.halloweenEntitlement(user.discord_id).then((id) => accounts.setHalloween(userId, id)),
+  ]);
+  const changed = results.some((result) => result.value === true);
   if (changed) pushProfile(userId);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
   return changed;
 };
 
@@ -118,12 +123,12 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 setInterval(() => {
-  if (!discord.supporterConfigured()) return;
-  accounts.q.supporterAccounts.all().forEach(({ id }) => syncSupporter(id).catch((err) => console.error('[supporter]', err)));
+  if (!discord.supporterConfigured() && !discord.halloweenConfigured()) return;
+  accounts.q.purchaserAccounts.all().forEach(({ id }) => syncPurchases(id).catch((err) => console.error('[purchases]', err)));
 }, 10 * 60 * 1000).unref();
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, syncSupporter, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, syncPurchases, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
@@ -135,9 +140,9 @@ io.use(async (socket, next) => {
   const user = accounts.userForToken(socket.handshake.auth?.token);
   if (!user) return next(new Error('unauthorized'));
   try {
-    await syncSupporter(user.id);
+    await syncPurchases(user.id);
   } catch (err) {
-    console.error('[supporter]', err);
+    console.error('[purchases]', err);
   }
   socket.data.userId = user.id;
   socket.data.blitz = Array.isArray(socket.handshake.auth?.features) && socket.handshake.auth.features.includes('blitz');
