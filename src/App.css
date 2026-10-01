@@ -4000,9 +4000,13 @@ button.room-pill.copied {
 }
 
 .thumb-marble.skin-frost {
-  background: radial-gradient(circle at 32% 28%, #fff 0 7%, transparent 16%), repeating-linear-gradient(60deg, rgba(232, 248, 255, 0.55) 0 1.5px, transparent 1.5px 8px),
-    repeating-linear-gradient(-60deg, rgba(232, 248, 255, 0.35) 0 1px, transparent 1px 11px), radial-gradient(circle at 45% 45%, color-mix(in srgb, var(--seat) 72%, #9fdcff) 0%, color-mix(in srgb, var(--seat-dark) 70%, #0a2a44) 100%);
-  box-shadow: 0 0 12px rgba(159, 220, 255, 0.45), 0 6px 12px rgba(0, 0, 0, 0.45), inset -4px -6px 10px rgba(0, 0, 0, 0.25);
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0 6%, transparent 15%),
+    linear-gradient(55deg, transparent 49%, rgba(232, 248, 255, 0.85) 49.7% 50.4%, transparent 51%), linear-gradient(-38deg, transparent 60%, rgba(232, 248, 255, 0.55) 60.5% 61.3%, transparent 62%), linear-gradient(100deg, transparent 34%, rgba(232, 248, 255, 0.45) 34.5% 35.3%, transparent 36%),
+    linear-gradient(-75deg, transparent 23%, rgba(232, 248, 255, 0.4) 23.5% 24.2%, transparent 25%), linear-gradient(18deg, transparent 52%, rgba(232, 248, 255, 0.4) 52.5% 53.1%, transparent 53.8%),
+    radial-gradient(circle at 68% 30%, rgba(191, 233, 255, 0.5) 0 12%, transparent 26%), radial-gradient(circle at 30% 66%, rgba(10, 42, 68, 0.5) 0 14%, transparent 30%), radial-gradient(circle at 62% 74%, rgba(191, 233, 255, 0.4) 0 10%, transparent 24%),
+    radial-gradient(circle, rgba(242, 251, 255, 0.7) 0 0.5px, transparent 0.9px) 2px 3px / 9px 9px,
+    radial-gradient(circle at 45% 50%, color-mix(in srgb, var(--seat) 70%, #9fdcff) 0 40%, color-mix(in srgb, var(--seat-dark) 55%, #0a2a44) 82%, #061a2c 100%);
+  box-shadow: 0 0 12px rgba(159, 220, 255, 0.45), 0 6px 12px rgba(0, 0, 0, 0.45), inset -4px -6px 10px rgba(0, 0, 0, 0.3);
 }
 
 .thumb-marble.skin-gold {
@@ -4063,10 +4067,22 @@ button.room-pill.copied {
   background: radial-gradient(circle, #111 0 12%, transparent 14%) 0 0 / 7px 7px, #2c2b2d;
 }
 .thumb-board.skin-stone {
-  background: linear-gradient(130deg, transparent 45%, #8d8d95 46% 48%, transparent 49%), #ecebe8;
+  background: linear-gradient(126deg, transparent 30%, rgba(141, 141, 150, 0.55) 31%, rgba(165, 162, 168, 0.4) 32.5%, transparent 35%), linear-gradient(80deg, transparent 55%, rgba(141, 141, 150, 0.5) 56%, transparent 58.5%),
+    linear-gradient(150deg, transparent 74%, rgba(120, 122, 134, 0.45) 75%, transparent 77%), linear-gradient(60deg, transparent 90%, rgba(150, 148, 155, 0.35) 91%, transparent 93%),
+    radial-gradient(ellipse at 30% 22%, #ffffff, transparent 55%), linear-gradient(155deg, #f4f3ef, #e2e0d8 60%, #d3d0c7);
 }
 .thumb-board.skin-lacquer {
-  background: linear-gradient(135deg, transparent 46%, #ffcf5a 47% 53%, transparent 54%), #121014;
+  position: relative;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.16) 0 16%, transparent 46%), linear-gradient(160deg, #221f26, #0d0c10 55%, #171310);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 207, 90, 0.7), inset 0 0 14px rgba(0, 0, 0, 0.85);
+}
+.thumb-board.skin-lacquer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 0 10%, #ffcf5a 11% 13%, transparent 15%),
+    radial-gradient(circle at 50% 8%, #ffcf5a 0 1.5px, transparent 2.2px), radial-gradient(circle at 92% 50%, #ffcf5a 0 1.5px, transparent 2.2px), radial-gradient(circle at 50% 92%, #ffcf5a 0 1.5px, transparent 2.2px), radial-gradient(circle at 8% 50%, #ffcf5a 0 1.5px, transparent 2.2px),
+    linear-gradient(135deg, transparent 47%, rgba(255, 207, 90, 0.9) 49.5% 50.5%, transparent 53%);
 }
 .thumb-board.skin-neon {
   background: linear-gradient(#ff3fd2 0 2px, transparent 2px) 0 0 / 10px 10px, linear-gradient(90deg, #2fe6ff 0 2px, transparent 2px) 0 0 / 10px 10px, #120a24;
@@ -5097,8 +5113,12 @@ button.room-pill.copied {
 }
 
 .thumb-marble.skin-camo {
-  background: radial-gradient(circle at 30% 30%, var(--seat-dark) 0 12px, transparent 13px), radial-gradient(circle at 70% 40%, #2b2a20 0 9px, transparent 10px), radial-gradient(circle at 45% 72%, color-mix(in srgb, var(--seat) 60%, #8a8a5a) 0 11px, transparent 12px),
-    color-mix(in srgb, var(--seat) 65%, #6b6a3a);
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.45) 0 7%, transparent 18%),
+    radial-gradient(ellipse 17px 10px at 22% 34%, var(--seat-dark) 0 62%, transparent 74%), radial-gradient(ellipse 13px 9px at 68% 30%, #2b2a20 0 62%, transparent 74%), radial-gradient(ellipse 18px 11px at 44% 64%, color-mix(in srgb, var(--seat) 55%, #8a8a5a) 0 62%, transparent 74%),
+    radial-gradient(ellipse 13px 9px at 78% 66%, var(--seat-dark) 0 62%, transparent 74%), radial-gradient(ellipse 15px 10px at 30% 80%, #2b2a20 0 62%, transparent 74%), radial-gradient(ellipse 11px 8px at 86% 46%, color-mix(in srgb, var(--seat) 45%, #2d2a1a) 0 62%, transparent 74%),
+    radial-gradient(ellipse 12px 8px at 55% 16%, color-mix(in srgb, var(--seat) 55%, #8a8a5a) 0 62%, transparent 74%), radial-gradient(ellipse 10px 7px at 10% 58%, color-mix(in srgb, var(--seat) 45%, #2d2a1a) 0 62%, transparent 74%), radial-gradient(ellipse 8px 6px at 62% 82%, var(--seat-dark) 0 62%, transparent 74%),
+    radial-gradient(circle at 45% 48%, color-mix(in srgb, var(--seat) 65%, #6b6a3a) 0 55%, color-mix(in srgb, var(--seat-dark) 60%, #3a3820) 100%);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45), inset -4px -6px 10px rgba(0, 0, 0, 0.3);
 }
 
 .thumb-marble.skin-honey {
@@ -5199,19 +5219,51 @@ button.room-pill.copied {
   background: radial-gradient(circle, rgba(120, 80, 35, 0.5) 0 2px, transparent 3px) 0 0 / 7px 6px, radial-gradient(circle, rgba(240, 215, 160, 0.4) 0 1.5px, transparent 2px) 3px 3px / 7px 6px, #c9a26b;
 }
 .thumb-board.skin-slate {
-  background: linear-gradient(120deg, transparent 40%, #7d8794 41% 43%, transparent 44%), #3a3f47;
+  background: linear-gradient(118deg, transparent 34%, rgba(141, 151, 165, 0.55) 35%, rgba(141, 151, 165, 0.3) 36.5%, transparent 38%), linear-gradient(98deg, transparent 58%, rgba(141, 151, 165, 0.4) 59%, transparent 61%),
+    linear-gradient(74deg, transparent 76%, rgba(120, 130, 144, 0.45) 77%, transparent 79%), repeating-linear-gradient(174deg, transparent 0 5px, rgba(255, 255, 255, 0.05) 5px 6px),
+    radial-gradient(circle, rgba(10, 12, 16, 0.6) 0 1px, transparent 1.4px) 2px 3px / 7px 6px, linear-gradient(155deg, #454c56, #333942 55%, #242a31);
 }
 .thumb-board.skin-terrazzo {
-  background: radial-gradient(circle at 20% 30%, #e03a3e 0 3px, transparent 4px), radial-gradient(circle at 70% 25%, #2a6fcf 0 3px, transparent 4px), radial-gradient(circle at 45% 60%, #f0b428 0 3px, transparent 4px),
-    radial-gradient(circle at 80% 70%, #3e9b62 0 2.5px, transparent 3.5px), radial-gradient(circle at 25% 80%, #2b2b2b 0 2.5px, transparent 3.5px), #efe9df;
+  background: conic-gradient(from 40deg at 45% 55%, #d2363a 0 80deg, transparent 0) 6% 10% / 21px 19px no-repeat, conic-gradient(from 205deg at 40% 40%, #2a63b8 0 70deg, transparent 0) 66% 2% / 25px 21px no-repeat,
+    conic-gradient(from 310deg at 50% 45%, #d99f24 0 95deg, transparent 0) 28% 42% / 27px 23px no-repeat, conic-gradient(from 150deg at 45% 50%, #38855a 0 75deg, transparent 0) 74% 56% / 21px 19px no-repeat,
+    conic-gradient(from 255deg at 50% 50%, #2b2b2b 0 65deg, transparent 0) 8% 64% / 17px 15px no-repeat, conic-gradient(from 100deg at 50% 40%, #e07a33 0 85deg, transparent 0) 50% 74% / 19px 17px no-repeat,
+    conic-gradient(from 20deg at 55% 45%, #a45fe0 0 70deg, transparent 0) 84% 26% / 13px 12px no-repeat, conic-gradient(from 285deg at 45% 45%, #d99f24 0 60deg, transparent 0) 58% 24% / 12px 10px no-repeat,
+    conic-gradient(from 330deg at 45% 55%, #2b2b2b 0 55deg, transparent 0) 34% 12% / 11px 9px no-repeat, conic-gradient(from 120deg at 50% 50%, #d2363a 0 60deg, transparent 0) 16% 84% / 12px 10px no-repeat,
+    conic-gradient(from 75deg at 50% 50%, #38855a 0 65deg, transparent 0) 44% 60% / 12px 11px no-repeat, conic-gradient(from 230deg at 50% 50%, #c9c0ac 0 90deg, transparent 0) 88% 80% / 13px 12px no-repeat,
+    conic-gradient(from 190deg at 45% 50%, #2a63b8 0 55deg, transparent 0) 92% 44% / 9px 8px no-repeat, conic-gradient(from 305deg at 50% 45%, #e07a33 0 60deg, transparent 0) 42% 26% / 9px 8px no-repeat,
+    conic-gradient(from 170deg at 50% 50%, #38855a 0 70deg, transparent 0) 22% 46% / 9px 9px no-repeat, conic-gradient(from 90deg at 50% 50%, #a45fe0 0 60deg, transparent 0) 55% 12% / 8px 8px no-repeat,
+    conic-gradient(from 265deg at 45% 50%, #d2363a 0 55deg, transparent 0) 66% 84% / 10px 9px no-repeat, conic-gradient(from 135deg at 50% 45%, #c9c0ac 0 80deg, transparent 0) 4% 40% / 8px 8px no-repeat,
+    conic-gradient(from 350deg at 50% 50%, #2b2b2b 0 50deg, transparent 0) 80% 10% / 7px 7px no-repeat, conic-gradient(from 55deg at 50% 50%, #2a63b8 0 65deg, transparent 0) 38% 92% / 8px 7px no-repeat,
+    conic-gradient(from 210deg at 50% 50%, rgba(43, 43, 43, 0.45) 0 55deg, transparent 0) 3px 5px / 23px 23px, conic-gradient(from 100deg at 50% 50%, rgba(201, 192, 172, 0.6) 0 70deg, transparent 0) 9px 14px / 29px 29px,
+    conic-gradient(from 320deg at 50% 50%, rgba(210, 153, 36, 0.5) 0 45deg, transparent 0) 15px 8px / 41px 41px, conic-gradient(from 160deg at 50% 50%, rgba(42, 99, 184, 0.4) 0 50deg, transparent 0) 20px 18px / 53px 53px,
+    linear-gradient(155deg, #c6bca4, #b3a892 55%, #a2987f);
 }
 .thumb-board.skin-ocean {
   background: repeating-linear-gradient(-20deg, transparent 0 5px, rgba(143, 227, 255, 0.35) 5px 6px), linear-gradient(135deg, #0b3d6b, #0d5c8a 50%, #083152);
   filter: drop-shadow(0 0 6px #3fc1b0);
 }
 .thumb-board.skin-aurora {
-  background: linear-gradient(160deg, transparent 25%, rgba(47, 210, 160, 0.7) 32% 40%, transparent 47%), linear-gradient(160deg, transparent 50%, rgba(106, 60, 255, 0.7) 57% 65%, transparent 72%), #070a1e;
+  background: linear-gradient(158deg, transparent 16%, rgba(47, 210, 160, 0.8) 30%, rgba(140, 242, 226, 0.55) 38%, transparent 50%), linear-gradient(163deg, transparent 40%, rgba(106, 60, 255, 0.75) 52%, rgba(47, 230, 255, 0.5) 58%, transparent 70%),
+    linear-gradient(167deg, transparent 62%, rgba(93, 255, 157, 0.6) 74%, rgba(182, 107, 255, 0.4) 80%, transparent 90%),
+    radial-gradient(circle at 22% 18%, #fff 0 0.8px, transparent 1.4px), radial-gradient(circle at 68% 26%, #dfe8ff 0 0.7px, transparent 1.3px), radial-gradient(circle at 42% 76%, #fff 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 84% 82%, #cfe0ff 0 0.6px, transparent 1.2px), radial-gradient(circle at 12% 60%, #fff 0 0.6px, transparent 1.2px), linear-gradient(170deg, #0a0e2e, #04061a 70%);
+  background-size: 140% 140%;
+  animation: aurora-drift 8s ease-in-out infinite alternate;
   filter: drop-shadow(0 0 6px #2fd2a0);
+}
+@keyframes aurora-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -18px 0, -28px 0, -38px 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  }
+}
+.item-card.locked .thumb-board {
+  animation: none;
+}
+.item-card.locked .thumb-board::before {
+  animation: none;
 }
 @property --eh-spin {
   syntax: '<angle>';
