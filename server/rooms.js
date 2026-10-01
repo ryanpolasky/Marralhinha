@@ -466,6 +466,18 @@ class Room {
     this.changed();
   }
 
+  endTable(userId) {
+    const { player } = this.requireHost(userId);
+    if (!this.instanceId) throw new UserError('Only Discord tables can end a game');
+    if (!this.game || this.game.phase === 'over') throw new UserError('There is no active game to end');
+    this.doRematch();
+    this.teamLogs = [[], []];
+    this.banterTimers.forEach(clearTimeout);
+    this.banterTimers.clear();
+    this.changed();
+    this.hooks.onTableEnded?.(this, { id: player.id, name: player.name });
+  }
+
   // start() without the host check: a unanimous vote goes straight to the next round
   beginGame() {
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
@@ -529,7 +541,7 @@ class Room {
   }
 
   doRematch() {
-    this.lastWinners = this.game.winners.map((s) => this.seats[s]?.id).filter(Boolean);
+    this.lastWinners = this.game.winners?.map((s) => this.seats[s]?.id).filter(Boolean) || [];
     this.game = null;
     // Activity seats held by closed clients free up for the next round instead of staying locked
     const gone = (p) => p.standIn || (this.instanceId && !p.isBot && !p.connected);

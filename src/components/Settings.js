@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
 import { SEAT_COLORS } from '../game/geometry';
-import { Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
+import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
 
 const STEP = 0.05;
 
@@ -51,7 +51,7 @@ function VolumeSlider({ label, value, onChange, onRelease, icons: [On, Off], hin
   );
 }
 
-export function SettingsModal({ onClose }) {
+export function SettingsModal({ onClose, onReport }) {
   const settings = useSettings();
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -88,6 +88,14 @@ export function SettingsModal({ onClose }) {
             </span>
           </label>
         </div>
+        {onReport && (
+          <div className="settings-group">
+            <h3>Support</h3>
+            <button className="btn secondary block" onClick={() => { onClose(); onReport(); }}>
+              <Bug /> Report & ideas
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body
@@ -139,7 +147,7 @@ export function AutoRollToggle() {
   );
 }
 
-export function SettingsButton({ className = 'icon-btn', label = false }) {
+export function SettingsButton({ className = 'icon-btn', label = false, onReport }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -147,7 +155,7 @@ export function SettingsButton({ className = 'icon-btn', label = false }) {
         <Gear />
         {label && <span>Settings</span>}
       </button>
-      {open && <SettingsModal onClose={() => setOpen(false)} />}
+      {open && <SettingsModal onClose={() => setOpen(false)} onReport={onReport} />}
     </>
   );
 }

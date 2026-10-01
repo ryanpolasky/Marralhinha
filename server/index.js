@@ -82,6 +82,7 @@ const rooms = new RoomManager({
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
   onHostChange: (room, host) => io.to(room.code).emit('room:host', host),
   onRematchVote: (room, vote) => io.to(room.code).emit('room:rematch', vote),
+  onTableEnded: (room, host) => io.to(room.code).emit('room:tableEnded', host),
   onTeam: emitToSeats,
   onPing: (room, ping, seats) => (seats ? emitToSeats(room, seats, 'room:ping', ping) : io.to(room.code).emit('room:ping', ping)),
   onGameOver: (room, { players, botGame }) => {
@@ -256,6 +257,7 @@ io.on('connection', (socket) => {
   handle('lobby:variant', ({ variant }) => current().setVariant(userId, variant));
   handle('lobby:turnTime', ({ seconds }) => current().setTurnTime(userId, seconds ?? null));
   handle('game:start', () => current().start(userId));
+  handle('game:endTable', () => current().endTable(userId));
   handle('game:roll', () => current().roll(userId));
   handle('game:move', ({ moveId }) => current().move(userId, moveId));
   handle('game:react', ({ key }) => current().react(userId, key));

@@ -240,12 +240,20 @@ const App = () => {
       notify(on ? `${name} wants a rematch` : `${name} backed out of the rematch`, 'good');
       sfx.pop();
     };
+    const onTableEnded = ({ id, name }) => {
+      setPings([]);
+      setReactions([]);
+      setTeamLog({ code: null, entries: [] });
+      notify(id === sessionRef.current?.playerId ? 'You ended the game. Back to lobby.' : `${name} ended the game. Back to lobby.`, 'good');
+      sfx.pop();
+    };
     socket.on('room:ping', onPing);
     socket.on('room:teamChat', onTeamChat);
     socket.on('room:teamLog', onTeamLog);
     socket.on('room:left', onRoomLeft);
     socket.on('room:host', onHost);
     socket.on('room:rematch', onRematchVote);
+    socket.on('room:tableEnded', onTableEnded);
     socket.on('account:update', setAccount);
     socket.on('luckiest:change', onLuckyChange);
 
@@ -273,6 +281,7 @@ const App = () => {
       socket.off('room:left', onRoomLeft);
       socket.off('room:host', onHost);
       socket.off('room:rematch', onRematchVote);
+      socket.off('room:tableEnded', onTableEnded);
       socket.off('room:ping', onPing);
       socket.off('room:teamChat', onTeamChat);
       socket.off('room:teamLog', onTeamLog);
@@ -457,7 +466,6 @@ const App = () => {
       onProfile={() => setModal('profile')}
       onAdmin={() => setModal('admin')}
       onBoards={() => setModal('boards')}
-      onReport={inRoom && !game ? () => setModal('report') : undefined}
       onMail={account?.replies?.length ? () => setModal('replies') : undefined}
       onDaily={claimDaily}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
@@ -522,7 +530,7 @@ const App = () => {
       />
     );
   } else if (!game) {
-    screen = <Lobby room={room} playerId={session.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} />;
+    screen = <Lobby room={room} playerId={session.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} onReport={() => setModal('report')} />;
   } else {
     screen = (
       <Game

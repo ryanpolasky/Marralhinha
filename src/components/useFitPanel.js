@@ -13,7 +13,7 @@ export default function useFitPanel(active, contentKey, { maxWidth = 880, reserv
     const measure = () => {
       const bar = reserveBar ? document.querySelector('.account-bar') : null;
       const top = reserveBar ? Math.max(72, Math.ceil(bar?.getBoundingClientRect().bottom || 64) + 8) : 20;
-      const foot = reserveBar && window.innerWidth <= 560 ? 72 : bottom;
+      const foot = reserveBar && window.innerWidth <= 560 ? Math.max(72, bottom) : bottom;
       screen.style.paddingTop = `${top}px`;
       screen.style.paddingBottom = `${foot}px`;
       const style = getComputedStyle(screen);

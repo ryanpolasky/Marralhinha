@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import Shop from './components/Shop';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
+import { SettingsButton } from './components/Settings';
+import { DialogHost } from './components/Dialog';
 import { LuckiestPanel } from './components/Stats';
 import { canUse, collectible, itemsForSlot } from './game/catalog';
 
@@ -91,13 +93,17 @@ test('Supporter pack does not unlock until the profile carries a verified tag', 
 });
 
 test('Discord lobby keeps seats and controls in a fitted two-column panel', () => {
+  const onReport = jest.fn();
   const room = { activity: true, code: 'DEMO', hostId: 'p1', seats: [{ id: 'p1', name: 'Host', connected: true }, { id: 'p2', name: 'Guest', connected: true }, null, null], spectators: [], swapOffers: [], teams: false, variant: 'classic', turnSeconds: 30 };
-  const { container } = render(<Lobby room={room} playerId="p1" onAction={() => {}} onLeave={null} />);
+  const { container } = render(<Lobby room={room} playerId="p1" onAction={() => {}} onLeave={null} onReport={onReport} />);
   const panel = container.querySelector('.activity-lobby');
   expect(container.querySelector('.activity-lobby-screen')).toBeInTheDocument();
   expect(panel.querySelector('.lobby-table .seats')).toBeInTheDocument();
   expect(panel.querySelector('.lobby-controls')).toContainElement(screen.getByRole('button', { name: 'Start game' }));
   expect(panel.querySelector('.lobby-controls')).toContainElement(screen.getByRole('slider', { name: 'Turn timer' }));
+  expect(screen.getByRole('button', { name: 'Report & ideas' })).toHaveClass('home-report');
+  fireEvent.click(screen.getByRole('button', { name: 'Report & ideas' }));
+  expect(onReport).toHaveBeenCalledTimes(1);
 });
 
 test('end-game player markers have both colors and open the other player card', () => {
@@ -113,6 +119,40 @@ test('end-game player markers have both colors and open the other player card', 
   expect(row.style.getPropertyValue('--seat-light')).toBe('#8cc2ff');
   fireEvent.click(row);
   expect(onPlayerStats).toHaveBeenCalledWith(room.seats[1]);
+});
+
+test('in-game reporting lives in Settings', () => {
+  const onReport = jest.fn();
+  render(<SettingsButton onReport={onReport} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Report & ideas' }));
+  expect(onReport).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument();
+});
+
+test('Discord host can end a game after confirmation while guests cannot', async () => {
+  const onAction = jest.fn();
+  const onReport = jest.fn();
+  const room = { activity: true, code: 'TEST', hostId: 'p1', seats: [{ id: 'p1', name: 'Ana', connected: true }, { id: 'p2', name: 'Rui', connected: true }, null, null], spectators: [], game: {
+    phase: 'roll', mode: 'solo', turn: 0, active: [0, 1], marbles: [[], [], [], []], log: [],
+  } };
+  const { rerender } = render(<><Game room={room} playerId="p1" onAction={onAction} onReport={onReport} onResetView={() => {}} /><DialogHost /></>);
+  expect(screen.queryByRole('button', { name: 'Report a bug or suggest a feature' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Report & ideas' }));
+  expect(onReport).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'End game for everyone' }));
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('Everyone returns to the lobby');
+  fireEvent.click(screen.getByRole('button', { name: 'Keep playing' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  expect(onAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'End game for everyone' }));
+  fireEvent.click(screen.getByRole('button', { name: 'End game' }));
+  await waitFor(() => expect(onAction).toHaveBeenCalledWith('game:endTable'));
+  expect(onAction).toHaveBeenCalledTimes(1);
+  rerender(<><Game room={room} playerId="p2" onAction={onAction} onResetView={() => {}} /><DialogHost /></>);
+  expect(screen.queryByRole('button', { name: 'End game for everyone' })).not.toBeInTheDocument();
 });
 
 test('signs in as a guest and renders the home screen with the account bar', async () => {

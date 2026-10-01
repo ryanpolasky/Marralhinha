@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
-import { boardSkin } from './skins';
+import { boardSkin, animateBoardSkin } from './skins';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
 
@@ -271,6 +271,7 @@ function useSkinTransition(skin, animate) {
 export default function Board({ active, names, turn, showNames, skin, table = true, layout = CLASSIC_LAYOUT }) {
   const [shownSkin, wave] = useSkinTransition(skin, table);
   const materials = boardSkin(shownSkin);
+  useFrame(({ clock }) => animateBoardSkin(materials, clock.elapsedTime));
   const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
   const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
   const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);

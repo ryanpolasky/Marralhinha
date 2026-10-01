@@ -1409,36 +1409,97 @@ button.room-pill.copied {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.board-picker-head.troll-head {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-line);
+}
+
+.picker-victim {
+  color: var(--seat);
+}
+
+.troll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .troll-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  padding: 3px 2px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--seat) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--seat) 28%, transparent);
 }
 
 .troll-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   color: var(--seat);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.troll-slots {
+  display: flex;
+  gap: 6px;
+}
+
 .troll-slot {
-  width: 34px;
-  height: 34px;
-  padding: 3px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px;
   border: 1px solid var(--glass-line);
-  border-radius: 9px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font: inherit;
   cursor: pointer;
+  text-align: left;
+}
+
+.troll-slot .thumb-marble,
+.troll-slot .thumb-dice {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.troll-slot-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.troll-slot-info b {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-dim);
+}
+
+.troll-slot-info span {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .troll-slot:hover {
   background: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--seat) 55%, transparent);
 }
 
 .troll-actions {
@@ -3118,11 +3179,12 @@ button.room-pill.copied {
 
 .host-crown {
   position: absolute;
-  top: -11px;
-  left: 50%;
+  top: -9px;
+  right: -3px;
   width: 22px;
   height: 15px;
-  transform: translateX(-50%) rotate(-12deg);
+  transform: rotate(15deg);
+  transform-origin: 25% 85%;
   fill: #ffd166;
   stroke: #8a6100;
   stroke-width: 1.2;
@@ -3133,7 +3195,7 @@ button.room-pill.copied {
 
 @keyframes crown-in {
   from {
-    transform: translateX(-50%) translateY(-6px) rotate(-30deg) scale(0.4);
+    transform: translateY(-6px) rotate(40deg) scale(0.4);
     opacity: 0;
   }
 }
@@ -7054,7 +7116,12 @@ textarea.report-text {
 }
 
 .switch-row.compact {
+  align-items: center;
   padding: 4px 2px;
+}
+
+.switch-row.compact .switch {
+  margin-top: 0;
 }
 
 /* ---------- Mail (dev replies) ---------- */

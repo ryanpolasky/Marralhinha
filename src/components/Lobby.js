@@ -4,7 +4,7 @@ import { SEATS, SEAT_COLORS } from '../game/geometry';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
 import RulesButton from './Rules';
-import { Copy } from './Icons';
+import { Bug, Copy } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
@@ -71,11 +71,11 @@ function TurnTimer({ seconds, isHost, onChange }) {
   );
 }
 
-export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
+export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onReport }) {
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [screenRef, panelRef] = useFitPanel(room.activity, room, { reserveBar: true, bottom: 28 });
+  const [screenRef, panelRef] = useFitPanel(room.activity, room, { reserveBar: true, bottom: 100 });
   const events = useSeatEvents(room, playerId);
   const act = async (fn) => {
     if (busy) return;
@@ -313,13 +313,20 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave }) {
             <button className="btn link" onClick={onLeave}>
               Leave room
             </button>
-          ) : (
+          ) : spectator ? (
             <span className="muted small-text">Everyone in this voice channel joins this table.</span>
+          ) : (
+            <button className="btn link" onClick={() => onAction('lobby:spectate')}>
+              Spectate instead
+            </button>
           )}
           <RulesButton className="btn link" />
         </div>
         </div>
       </div>
+      <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
+        <Bug /> Report & ideas
+      </button>
       <Credit className="corner" />
     </div>
   );

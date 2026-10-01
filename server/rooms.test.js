@@ -386,6 +386,53 @@ test('a holdout leaving completes a pending rematch vote', (t) => {
   assert.strictEqual(room.game.turn, 2);
 });
 
+test('only an activity host can end a live game and bring the table back to lobby', (t) => {
+  const ended = [];
+  const room = new Room('STOP', { onChange: () => {}, onTableEnded: (_, event) => ended.push(event), onGameOver: () => assert.fail('Ending a table must not pay rewards') }, { instanceId: 'inst-stop' });
+  t.after(() => room.dispose());
+  ['u1', 'u2'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  assert.throws(() => room.endTable('u1'), /no active game/i);
+  room.start('u1');
+  assert.ok(room.timer);
+  assert.throws(() => room.endTable('u2'), /Only the host/);
+  room.rematchVotes.add(room.seats[2].id);
+  room.lastWinners = ['old-winner'];
+  const host = room.hostId;
+  room.endTable('u1');
+  assert.strictEqual(room.view().game, null);
+  assert.strictEqual(room.timer, null);
+  assert.strictEqual(room.turnDeadline, null);
+  assert.strictEqual(room.hostId, host);
+  assert.deepStrictEqual(room.lastWinners, []);
+  assert.strictEqual(room.rematchVotes.size, 0);
+  assert.deepStrictEqual(ended, [{ id: host, name: 'P0' }]);
+  room.start('u1');
+  assert.strictEqual(room.game.pick.reason, 'wheel');
+  room.game.phase = 'over';
+  assert.throws(() => room.endTable('u1'), /no active game/i);
+});
+
+test('ending a Discord game frees closed seats, but web hosts cannot end theirs', (t) => {
+  const web = startedRoom().room;
+  const room = new Room('ENDD', { onChange: () => {} }, { instanceId: 'inst-end' });
+  t.after(() => { web.dispose(); room.dispose(); });
+  assert.throws(() => web.endTable('u1'), /Discord/);
+  ['u1', 'u2'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.start('u1');
+  room.detach('u2', 's1');
+  assert.ok(room.findByUser('u2'));
+  room.endTable('u1');
+  assert.strictEqual(room.findByUser('u2'), null);
+  assert.strictEqual(room.seats[2], null);
+  assert.strictEqual(room.hostId, room.seats[0].id);
+});
+
 test('a closed activity frees the lobby seat and passes the host on the spot', (t) => {
   const room = new Room('ACTD', { onChange: () => {} }, { instanceId: 'inst-a' });
   t.after(() => room.dispose());

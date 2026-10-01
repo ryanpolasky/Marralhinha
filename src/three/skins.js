@@ -1009,9 +1009,9 @@ function corkCanvas() {
 function terrazzoCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
   const rand = seeded(23);
-  ctx.fillStyle = '#cfc5b3';
+  ctx.fillStyle = '#b3a892';
   ctx.fillRect(0, 0, 1024, 1024);
-  const chips = ['#e03a3e', '#2a6fcf', '#f0b428', '#3e9b62', '#2b2b2b', '#b36bff', '#ff8a3d', '#eee8dc'];
+  const chips = ['#d2363a', '#2a63b8', '#d99f24', '#38855a', '#2b2b2b', '#a45fe0', '#e07a33', '#c9c0ac'];
   for (let i = 0; i < 700; i++) {
     const x = rand() * 1024;
     const y = rand() * 1024;
@@ -1162,8 +1162,8 @@ function mainframeCanvases() {
 }
 
 // Deeper Prussian blue with cyan linework, so the board doesn't read as the same blue as the Prototype marble
-function blueprintCanvas() {
-  const [canvas, ctx] = makeCanvas(1024, 1024);
+function blueprintCanvases() {
+  const [base, ctx] = makeCanvas(1024, 1024);
   ctx.fillStyle = '#123066';
   ctx.fillRect(0, 0, 1024, 1024);
   grid(ctx, 1024, 32, 'rgba(140,220,255,0.12)');
@@ -1183,7 +1183,18 @@ function blueprintCanvas() {
     ctx.stroke();
   });
   ctx.setLineDash([]);
-  return canvas;
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  const band = gctx.createLinearGradient(0, 336, 0, 688);
+  band.addColorStop(0, 'rgba(120,210,255,0)');
+  band.addColorStop(0.44, 'rgba(140,225,255,0.5)');
+  band.addColorStop(0.5, 'rgba(230,250,255,0.95)');
+  band.addColorStop(0.56, 'rgba(140,225,255,0.5)');
+  band.addColorStop(1, 'rgba(120,210,255,0)');
+  gctx.fillStyle = band;
+  gctx.fillRect(0, 336, 1024, 352);
+  return [base, glow];
 }
 
 function bambooCanvas() {
@@ -1285,7 +1296,7 @@ const SPECIAL_BOARDS = {
   bamboo: () => ({ canvas: bambooCanvas(), repeat: 0.07, roughness: 0.45, dish: '#a8984c', felt: '#23443a', cup: '#3d3212' }),
   azulejo: () => ({ canvas: azulejoCanvas(), repeat: 1 / 8, offset: 9 / 16, roughness: 0.38, clearcoat: 0.35, dish: '#2a63b8', felt: '#102a4a', cup: '#0e2046' }),
   basalt: () => ({ canvas: stoneCanvas({ base: '#2c2b2d', vein: '#4a4648', count: 6, seed: 9, dots: 900 }), repeat: 0.06, roughness: 0.92, dish: '#3a3638', felt: '#2b1d17', cup: '#0e0d0e' }),
-  stone: () => ({ canvas: stoneCanvas({ base: '#d5d0c6', vein: '#8d8d95', count: 26, seed: 21 }), repeat: 0.05, roughness: 0.3, clearcoat: 0.4, dish: '#c3beb5', felt: '#233139', cup: '#54545a' }),
+  stone: () => ({ canvas: stoneCanvas({ base: '#c6bfb1', vein: '#7d7c86', count: 26, seed: 21 }), repeat: 0.05, roughness: 0.38, clearcoat: 0.26, dish: '#ada697', felt: '#233139', cup: '#45454b' }),
   lacquer: () => ({ color: '#121014', roughness: 0.12, clearcoat: 1, dish: '#1b1719', felt: '#4a0f16', cup: '#050405', accent: { color: '#ffcf5a', metalness: 1, roughness: 0.18 } }),
   neon: () => {
     const [base, glow] = neonCanvases();
@@ -1293,7 +1304,7 @@ const SPECIAL_BOARDS = {
   },
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
-  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.38, clearcoat: 0.25, dish: '#c9bfaa', felt: '#2b3a44', cup: '#5f594f', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
+  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#a99d84', felt: '#2b3a44', cup: '#4a4439', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
   ocean: () => {
     const [base, glow] = oceanCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 0.55, repeat: 0.05, roughness: 0.08, clearcoat: 1, dish: '#0b3d6b', felt: '#061c33', cup: '#031424', accent: { color: '#8fe3ff', emissive: '#3fc1b0', emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.25 } };
@@ -1304,13 +1315,46 @@ const SPECIAL_BOARDS = {
   },
   dev: () => {
     const [base, glow] = mainframeCanvases();
-    return { canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: 0.045, roughness: 0.16, clearcoat: 1, dish: '#170d11', felt: '#12090c', cup: '#050305', accent: { color: '#ff4a5a', emissive: '#ff4a5a', emissiveIntensity: 1.5, roughness: 0.25 } };
+    return {
+      canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: 0.045, roughness: 0.16, clearcoat: 1,
+      dish: '#170d11', felt: '#12090c', cup: '#050305',
+      accent: { color: '#ff4a5a', emissive: '#ff4a5a', emissiveIntensity: 1.5, roughness: 0.25 },
+      // A surge packet sweeping the trace field, over a gentle mains flicker
+      shader: `{
+        vec4 emissiveColor = texture2D(emissiveMap, vEmissiveMapUv);
+        float sweep = pow(0.5 + 0.5 * sin((vEmissiveMapUv.x + vEmissiveMapUv.y * 0.6) * 6.283185 - uSkinTime * 1.6), 16.0);
+        float hum = 0.86 + 0.14 * sin(uSkinTime * 5.3) * sin(uSkinTime * 2.1 + 1.3);
+        totalEmissiveRadiance *= emissiveColor.rgb * hum * (0.4 + 1.8 * sweep);
+      }`,
+    };
   },
   // Sits on a green self-healing cutting mat instead of more blue felt
-  beta: () => ({ canvas: blueprintCanvas(), repeat: 0.06, roughness: 0.55, dish: '#15397a', felt: '#1f4a3c', cup: '#0b1d3f', accent: { color: '#bff0ff', metalness: 0.1, roughness: 0.5 } }),
+  beta: () => {
+    const [base, glow] = blueprintCanvases();
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    return {
+      canvas: base, glowCanvas: glow, glowIntensity: 0.85, repeat: 0.06, roughness: 0.55,
+      dish: '#15397a', felt: '#1f4a3c', cup: '#0b1d3f',
+      accent: { color: '#bff0ff', metalness: 0.1, roughness: 0.5 },
+      animate: (mats, t) => {
+        mats.board.emissiveMap.offset.y = 0.5 - (still?.matches ? 0 : t) * 0.055;
+      },
+    };
+  },
   supporter: () => {
     const [base, glow] = moonwakeCanvases();
-    return { canvas: base, glowCanvas: glow, glowIntensity: 0.32, repeat: 0.045, roughness: 0.14, clearcoat: 1, dish: '#174b56', felt: '#071f2d', cup: '#061b26', accent: { color: '#b1ebd9', metalness: 0.72, roughness: 0.22, emissive: '#7ac8b7', emissiveIntensity: 0.23 } };
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    return {
+      canvas: base, glowCanvas: glow, glowIntensity: 0.32, repeat: 0.045, roughness: 0.14, clearcoat: 1,
+      dish: '#174b56', felt: '#071f2d', cup: '#061b26',
+      accent: { color: '#b1ebd9', metalness: 0.72, roughness: 0.22, emissive: '#7ac8b7', emissiveIntensity: 0.23 },
+      // Tide lines are pure sine waves, so sliding the glow sideways reads as water flowing
+      animate: (mats, t) => {
+        const flow = still?.matches ? 0 : t;
+        mats.board.emissiveMap.offset.x = 0.5 + flow * 0.012;
+        mats.board.emissiveIntensity = 0.24 + (0.5 + 0.5 * Math.sin(flow * 0.45)) * 0.14;
+      },
+    };
   },
 };
 
@@ -1340,12 +1384,33 @@ export function boardSkin(itemId) {
       dishMap.offset.set(0.5, 0.5);
       Object.assign(dishParams, { map: dishMap, color: '#ffffff' });
     }
-    return {
-      board: new THREE.MeshPhysicalMaterial(boardParams),
+    const board = new THREE.MeshPhysicalMaterial(boardParams);
+    if (spec.shader) {
+      const time = { value: 0 };
+      board.userData.skinTime = time;
+      board.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+      board.customProgramCacheKey = () => `board-${resolved}-animated`;
+      board.onBeforeCompile = (shader) => {
+        shader.uniforms.uSkinTime = time;
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform float uSkinTime;')
+          .replace('#include <emissivemap_fragment>', spec.shader);
+      };
+    }
+    const mats = {
+      board,
       dish: new THREE.MeshPhysicalMaterial(dishParams),
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: makeFeltTexture(spec.felt),
     };
+    if (spec.animate) mats.animate = spec.animate;
+    return mats;
   });
+}
+
+export function animateBoardSkin(materials, t) {
+  const time = materials.board.userData.skinTime;
+  if (time) time.value = materials.board.userData.reducedMotion?.matches ? 0 : t;
+  materials.animate?.(materials, t);
 }

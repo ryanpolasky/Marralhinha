@@ -6,11 +6,12 @@ import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee, Bug } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf } from '../game/catalog';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
+import { ask } from './Dialog';
 import { useSettings, updateSettings, getSettings } from '../game/settings';
 import useFitPanel from './useFitPanel';
 
@@ -295,8 +296,8 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
           <div className="board-picker-pop" role="menu" aria-label="Dev tools">
             {edit ? (
               <>
-                <div className="board-picker-head">
-                  <span>
+                <div className="board-picker-head" style={{ '--seat': SEAT_COLORS[edit.seat].main }}>
+                  <span className="picker-victim">
                     {victim?.name}'s {slotLabel}
                   </span>
                   <TagBadge tag="dev" small />
@@ -335,21 +336,29 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
                 <button className="btn tiny ghost block" onClick={() => onPick(null)}>
                   Back to the starter's board
                 </button>
-                <div className="board-picker-head">
+                <div className="board-picker-head troll-head">
                   <span>Dress the table</span>
                 </div>
-                {seats.map((p, s) =>
-                  p ? (
-                    <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
-                      <span className="troll-name">{p.name}</span>
-                      {['marble', 'dice'].map((slot) => (
-                        <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${slot === 'dice' ? 'dice' : 'marbles'}`} title={slot === 'dice' ? `${p.name}'s dice` : `${p.name}'s marbles`} onClick={() => setEdit({ seat: s, slot })}>
-                          <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
-                        </button>
-                      ))}
-                    </div>
-                  ) : null
-                )}
+                <div className="troll-list">
+                  {seats.map((p, s) =>
+                    p ? (
+                      <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
+                        <span className="troll-name">{p.name}</span>
+                        <div className="troll-slots">
+                          {['marble', 'dice'].map((slot) => (
+                            <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${slot === 'dice' ? 'dice' : 'marbles'}`} title={slot === 'dice' ? `${p.name}'s dice` : `${p.name}'s marbles`} onClick={() => setEdit({ seat: s, slot })}>
+                              <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
+                              <span className="troll-slot-info">
+                                <b>{slot === 'dice' ? 'Dice' : 'Marbles'}</b>
+                                <span>{ITEMS[cosmeticsOf(p)[slot]]?.name || 'None'}</span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -871,12 +880,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
             />
           )}
-          <SettingsButton />
-          {onReport && (
-            <button className="icon-btn" onClick={onReport} aria-label="Report a bug or suggest a feature" title="Report a bug or suggest a feature">
-              <Bug />
-            </button>
-          )}
+          <SettingsButton onReport={onReport} />
           <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
             <Camera />
           </button>
@@ -885,6 +889,19 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
           </button>
           {onLeave && (
             <button className="icon-btn" onClick={onLeave} aria-label="Leave game" title="Leave game">
+              <Exit />
+            </button>
+          )}
+          {room.activity && isHost && game.phase !== 'over' && (
+            <button
+              className="icon-btn"
+              onClick={async () => {
+                const ok = await ask({ title: 'End this game?', message: 'Everyone returns to the lobby. This round ends without rewards.', confirm: 'End game', cancel: 'Keep playing', tone: 'danger' });
+                if (ok) onAction('game:endTable');
+              }}
+              aria-label="End game for everyone"
+              title="End game for everyone"
+            >
               <Exit />
             </button>
           )}
