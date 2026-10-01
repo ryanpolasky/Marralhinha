@@ -1315,15 +1315,20 @@ function corkCanvas() {
 function terrazzoCanvas() {
   const [canvas, ctx] = makeCanvas(1024, 1024);
   const rand = seeded(23);
-  ctx.fillStyle = '#b3a892';
+  ctx.fillStyle = '#34373b';
   ctx.fillRect(0, 0, 1024, 1024);
-  const chips = ['#d2363a', '#2a63b8', '#d99f24', '#38855a', '#2b2b2b', '#a45fe0', '#e07a33', '#c9c0ac'];
-  for (let i = 0; i < 700; i++) {
+  for (let i = 0; i < 6000; i++) {
+    ctx.fillStyle = `rgba(${rand() > 0.5 ? '255,255,255' : '0,0,0'},${rand() * 0.07})`;
+    ctx.fillRect(rand() * 1024, rand() * 1024, 2 + rand() * 4, 2 + rand() * 4);
+  }
+  // Muted chips on dark concrete so no seat color, especially yellow, can hide in the floor
+  const chips = ['#b9b4aa', '#b9b4aa', '#8e949a', '#8e949a', '#17191c', '#17191c', '#9a5a46', '#5d7a80', '#7f7392'];
+  for (let i = 0; i < 1100; i++) {
     const x = rand() * 1024;
     const y = rand() * 1024;
-    const r = 5 + rand() * 20;
+    const r = 3 + rand() * rand() * 18;
     ctx.fillStyle = chips[Math.floor(rand() * chips.length)];
-    ctx.globalAlpha = 0.8 + rand() * 0.2;
+    ctx.globalAlpha = 0.55 + rand() * 0.35;
     ctx.beginPath();
     for (let k = 0; k < 5 + Math.floor(rand() * 3); k++) {
       const a = (k / 7) * TAU + rand() * 0.7;
@@ -2899,7 +2904,7 @@ const SPECIAL_BOARDS = {
   },
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
-  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#a99d84', felt: '#2b3a44', cup: '#4a4439', accent: { color: '#2b2b2b', metalness: 0.3, roughness: 0.4 } }),
+  terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#2b2e32', felt: '#2b3a44', cup: '#141618', accent: { color: '#d9d4ca', metalness: 0.3, roughness: 0.4 } }),
   ocean: () => {
     const [base, glow] = oceanCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 0.55, repeat: 0.05, roughness: 0.08, clearcoat: 1, dish: '#0b3d6b', felt: '#061c33', cup: '#031424', accent: { color: '#8fe3ff', emissive: '#3fc1b0', emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.25 } };

@@ -5281,19 +5281,19 @@ button.room-pill.copied {
     radial-gradient(circle, rgba(10, 12, 16, 0.6) 0 1px, transparent 1.4px) 2px 3px / 7px 6px, linear-gradient(155deg, #454c56, #333942 55%, #242a31);
 }
 .thumb-board.skin-terrazzo {
-  background: conic-gradient(from 40deg at 45% 55%, #d2363a 0 80deg, transparent 0) 6% 10% / 21px 19px no-repeat, conic-gradient(from 205deg at 40% 40%, #2a63b8 0 70deg, transparent 0) 66% 2% / 25px 21px no-repeat,
-    conic-gradient(from 310deg at 50% 45%, #d99f24 0 95deg, transparent 0) 28% 42% / 27px 23px no-repeat, conic-gradient(from 150deg at 45% 50%, #38855a 0 75deg, transparent 0) 74% 56% / 21px 19px no-repeat,
-    conic-gradient(from 255deg at 50% 50%, #2b2b2b 0 65deg, transparent 0) 8% 64% / 17px 15px no-repeat, conic-gradient(from 100deg at 50% 40%, #e07a33 0 85deg, transparent 0) 50% 74% / 19px 17px no-repeat,
-    conic-gradient(from 20deg at 55% 45%, #a45fe0 0 70deg, transparent 0) 84% 26% / 13px 12px no-repeat, conic-gradient(from 285deg at 45% 45%, #d99f24 0 60deg, transparent 0) 58% 24% / 12px 10px no-repeat,
-    conic-gradient(from 330deg at 45% 55%, #2b2b2b 0 55deg, transparent 0) 34% 12% / 11px 9px no-repeat, conic-gradient(from 120deg at 50% 50%, #d2363a 0 60deg, transparent 0) 16% 84% / 12px 10px no-repeat,
-    conic-gradient(from 75deg at 50% 50%, #38855a 0 65deg, transparent 0) 44% 60% / 12px 11px no-repeat, conic-gradient(from 230deg at 50% 50%, #c9c0ac 0 90deg, transparent 0) 88% 80% / 13px 12px no-repeat,
-    conic-gradient(from 190deg at 45% 50%, #2a63b8 0 55deg, transparent 0) 92% 44% / 9px 8px no-repeat, conic-gradient(from 305deg at 50% 45%, #e07a33 0 60deg, transparent 0) 42% 26% / 9px 8px no-repeat,
-    conic-gradient(from 170deg at 50% 50%, #38855a 0 70deg, transparent 0) 22% 46% / 9px 9px no-repeat, conic-gradient(from 90deg at 50% 50%, #a45fe0 0 60deg, transparent 0) 55% 12% / 8px 8px no-repeat,
-    conic-gradient(from 265deg at 45% 50%, #d2363a 0 55deg, transparent 0) 66% 84% / 10px 9px no-repeat, conic-gradient(from 135deg at 50% 45%, #c9c0ac 0 80deg, transparent 0) 4% 40% / 8px 8px no-repeat,
-    conic-gradient(from 350deg at 50% 50%, #2b2b2b 0 50deg, transparent 0) 80% 10% / 7px 7px no-repeat, conic-gradient(from 55deg at 50% 50%, #2a63b8 0 65deg, transparent 0) 38% 92% / 8px 7px no-repeat,
-    conic-gradient(from 210deg at 50% 50%, rgba(43, 43, 43, 0.45) 0 55deg, transparent 0) 3px 5px / 23px 23px, conic-gradient(from 100deg at 50% 50%, rgba(201, 192, 172, 0.6) 0 70deg, transparent 0) 9px 14px / 29px 29px,
-    conic-gradient(from 320deg at 50% 50%, rgba(210, 153, 36, 0.5) 0 45deg, transparent 0) 15px 8px / 41px 41px, conic-gradient(from 160deg at 50% 50%, rgba(42, 99, 184, 0.4) 0 50deg, transparent 0) 20px 18px / 53px 53px,
-    linear-gradient(155deg, #c6bca4, #b3a892 55%, #a2987f);
+  background: conic-gradient(from 40deg at 45% 55%, #9a5a46 0 80deg, transparent 0) 6% 10% / 21px 19px no-repeat, conic-gradient(from 205deg at 40% 40%, #5d7a80 0 70deg, transparent 0) 66% 2% / 25px 21px no-repeat,
+    conic-gradient(from 310deg at 50% 45%, #b9b4aa 0 95deg, transparent 0) 28% 42% / 27px 23px no-repeat, conic-gradient(from 150deg at 45% 50%, #8e949a 0 75deg, transparent 0) 74% 56% / 21px 19px no-repeat,
+    conic-gradient(from 255deg at 50% 50%, #17191c 0 65deg, transparent 0) 8% 64% / 17px 15px no-repeat, conic-gradient(from 100deg at 50% 40%, #9a5a46 0 85deg, transparent 0) 50% 74% / 19px 17px no-repeat,
+    conic-gradient(from 20deg at 55% 45%, #7f7392 0 70deg, transparent 0) 84% 26% / 13px 12px no-repeat, conic-gradient(from 285deg at 45% 45%, #b9b4aa 0 60deg, transparent 0) 58% 24% / 12px 10px no-repeat,
+    conic-gradient(from 330deg at 45% 55%, #17191c 0 55deg, transparent 0) 34% 12% / 11px 9px no-repeat, conic-gradient(from 120deg at 50% 50%, #9a5a46 0 60deg, transparent 0) 16% 84% / 12px 10px no-repeat,
+    conic-gradient(from 75deg at 50% 50%, #8e949a 0 65deg, transparent 0) 44% 60% / 12px 11px no-repeat, conic-gradient(from 230deg at 50% 50%, #b9b4aa 0 90deg, transparent 0) 88% 80% / 13px 12px no-repeat,
+    conic-gradient(from 190deg at 45% 50%, #5d7a80 0 55deg, transparent 0) 92% 44% / 9px 8px no-repeat, conic-gradient(from 305deg at 50% 45%, #9a5a46 0 60deg, transparent 0) 42% 26% / 9px 8px no-repeat,
+    conic-gradient(from 170deg at 50% 50%, #8e949a 0 70deg, transparent 0) 22% 46% / 9px 9px no-repeat, conic-gradient(from 90deg at 50% 50%, #7f7392 0 60deg, transparent 0) 55% 12% / 8px 8px no-repeat,
+    conic-gradient(from 265deg at 45% 50%, #9a5a46 0 55deg, transparent 0) 66% 84% / 10px 9px no-repeat, conic-gradient(from 135deg at 50% 45%, #b9b4aa 0 80deg, transparent 0) 4% 40% / 8px 8px no-repeat,
+    conic-gradient(from 350deg at 50% 50%, #17191c 0 50deg, transparent 0) 80% 10% / 7px 7px no-repeat, conic-gradient(from 55deg at 50% 50%, #5d7a80 0 65deg, transparent 0) 38% 92% / 8px 7px no-repeat,
+    conic-gradient(from 210deg at 50% 50%, rgba(23, 25, 28, 0.6) 0 55deg, transparent 0) 3px 5px / 23px 23px, conic-gradient(from 100deg at 50% 50%, rgba(185, 180, 170, 0.45) 0 70deg, transparent 0) 9px 14px / 29px 29px,
+    conic-gradient(from 320deg at 50% 50%, rgba(142, 148, 154, 0.5) 0 45deg, transparent 0) 15px 8px / 41px 41px, conic-gradient(from 160deg at 50% 50%, rgba(93, 122, 128, 0.4) 0 50deg, transparent 0) 20px 18px / 53px 53px,
+    linear-gradient(155deg, #3e4146, #34373b 55%, #2a2d31);
 }
 .thumb-board.skin-ocean {
   background: repeating-linear-gradient(-20deg, transparent 0 5px, rgba(143, 227, 255, 0.35) 5px 6px), linear-gradient(135deg, #0b3d6b, #0d5c8a 50%, #083152);
