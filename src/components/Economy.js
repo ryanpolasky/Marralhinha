@@ -123,7 +123,7 @@ export function PreviewStage({ itemId, seat = 0, playerName }) {
   );
 }
 
-export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, footer, seat = 0, label, disabled = false }) {
+export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, onPointerEnter, footer, seat = 0, label, disabled = false }) {
   const item = ITEMS[itemId];
   const rarity = rarityOf(item);
   return (
@@ -132,6 +132,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       className={`item-card rarity-${item.rarity}${item.tag ? ` tag-${item.tag}` : ''}${owned ? '' : ' locked'}${equipped ? ' equipped' : ''}${selected ? ' selected' : ''}`}
       style={{ '--rarity': rarity.color }}
       onClick={onClick}
+      onPointerEnter={onPointerEnter}
       title={item.desc}
       aria-label={label}
       aria-disabled={disabled || undefined}

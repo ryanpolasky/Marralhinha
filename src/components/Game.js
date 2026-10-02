@@ -9,6 +9,7 @@ import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf } from '../game/catalog';
+import { warmBoardSkin } from '../game/skinWarm';
 import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { ask } from './Dialog';
@@ -282,6 +283,10 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(null);
   const boards = itemsForSlot('board');
+  // Opening prebuilds every board on idle; hovering rushes just that one
+  useEffect(() => {
+    if (open) warmBoardSkin();
+  }, [open]);
   const items = edit ? itemsForSlot(edit.slot) : [];
   const victim = edit && seats[edit.seat];
   const slotLabel = edit?.slot === 'dice' ? 'dice' : 'marbles';
@@ -328,7 +333,7 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
                 </div>
                 <div className="board-picker-grid">
                   {boards.map((b) => (
-                    <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} title={b.desc}>
+                    <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} onPointerEnter={() => warmBoardSkin(b.id)} title={b.desc}>
                       <ItemThumb itemId={b.id} />
                       <span>{b.name}</span>
                     </button>
@@ -839,6 +844,10 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     };
   }, [needsMe]);
 
+  // Every client in a game prebuilds boards on idle, so dev picks and board reveals stay smooth
+  useEffect(() => {
+    warmBoardSkin();
+  }, []);
 
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';

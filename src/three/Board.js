@@ -1,9 +1,11 @@
-import React, { useLayoutEffect, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
 import { boardSkin, animateBoardSkin } from './skins';
+import { itemsForSlot } from '../game/catalog';
+import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
 
@@ -207,6 +209,10 @@ const SWAP_MS = 150;
 const WAVE_S = 0.9;
 const WAVE_R = 13;
 
+// Program compile only needs the material, so a plane stands in for the real board mesh
+const WARM_GEO = new THREE.PlaneGeometry(1, 1);
+const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 900 }) : setTimeout(fn, 80));
+
 // Glowing shockwave that sweeps out from the center while the board skin changes underneath it
 function SwapWave({ wave }) {
   const ring = useRef();
@@ -247,31 +253,124 @@ function SwapWave({ wave }) {
   );
 }
 
-// The shown skin trails the requested one by a beat, so the swap happens under the wave's flash.
-// Previews (table=false) swap instantly: particles share a global bus and would spray onto the main board
-function useSkinTransition(skin, animate) {
-  const [shown, setShown] = useState(skin);
+// The shown skin trails the requested one: it's fully built and compiled first, then the wave plays
+// and the swap lands under the flash, so picking a new board never stalls a frame mid-animation.
+// Previews (table=false) show as soon as their skin is ready: particles share a global bus and would
+// spray onto the main board
+function useSkinTransition(skin, animate, prepare) {
+  const [shown, setShown] = useState(() => (animate ? skin : null));
   const [wave, setWave] = useState(0);
   useEffect(() => {
     if (skin === shown) return undefined;
-    // No show on the very first skin (page load), only on real swaps
-    if (!animate || !shown) {
-      setShown(skin);
-      return undefined;
-    }
-    setWave((w) => w + 1);
-    sfx.boardSwap();
-    fx.emit('burst', { position: [0, 0.3, 0], colors: ['#ffd166', '#fff3b0', '#ffffff'], count: 80, speed: 9, up: 2.5, size: 0.09, gravity: 0.35, life: 1.1, spread: 1.4 });
-    const t = setTimeout(() => setShown(skin), SWAP_MS);
-    return () => clearTimeout(t);
+    let dead = false;
+    let timer;
+    Promise.resolve()
+      .then(() => new Promise((r) => requestAnimationFrame(r)))
+      .then(() => prepare(skin))
+      .catch(() => {})
+      .then(() => {
+        if (dead) return;
+        // No show on the very first skin (page load), only on real swaps
+        if (!animate || !shown) {
+          setShown(skin);
+          return;
+        }
+        setWave((w) => w + 1);
+        sfx.boardSwap();
+        fx.emit('burst', { position: [0, 0.3, 0], colors: ['#ffd166', '#fff3b0', '#ffffff'], count: 80, speed: 9, up: 2.5, size: 0.09, gravity: 0.35, life: 1.1, spread: 1.4 });
+        timer = setTimeout(() => {
+          if (!dead) setShown(skin);
+        }, SWAP_MS);
+      });
+    return () => {
+      dead = true;
+      clearTimeout(timer);
+    };
   }, [skin]); // eslint-disable-line react-hooks/exhaustive-deps
   return [shown, wave];
 }
 
 export default function Board({ active, names, turn, showNames, skin, table = true, layout = CLASSIC_LAYOUT }) {
-  const [shownSkin, wave] = useSkinTransition(skin, table);
-  const materials = boardSkin(shownSkin, layout);
-  useFrame(({ clock }) => animateBoardSkin(materials, clock.elapsedTime));
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+
+  // Builds the skin's canvases (cache-hit after the first), compiles its shader programs against this
+  // scene's lights/fog/env, and uploads its textures: everything a swap frame would otherwise stall on
+  const warmed = useRef(new Set());
+  const uploaded = useRef(new Set());
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+  const prepareSkin = useCallback(
+    (id, upload = true) => {
+      const key = `${id}:${layout.spec.id}`;
+      let mats;
+      try {
+        mats = boardSkin(id, layout);
+      } catch {
+        return Promise.resolve();
+      }
+      if (!warmed.current.has(key)) {
+        warmed.current.add(key);
+        const scratch = new THREE.Scene();
+        [mats.board, mats.dish].forEach((m) => {
+          const probe = new THREE.Mesh(WARM_GEO, m);
+          probe.castShadow = probe.receiveShadow = true;
+          scratch.add(probe);
+        });
+        gl.compile(scratch, camera, scene);
+      }
+      if (upload && !uploaded.current.has(key)) {
+        uploaded.current.add(key);
+        [mats.board, mats.dish].forEach((m) => [m.map, m.emissiveMap].forEach((t) => t && gl.initTexture(t)));
+      }
+      // Best-effort wait for parallel shader compile; capped so an unmount can't spin forever
+      return new Promise((resolve) => {
+        let tries = 40;
+        const check = () => {
+          const pending = [mats.board, mats.dish].some((m) => {
+            const p = gl.properties?.get(m)?.currentProgram;
+            return p && p.isReady && !p.isReady();
+          });
+          if (!pending || --tries <= 0 || !mounted.current) return resolve();
+          setTimeout(check, 30);
+        };
+        check();
+      });
+    },
+    [gl, scene, camera, layout]
+  );
+
+  // DOM pickers announce hover/open through the bridge; only the real table board answers
+  const warmAllAt = useRef(0);
+  useEffect(() => {
+    if (!table) return undefined;
+    let alive = true;
+    const off = onBoardSkinWarm((id) => {
+      if (id) {
+        prepareSkin(id);
+        return;
+      }
+      const now = Date.now();
+      if (now - warmAllAt.current < 30000) return;
+      warmAllAt.current = now;
+      const queue = itemsForSlot('board').map((b) => b.id);
+      const step = () => {
+        if (!alive || !queue.length) return;
+        prepareSkin(queue.shift(), false);
+        idle(step);
+      };
+      idle(step);
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [table, prepareSkin]);
+
+  const [shownSkin, wave] = useSkinTransition(skin, table, prepareSkin);
+  const materials = useMemo(() => (shownSkin === null ? null : boardSkin(shownSkin, layout)), [shownSkin, layout]);
+  useFrame(({ clock }) => materials && animateBoardSkin(materials, clock.elapsedTime));
   const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
   const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
   const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);
@@ -287,6 +386,8 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
   useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
   useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
+
+  if (!materials) return <group />;
 
   return (
     <group>

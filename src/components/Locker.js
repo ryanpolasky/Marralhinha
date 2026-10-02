@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { SLOTS, SLOT_KEYS, ITEMS, TAGS, itemsForSlot, canUse, collectible } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
 import { ItemCard, PreviewStage, RarityTag, TagBadge } from './Economy';
+import { warmBoardSkin } from '../game/skinWarm';
 import { Close } from './Icons';
 
 export default function Locker({ account, onClose, onEquip, onShop }) {
@@ -10,6 +11,9 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
   const [seat, setSeat] = useState(0);
 
   useEffect(() => setSelected(account.equipped[slot]), [slot]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (slot === 'board') warmBoardSkin();
+  }, [slot]);
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -83,7 +87,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
           </div>
           <div className="item-grid">
             {itemsForSlot(slot).map((i) => (
-              <ItemCard key={i.id} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => setSelected(i.id)} />
+              <ItemCard key={i.id} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => setSelected(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
             ))}
           </div>
         </div>
