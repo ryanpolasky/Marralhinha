@@ -167,6 +167,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
 }
 
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
+const APP_TITLE = document.title || 'Marralhinha Online';
 const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle || p.away);
 
 // Speech bubbles live in <body> and follow their chip every frame, so the scrolling (clipped) mobile
@@ -823,6 +824,20 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     });
     return () => timers.forEach(clearTimeout);
   }, [myClock, deadline]);
+
+  // While the tab is hidden, the title calls you back when the table needs you
+  const needsMe = myTurn && !meAway && !startPending;
+  useEffect(() => {
+    const apply = () => {
+      document.title = needsMe && document.hidden ? `Your turn · ${APP_TITLE}` : APP_TITLE;
+    };
+    apply();
+    document.addEventListener('visibilitychange', apply);
+    return () => {
+      document.removeEventListener('visibilitychange', apply);
+      document.title = APP_TITLE;
+    };
+  }, [needsMe]);
 
 
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);

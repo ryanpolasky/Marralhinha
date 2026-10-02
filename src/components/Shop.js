@@ -204,8 +204,9 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
     else if (e.key === 'ArrowRight') go(slide + 1);
   };
   const onSwipeEnd = (e) => {
+    if (swipeStart.current === null) return;
     const dx = e.changedTouches[0].clientX - swipeStart.current;
-    if (swipeStart.current !== null && Math.abs(dx) > 50) go(slide + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 50) go(slide + (dx < 0 ? 1 : -1));
     swipeStart.current = null;
   };
   const slideProps = (i) => (i === slide ? {} : { 'aria-hidden': true, inert: '' });

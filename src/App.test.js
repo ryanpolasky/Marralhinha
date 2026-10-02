@@ -178,6 +178,22 @@ test('Discord host can end a game after confirmation while guests cannot', async
   expect(screen.queryByRole('button', { name: 'End game for everyone' })).not.toBeInTheDocument();
 });
 
+test('hidden tab titles the game Your turn until the turn passes', () => {
+  let hiddenNow = false;
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hiddenNow });
+  const room = { code: 'T', hostId: 'p2', spectators: [], seats: [{ id: 'p1', name: 'Ana', connected: true }, { id: 'p2', name: 'Rui', connected: true }, null, null], game: {
+    phase: 'roll', mode: 'solo', turn: 0, active: [0, 1], marbles: [[], [], [], []], log: [],
+  } };
+  const { rerender } = render(<Game room={room} playerId="p1" onAction={() => {}} onResetView={() => {}} />);
+  expect(document.title).toBe('Marralhinha Online');
+  hiddenNow = true;
+  fireEvent(document, new Event('visibilitychange'));
+  expect(document.title).toBe('Your turn · Marralhinha Online');
+  rerender(<Game room={{ ...room, game: { ...room.game, turn: 1 } }} playerId="p1" onAction={() => {}} onResetView={() => {}} />);
+  expect(document.title).toBe('Marralhinha Online');
+  delete document.hidden;
+});
+
 test('signs in as a guest and renders the home screen with the account bar', async () => {
   render(<App />);
   expect(await screen.findByRole('button', { name: /quick play/i })).toBeInTheDocument();

@@ -7868,7 +7868,8 @@ textarea.report-text {
 
 .carousel-arrow {
   position: absolute;
-  top: calc(17.65cqw - 19px);
+  top: 17.65cqw;
+  margin-top: -19px;
   z-index: 3;
   display: grid;
   place-items: center;
