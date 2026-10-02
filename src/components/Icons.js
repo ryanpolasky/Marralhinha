@@ -204,3 +204,16 @@ export const DieIcon = ({ size = 26 }) => (
     <circle cx="12" cy="12" r="1" fill="currentColor" />
   </Icon>
 );
+
+export const Alert = ({ size = 20 }) => (
+  <Icon size={size}>
+    <path d="M12 6v7.5" strokeWidth="2.8" />
+    <circle cx="12" cy="17.6" r="1.3" fill="currentColor" stroke="none" />
+  </Icon>
+);
+
+export const Check = ({ size = 20 }) => (
+  <Icon size={size}>
+    <path d="M5 12.5l4.4 4.4L19 7.3" strokeWidth="2.8" />
+  </Icon>
+);

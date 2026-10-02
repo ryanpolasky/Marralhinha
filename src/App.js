@@ -7,6 +7,7 @@ import { IS_ACTIVITY } from './net/config';
 import { unlockAudio, sfx } from './game/sound';
 import { getSettings } from './game/settings';
 import PingMenu from './components/PingMenu';
+import Toast from './components/Toast';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
 import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, coveringTurn, startPendingFor } from './game/moves';
@@ -142,6 +143,7 @@ const App = () => {
   const instanceRef = useRef(null);
 
   const notify = useCallback((text, tone = 'bad') => setToast({ text, tone, id: Math.random() }), []);
+  const dismissToast = useCallback((id) => setToast((t) => (t && t.id === id ? null : t)), []);
 
   const saveSession = useCallback((next) => {
     sessionRef.current = next;
@@ -310,12 +312,6 @@ const App = () => {
       gestures.forEach((type) => window.removeEventListener(type, unlock));
     };
   }, []);
-
-  useEffect(() => {
-    if (!toast) return undefined;
-    const t = setTimeout(() => setToast(null), 4200);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const run = async (fn) => {
     setBusy(true);
@@ -588,11 +584,7 @@ const App = () => {
       <div className="vignette" />
       {account && !game && accountBar}
       {account && !connected && <div className="banner">Connecting to the game server…</div>}
-      {toast && (
-        <div key={toast.id} className={`toast ${toast.tone}`} role="alert" onClick={() => setToast(null)}>
-          {toast.text}
-        </div>
-      )}
+      {toast && <Toast key={toast.id} toast={toast} onDone={dismissToast} />}
       {screen}
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}
       {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onShop={() => setModal('shop')} />}
