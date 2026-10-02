@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Credit } from './About';
+import { Close } from './Icons';
 import { RING, HOME, BASE, SEAT_COLORS, BASE_TRAY } from '../game/geometry';
 import { Arrow, BoardArt, Coin, Defs, Die, Dish, Label, Marble, Mark, PingMark, Ring, RowArt, Trail, rowAt } from './TutorialArt';
 
@@ -285,6 +286,9 @@ export function RulesModal({ onClose }) {
           <span className="muted">
             {index + 1} / {SLIDES.length}
           </span>
+          <button className="icon-close" onClick={onClose} aria-label="Close">
+            <Close />
+          </button>
         </div>
         <div key={index} className={`tutorial-slide ${direction > 0 ? 'from-right' : 'from-left'}`}>
           <div className="tutorial-visual">{slide.art(`tut${index}`)}</div>

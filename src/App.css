@@ -641,8 +641,9 @@ button.pronounce:hover {
 
 .tutorial-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 14px;
 }
 
 .tutorial-slide {
