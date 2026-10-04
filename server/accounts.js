@@ -1,6 +1,7 @@
 const { randomBytes, createHash } = require('crypto');
 const { transaction } = require('./db');
 const discord = require('./discord');
+const { nameBlocked } = require('./namefilter');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
 const LUCKY_ITEM = 'dice.lucky';
@@ -18,6 +19,10 @@ class AccountError extends Error {}
 const newId = () => randomBytes(9).toString('base64url');
 const hashToken = (token) => createHash('sha256').update(String(token)).digest('hex');
 const cleanName = (name) => String(name ?? '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+const safeName = (name) => {
+  const clean = cleanName(name);
+  return !clean || nameBlocked(clean) ? 'Player' : clean;
+};
 const parse = (json, fallback) => {
   try {
     return JSON.parse(json) ?? fallback;
@@ -115,7 +120,7 @@ class Accounts {
     const id = newId();
     const now = Date.now();
     transaction(this.db, () => {
-      this.q.insertUser.run(id, discordId, cleanName(name) || 'Player', avatar, REWARDS.starting, now, now);
+      this.q.insertUser.run(id, discordId, safeName(name), avatar, REWARDS.starting, now, now);
       this.q.ledger.run(id, REWARDS.starting, 'welcome', now);
     });
     return this.getUser(id);
@@ -285,6 +290,7 @@ class Accounts {
   rename(userId, name) {
     const clean = cleanName(name);
     if (!clean) throw new AccountError('Pick a name first');
+    if (nameBlocked(clean)) throw new AccountError('That name is not allowed');
     this.q.rename.run(clean, userId);
   }
 
@@ -337,7 +343,7 @@ class Accounts {
   loginDiscord(discordUser, guestId = null) {
     const discordId = String(discordUser.id);
     const avatar = discordUser.avatar || null;
-    const displayName = cleanName(discordUser.global_name || discordUser.username) || 'Player';
+    const displayName = safeName(discordUser.global_name || discordUser.username);
     return transaction(this.db, () => {
       const existing = this.q.userByDiscord.get(discordId);
       const guest = guestId ? this.getUser(guestId) : null;
