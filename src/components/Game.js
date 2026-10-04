@@ -177,15 +177,19 @@ function Bubble({ anchor, className, style, fit = false, children }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     let frame;
+    // Reads first, then only the writes that actually changed, so a settled bubble never forces a reflow
+    const last = { width: null, left: null, top: null };
     const place = () => {
       const chip = anchor.current;
       const el = ref.current;
       if (chip && el) {
         const r = chip.getBoundingClientRect();
-        if (fit) el.style.maxWidth = `${r.width}px`;
+        if (fit && r.width !== last.width) el.style.maxWidth = `${(last.width = r.width)}px`;
         const half = el.offsetWidth / 2;
-        el.style.left = `${Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8)}px`;
-        el.style.top = `${r.bottom + 12}px`;
+        const left = Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8);
+        const top = r.bottom + 12;
+        if (left !== last.left) el.style.left = `${(last.left = left)}px`;
+        if (top !== last.top) el.style.top = `${(last.top = top)}px`;
       }
       frame = requestAnimationFrame(place);
     };
@@ -870,10 +874,10 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     };
   }, [needsMe]);
 
-  // Every client in a game prebuilds boards on idle, so dev picks and board reveals stay smooth
+  // Only Devs can swap the table mid-game, so only they prebuild every board; everyone else builds a skin when it's picked
   useEffect(() => {
-    warmBoardSkin();
-  }, []);
+    if (isAdmin) warmBoardSkin();
+  }, [isAdmin]);
 
   const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
   const teams = game.mode === 'teams';

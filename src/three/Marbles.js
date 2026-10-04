@@ -14,6 +14,15 @@ export const MARBLE_R = 0.335;
 const REST_Y = 0.07;
 const STACKED_Y = REST_Y + MARBLE_R * 1.95;
 
+// One copy of each buffer on the GPU instead of one per marble, ghost and halo
+export const MARBLE_GEO = new THREE.SphereGeometry(MARBLE_R, 40, 24);
+const HIT_GEO = new THREE.SphereGeometry(0.5, 12, 8);
+const HALO_GEO = new THREE.RingGeometry(0.4, 0.5, 40);
+const GHOST_GEO = new THREE.SphereGeometry(MARBLE_R, 24, 16);
+const GHOST_RING_GEO = new THREE.RingGeometry(0.42, 0.56, 40);
+const CAPTURE_RING_GEO = new THREE.RingGeometry(0.6, 0.68, 40);
+const PATH_DOT_GEO = new THREE.SphereGeometry(0.07, 10, 8);
+
 const CLASSIC_LAYOUT = layoutFor('classic');
 const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
   const [r, c] = positionIn(seat, pos, marble, layout);
@@ -167,19 +176,15 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
   return (
     <>
       <group ref={group}>
-        <mesh ref={body} material={material} castShadow>
-          <sphereGeometry args={[MARBLE_R, 40, 24]} />
-        </mesh>
+        <mesh ref={body} geometry={MARBLE_GEO} material={material} castShadow />
         {movable && (
-          <mesh {...handlers}>
-            <sphereGeometry args={[0.5, 12, 8]} />
+          <mesh geometry={HIT_GEO} {...handlers}>
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
         )}
       </group>
       {movable && (
-        <mesh ref={halo} position={[target.x, 0.02, target.z]} rotation-x={-Math.PI / 2}>
-          <ringGeometry args={[0.4, 0.5, 40]} />
+        <mesh ref={halo} geometry={HALO_GEO} position={[target.x, 0.02, target.z]} rotation-x={-Math.PI / 2}>
           <meshBasicMaterial color={selected ? '#ffe066' : SEAT_COLORS[seat].light} transparent toneMapped={false} depthWrite={false} />
         </mesh>
       )}
@@ -213,6 +218,7 @@ function Ghost({ move, strong, label, onMove, layout }) {
     <group position={[target.x, 0, target.z]}>
       <mesh
         ref={ref}
+        geometry={GHOST_GEO}
         onClick={(e) => {
           e.stopPropagation();
           setCursor(false);
@@ -224,16 +230,13 @@ function Ghost({ move, strong, label, onMove, layout }) {
         }}
         onPointerOut={() => setCursor(false)}
       >
-        <sphereGeometry args={[MARBLE_R, 24, 16]} />
         <meshStandardMaterial color={color.light} emissive={color.main} emissiveIntensity={0.7} transparent opacity={strong ? 0.6 : 0.35} depthWrite={false} />
       </mesh>
-      <mesh ref={ring} position-y={0.03} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[0.42, 0.56, 40]} />
+      <mesh ref={ring} geometry={GHOST_RING_GEO} position-y={0.03} rotation-x={-Math.PI / 2}>
         <meshBasicMaterial color={move.capture ? '#ff4040' : '#ffffff'} transparent opacity={strong ? 0.9 : 0.5} toneMapped={false} depthWrite={false} />
       </mesh>
       {move.capture && (
-        <mesh position-y={0.03} rotation-x={-Math.PI / 2}>
-          <ringGeometry args={[0.6, 0.68, 40]} />
+        <mesh geometry={CAPTURE_RING_GEO} position-y={0.03} rotation-x={-Math.PI / 2}>
           <meshBasicMaterial color="#ff4040" transparent opacity={0.7} toneMapped={false} depthWrite={false} />
         </mesh>
       )}
@@ -247,8 +250,7 @@ function PathDots({ move, layout }) {
   return move.path.slice(0, -1).map((cell, i) => {
     const p = worldOf(move.seat, cell, move.marble, layout);
     return (
-      <mesh key={i} position={[p.x, 0.06, p.z]}>
-        <sphereGeometry args={[0.07, 10, 8]} />
+      <mesh key={i} geometry={PATH_DOT_GEO} position={[p.x, 0.06, p.z]}>
         <meshBasicMaterial color={SEAT_COLORS[move.seat].light} toneMapped={false} />
       </mesh>
     );

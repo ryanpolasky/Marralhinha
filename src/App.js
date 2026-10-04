@@ -10,6 +10,8 @@ import PingMenu from './components/PingMenu';
 import Toast from './components/Toast';
 import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
+import { warmBoardSkin } from './game/skinWarm';
+import { quality } from './three/quality';
 import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, coveringTurn, startPendingFor } from './game/moves';
 import BOARDS from './shared/boards.json';
 import Home from './components/Home';
@@ -408,6 +410,13 @@ const App = () => {
   // A Dev's mid-game pick wins over the starter's board
   const tableBoard = game?.boardOverride || (game && game.boardSeat !== null && boardRevealed ? room.seats[game.boardSeat]?.cosmetics?.board : null);
   const boardSkinId = tableBoard || account?.equipped.board;
+  // Build the starter's board while the wheel spins (after the camera has settled) so the reveal swaps instead of hitching
+  const pendingBoard = game && !boardRevealed && game.boardSeat !== null ? room.seats[game.boardSeat]?.cosmetics?.board : null;
+  useEffect(() => {
+    if (!pendingBoard) return undefined;
+    const t = setTimeout(() => warmBoardSkin(pendingBoard), 1600);
+    return () => clearTimeout(t);
+  }, [pendingBoard]);
 
   const sceneProps = useMemo(() => {
     if (!inRoom) {
@@ -559,7 +568,7 @@ const App = () => {
   }
 
   return (
-    <div className={`app mode-${sceneProps.mode}`}>
+    <div className={`app mode-${sceneProps.mode}${quality.glass ? '' : ' flat-glass'}`}>
       <div className="scene-layer">
         <SceneBoundary>
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>

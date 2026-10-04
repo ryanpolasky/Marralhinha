@@ -22,6 +22,8 @@ export function Environment({ intensity = 0.55 }) {
 }
 
 export function Lights({ shadowSize = 2048, extent = 16 }) {
+  // Keeps the normal offset at the same number of shadow texels whatever the map resolution, so smaller maps don't acne
+  const normalBias = 0.03 * (2048 / shadowSize) * (extent / 16);
   return (
     <>
       <Environment />
@@ -39,7 +41,7 @@ export function Lights({ shadowSize = 2048, extent = 16 }) {
         shadow-camera-near={1}
         shadow-camera-far={60}
         shadow-bias={-0.0004}
-        shadow-normalBias={0.03}
+        shadow-normalBias={normalBias}
       />
       <pointLight position={[-12, 9, -8]} intensity={60} distance={45} color="#8fc9ff" />
     </>

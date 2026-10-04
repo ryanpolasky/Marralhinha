@@ -9,12 +9,15 @@ import KillFxLayer from './KillFxLayer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
+import { quality as defaultQuality, antialiasFor } from './quality';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 
 const BG = '#0b1f24';
 const NO_MOVES = [];
 const NO_COSMETICS = [];
 const NO_PINGS = [];
+// three r182 dropped PCFSoft and silently falls back to PCF with a console warning; ask for PCF outright
+const SHADOWS = { type: THREE.PCFShadowMap };
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 const _toCamera = new THREE.Vector3();
@@ -252,7 +255,7 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, quality = defaultQuality }) {
   const layout = layoutFor(board.variant);
   const pointer = useRef(null);
   usePingKeys(pointer, canPing, onPing, layout);
@@ -276,15 +279,15 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
 
   return (
     <Canvas
-      shadows
-      dpr={[1, 2]}
+      shadows={SHADOWS}
+      dpr={[1, quality.dpr]}
       camera={{ fov: 38, near: 0.5, far: 400, position: [0, 34, 34] }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: antialiasFor(quality), powerPreference: 'high-performance' }}
       onPointerMissed={() => setSelected(null)}
     >
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
-      <Lights />
+      <Lights shadowSize={quality.shadowSize} />
       <Turntable viewSeat={viewSeat}>
         <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} layout={layout} />
         <KillFxLayer layout={layout} />

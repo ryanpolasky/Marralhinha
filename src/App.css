@@ -7981,6 +7981,116 @@ textarea.report-text {
   color: var(--ink-dim);
 }
 
+/* Render quality + HUD glass comparisons */
+.preview-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.preview-compare h3 {
+  margin: 10px 0 2px;
+  font-size: 15px;
+}
+
+.preview-compare small {
+  color: var(--ink-dim);
+}
+
+.preview-canvas {
+  position: relative;
+  height: 420px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0b1f24;
+}
+
+.preview-canvas.tall {
+  height: 600px;
+}
+
+.preview-toggles {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.preview-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.glass-compare {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 18px;
+  pointer-events: none;
+}
+
+.glass-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.glass-side > .glass-label {
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.glass-side > .panel {
+  padding: 16px 18px;
+  animation: none;
+}
+
+.glass-side .action-panel {
+  min-width: 0;
+  width: 100%;
+  max-width: 420px;
+}
+
+@media (max-width: 900px) {
+  .preview-compare,
+  .glass-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Flat glass: no backdrop blur over the live canvas (toggled by quality.glass) ---------- */
+
+.flat-glass .panel,
+.flat-glass .icon-btn,
+.flat-glass .brand-chip,
+.flat-glass .chip,
+.flat-glass .action-panel,
+.flat-glass .away-banner,
+.flat-glass .board-picker-pop,
+.flat-glass .ping-menu,
+.flat-glass .spectators-pop,
+.flat-glass .stickers,
+.flat-glass .plate-basic.account-plate,
+.flat-glass .bar-btn,
+.flat-glass .home-report,
+.flat-glass .credit.corner,
+.flat-glass .toast,
+.flat-glass .start-card,
+.flat-glass .lobby-event,
+.flat-glass .skin-viewer,
+.flat-glass .carousel-arrow {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .skin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

@@ -9,6 +9,7 @@ import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
 import { playKillFx } from './killfx';
 import { playTrail } from './trails';
+import { MARBLE_GEO } from './Marbles';
 import { ITEMS } from '../game/catalog';
 import { layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
@@ -102,12 +103,8 @@ function FxPreview({ itemId, seat, replay }) {
       <group position={[-2, 0, -4]}>
         <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin="board.oak" table={false} />
       </group>
-      <mesh ref={target} material={victimSkin.material} position={[0, 0.07, 0]} castShadow>
-        <sphereGeometry args={[0.335, 40, 24]} />
-      </mesh>
-      <mesh ref={attacker} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow>
-        <sphereGeometry args={[0.335, 40, 24]} />
-      </mesh>
+      <mesh ref={target} geometry={MARBLE_GEO} material={victimSkin.material} position={[0, 0.07, 0]} castShadow />
+      <mesh ref={attacker} geometry={MARBLE_GEO} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow />
       <KillFxLayer key={replay} bus={bus} layout={CLASSIC} origin={BOARD_ORIGIN} />
     </group>
   );
@@ -166,12 +163,8 @@ function TrailPreview({ itemId, seat, replay }) {
       <group position={[-2, 0, -4]}>
         <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin="board.oak" table={false} />
       </group>
-      <mesh material={blockerSkin.material} position={[0, 0.07, 1]} castShadow>
-        <sphereGeometry args={[0.335, 40, 24]} />
-      </mesh>
-      <mesh ref={m} material={skin.material} position={[0, 0.07, RUN]} castShadow>
-        <sphereGeometry args={[0.335, 40, 24]} />
-      </mesh>
+      <mesh geometry={MARBLE_GEO} material={blockerSkin.material} position={[0, 0.07, 1]} castShadow />
+      <mesh ref={m} geometry={MARBLE_GEO} material={skin.material} position={[0, 0.07, RUN]} castShadow />
       <Spectacle key={replay} bus={bus} />
     </group>
   );

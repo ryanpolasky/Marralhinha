@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
 
 const MAX = 600;
 const GRAVITY = -9;
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 
 export default function Particles({ bus = fx }) {
   const mesh = useRef();
@@ -12,6 +13,7 @@ export default function Particles({ bus = fx }) {
     () =>
       Array.from({ length: MAX }, () => ({
         alive: false,
+        shown: false,
         pos: new THREE.Vector3(),
         vel: new THREE.Vector3(),
         life: 0,
@@ -23,11 +25,19 @@ export default function Particles({ bus = fx }) {
     []
   );
   const cursor = useRef(0);
+  const live = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
 
+  useLayoutEffect(() => {
+    for (let i = 0; i < MAX; i++) mesh.current.setMatrixAt(i, HIDDEN);
+    mesh.current.instanceMatrix.needsUpdate = true;
+  }, []);
+
   useEffect(() => {
     const burst = ({ position, colors, count = 40, speed = 4, up = 3, life = 0.9, size = 0.1, gravity = 1, spread = 1, radius = 0, inward = false }) => {
+      live.current = 1;
+      mesh.current.visible = true;
       for (let i = 0; i < count; i++) {
         const index = cursor.current;
         const p = pool[index];
@@ -50,8 +60,11 @@ export default function Particles({ bus = fx }) {
   }, [pool, color, bus]);
 
   useFrame((_, rawDt) => {
+    if (!live.current) return;
     const dt = Math.min(rawDt, 0.05);
+    let alive = 0;
     pool.forEach((p, i) => {
+      if (!p.alive && !p.shown) return;
       if (p.alive) {
         p.life += dt;
         if (p.life >= p.maxLife) p.alive = false;
@@ -59,6 +72,8 @@ export default function Particles({ bus = fx }) {
         p.vel.multiplyScalar(1 - dt * 1.2);
         p.pos.addScaledVector(p.vel, dt);
       }
+      p.shown = p.alive;
+      if (p.alive) alive++;
       const k = p.alive ? 1 - p.life / p.maxLife : 0;
       dummy.position.copy(p.pos);
       dummy.rotation.set(p.spin + p.life * 8, p.spin * 2 + p.life * 6, 0);
@@ -66,11 +81,13 @@ export default function Particles({ bus = fx }) {
       dummy.updateMatrix();
       mesh.current.setMatrixAt(i, dummy.matrix);
     });
+    live.current = alive;
+    mesh.current.visible = alive > 0;
     mesh.current.instanceMatrix.needsUpdate = true;
   });
 
   return (
-    <instancedMesh ref={mesh} args={[null, null, MAX]} frustumCulled={false}>
+    <instancedMesh ref={mesh} args={[null, null, MAX]} frustumCulled={false} visible={false}>
       <octahedronGeometry args={[1, 0]} />
       <meshBasicMaterial toneMapped={false} />
     </instancedMesh>
