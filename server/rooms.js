@@ -2,7 +2,7 @@ const { randomBytes, randomInt } = require('crypto');
 const rules = require('./game/rules');
 const { chooseMove } = require('./game/bot');
 const { botCosmetics } = require('./economy');
-const { ITEMS } = require('./catalog');
+const { ITEMS, DEFAULTS } = require('./catalog');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SEAT_ORDER = [0, 2, 1, 3];
@@ -635,7 +635,9 @@ class Room {
 
   react(userId, key) {
     const { seat, player } = this.require(userId);
-    if (!REACTIONS.includes(key)) throw new UserError('Unknown reaction');
+    const pack = ITEMS.get(player.cosmetics?.emotes || DEFAULTS.emotes);
+    const emote = pack?.slot === 'emotes' && (pack.emotes || []).some((e) => e.key === key);
+    if (!REACTIONS.includes(key) && !emote) throw new UserError('Unknown reaction');
     const now = Date.now();
     const cooldown = (player.tags || []).some((tag) => TESTER_TAGS.includes(tag)) ? TESTER_REACTION_COOLDOWN_MS : REACTION_COOLDOWN_MS;
     if (now - (player.lastReaction || 0) < cooldown) return;

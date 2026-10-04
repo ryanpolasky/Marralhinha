@@ -6,11 +6,11 @@ import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Eye, BoardIcon, Coffee } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee } from './Icons';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
-import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf } from '../game/catalog';
+import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf, emotesOf, emoteFor } from '../game/catalog';
 import { warmBoardSkin } from '../game/skinWarm';
-import { Coins, Coin, ItemThumb, TagBadge, TagBadges } from './Economy';
+import { Coins, Coin, EmoteGlyph, ItemThumb, TagBadge, TagBadges } from './Economy';
 import { SettingsButton } from './Settings';
 import { ask } from './Dialog';
 import { useSettings, updateSettings, getSettings } from '../game/settings';
@@ -221,6 +221,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
+  const emote = reaction && !sticker && !reaction.text && emoteFor(player, reaction.key);
   const chipRef = useRef(null);
   const seatVars = { '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark };
   const who = seat === mySeat ? 'your' : `${player?.name || color.name}'s`;
@@ -248,6 +249,11 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
       {sticker && (
         <Bubble key={reaction.id} anchor={chipRef} className="bubble" style={{ ...seatVars, '--sticker': sticker.color, '--tilt': `${sticker.tilt}deg` }}>
           {sticker.label}
+        </Bubble>
+      )}
+      {emote && (
+        <Bubble key={reaction.id} anchor={chipRef} className="bubble emote" style={seatVars}>
+          <EmoteGlyph emote={emote} />
         </Bubble>
       )}
       {reaction?.text && (
@@ -506,28 +512,45 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
   );
 }
 
-export function ReactionBar({ onReact, spam = false }) {
-  const [open, setOpen] = useState(false);
+export function ReactionBar({ onReact, spam = false, emotes = [] }) {
+  const [panel, setPanel] = useState(null);
   const [cooling, setCooling] = useState(false);
   const send = (key) => {
     if (cooling) return;
     onReact(key);
-    if (!spam) setOpen(false);
+    if (!spam) setPanel(null);
     setCooling(true);
     setTimeout(() => setCooling(false), spam ? 250 : 1200);
   };
+  const toggle = (next) => setPanel((cur) => (cur === next ? null : next));
   return (
-    <div className={`reactions${open ? ' open' : ''}`}>
-      <button className="icon-btn reactions-toggle" onClick={() => setOpen((o) => !o)} aria-label="Reactions" title="Reactions">
-        <Chat />
-      </button>
-      <div className="stickers">
-        {REACTIONS.map((r) => (
-          <button key={r.key} className="sticker" disabled={cooling} title={r.hint} style={{ '--sticker': r.color, '--tilt': `${r.tilt}deg` }} onClick={() => send(r.key)}>
-            {r.label}
-          </button>
-        ))}
+    <div className={`reactions${panel ? ' open' : ''}`}>
+      <div className="reactions-toggles">
+        <button className={`icon-btn reactions-toggle${panel === 'chat' ? ' on' : ''}`} onClick={() => toggle('chat')} aria-label="Quick chat" title="Quick chat" aria-expanded={panel === 'chat'}>
+          <Chat />
+        </button>
+        <button className={`icon-btn reactions-toggle${panel === 'emotes' ? ' on' : ''}`} onClick={() => toggle('emotes')} aria-label="Emotes" title="Emotes" aria-expanded={panel === 'emotes'}>
+          <Smiley />
+        </button>
       </div>
+      {panel === 'chat' && (
+        <div className="stickers">
+          {REACTIONS.map((r) => (
+            <button key={r.key} className="sticker" disabled={cooling} title={r.hint} style={{ '--sticker': r.color, '--tilt': `${r.tilt}deg` }} onClick={() => send(r.key)}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {panel === 'emotes' && (
+        <div className="stickers emote-stickers">
+          {emotes.map((e) => (
+            <button key={e.key} className="sticker emote" disabled={cooling} title={e.hint} onClick={() => send(e.key)}>
+              <EmoteGlyph emote={e} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -992,7 +1015,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               <Coffee />
             </button>
           )}
-          {mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} onReact={(key) => onAction('game:react', { key })} />}
+          {mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
 

@@ -741,3 +741,14 @@ test('beta and dev tags get a hair trigger on reactions; everyone else waits', (
   room.react('u2', 'nice');
   assert.strictEqual(reactions.length, 4);
 });
+
+test('emotes only fire from the pack a player has equipped', (t) => {
+  const { room, reactions } = startedRoom();
+  t.after(() => room.dispose());
+  assert.throws(() => room.react('u1', 'fire'), UserError, 'the starter pack has no fire');
+  room.seats[0].cosmetics = { emotes: 'emotes.hype' };
+  room.react('u1', 'fire');
+  assert.strictEqual(reactions.at(-1).key, 'fire');
+  room.seats[2].cosmetics = { emotes: 'emotes.hype' };
+  assert.throws(() => room.react('u2', 'salt'), UserError, 'hype pack cannot borrow from the salt pack');
+});

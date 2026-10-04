@@ -44,3 +44,6 @@ export const collectible = (account) =>
 
 export const skinKey = (id) => (id || '').split('.')[1] || '';
 export const cosmeticsOf = (seat) => ({ ...DEFAULT_COSMETICS, ...(seat?.cosmetics || {}) });
+
+export const emotesOf = (player) => ITEMS[cosmeticsOf(player).emotes]?.emotes || [];
+export const emoteFor = (player, key) => emotesOf(player).find((e) => e.key === key);

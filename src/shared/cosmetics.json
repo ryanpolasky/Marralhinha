@@ -29,7 +29,8 @@
     "dice": { "label": "Dice", "default": "dice.ivory" },
     "nameplate": { "label": "Nameplates", "default": "plate.basic" },
     "fx": { "label": "Kill Effects", "default": "fx.pop" },
-    "trail": { "label": "Move Trails", "default": "trail.dust" }
+    "trail": { "label": "Move Trails", "default": "trail.dust" },
+    "emotes": { "label": "Emotes", "default": "emotes.starter" }
   },
   "items": [
     { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
@@ -169,7 +170,120 @@
     { "id": "trail.supporter", "slot": "trail", "name": "Wake", "rarity": "exclusive", "tag": "supporter", "desc": "Even the tide makes way." },
     { "id": "trail.halloween", "slot": "trail", "name": "Haunting", "rarity": "exclusive", "tag": "halloween", "desc": "Something follows behind." },
     { "id": "trail.beta", "slot": "trail", "name": "Wireframe", "rarity": "exclusive", "tag": "beta", "desc": "Now with rendering issues." },
-    { "id": "trail.dev", "slot": "trail", "name": "Accretion", "rarity": "exclusive", "tag": "dev", "desc": "Whatever you pass falls in behind you." }
+    { "id": "trail.dev", "slot": "trail", "name": "Accretion", "rarity": "exclusive", "tag": "dev", "desc": "Whatever you pass falls in behind you." },
+
+    { "id": "emotes.starter", "slot": "emotes", "name": "Table Talkers", "rarity": "default", "desc": "The six faces every marble player needs.", "emotes": [
+      { "key": "grin", "emoji": "😄", "hint": "Grinning" },
+      { "key": "cry", "emoji": "😢", "hint": "Crying" },
+      { "key": "shock", "emoji": "😮", "hint": "Shocked" },
+      { "key": "mad", "emoji": "😡", "hint": "Fuming" },
+      { "key": "clap", "emoji": "👏", "hint": "Clapping" },
+      { "key": "party", "emoji": "🎉", "hint": "Party" }
+    ] },
+    { "id": "emotes.hype", "slot": "emotes", "name": "Hype Squad", "rarity": "common", "desc": "For when the table needs to know you're feeling it.", "emotes": [
+      { "key": "fire", "emoji": "🔥", "hint": "On fire" },
+      { "key": "hundred", "emoji": "💯", "hint": "Perfect" },
+      { "key": "bolt", "emoji": "⚡", "hint": "Lightning" },
+      { "key": "trophy", "emoji": "🏆", "hint": "Champion" },
+      { "key": "rocket", "emoji": "🚀", "hint": "To the moon" },
+      { "key": "mind", "emoji": "🤯", "hint": "Mind blown" }
+    ] },
+    { "id": "emotes.salty", "slot": "emotes", "name": "Salt Shaker", "rarity": "rare", "desc": "Season the table after every capture.", "emotes": [
+      { "key": "salt", "emoji": "🧂", "hint": "Salty" },
+      { "key": "sob", "emoji": "😭", "hint": "Sobbing" },
+      { "key": "skull", "emoji": "💀", "hint": "Dead" },
+      { "key": "clown", "emoji": "🤡", "hint": "Clown" },
+      { "key": "melt", "emoji": "🫠", "hint": "Melting" },
+      { "key": "wink", "emoji": "🙃", "hint": "Sure, sure" }
+    ] },
+    { "id": "emotes.hampter", "slot": "emotes", "name": "Hampter", "rarity": "legendary", "desc": "Six tiny rodents, one for every mood at the table.", "emotes": [
+      { "key": "hangry", "img": "/emotes/hampter/hampterangry.webp", "hint": "Furious" },
+      { "key": "glee", "img": "/emotes/hampter/hampterglee.webp", "hint": "Gleeful" },
+      { "key": "sad", "img": "/emotes/hampter/hamptersad.webp", "hint": "Devastated" },
+      { "key": "think", "img": "/emotes/hampter/hampterthink.webp", "hint": "Pondering" },
+      { "key": "troll", "img": "/emotes/hampter/hamptertroll.webp", "hint": "Problem?" },
+      { "key": "blank", "img": "/emotes/hampter/hampterwot.webp", "hint": "Blank" }
+    ] },
+    { "id": "emotes.cat", "slot": "emotes", "name": "Cats", "rarity": "legendary", "desc": "Cats. Obviously.", "emotes": [
+      { "key": "happy", "img": "/emotes/cat/happy.png", "hint": "Happy" },
+      { "key": "kiss", "img": "/emotes/cat/kiss.gif", "hint": "Smooch" },
+      { "key": "dead", "img": "/emotes/cat/dead.gif", "hint": "Deceased" },
+      { "key": "crythumb", "img": "/emotes/cat/crythumb.png", "hint": "Proud of you" },
+      { "key": "jam", "img": "/emotes/cat/catjam.gif", "hint": "Jamming" },
+      { "key": "ahhh", "img": "/emotes/cat/ahhh.png", "hint": "Ahhh" }
+    ] },
+    { "id": "emotes.criipy", "slot": "emotes", "name": "Criipy", "rarity": "rare", "desc": "That little smile means it's already too late.", "emotes": [
+      { "key": "evilhehe", "img": "/emotes/criipy/evilhehe.gif", "hint": "Evil giggle" },
+      { "key": "sushehe", "img": "/emotes/criipy/sushehe.gif", "hint": "Sus giggle" },
+      { "key": "smile", "img": "/emotes/criipy/smile.png", "hint": "Smiley" },
+      { "key": "shocked", "img": "/emotes/criipy/shocked.png", "hint": "Shocked" },
+      { "key": "sip", "img": "/emotes/criipy/sip.png", "hint": "Sipping" },
+      { "key": "suscry", "img": "/emotes/criipy/suscry.png", "hint": "Sussy tears" }
+    ] },
+    { "id": "emotes.pink", "slot": "emotes", "name": "Pink", "rarity": "rare", "desc": "Weaponized adorableness.", "emotes": [
+      { "key": "threat", "img": "/emotes/pink/threat.png", "hint": "Threat" },
+      { "key": "awooga", "img": "/emotes/pink/awooga.png", "hint": "Awooga" },
+      { "key": "scowl", "img": "/emotes/pink/scowl.png", "hint": "Scowling" },
+      { "key": "uwu", "img": "/emotes/pink/uwu.png", "hint": "uwu" },
+      { "key": "disappointed", "img": "/emotes/pink/disappointed.png", "hint": "Disappointed" },
+      { "key": "plead", "img": "/emotes/pink/plead.png", "hint": "Pleading" }
+    ] },
+    { "id": "emotes.peepo", "slot": "emotes", "name": "Peepo", "rarity": "epic", "desc": "The classics, straight from the swamp.", "emotes": [
+      { "key": "pray", "img": "/emotes/peepo/pray.png", "hint": "Praying" },
+      { "key": "love", "img": "/emotes/peepo/love.png", "hint": "Love" },
+      { "key": "copium", "img": "/emotes/peepo/copium.png", "hint": "Copium" },
+      { "key": "happy", "img": "/emotes/peepo/happy.png", "hint": "Happy" },
+      { "key": "pepehands", "img": "/emotes/peepo/pepehands.png", "hint": "PepeHands" },
+      { "key": "monkas", "img": "/emotes/peepo/monkas.png", "hint": "monkaS" }
+    ] },
+    { "id": "emotes.tiktok", "slot": "emotes", "name": "TikTok", "rarity": "common", "desc": "The whole comment section in six stickers.", "emotes": [
+      { "key": "astonish", "img": "/emotes/tiktok/astonish.png", "hint": "Astonished" },
+      { "key": "rage", "img": "/emotes/tiktok/rage.png", "hint": "Rage" },
+      { "key": "hehe", "img": "/emotes/tiktok/hehe.png", "hint": "Hehe" },
+      { "key": "cute", "img": "/emotes/tiktok/cute.png", "hint": "Cute" },
+      { "key": "love", "img": "/emotes/tiktok/love.png", "hint": "In love" },
+      { "key": "tears", "img": "/emotes/tiktok/tears.png", "hint": "Tears" }
+    ] },
+    { "id": "emotes.dogs", "slot": "emotes", "name": "Dogs", "rarity": "epic", "desc": "Good boys, all six of them.", "emotes": [
+      { "key": "stare", "img": "/emotes/dogs/stare.gif", "hint": "Staring" },
+      { "key": "weird", "img": "/emotes/dogs/weird.gif", "hint": "Weird look" },
+      { "key": "dawg", "img": "/emotes/dogs/dawg.gif", "hint": "Dawg" },
+      { "key": "sniff", "img": "/emotes/dogs/sniff.gif", "hint": "Sniffing" },
+      { "key": "aloo", "img": "/emotes/dogs/aloo.gif", "hint": "Awoo" },
+      { "key": "teeth", "img": "/emotes/dogs/teeth.gif", "hint": "Teeth out" }
+    ] },
+    { "id": "emotes.esnupi", "slot": "emotes", "name": "Esnupi", "rarity": "rare", "desc": "A very beagle mood.", "emotes": [
+      { "key": "confused", "img": "/emotes/esnupi/confused.png", "hint": "Confused" },
+      { "key": "pout", "img": "/emotes/esnupi/pout.png", "hint": "Pouting" },
+      { "key": "stress", "img": "/emotes/esnupi/stress.png", "hint": "Stressed" },
+      { "key": "laugh", "img": "/emotes/esnupi/laugh.png", "hint": "Laughing" },
+      { "key": "rip", "img": "/emotes/esnupi/rip.png", "hint": "F" },
+      { "key": "salute", "img": "/emotes/esnupi/salute.png", "hint": "Saluting" }
+    ] },
+    { "id": "emotes.kermit", "slot": "emotes", "name": "Kermit", "rarity": "epic", "desc": "But that's none of my business.", "emotes": [
+      { "key": "hi", "img": "/emotes/kermit/hi.png", "hint": "Hi" },
+      { "key": "worried", "img": "/emotes/kermit/worried.png", "hint": "Worried" },
+      { "key": "hmm", "img": "/emotes/kermit/hmm.png", "hint": "Hmm" },
+      { "key": "gun", "img": "/emotes/kermit/gun.gif", "hint": "Choose wisely" },
+      { "key": "window", "img": "/emotes/kermit/window.gif", "hint": "Watching" },
+      { "key": "kermit", "img": "/emotes/kermit/kermit.png", "hint": "Kermit" }
+    ] },
+    { "id": "emotes.thebob", "slot": "emotes", "name": "The Bob", "rarity": "epic", "desc": "Decades of react face, in six frames.", "emotes": [
+      { "key": "lost", "img": "/emotes/thebob/lost.png", "hint": "Lost" },
+      { "key": "closeup", "img": "/emotes/thebob/closeup.png", "hint": "Too close" },
+      { "key": "speed", "img": "/emotes/thebob/speed.png", "hint": "Speed" },
+      { "key": "run", "img": "/emotes/thebob/run.gif", "hint": "Running" },
+      { "key": "squint", "img": "/emotes/thebob/squint.png", "hint": "Squinting" },
+      { "key": "dance", "img": "/emotes/thebob/dance.gif", "hint": "Dancing" }
+    ] },
+    { "id": "emotes.joe", "slot": "emotes", "name": "Joe", "rarity": "common", "desc": "Don't ask who Joe is.", "emotes": [
+      { "key": "walk", "img": "/emotes/joe/walk.gif", "hint": "Walking in" },
+      { "key": "mad", "img": "/emotes/joe/mad.png", "hint": "Mad" },
+      { "key": "sad", "img": "/emotes/joe/sad.png", "hint": "Sad" },
+      { "key": "shhh", "img": "/emotes/joe/shhh.png", "hint": "Shhh" },
+      { "key": "nojoe", "img": "/emotes/joe/nojoe.gif", "hint": "No Joe" },
+      { "key": "cool", "img": "/emotes/joe/cool.gif", "hint": "Joe Cool" }
+    ] }
   ],
   "boxes": [
     {

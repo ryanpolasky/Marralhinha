@@ -172,6 +172,14 @@ export const Chat = () => (
   </Icon>
 );
 
+export const Smiley = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="M8.6 9.9h.01M15.4 9.9h.01" strokeWidth="2.8" />
+    <path d="M8.3 14.1c1 1.4 2.2 2.1 3.7 2.1s2.7-.7 3.7-2.1" />
+  </Icon>
+);
+
 export const Bug = ({ size = 20 }) => (
   <Icon size={size}>
     <ellipse cx="12" cy="14" rx="5.5" ry="6.5" />

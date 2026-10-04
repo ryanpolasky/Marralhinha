@@ -87,6 +87,11 @@ export const TagBadges = ({ tags, small }) => {
   return visible.map((tag) => <TagBadge key={tag} tag={tag} small={small} />);
 };
 
+export function EmoteGlyph({ emote }) {
+  if (!emote) return null;
+  return emote.img ? <img className="emote-glyph" src={emote.img} alt={emote.hint || ''} draggable={false} /> : <span className="emote-glyph">{emote.emoji}</span>;
+}
+
 export function ItemThumb({ itemId, seat = 0 }) {
   const item = ITEMS[itemId];
   const key = skinKey(itemId);
@@ -95,6 +100,13 @@ export function ItemThumb({ itemId, seat = 0 }) {
     <span className={`thumb thumb-${item.slot} skin-${key}`} style={{ '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark }}>
       {item.slot === 'nameplate' && <Nameplate plate={itemId}>Aa</Nameplate>}
       {item.slot === 'dice' && <span className="thumb-pips" />}
+      {item.slot === 'emotes' && (
+        <span className="emote-quad">
+          {(item.emotes || []).slice(0, 4).map((e) => (
+            <EmoteGlyph key={e.key} emote={e} />
+          ))}
+        </span>
+      )}
     </span>
   );
 }
@@ -111,6 +123,17 @@ export function PreviewStage({ itemId, seat = 0, playerName, replay = 0 }) {
           </span>
           <span>{playerName || 'Player'}</span>
         </Nameplate>
+      </div>
+    );
+  }
+  if (item.slot === 'emotes') {
+    return (
+      <div className="preview-stage emote-preview">
+        {(item.emotes || []).map((e) => (
+          <span key={e.key} className="emote-sample" title={e.hint}>
+            <EmoteGlyph emote={e} />
+          </span>
+        ))}
       </div>
     );
   }

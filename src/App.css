@@ -2048,6 +2048,21 @@ button.room-pill.copied {
   border-bottom-color: var(--seat);
 }
 
+.bubble.emote {
+  --tilt: 0deg;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0 4px;
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5));
+}
+
+.bubble.emote::before {
+  display: none;
+}
+
 @keyframes bubble {
   0% {
     opacity: 0;
@@ -2225,13 +2240,18 @@ button.room-pill.copied {
   gap: 8px;
 }
 
+.reactions-toggles {
+  display: flex;
+  gap: 8px;
+}
+
 .reactions-toggle {
   width: 52px !important;
   height: 52px !important;
   border-radius: 18px !important;
 }
 
-.reactions.open .reactions-toggle {
+.reactions-toggle.on {
   background: var(--gold) !important;
   color: #1b1208 !important;
 }
@@ -2256,6 +2276,25 @@ button.room-pill.copied {
   display: grid;
   animation: stickers-in 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
   transform-origin: bottom right;
+}
+
+.sticker.emote {
+  --tilt: 0deg;
+  font-size: 26px;
+  line-height: 1;
+  padding: 8px 10px;
+  background: #fffcf5;
+}
+
+.emote-glyph {
+  line-height: 1;
+}
+
+img.emote-glyph {
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  vertical-align: -0.2em;
 }
 
 @keyframes stickers-in {
@@ -3680,6 +3719,19 @@ button.room-pill.copied {
   justify-content: center;
 }
 
+.emote-preview {
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 20px 28px;
+  padding: 0 30px;
+}
+
+.emote-sample {
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+
 .preview-stage > div:not(.plate) {
   position: absolute !important;
   inset: 0;
@@ -3711,10 +3763,12 @@ button.room-pill.copied {
   display: flex;
   gap: 6px;
   margin-bottom: 14px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
 }
 
 .tab {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3737,6 +3791,44 @@ button.room-pill.copied {
 .tab-count {
   font-size: 12px;
   opacity: 0.8;
+}
+
+/* Scrollbars hidden at rest, appear while hovering the strip */
+.tabs,
+.pack-items {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.tabs:hover,
+.pack-items:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.tabs::-webkit-scrollbar,
+.pack-items::-webkit-scrollbar {
+  height: 5px;
+}
+
+.tabs::-webkit-scrollbar-track,
+.pack-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs::-webkit-scrollbar-thumb,
+.pack-items::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: transparent;
+}
+
+.tabs:hover::-webkit-scrollbar-thumb,
+.pack-items:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.tabs::-webkit-scrollbar-thumb:hover,
+.pack-items::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .locker-body {
@@ -3980,6 +4072,15 @@ button.room-pill.copied {
   width: 64px;
   height: 64px;
   flex-shrink: 0;
+}
+
+.emote-quad {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
 }
 
 .thumb-marble {
@@ -8231,8 +8332,8 @@ textarea.report-text {
 .halloween-shop-body p { margin: 10px 0 0; line-height: 1.5; color: #f1e4ff; }
 .halloween-shop-body .halloween-note { max-width: 720px; margin-top: 14px; color: #e6d6f7; }
 
-.pack-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; margin: 16px 0 6px; }
-.pack-item { display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; min-width: 96px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; }
+.pack-items { display: flex; justify-content: safe center; gap: 10px 22px; margin: 16px 0 6px; padding: 2px 2px 8px; overflow-x: auto; }
+.pack-item { flex-shrink: 0; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; min-width: 96px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; }
 .pack-item small { color: #c9a8ea; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
 .supporter-shop .pack-item { color: #d6fff3; }
 .supporter-shop .pack-item small { color: #9fd9cb; }
