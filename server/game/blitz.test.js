@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const rules = require('./rules');
-const { chooseMove } = require('./bot');
+const rules = require('../../src/shared/rules');
+const { chooseMove } = require('../../src/shared/bot');
 
 const seats = (n) => [0, 1, 2, 3].map((s) => (s < n ? { name: `P${s}` } : null));
 const track = (idx) => ({ zone: 'track', idx });

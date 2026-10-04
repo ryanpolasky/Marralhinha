@@ -1,5 +1,4 @@
-const { randomInt } = require('crypto');
-const BOARDS = require('../../src/shared/boards.json');
+const BOARDS = require('./boards.json');
 
 const CLASSIC = BOARDS.classic;
 const specOf = (state) => state?.spec || CLASSIC;
@@ -30,7 +29,7 @@ const cellKey = (seat, pos) => {
   return null;
 };
 
-const rollDie = () => randomInt(1, 7);
+const rollDie = () => 1 + Math.floor(Math.random() * 6);
 
 // `starter` skips the dice roll-off: { seat, reason: 'wheel' | 'winner' }. The starter also lends their board to the table.
 function createGame(seats, { rng = rollDie, teams = false, starter = null, boardSeat = null, variant = 'classic' } = {}) {

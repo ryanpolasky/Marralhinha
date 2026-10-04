@@ -1,6 +1,6 @@
 const { randomBytes, randomInt } = require('crypto');
-const rules = require('./game/rules');
-const { chooseMove } = require('./game/bot');
+const rules = require('../src/shared/rules');
+const { chooseMove } = require('../src/shared/bot');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -53,6 +53,7 @@ const cleanChat = (text) =>
 
 class UserError extends Error {}
 
+const secureDie = () => randomInt(1, 7);
 const newId = (bytes = 6) => randomBytes(bytes).toString('hex');
 
 // Bots wait for the dice and marble animations to finish before acting
@@ -493,7 +494,7 @@ class Room {
     this.swapOffers = [];
     this.teamLogs = [[], []];
     this.rematchVotes.clear();
-    this.game = rules.createGame(this.seats, { teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
+    this.game = rules.createGame(this.seats, { rng: secureDie, teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
     // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
     this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
@@ -599,7 +600,7 @@ class Room {
     const kind = this.requireTurn(userId);
     if (this.game.phase !== 'roll') throw new UserError('Pick a marble to move first');
     const seat = this.game.turn;
-    rules.roll(this.game);
+    rules.roll(this.game, secureDie);
     this.recordRoll(seat, kind);
     this.changed();
   }
@@ -787,7 +788,7 @@ class Room {
       }
       const seat = game.turn;
       if (game.phase === 'roll') {
-        rules.roll(game);
+        rules.roll(game, secureDie);
         if (human) this.recordRoll(seat, 'bot');
       } else {
         rules.move(game, chooseMove(game).id);

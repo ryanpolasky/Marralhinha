@@ -6,7 +6,7 @@ const { Economy } = require('./economy');
 const { Reports } = require('./reports');
 const { Matches } = require('./matches');
 const { Room } = require('./rooms');
-const rules = require('./game/rules');
+const rules = require('../src/shared/rules');
 
 function setup() {
   const db = openDb(':memory:');
