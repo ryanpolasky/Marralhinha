@@ -551,7 +551,7 @@ function Shards({ bus }) {
       ['tetra', 'box'].map((shape) => ({
         shape,
         cursor: 0,
-        live: 0,
+        live: 1,
         mesh: null,
         pool: Array.from({ length: SHARDS }, () => ({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), age: 0, life: 1, size: 0.1, grav: 1, bounce: 0.45 })),
       })),
