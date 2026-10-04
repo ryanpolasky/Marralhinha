@@ -162,6 +162,23 @@ const makeAtlas = () => {
   return tex;
 };
 
+let atlasCache = null;
+const sharedAtlas = () => atlasCache || (atlasCache = makeAtlas());
+
+// Next dead slot from the cursor, so busy pools only steal live slots when truly full
+const claim = (pool, cursor) => {
+  for (let k = 0; k < pool.length; k++) {
+    const i = (cursor.current + k) % pool.length;
+    if (!pool[i].alive) {
+      cursor.current = (i + 1) % pool.length;
+      return i;
+    }
+  }
+  const i = cursor.current;
+  cursor.current = (i + 1) % pool.length;
+  return i;
+};
+
 const SPRITE_VERT = `
 attribute vec3 aColor;
 attribute float aSize;
@@ -206,6 +223,7 @@ void main() {
 }`;
 
 const SPRITES = 900;
+const SPRITE_ATTRS = [['position', 3], ['aColor', 3], ['aSize', 1], ['aAlpha', 1], ['aTile', 1], ['aRot', 1]];
 
 function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false }) {
   const { gl, camera, size } = useThree();
@@ -225,13 +243,8 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
   const tmp = useMemo(() => new THREE.Color(), []);
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
-    const attr = (name, n) => g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(SPRITES * n), n).setUsage(THREE.DynamicDrawUsage));
-    attr('position', 3);
-    attr('aColor', 3);
-    attr('aSize', 1);
-    attr('aAlpha', 1);
-    attr('aTile', 1);
-    attr('aRot', 1);
+    SPRITE_ATTRS.forEach(([name, n]) => g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(SPRITES * n), n).setUsage(THREE.DynamicDrawUsage)));
+    g.setDrawRange(0, 0);
     return g;
   }, []);
   const material = useMemo(
@@ -263,8 +276,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
         live.current = 1;
         const { position, n = 1, tile = 0, c = ['#ffffff'], c2 = null, speed = 0, up = 0, uj = null, sphere = false, vel = [0, 0, 0], size: s0 = 0.3, size2 = s0, life = 0.6, grav = 0, drag = 0, rot = null, rotv = 0, radius = 0, inward = false, swirl = 0, a = 1, fade = 1, fadeIn = 0.06, flick = 0, land = false, jitter = 0.05 } = d;
         for (let i = 0; i < n; i++) {
-          const p = sim[cursor.current];
-          cursor.current = (cursor.current + 1) % SPRITES;
+          const p = sim[claim(sim, cursor)];
           const th = Math.random() * Math.PI * 2;
           const sp = speed * (0.45 + Math.random() * 0.55);
           let hv = 1;
@@ -309,7 +321,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
 
   useFrame((_, rawDt) => {
     if (!live.current) return;
-    let alive = 0;
+    let j = 0;
     const dt = Math.min(rawDt, 0.05);
     material.uniforms.uScale.value = (size.height * gl.getPixelRatio()) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const pos = geo.attributes.position.array;
@@ -320,55 +332,60 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
     const rt = geo.attributes.aRot.array;
     for (let i = 0; i < SPRITES; i++) {
       const p = sim[i];
-      if (p.alive) {
-        p.age += dt;
-        if (p.age >= p.life) p.alive = false;
-        else {
-          p.vy -= 9 * p.grav * dt;
-          if (p.drag) {
-            const f = Math.exp(-p.drag * dt);
-            p.vx *= f;
-            p.vy *= f;
-            p.vz *= f;
-          }
-          if (p.swirl) {
-            const ang = p.swirl * dt;
-            const dx = p.x - p.cx;
-            const dz = p.z - p.cz;
-            const cs = Math.cos(ang);
-            const sn = Math.sin(ang);
-            p.x = p.cx + dx * cs - dz * sn;
-            p.z = p.cz + dx * sn + dz * cs;
-          }
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          p.z += p.vz * dt;
-          p.rot += p.rotv * dt;
-          if (p.land && p.y < (!clip || clip.test(p.x, p.z) ? FLOOR : -2)) p.alive = false;
-        }
-      }
-      if (!p.alive) {
-        sz[i] = 0;
-        al[i] = 0;
+      if (!p.alive) continue;
+      p.age += dt;
+      if (p.age >= p.life) {
+        p.alive = false;
         continue;
       }
-      alive++;
+      p.vy -= 9 * p.grav * dt;
+      if (p.drag) {
+        const f = Math.exp(-p.drag * dt);
+        p.vx *= f;
+        p.vy *= f;
+        p.vz *= f;
+      }
+      if (p.swirl) {
+        const ang = p.swirl * dt;
+        const dx = p.x - p.cx;
+        const dz = p.z - p.cz;
+        const cs = Math.cos(ang);
+        const sn = Math.sin(ang);
+        p.x = p.cx + dx * cs - dz * sn;
+        p.z = p.cz + dx * sn + dz * cs;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+      p.rot += p.rotv * dt;
+      if (p.land && p.y < (!clip || clip.test(p.x, p.z) ? FLOOR : -2)) {
+        p.alive = false;
+        continue;
+      }
       const k = p.age / p.life;
       const e = 1 - (1 - k) * (1 - k);
-      pos[i * 3] = p.x;
-      pos[i * 3 + 1] = p.y;
-      pos[i * 3 + 2] = p.z;
+      pos[j * 3] = p.x;
+      pos[j * 3 + 1] = p.y;
+      pos[j * 3 + 2] = p.z;
       tmp.copy(p.c0).lerp(p.c1, k);
-      col[i * 3] = tmp.r;
-      col[i * 3 + 1] = tmp.g;
-      col[i * 3 + 2] = tmp.b;
-      sz[i] = p.s0 + (p.s1 - p.s0) * e;
-      al[i] = p.a * Math.min(1, p.age / p.fin) * Math.pow(1 - k, p.fade) * (p.flick ? 0.55 + 0.45 * Math.sin(p.age * p.flick + p.phase) : 1);
-      tl[i] = p.tile;
-      rt[i] = p.rot;
+      col[j * 3] = tmp.r;
+      col[j * 3 + 1] = tmp.g;
+      col[j * 3 + 2] = tmp.b;
+      sz[j] = p.s0 + (p.s1 - p.s0) * e;
+      al[j] = p.a * Math.min(1, p.age / p.fin) * Math.pow(1 - k, p.fade) * (p.flick ? 0.55 + 0.45 * Math.sin(p.age * p.flick + p.phase) : 1);
+      tl[j] = p.tile;
+      rt[j] = p.rot;
+      j++;
     }
-    live.current = alive;
-    ['position', 'aColor', 'aSize', 'aAlpha', 'aTile', 'aRot'].forEach((n) => (geo.attributes[n].needsUpdate = true));
+    live.current = j;
+    geo.setDrawRange(0, j);
+    if (!j) return;
+    SPRITE_ATTRS.forEach(([n, size]) => {
+      const a = geo.attributes[n];
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, j * size);
+      a.needsUpdate = true;
+    });
   });
 
   return <points geometry={geo} material={material} frustumCulled={false} renderOrder={additive ? 3 : 2} />;
@@ -485,73 +502,137 @@ const jagged = (from, to, jag, n) => {
   });
 };
 
-function Bolts({ bus }) {
-  const root = useRef();
-  const live = useRef([]);
+const STRANDS = 48;
+const STRAND_PTS = 40;
+const STRAND_SIDES = 5;
+const STRAND_LAYERS = [[1, 1], [4, 0.4]];
 
-  useEffect(() => {
-    const kill = (b) => {
-      root.current?.remove(b.group);
-      b.group.traverse((o) => {
-        o.geometry?.dispose();
-        o.material?.dispose();
-      });
-    };
-    const off = bus.on((type, d) => {
-      if (type !== 'bolt' || !root.current) return;
-      const { from, to, color = '#bfefff', radius = 0.03, life = 0.2, jag = 0.3, branches = 1, delay = 0 } = d;
-      const group = new THREE.Group();
-      const core = new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.75);
-      const mats = [];
-      const add = (pts, r) => {
-        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.15);
-        [[r, core, 1], [r * 4, new THREE.Color(color), 0.4]].forEach(([rad, c, o]) => {
-          const m = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
-          m.userData.base = o;
-          mats.push(m);
-          group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length * 3, rad, 5, false), m));
-        });
-      };
-      const segs = Math.max(8, Math.round(new THREE.Vector3(...from).distanceTo(new THREE.Vector3(...to)) * 2.2));
-      const main = jagged(from, to, jag, segs);
-      add(main, radius);
-      for (let i = 0; i < branches; i++) {
-        const at = main[Math.floor(rand(2, main.length - 3))];
-        const end = at.clone().add(new THREE.Vector3(rand(-1, 1), rand(-0.9, -0.2), rand(-1, 1)).multiplyScalar(rand(0.8, 1.8)));
-        end.y = Math.max(end.y, 0.1);
-        add(jagged(at.toArray(), end.toArray(), jag * 0.6, 6), radius * 0.55);
+const strandGeometry = () => {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(STRAND_PTS * STRAND_SIDES * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  const idx = [];
+  for (let i = 0; i < STRAND_PTS - 1; i++) {
+    for (let k = 0; k < STRAND_SIDES; k++) {
+      const a = i * STRAND_SIDES + k;
+      const b = i * STRAND_SIDES + ((k + 1) % STRAND_SIDES);
+      idx.push(a, a + STRAND_SIDES, b, b, a + STRAND_SIDES, b + STRAND_SIDES);
+    }
+  }
+  g.setIndex(idx);
+  g.setDrawRange(0, 0);
+  return g;
+};
+
+const WHITE = new THREE.Color('#ffffff');
+const UP = new THREE.Vector3(0, 1, 0);
+const SIDE = new THREE.Vector3(1, 0, 0);
+const tan = new THREE.Vector3();
+const nu = new THREE.Vector3();
+const nv = new THREE.Vector3();
+const samples = Array.from({ length: STRAND_PTS }, () => new THREE.Vector3());
+
+const writeStrand = (geos, pts, radius) => {
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.15);
+  const n = Math.min(STRAND_PTS, pts.length * 3 + 1);
+  for (let i = 0; i < n; i++) curve.getPoint(i / (n - 1), samples[i]);
+  geos.forEach((g, layer) => {
+    const r = radius * STRAND_LAYERS[layer][0];
+    const arr = g.attributes.position.array;
+    for (let i = 0; i < n; i++) {
+      tan.subVectors(samples[Math.min(i + 1, n - 1)], samples[Math.max(i - 1, 0)]).normalize();
+      nu.crossVectors(tan, Math.abs(tan.y) < 0.9 ? UP : SIDE).normalize();
+      nv.crossVectors(tan, nu);
+      for (let k = 0; k < STRAND_SIDES; k++) {
+        const a = (k / STRAND_SIDES) * Math.PI * 2;
+        const c = Math.cos(a) * r;
+        const s = Math.sin(a) * r;
+        const o = (i * STRAND_SIDES + k) * 3;
+        arr[o] = samples[i].x + nu.x * c + nv.x * s;
+        arr[o + 1] = samples[i].y + nu.y * c + nv.y * s;
+        arr[o + 2] = samples[i].z + nu.z * c + nv.z * s;
       }
-      group.visible = false;
-      root.current.add(group);
-      live.current.push({ group, mats, t: -delay, life });
+    }
+    g.attributes.position.clearUpdateRanges();
+    g.attributes.position.addUpdateRange(0, n * STRAND_SIDES * 3);
+    g.attributes.position.needsUpdate = true;
+    g.setDrawRange(0, (n - 1) * STRAND_SIDES * 6);
+  });
+};
+
+function Bolts({ bus }) {
+  const cursor = useRef(0);
+  const { group, strands } = useMemo(() => {
+    const g = new THREE.Group();
+    const list = Array.from({ length: STRANDS }, () => {
+      const geos = STRAND_LAYERS.map(strandGeometry);
+      const meshes = geos.map((geo) => {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+        m.visible = false;
+        m.frustumCulled = false;
+        g.add(m);
+        return m;
+      });
+      return { alive: false, t: 0, life: 0.2, geos, meshes };
     });
-    return () => {
-      off();
-      live.current.forEach(kill);
-      live.current = [];
-    };
-  }, [bus]);
+    return { group: g, strands: list };
+  }, []);
+
+  useEffect(
+    () => () =>
+      strands.forEach((s) =>
+        s.meshes.forEach((m) => {
+          m.geometry.dispose();
+          m.material.dispose();
+        })
+      ),
+    [strands]
+  );
+
+  useEffect(
+    () =>
+      bus.on((type, d) => {
+        if (type !== 'bolt') return;
+        const { from, to, color = '#bfefff', radius = 0.03, life = 0.2, jag = 0.3, branches = 1, delay = 0 } = d;
+        const add = (pts, r) => {
+          const s = strands[claim(strands, cursor)];
+          Object.assign(s, { alive: true, t: -delay, life });
+          writeStrand(s.geos, pts, r);
+          s.meshes[0].material.color.set(color).lerp(WHITE, 0.75);
+          s.meshes[1].material.color.set(color);
+          s.meshes.forEach((m) => (m.visible = false));
+        };
+        const segs = Math.max(8, Math.round(new THREE.Vector3(...from).distanceTo(new THREE.Vector3(...to)) * 2.2));
+        const main = jagged(from, to, jag, segs);
+        add(main, radius);
+        for (let i = 0; i < branches; i++) {
+          const at = main[Math.floor(rand(2, main.length - 3))];
+          const end = at.clone().add(new THREE.Vector3(rand(-1, 1), rand(-0.9, -0.2), rand(-1, 1)).multiplyScalar(rand(0.8, 1.8)));
+          end.y = Math.max(end.y, 0.1);
+          add(jagged(at.toArray(), end.toArray(), jag * 0.6, 6), radius * 0.55);
+        }
+      }),
+    [bus, strands]
+  );
 
   useFrame((_, dt) => {
-    live.current = live.current.filter((b) => {
-      b.t += dt;
-      if (b.t >= b.life) {
-        root.current.remove(b.group);
-        b.group.traverse((o) => {
-          o.geometry?.dispose();
-          o.material?.dispose();
-        });
-        return false;
+    strands.forEach((s) => {
+      if (!s.alive) return;
+      s.t += dt;
+      if (s.t >= s.life) {
+        s.alive = false;
+        s.meshes.forEach((m) => (m.visible = false));
+        return;
       }
-      b.group.visible = b.t >= 0;
-      const k = Math.max(0, b.t / b.life);
+      const k = Math.max(0, s.t / s.life);
       const flicker = 0.45 + Math.random() * 0.55;
-      b.mats.forEach((m) => (m.opacity = m.userData.base * flicker * (1 - k * k)));
-      return true;
+      s.meshes.forEach((m, j) => {
+        m.visible = s.t >= 0;
+        m.material.opacity = STRAND_LAYERS[j][1] * flicker * (1 - k * k);
+      });
     });
   });
 
-  return <group ref={root} />;
+  return <primitive object={group} />;
 }
 
 const SHARDS = 220;
@@ -563,10 +644,10 @@ function Shards({ bus, clip = null }) {
     () =>
       ['tetra', 'box'].map((shape) => ({
         shape,
-        cursor: 0,
+        cursor: { current: 0 },
         live: 1,
         mesh: null,
-        pool: Array.from({ length: SHARDS }, () => ({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), age: 0, life: 1, size: 0.1, grav: 1, bounce: 0.45 })),
+        pool: Array.from({ length: SHARDS }, () => ({ alive: false, shown: true, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), age: 0, life: 1, size: 0.1, grav: 1, bounce: 0.45 })),
       })),
     []
   );
@@ -580,9 +661,8 @@ function Shards({ bus, clip = null }) {
         kind.live = 1;
         const { position, colors, n = 12, speed = 3, up = 3, size = 0.1, life = 1.4, grav = 1, bounce = 0.45, spin = 9 } = d;
         for (let i = 0; i < n; i++) {
-          const idx = kind.cursor;
+          const idx = claim(kind.pool, kind.cursor);
           const s = kind.pool[idx];
-          kind.cursor = (idx + 1) % SHARDS;
           const th = Math.random() * Math.PI * 2;
           const sp = speed * rand(0.35, 1);
           s.alive = true;
@@ -608,6 +688,7 @@ function Shards({ bus, clip = null }) {
       if (!kind.mesh || !kind.live) return;
       let alive = 0;
       kind.pool.forEach((s, i) => {
+        if (!s.alive && !s.shown) return;
         if (s.alive) {
           s.age += dt;
           if (s.age >= s.life) s.alive = false;
@@ -623,6 +704,7 @@ function Shards({ bus, clip = null }) {
             s.w.multiplyScalar(0.6);
           }
         }
+        s.shown = s.alive;
         if (s.alive) alive++;
         const k = s.alive ? s.age / s.life : 1;
         dummy.position.copy(s.p);
@@ -833,16 +915,17 @@ const DECALS = {
 
 const PANELS = { bsod: 512 / 352 };
 const DECAL_POOL = 6;
+const decalCache = {};
+const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
 
 function Decals({ bus, clip = null }) {
   const { camera } = useThree();
   const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
-  const textures = useRef({});
   const state = useMemo(() => Array.from({ length: DECAL_POOL }, () => ({ alive: false, t: 0, life: 1, size: 1, spin: 0, angle: 0, grow: 0.3, kind: 'scorch', billboard: false, base: 1, jitter: 0, home: [0, 0, 0] })), []);
   const mats = useMemo(
     () =>
       state.map(() => {
-        const m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+        const m = new THREE.MeshBasicMaterial({ map: decalTexture('scorch'), transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
         clipToBoard(m, clip);
         return m;
       }),
@@ -851,14 +934,13 @@ function Decals({ bus, clip = null }) {
   const meshes = useRef([]);
   const q = useMemo(() => new THREE.Quaternion(), []);
 
-  useEffect(() => {
-    const texs = textures.current;
-    return () => {
+  useEffect(
+    () => () => {
       geo.dispose();
       mats.forEach((m) => m.dispose());
-      Object.values(texs).forEach((t) => t.dispose());
-    };
-  }, [geo, mats]);
+    },
+    [geo, mats]
+  );
 
   useEffect(
     () =>
@@ -867,17 +949,12 @@ function Decals({ bus, clip = null }) {
         const i = Math.max(0, state.findIndex((s) => !s.alive));
         const s = state[i];
         const kind = d.kind;
-        if (!textures.current[kind]) {
-          const [w, h, draw] = DECALS[kind];
-          textures.current[kind] = canvasTex(w, h, draw);
-        }
         const billboard = kind in PANELS;
         Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, home: d.position });
         const m = mats[i];
-        m.map = textures.current[kind];
+        m.map = decalTexture(kind);
         m.color.set(d.color || '#ffffff');
         m.blending = d.add ? THREE.AdditiveBlending : THREE.NormalBlending;
-        m.needsUpdate = true;
         const mesh = meshes.current[i];
         if (mesh) {
           mesh.position.set(d.position[0], d.position[1], d.position[2]);
@@ -924,12 +1001,27 @@ function Decals({ bus, clip = null }) {
   );
 }
 
+// Compiles hidden pooled meshes and uploads textures on mount so the first kill doesn't hitch
+export const useWarmup = () => {
+  const { gl, camera, scene } = useThree();
+  const root = useRef();
+  useEffect(() => {
+    gl.compile(root.current, camera, scene);
+  }, [gl, camera, scene]);
+  return root;
+};
+
 // Everything the kill effects need beyond plain bursts: billboard sprites, domes, lightning, solid shards and floor decals
 export default function Spectacle({ bus = fx, clip = null }) {
-  const atlas = useMemo(makeAtlas, []);
-  useEffect(() => () => atlas.dispose(), [atlas]);
+  const { gl } = useThree();
+  const atlas = sharedAtlas();
+  const root = useWarmup();
+  useEffect(() => {
+    [atlas, ...Object.keys(DECALS).map(decalTexture)].forEach((t) => gl.initTexture(t));
+  }, [gl, atlas]);
+  useFrame((_, dt) => bus.tick(Math.min(dt, 0.05)));
   return (
-    <group>
+    <group ref={root}>
       <Decals bus={bus} clip={clip} />
       <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />

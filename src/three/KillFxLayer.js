@@ -7,7 +7,9 @@ import Shockwaves from './Shockwaves';
 import Spectacle from './Spectacle';
 
 // Every kill-effect renderer in one group, aware of the board outline so floor effects don't spill into the void
-export default function KillFxLayer({ bus = fx, layout, origin = [0, 0] }) {
+const NO_ORIGIN = [0, 0];
+
+export default function KillFxLayer({ bus = fx, layout, origin = NO_ORIGIN }) {
   const group = useRef();
   const clip = useMemo(() => makeBoardClip(), []);
   const { halfWidth, halfLength } = layout.spec;

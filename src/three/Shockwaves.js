@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
 import { clipToBoard } from './boardClip';
+import { useWarmup } from './Spectacle';
 
 const MAX_RINGS = 12;
 const MAX_BEAMS = 6;
@@ -17,6 +18,7 @@ export default function Shockwaves({ bus = fx, clip = null }) {
   useEffect(() => {
     ringMeshes.current.forEach((m) => m && clipToBoard(m.material, clip));
   }, [clip]);
+  const root = useWarmup();
 
   useEffect(
     () =>
@@ -74,7 +76,7 @@ export default function Shockwaves({ bus = fx, clip = null }) {
   });
 
   return (
-    <group>
+    <group ref={root}>
       {rings.map((_, i) => (
         <mesh key={i} ref={(m) => (ringMeshes.current[i] = m)} rotation-x={-Math.PI / 2} visible={false}>
           <ringGeometry args={[0.8, 1, 48]} />

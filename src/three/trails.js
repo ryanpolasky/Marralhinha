@@ -13,9 +13,7 @@ const down = (p, dy = 0.15) => [p[0], Math.max(0.1, p[1] - dy), p[2]];
 
 let tick = 0;
 
-// One (emit, p, info) => {} per trail skin key. p = marble position this tick, info = { by, prev, n }.
-// Caller emits once per ~0.34 units of hop travel, so keep each call to a couple of sprites.
-// Ghost sprites belong to the halloween trail only.
+// Called every ~0.34 units of hop travel with info = { by, prev, n }, so keep each call cheap
 const TRAILS = {
   // kicked-up dust
   dust: (emit, p) => {
@@ -100,7 +98,7 @@ const TRAILS = {
     emit('spr', { position: p, tile: TILE.glow, c: ['#8fd4ff'], size: 0.45, size2: 0, life: 0.7, a: 0.6 });
   },
 
-  // expanding color rings, one hue per hop
+  // expanding color rings, hue cycling along the path
   spectrum: (emit, p, { n }) => {
     const hue = HUES[n % HUES.length];
     emit('spr', { position: p, tile: TILE.ring, c: [hue], size: 0.1, size2: 0.9, life: 0.55, rot: 0 });

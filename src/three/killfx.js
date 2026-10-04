@@ -3,23 +3,24 @@ import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 
 const col = (s) => SEAT_COLORS[s];
-const later = (ms, fn) => setTimeout(fn, ms);
 const rand = (a, b) => a + Math.random() * (b - a);
-const seq = (n, gap, fn, start = 0) => Array.from({ length: n }, (_, i) => later(start + i * gap, () => fn(n > 1 ? i / (n - 1) : 1, i)));
 const off = (at, dx = 0, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
 const ground = (at, dx = 0, dz = 0) => [at[0] + dx, 0.1, at[2] + dz];
 const lerp3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12 };
 
-// Slides a moving point from a to b, calling step(position, progress) every ~18ms
-const track = (a, b, ms, step, ease = (k) => k) => {
-  const n = Math.max(2, Math.round(ms / 18));
-  seq(n, ms / (n - 1), (k) => step(lerp3(a, b, ease(k)), k));
+// Timers ride the bus clock so they pause with the frame loop and die with the scene
+const timeline = (bus) => {
+  const later = (ms, fn) => bus.later(ms / 1000, fn);
+  const seq = (n, gap, fn, start = 0) => Array.from({ length: n }, (_, i) => later(start + i * gap, () => fn(n > 1 ? i / (n - 1) : 1, i)));
+  const track = (a, b, ms, step, ease = (k) => k) => {
+    const n = Math.max(2, Math.round(ms / 18));
+    seq(n, ms / (n - 1), (k) => step(lerp3(a, b, ease(k)), k));
+  };
+  return { later, seq, track };
 };
 
-// One (emit, info) => {} per kill-effect skin key. info = { at: [x,y,z], by, victim, sfx(name) }.
-// Primitives: spr (billboard sprites), shard (solid bouncing bits), dome (fresnel shell), bolt (lightning),
-// decal (floor art or billboard panel), ring/beam (Shockwaves), shake (Turntable)
+// One (emit, info) => {} per skin key; info = { at, by, victim, sfx, later, seq, track }
 const KILL_FX = {
   // Glass marble shatters into solid shards
   pop: (emit, { at, by, victim }) => {
@@ -32,7 +33,7 @@ const KILL_FX = {
   },
 
   // Tall geyser erupts from the floor and rains back down in colorful droplets
-  fountain: (emit, { at, by }) => {
+  fountain: (emit, { at, by, seq, later }) => {
     const base = ground(at);
     seq(22, 55, (k) => {
       emit('spr', { position: off(base, 0, 0.1), n: 4, tile: TILE.drop, c: [col(by).light, '#ffffff', '#cfe9ff', col(by).main], radius: 0.06, speed: 0.25, up: 10.5, uj: 2.5, size: 0.17, size2: 0.1, life: 1.5, grav: 1, land: true, a: 0.95 });
@@ -45,7 +46,7 @@ const KILL_FX = {
   },
 
   // Water balloon: a translucent bubble swells and bursts into a hemisphere of spray
-  splash: (emit, { at, by, sfx }) => {
+  splash: (emit, { at, by, sfx, later }) => {
     const base = ground(at);
     emit('dome', { position: base, color: '#6ec0f5', size: 1.1, squash: 0.9, life: 0.28, add: false, solid: 0.25, from: 0.3, opacity: 0.8 });
     later(240, () => {
@@ -68,7 +69,7 @@ const KILL_FX = {
   },
 
   // A rocket climbs, then bursts into a glittering firework overhead
-  sparkler: (emit, { at, by, sfx }) => {
+  sparkler: (emit, { at, by, sfx, later, track }) => {
     const top = off(at, 0, 3.4);
     const hues = [col(by).light, '#ffe38a', '#ffffff', col(by).main];
     track(at, top, 380, (p) => {
@@ -87,7 +88,7 @@ const KILL_FX = {
   },
 
   // Electric discharge arcing around the marble
-  volt: (emit, { at, by, sfx }) => {
+  volt: (emit, { at, by, sfx, later, seq }) => {
     const hub = off(at, 0, 0.05);
     emit('dome', { position: at, color: '#8fe4ff', size: 1.2, life: 0.5 });
     later(180, () => emit('dome', { position: at, color: '#ffe94d', size: 0.9, life: 0.35 }));
@@ -107,7 +108,7 @@ const KILL_FX = {
   },
 
   // Flower blooms on the floor while petals drift down
-  bloom: (emit, { at }) => {
+  bloom: (emit, { at, seq }) => {
     const base = ground(at);
     emit('decal', { position: base, kind: 'flower', color: '#ff8fcb', size: 3.2, life: 2, spin: 0.35, grow: 0.05 });
     emit('spr', { position: at, n: 24, tile: TILE.petal, c: ['#ff9ad5', '#ffc1e3', '#fff0f7', '#ff6fb5'], add: false, radius: 0.15, speed: 1.8, up: 2.8, uj: 1.4, size: 0.34, size2: 0.28, life: 2, grav: 0.2, drag: 0.9, rotv: 1.6, a: 0.95, fade: 0.6 });
@@ -118,7 +119,7 @@ const KILL_FX = {
   },
 
   // Icy comet streaks in from the sky and leaves stardust
-  comet: (emit, { at, by, sfx }) => {
+  comet: (emit, { at, by, sfx, later, track }) => {
     const from = off(at, -4.8, 8.5, 2.8);
     track(from, at, 360, (p) => {
       emit('spr', { position: p, tile: TILE.glow, c: ['#ffffff'], size: 1, life: 0.07 });
@@ -149,7 +150,7 @@ const KILL_FX = {
   },
 
   // Black hole that eats the marble, then spits the remains
-  vortex: (emit, { at, victim, sfx }) => {
+  vortex: (emit, { at, victim, sfx, later, seq }) => {
     const core = off(at, 0, 0.1);
     emit('decal', { position: ground(at), kind: 'vortex', color: '#b36bff', size: 4.2, life: 1.5, spin: 6, grow: 0.2, add: true });
     emit('dome', { position: core, color: '#04000a', size: 0.75, life: 1.05, add: false, solid: 0.85, from: 0.2, opacity: 0.95 });
@@ -165,7 +166,7 @@ const KILL_FX = {
   },
 
   // Storm cloud gathers, rain falls, three heavy strikes
-  tempest: (emit, { at, by, sfx }) => {
+  tempest: (emit, { at, by, sfx, later, seq }) => {
     const sky = 4.6;
     seq(10, 40, () => emit('spr', { position: [at[0], sky, at[2]], n: 3, tile: TILE.smoke, c: ['#2b3340', '#3c4757', '#1b2230'], add: false, radius: 1.5, speed: 0.4, size: 1.5, size2: 2.4, life: 1.6, a: 0.9, fade: 0.5 }));
     seq(18, 38, () => emit('spr', { position: [at[0], sky - 0.3, at[2]], n: 7, tile: TILE.streak, c: ['#a9c6e8'], radius: 1.7, up: -11, uj: 0, size: 0.34, size2: 0.34, life: 0.5, grav: 0.1, rot: Math.PI / 2, a: 0.6, land: true, fade: 0.3 }), 120);
@@ -189,7 +190,7 @@ const KILL_FX = {
   },
 
   // A fire bird unfolds its wings over the marble
-  phoenix: (emit, { at, by, sfx }) => {
+  phoenix: (emit, { at, sfx, later, seq }) => {
     const fire = ['#ffd166', '#ff9a3c', '#ff5f3a'];
     emit('decal', { position: ground(at), kind: 'rune', color: '#ff9a3c', size: 3.6, life: 1.7, spin: 1.5, grow: 0.3, add: true });
     emit('dome', { position: at, color: '#ff7a2a', size: 1.6, life: 0.4 });
@@ -213,7 +214,7 @@ const KILL_FX = {
   },
 
   // Flaming rock slams in, leaves a crater and a smoke column
-  meteor: (emit, { at, by, victim, sfx }) => {
+  meteor: (emit, { at, sfx, later, seq, track }) => {
     const from = off(at, 3.6, 10, -2.2);
     track(from, at, 320, (p) => {
       emit('spr', { position: p, tile: TILE.smoke, c: ['#3d342f'], add: false, size: 1.2, life: 0.1, a: 0.95 });
@@ -239,7 +240,7 @@ const KILL_FX = {
   },
 
   // 8-bit: marble blows apart into voxels and glitchy pixels
-  pixel: (emit, { at, by, sfx }) => {
+  pixel: (emit, { at, by, sfx, seq }) => {
     const neon = ['#ff4fd8', '#2fe6ff', '#ffe94d', '#ffffff', col(by).main];
     emit('decal', { position: ground(at), kind: 'pixels', size: 3.4, life: 1.3, grow: 0.7, add: true });
     emit('shard', { shape: 'box', position: at, colors: neon, n: 40, speed: 3.6, up: 4.2, size: 0.12, life: 1.7, bounce: 0.55, spin: 5 });
@@ -252,7 +253,7 @@ const KILL_FX = {
   },
 
   // Whirlpool of foam and bubbles drags the marble under
-  supporter: (emit, { at, by, sfx }) => {
+  supporter: (emit, { at, by, sfx, seq }) => {
     const base = ground(at);
     emit('decal', { position: base, kind: 'vortex', color: '#44b6ad', size: 4, life: 1.7, spin: -5, grow: 0.3, add: true });
     emit('decal', { position: base, kind: 'puddle', color: '#7ef0d4', size: 3, life: 1.9, delay: 0.3 });
@@ -266,7 +267,7 @@ const KILL_FX = {
   },
 
   // Ghosts and bats swirl up out of a glowing circle
-  halloween: (emit, { at, victim, sfx }) => {
+  halloween: (emit, { at, victim, sfx, later, seq }) => {
     emit('decal', { position: ground(at), kind: 'rune', color: '#7bf1a8', size: 3.2, life: 1.9, spin: -1, grow: 0.3, add: true });
     emit('dome', { position: at, color: '#b36bff', size: 1.6, life: 0.5 });
     [['#d9ffe9', 0, 1.6, -0.5], ['#e2d4ff', 160, 1.3, 0.5]].forEach(([c, ms, h, dx], i) =>
@@ -280,7 +281,7 @@ const KILL_FX = {
   },
 
   // A Windows-style crash screen pops up, flickers, then dissolves into blue pixels
-  beta: (emit, { at, sfx }) => {
+  beta: (emit, { at, sfx, later, seq }) => {
     const screen = off(at, 0, 1.5);
     emit('dome', { position: at, color: '#5fb8ff', size: 1.5, life: 0.4 });
     emit('decal', { position: screen, kind: 'bsod', size: 2.2, life: 1.5, jitter: 0.06, grow: 0.3 });
@@ -294,7 +295,7 @@ const KILL_FX = {
   },
 
   // Everything collapses inward, then the whole table goes supernova
-  dev: (emit, { at, by, sfx }) => {
+  dev: (emit, { at, by, sfx, later, seq }) => {
     const core = off(at, 0, 0.1);
     seq(12, 32, (k) => {
       emit('spr', { position: core, n: 6, tile: TILE.glow, c: [col(by).light, '#ffffff', '#ffd166'], radius: 2.7, inward: true, speed: 7.5, size: 0.3, size2: 0.06, life: 0.4, swirl: 3.5 });
@@ -316,8 +317,8 @@ const KILL_FX = {
 
 };
 
-export const playKillFx = (itemId, info, { emit = fx.emit, sfx = () => {} } = {}) => {
-  (KILL_FX[skinKey(itemId)] || KILL_FX.pop)(emit, { ...info, sfx });
+export const playKillFx = (itemId, info, { bus = fx, sfx = () => {} } = {}) => {
+  (KILL_FX[skinKey(itemId)] || KILL_FX.pop)(bus.emit, { ...info, sfx, ...timeline(bus) });
 };
 
 export { KILL_FX };

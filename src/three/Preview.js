@@ -94,7 +94,7 @@ function FxPreview({ itemId, seat, replay }) {
       fired.current = true;
       target.current.visible = false;
       sfx.capture('mine');
-      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim }, { emit: bus.emit, sfx: (name) => sfx[name]?.() });
+      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim }, { bus, sfx: (name) => sfx[name]?.() });
     }
   });
   return (
@@ -181,7 +181,7 @@ export default function ItemPreview({ itemId, seat = 0, replay = 0 }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
   return (
-    <Canvas key={slot} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
+    <Canvas key={stage ? 'stage' : 'item'} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
       <group key={`${itemId}-${seat}`}>
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}
