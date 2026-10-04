@@ -8068,6 +8068,23 @@ textarea.report-text {
 
 /* ---------- Flat glass: no backdrop blur over the live canvas (toggled by quality.glass) ---------- */
 
+.flat-glass {
+  --glass: rgba(7, 16, 19, 0.92);
+  --glass-strong: rgba(5, 13, 16, 0.96);
+}
+
+.flat-glass .credit.corner {
+  background: rgba(6, 15, 18, 0.88);
+}
+
+.flat-glass .start-card {
+  background: rgba(5, 13, 16, 0.94);
+}
+
+.flat-glass .carousel-arrow {
+  background: rgba(8, 5, 16, 0.88);
+}
+
 .flat-glass .panel,
 .flat-glass .icon-btn,
 .flat-glass .brand-chip,
