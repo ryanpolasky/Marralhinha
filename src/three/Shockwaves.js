@@ -2,16 +2,21 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
+import { clipToBoard } from './boardClip';
 
 const MAX_RINGS = 12;
 const MAX_BEAMS = 6;
 
 // Pooled expanding rings on the board surface and vertical light beams, fed by kill-effect events
-export default function Shockwaves({ bus = fx }) {
+export default function Shockwaves({ bus = fx, clip = null }) {
   const rings = useMemo(() => Array.from({ length: MAX_RINGS }, () => ({ alive: false, t: 0, life: 0.6, size: 2 })), []);
   const beams = useMemo(() => Array.from({ length: MAX_BEAMS }, () => ({ alive: false, t: 0, life: 0.35, size: 1, height: 4 })), []);
   const ringMeshes = useRef([]);
   const beamMeshes = useRef([]);
+
+  useEffect(() => {
+    ringMeshes.current.forEach((m) => m && clipToBoard(m.material, clip));
+  }, [clip]);
 
   useEffect(
     () =>

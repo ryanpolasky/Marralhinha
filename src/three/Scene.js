@@ -5,9 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import Board from './Board';
 import Marbles from './Marbles';
 import Die from './Die';
-import Particles from './Particles';
-import Shockwaves from './Shockwaves';
-import Spectacle from './Spectacle';
+import KillFxLayer from './KillFxLayer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
@@ -289,9 +287,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
       <Lights />
       <Turntable viewSeat={viewSeat}>
         <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} layout={layout} />
-        <Particles />
-        <Shockwaves />
-        <Spectacle />
+        <KillFxLayer layout={layout} />
         <Marbles
           board={board}
           skins={cosmetics.map((c) => c?.marble)}

@@ -270,7 +270,7 @@ const KILL_FX = {
     emit('decal', { position: ground(at), kind: 'rune', color: '#7bf1a8', size: 3.2, life: 1.9, spin: -1, grow: 0.3, add: true });
     emit('dome', { position: at, color: '#b36bff', size: 1.6, life: 0.5 });
     [['#d9ffe9', 0, 1.6, -0.5], ['#e2d4ff', 160, 1.3, 0.5]].forEach(([c, ms, h, dx], i) =>
-      later(ms, () => emit('spr', { position: off(at, dx, 0.2), tile: TILE.ghost, c: [c], add: false, size: 0.6, size2: 1.7 - i * 0.2, life: 1.9, up: h, uj: 0, a: 0.85, rot: dx * 0.4, fade: 1.2 }))
+      later(ms, () => emit('spr', { position: off(at, dx, 0.5), tile: TILE.ghost, c: [c], add: false, size: 0.6, size2: 1.7 - i * 0.2, life: 1.9, up: h, uj: 0, a: 0.85, rot: dx * 0.4, fade: 1.2 }))
     );
     seq(10, 90, () => emit('spr', { position: off(at, 0, 0.1), n: 2, tile: TILE.glow, c: ['#7bf1a8', '#b36bff', col(victim).light], radius: 0.35, speed: 0.3, up: 1.5, size: 0.3, size2: 0.05, life: 1.2, grav: -0.05, swirl: 3, a: 0.8 }));
     emit('spr', { position: off(at, 0, 0.3), n: 9, tile: TILE.bat, c: ['#1a0a24', '#2a123a'], add: false, rot: 0, radius: 0.2, speed: 2.6, up: 2.2, uj: 1, size: 0.55, size2: 0.4, life: 1.6, grav: -0.3, drag: 0.6, swirl: 1.5, a: 0.95, fade: 0.5 });

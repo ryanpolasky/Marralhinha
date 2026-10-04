@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { fx } from './fx';
+import { clipToBoard } from './boardClip';
 
 const T = 64;
 const FLOOR = 0.08;
@@ -196,7 +197,7 @@ void main() {
 
 const SPRITES = 900;
 
-function SpriteLayer({ bus, atlas, additive = false }) {
+function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
   const { gl, camera, size } = useThree();
   const live = useRef(0);
   const cursor = useRef(0);
@@ -231,6 +232,7 @@ function SpriteLayer({ bus, atlas, additive = false }) {
         fragmentShader: SPRITE_FRAG,
         transparent: true,
         depthWrite: false,
+        depthTest: additive,
         blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       }),
     [atlas, additive]
@@ -331,7 +333,7 @@ function SpriteLayer({ bus, atlas, additive = false }) {
           p.y += p.vy * dt;
           p.z += p.vz * dt;
           p.rot += p.rotv * dt;
-          if (p.land && p.y < FLOOR) p.alive = false;
+          if (p.land && p.y < (!clip || clip.test(p.x, p.z) ? FLOOR : -2)) p.alive = false;
         }
       }
       if (!p.alive) {
@@ -543,7 +545,7 @@ function Bolts({ bus }) {
 
 const SHARDS = 220;
 
-function Shards({ bus }) {
+function Shards({ bus, clip = null }) {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
   const kinds = useMemo(
@@ -602,7 +604,7 @@ function Shards({ bus }) {
           s.p.addScaledVector(s.v, dt);
           s.r.addScaledVector(s.w, dt);
           const floor = FLOOR + s.size * 0.5;
-          if (s.p.y < floor) {
+          if (s.p.y < floor && (!clip || clip.test(s.p.x, s.p.z))) {
             s.p.y = floor;
             s.v.y = Math.abs(s.v.y) * s.bounce;
             s.v.x *= 0.7;
@@ -821,12 +823,20 @@ const DECALS = {
 const PANELS = { bsod: 512 / 352 };
 const DECAL_POOL = 6;
 
-function Decals({ bus }) {
+function Decals({ bus, clip = null }) {
   const { camera } = useThree();
   const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const textures = useRef({});
   const state = useMemo(() => Array.from({ length: DECAL_POOL }, () => ({ alive: false, t: 0, life: 1, size: 1, spin: 0, angle: 0, grow: 0.3, kind: 'scorch', billboard: false, base: 1, jitter: 0, home: [0, 0, 0] })), []);
-  const mats = useMemo(() => state.map(() => new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide })), [state]);
+  const mats = useMemo(
+    () =>
+      state.map(() => {
+        const m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+        clipToBoard(m, clip);
+        return m;
+      }),
+    [state, clip]
+  );
   const meshes = useRef([]);
   const q = useMemo(() => new THREE.Quaternion(), []);
 
@@ -904,17 +914,17 @@ function Decals({ bus }) {
 }
 
 // Everything the kill effects need beyond plain bursts: billboard sprites, domes, lightning, solid shards and floor decals
-export default function Spectacle({ bus = fx }) {
+export default function Spectacle({ bus = fx, clip = null }) {
   const atlas = useMemo(makeAtlas, []);
   useEffect(() => () => atlas.dispose(), [atlas]);
   return (
     <group>
-      <Decals bus={bus} />
-      <Shards bus={bus} />
+      <Decals bus={bus} clip={clip} />
+      <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />
       <Bolts bus={bus} />
-      <SpriteLayer bus={bus} atlas={atlas} />
-      <SpriteLayer bus={bus} atlas={atlas} additive />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive />
     </group>
   );
 }

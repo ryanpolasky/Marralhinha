@@ -4,12 +4,11 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { Lights } from './Stage';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
 import Board from './Board';
-import Particles from './Particles';
-import Shockwaves from './Shockwaves';
-import Spectacle from './Spectacle';
+import KillFxLayer from './KillFxLayer';
 import { makeFxBus } from './fx';
 import { playKillFx } from './killfx';
 import { ITEMS } from '../game/catalog';
+import { layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
 
 function Spinner({ children, speed = 0.6, tilt = 0.35 }) {
@@ -54,6 +53,8 @@ function BoardPreview({ itemId }) {
   );
 }
 
+const CLASSIC = layoutFor('classic');
+const BOARD_ORIGIN = [2, 4];
 const LANE = 3;
 const HOPS = 3;
 const HOP_TIME = 0.2;
@@ -105,9 +106,7 @@ function FxPreview({ itemId, seat, replay }) {
       <mesh ref={attacker} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow>
         <sphereGeometry args={[0.335, 40, 24]} />
       </mesh>
-      <Particles key={replay} bus={bus} />
-      <Shockwaves key={replay} bus={bus} />
-      <Spectacle key={replay} bus={bus} />
+      <KillFxLayer key={replay} bus={bus} layout={CLASSIC} origin={BOARD_ORIGIN} />
     </group>
   );
 }
