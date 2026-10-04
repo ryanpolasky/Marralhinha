@@ -61,7 +61,7 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           </button>
         )}
         {account.replies?.length > 0 && onMail && (
-          <button className="bar-btn mail has-mail" onClick={onMail} title={`${account.replies.length} repl${account.replies.length === 1 ? 'y' : 'ies'} from the devs`}>
+          <button className="bar-btn mail has-mail" onClick={onMail} title={`${account.replies.length} repl${account.replies.length === 1 ? 'y' : 'ies'} from Ryan`}>
             <Mail />
             <span>Mail</span>
             <span className="mail-count">{account.replies.length}</span>

@@ -168,7 +168,7 @@ export function RepliesModal({ replies: incoming, onClose, onClaim }) {
             <Close />
           </button>
         </div>
-        <p className="muted">The devs answered {replies.length === 1 ? 'your report' : `${replies.length} of your reports`}:</p>
+        <p className="muted">Ryan answered {replies.length === 1 ? 'your report' : `${replies.length} of your reports`}:</p>
 
         <div className="report-list">
           {replies.map((r) => {
