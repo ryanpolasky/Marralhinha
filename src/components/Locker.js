@@ -9,6 +9,11 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
   const [slot, setSlot] = useState('marble');
   const [selected, setSelected] = useState(account.equipped.marble);
   const [seat, setSeat] = useState(0);
+  const [replay, setReplay] = useState(0);
+  const pick = (id) => {
+    setSelected(id);
+    setReplay((r) => r + 1);
+  };
 
   useEffect(() => setSelected(account.equipped[slot]), [slot]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -56,7 +61,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
           <div className="locker-preview">
             {item && (
               <>
-                <PreviewStage itemId={item.id} seat={seat} playerName={account.name} />
+                <PreviewStage itemId={item.id} seat={seat} playerName={account.name} replay={replay} />
                 {slot === 'marble' && (
                   <div className="seat-picker" aria-label="Preview color">
                     {SEAT_COLORS.map((c, i) => (
@@ -87,7 +92,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
           </div>
           <div className="item-grid">
             {itemsForSlot(slot).map((i) => (
-              <ItemCard key={i.id} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => setSelected(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
+              <ItemCard key={i.id} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => pick(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
             ))}
           </div>
         </div>

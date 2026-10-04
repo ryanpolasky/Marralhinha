@@ -108,6 +108,31 @@ export const sfx = {
       tone({ freq: 247, to: 147, type: 'triangle', dur: 0.5, vol: 0.13, delay: 0.55 });
     }
   },
+  // Kill-effect accents; the base capture thump always plays too
+  zap: () => {
+    noise({ dur: 0.16, vol: 0.22, freq: 5200, to: 900, q: 1.4 });
+    tone({ freq: 1800, to: 300, type: 'sawtooth', dur: 0.16, vol: 0.07 });
+    tone({ freq: 2900, to: 1400, type: 'square', dur: 0.08, vol: 0.05, delay: 0.03 });
+  },
+  splash: () => {
+    noise({ dur: 0.4, vol: 0.24, freq: 2400, to: 500, q: 0.7 });
+    tone({ freq: 500, to: 180, type: 'sine', dur: 0.28, vol: 0.12 });
+    noise({ dur: 0.12, vol: 0.1, freq: 4200, delay: 0.2 });
+  },
+  spooky: () => {
+    tone({ freq: 620, to: 240, type: 'sine', dur: 0.9, vol: 0.1 });
+    tone({ freq: 311, to: 466, type: 'sine', dur: 0.7, vol: 0.05, delay: 0.15 });
+    noise({ dur: 0.7, vol: 0.06, freq: 5000, to: 1800, q: 2.5, delay: 0.1 });
+  },
+  glitch: () => {
+    [1600, 400, 2400, 700, 3200].forEach((f, i) => tone({ freq: f, type: 'square', dur: 0.045, vol: 0.08, delay: i * 0.05 }));
+    noise({ dur: 0.2, vol: 0.12, freq: 7000, to: 2500, q: 3 });
+  },
+  boom: () => {
+    tone({ freq: 120, to: 38, type: 'sine', dur: 0.6, vol: 0.4 });
+    noise({ dur: 0.5, vol: 0.3, freq: 300, to: 1400, q: 0.6 });
+  },
+  twinkle: () => [1568, 2093, 2637, 3136].forEach((f, i) => tone({ freq: jitter(f, 0.04), type: 'sine', dur: 0.16, vol: 0.09, delay: i * 0.07 })),
   ping: (type = 'look', team = false) => {
     const vol = team ? 0.08 : 0.11;
     if (type === 'danger') [880, 660].forEach((f, i) => tone({ freq: f, type: 'square', dur: 0.12, vol: vol * 0.7, delay: i * 0.12 }));

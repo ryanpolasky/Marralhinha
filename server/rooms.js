@@ -412,10 +412,10 @@ class Room {
     this.changed();
   }
 
-  // Dev-only (checked by the caller): dress a seat's marbles or dice in anything, null hands back their own
+  // Dev-only (checked by the caller): dress a seat's marbles, dice or kill effect in anything, null hands back their own
   setSkin(userId, { seat, slot, item }) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
-    if (!['marble', 'dice'].includes(slot)) throw new UserError('Pick marbles or dice');
+    if (!['marble', 'dice', 'fx'].includes(slot)) throw new UserError('Pick marbles, dice or kill effects');
     const target = this.seats[seat];
     if (!target) throw new UserError('That seat is empty');
     const entry = item == null ? null : ITEMS.get(item);

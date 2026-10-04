@@ -99,7 +99,7 @@ export function ItemThumb({ itemId, seat = 0 }) {
   );
 }
 
-export function PreviewStage({ itemId, seat = 0, playerName }) {
+export function PreviewStage({ itemId, seat = 0, playerName, replay = 0 }) {
   const item = ITEMS[itemId];
   if (!item) return null;
   if (item.slot === 'nameplate') {
@@ -117,7 +117,7 @@ export function PreviewStage({ itemId, seat = 0, playerName }) {
   return (
     <div className="preview-stage">
       <Suspense fallback={<ItemThumb itemId={itemId} seat={seat} />}>
-        <ItemPreview itemId={itemId} seat={seat} />
+        <ItemPreview itemId={itemId} seat={seat} replay={replay} />
       </Suspense>
     </div>
   );

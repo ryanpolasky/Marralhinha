@@ -38,7 +38,7 @@ test('Supporter is ordered above Luckiest and cannot be granted as a stored tag'
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Supporter' });
   assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'halloween', 'lucky']);
-  assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 4);
+  assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 5);
   accounts.setTags(id, ['supporter', 'lucky', 'beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
   assert.equal(accounts.owns(id, 'marble.supporter'), false);
@@ -112,7 +112,7 @@ test('Halloween Pack is verified through its own SKU, keeps Supporter separate, 
     const { accounts } = setup();
     const { id } = accounts.createUser({ name: 'H' });
     const halloweenItems = catalog.items.filter((item) => item.tag === 'halloween');
-    assert.deepEqual(halloweenItems.map((item) => item.slot).sort(), ['board', 'dice', 'marble', 'nameplate']);
+    assert.deepEqual(halloweenItems.map((item) => item.slot).sort(), ['board', 'dice', 'fx', 'marble', 'nameplate']);
     accounts.setTags(id, ['halloween']);
     assert.deepEqual(accounts.tags(accounts.getUser(id)), [], 'halloween cannot be a stored tag');
     assert.throws(() => accounts.grantItem(id, 'marble.halloween'), /Haunted tag/);
@@ -147,8 +147,8 @@ test('tag-exclusive cosmetics are owned through the tag, never dropped or sold',
   const { accounts, economy } = setup();
   const { id } = accounts.createUser({ name: 'A' });
   const devItems = catalog.items.filter((i) => i.tag === 'dev');
-  assert.equal(devItems.length, 4, 'a full dev set: marble, board, dice, nameplate');
-  assert.equal(catalog.items.filter((i) => i.tag === 'beta').length, 4);
+  assert.equal(devItems.length, 5, 'a full dev set: marble, board, dice, nameplate, kill effect');
+  assert.equal(catalog.items.filter((i) => i.tag === 'beta').length, 5);
 
   assert.equal(accounts.owns(id, 'marble.dev'), false);
   assert.throws(() => accounts.equip(id, 'marble', 'marble.dev'), /Dev only/);

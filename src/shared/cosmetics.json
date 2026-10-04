@@ -27,7 +27,8 @@
     "marble": { "label": "Marbles", "default": "marble.classic" },
     "board": { "label": "Boards", "default": "board.oak" },
     "dice": { "label": "Dice", "default": "dice.ivory" },
-    "nameplate": { "label": "Nameplates", "default": "plate.basic" }
+    "nameplate": { "label": "Nameplates", "default": "plate.basic" },
+    "fx": { "label": "Kill Effects", "default": "fx.pop" }
   },
   "items": [
     { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
@@ -128,7 +129,26 @@
     { "id": "plate.halloween", "slot": "nameplate", "name": "The Fool", "rarity": "exclusive", "tag": "halloween", "desc": "Card zero of the tarot. Seat four of the living room." },
     { "id": "plate.beta", "slot": "nameplate", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Drafted by an early tester." },
     { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" },
-    { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." }
+    { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." },
+
+    { "id": "fx.pop", "slot": "fx", "name": "Pop", "rarity": "default", "desc": "The classic send-off." },
+    { "id": "fx.fountain", "slot": "fx", "name": "Fountain", "rarity": "common", "desc": "Up, up and away." },
+    { "id": "fx.splash", "slot": "fx", "name": "Splash", "rarity": "common", "desc": "Cannonball!" },
+    { "id": "fx.puff", "slot": "fx", "name": "Puff", "rarity": "common", "desc": "Gone in a cloud of maybe." },
+    { "id": "fx.sparkler", "slot": "fx", "name": "Sparkler", "rarity": "common", "desc": "Tiny fireworks, tiny funeral." },
+    { "id": "fx.volt", "slot": "fx", "name": "Zap", "rarity": "rare", "desc": "Six thousand volts of no." },
+    { "id": "fx.bloom", "slot": "fx", "name": "Bloom", "rarity": "rare", "desc": "Petals for the fallen." },
+    { "id": "fx.comet", "slot": "fx", "name": "Comet", "rarity": "rare", "desc": "A streak of light, then a marble's luck runs out." },
+    { "id": "fx.nova", "slot": "fx", "name": "Nova", "rarity": "epic", "desc": "A quick flash and a handful of stars." },
+    { "id": "fx.vortex", "slot": "fx", "name": "Vortex", "rarity": "epic", "desc": "In you go." },
+    { "id": "fx.tempest", "slot": "fx", "name": "Tempest", "rarity": "epic", "desc": "Struck thrice, just to be sure." },
+    { "id": "fx.phoenix", "slot": "fx", "name": "Phoenix", "rarity": "legendary", "desc": "Rises from every capture." },
+    { "id": "fx.meteor", "slot": "fx", "name": "Meteor", "rarity": "legendary", "desc": "An extinction-level event." },
+    { "id": "fx.pixel", "slot": "fx", "name": "Wasted", "rarity": "mythic", "desc": "8 bits of disrespect." },
+    { "id": "fx.halloween", "slot": "fx", "name": "Soul Snatch", "rarity": "exclusive", "tag": "halloween", "desc": "The spirits collect their due." },
+    { "id": "fx.beta", "slot": "fx", "name": "Blue Screen", "rarity": "exclusive", "tag": "beta", "desc": "That marble has stopped responding." },
+    { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },
+    { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." }
   ],
   "boxes": [
     {

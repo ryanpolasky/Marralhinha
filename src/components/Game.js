@@ -278,7 +278,8 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
   );
 }
 
-// Dev-only: swap the whole table's board, or force anyone's marble and dice skins mid-game
+// Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
+const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect' };
 function BoardPicker({ current, seats, onPick, onSkin }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -289,7 +290,7 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
   }, [open]);
   const items = edit ? itemsForSlot(edit.slot) : [];
   const victim = edit && seats[edit.seat];
-  const slotLabel = edit?.slot === 'dice' ? 'dice' : 'marbles';
+  const slotLabel = TROLL_SLOTS[edit?.slot];
   const worn = victim ? cosmeticsOf(victim)[edit.slot] : null;
   return (
     <div className="board-picker">
@@ -351,11 +352,11 @@ function BoardPicker({ current, seats, onPick, onSkin }) {
                       <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
                         <span className="troll-name">{p.name}</span>
                         <div className="troll-slots">
-                          {['marble', 'dice'].map((slot) => (
-                            <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${slot === 'dice' ? 'dice' : 'marbles'}`} title={slot === 'dice' ? `${p.name}'s dice` : `${p.name}'s marbles`} onClick={() => setEdit({ seat: s, slot })}>
+                          {Object.keys(TROLL_SLOTS).map((slot) => (
+                            <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${TROLL_SLOTS[slot]}`} title={`${p.name}'s ${TROLL_SLOTS[slot]}`} onClick={() => setEdit({ seat: s, slot })}>
                               <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
                               <span className="troll-slot-info">
-                                <b>{slot === 'dice' ? 'Dice' : 'Marbles'}</b>
+                                <b>{TROLL_SLOTS[slot][0].toUpperCase() + TROLL_SLOTS[slot].slice(1)}</b>
                                 <span>{ITEMS[cosmeticsOf(p)[slot]]?.name || 'None'}</span>
                               </span>
                             </button>

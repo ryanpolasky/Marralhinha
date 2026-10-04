@@ -34,7 +34,7 @@ const PACKS = {
   },
 };
 
-const PACK_SLOTS = ['marble', 'board', 'dice', 'plate'];
+const PACK_SLOTS = ['marble', 'board', 'dice', 'plate', 'fx'];
 
 function PackItems({ kind }) {
   return (
@@ -313,7 +313,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                   </picture>
                   <div className="supporter-shop-body">
                     <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
-                    <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, and more to come! Only the look changes; never the gameplay.</p>
+                    <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, Riptide kill effect, and more to come! Only the look changes; never the gameplay.</p>
                     <PackItems kind="supporter" />
                     <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
                     <div className="supporter-actions">
@@ -341,7 +341,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                   </div>
                   <div className="halloween-shop-body">
                     <div className="halloween-shop-head"><span className="halloween-eyebrow">Pull up a chair</span><h3>Halloween Pack</h3><span className="halloween-price">$3.99 USD · one time</span></div>
-                    <p>The spirits gather round the table, and so do you. A permanent Haunted badge and four candlelit cosmetics. Only the look changes; never the gameplay.</p>
+                    <p>The spirits gather round the table, and so do you. A permanent Haunted badge and five candlelit cosmetics, kill effect included. Only the look changes; never the gameplay.</p>
                     <PackItems kind="halloween" />
                     <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
                     <div className="halloween-actions">

@@ -6,6 +6,7 @@ import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { fx } from './fx';
+import { playKillFx } from './killfx';
 import { makeLabelTexture } from './textures';
 
 export const MARBLE_R = 0.335;
@@ -52,9 +53,8 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT) {
   if (lastMove.kind === 'enter') last.burst = { colors: [SEAT_COLORS[seat].light, '#ffffff'], count: 18, up: 2, speed: 2, size: 0.07 };
   plans[`${seat}-${marble}`] = hops;
   if (capture) {
-    const colors = [SEAT_COLORS[seat].main, SEAT_COLORS[seat].light, SEAT_COLORS[capture.seat].main, '#ffffff', '#ffd166'];
     plans[`${capture.seat}-${capture.marble}`] = [
-      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { colors, by: seat, victim: capture.seat }, final: true },
+      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { by: seat, victim: capture.seat }, final: true },
     ];
   }
   return plans;
@@ -64,7 +64,7 @@ function setCursor(pointer) {
   document.body.style.cursor = pointer ? 'pointer' : '';
 }
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat }) {
+function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -98,8 +98,7 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
         seg.begun = true;
         if (seg.impact) {
           sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
-          fx.emit('burst', { position: [seg.from.x, 0.4, seg.from.z], colors: seg.impact.colors, count: 70, speed: 6, up: 5, size: 0.12 });
-          fx.emit('shake', { amount: 0.35 });
+          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim }, { sfx: (name) => sfx[name]?.() });
         }
       }
       if (t >= 1) {
@@ -245,7 +244,7 @@ function PathDots({ move, layout }) {
   });
 }
 
-export default function Marbles({ board, skins = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
+export default function Marbles({ board, skins = [], killFx = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -284,6 +283,7 @@ export default function Marbles({ board, skins = [], moves, selected, setSelecte
               onClick={() => clickMarble(seat, marble, pos)}
               onHover={(on) => setHovered(on ? { seat, marble } : null)}
               mySeat={mySeat}
+              killFx={killFx}
             />
           );
         })

@@ -6,6 +6,8 @@ import Board from './Board';
 import Marbles from './Marbles';
 import Die from './Die';
 import Particles from './Particles';
+import Shockwaves from './Shockwaves';
+import Spectacle from './Spectacle';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
@@ -288,9 +290,12 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
       <Turntable viewSeat={viewSeat}>
         <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} layout={layout} />
         <Particles />
+        <Shockwaves />
+        <Spectacle />
         <Marbles
           board={board}
           skins={cosmetics.map((c) => c?.marble)}
+          killFx={cosmetics.map((c) => c?.fx)}
           moves={moves}
           selected={selected}
           setSelected={setSelected}
