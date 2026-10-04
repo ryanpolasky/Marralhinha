@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { fx } from './fx';
+import { ARCADE_GLSL } from './skins';
 import { clipToBoard } from './boardClip';
 
 const T = 64;
@@ -88,6 +89,8 @@ const makeAtlas = () => {
   });
   tile(8, () => {
     g.fillStyle = white;
+    g.shadowColor = white;
+    g.shadowBlur = 5;
     g.beginPath();
     g.arc(0, -6, 19, Math.PI, 0);
     [[19, 26], [10, 18], [0, 26], [-10, 18], [-19, 26]].forEach(([x, y]) => g.lineTo(x, y));
@@ -153,8 +156,9 @@ const makeAtlas = () => {
     g.stroke();
   });
   const tex = new THREE.CanvasTexture(c);
-  tex.minFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
   return tex;
 };
 
@@ -176,7 +180,8 @@ void main() {
   vC = aColor; vA = aAlpha; vT = aTile; vR = aRot;
 }`;
 
-const SPRITE_FRAG = `
+const spriteFrag = (pixel) => `
+${pixel ? ARCADE_GLSL : ''}
 uniform sampler2D uMap;
 varying vec3 vC;
 varying float vA;
@@ -186,18 +191,23 @@ void main() {
   vec2 p = gl_PointCoord - 0.5;
   float c = cos(vR), s = sin(vR);
   p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) + 0.5;
-  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
+  bool outside = p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0;
+  ${pixel ? 'p = (floor(clamp(p, 0.0, 0.999) * 8.0) + 0.5) / 8.0;' : ''}
   float col = mod(vT, 4.0);
   float row = floor(vT / 4.0);
-  vec4 t = texture2D(uMap, vec2((col + p.x) / 4.0, 1.0 - (row + p.y) / 4.0));
-  gl_FragColor = vec4(vC * t.rgb, t.a * vA);
-  if (gl_FragColor.a < 0.003) discard;
+  vec2 uv = vec2((col + p.x) / 4.0, 1.0 - (row + p.y) / 4.0);
+  vec4 t = ${pixel ? 'texture2DLodEXT(uMap, uv, 0.0)' : 'texture2D(uMap, uv)'};
+  float a = t.a * vA;
+  ${pixel ? 'a = step(arcadeBayer(gl_FragCoord.xy * 0.5) * 0.9 + 0.05, a);' : ''}
+  if (outside || a < 0.003) discard;
+  gl_FragColor = vec4(vC * t.rgb, a);
   #include <colorspace_fragment>
+  ${pixel ? 'gl_FragColor.rgb = arcadeQuant(gl_FragColor.rgb);' : ''}
 }`;
 
 const SPRITES = 900;
 
-function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
+function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false }) {
   const { gl, camera, size } = useThree();
   const live = useRef(0);
   const cursor = useRef(0);
@@ -206,7 +216,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
       Array.from({ length: SPRITES }, () => ({
         alive: false,
         x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
-        age: 0, life: 1, s0: 0.2, s1: 0.2, a: 1, fade: 1, flick: 0, phase: 0,
+        age: 0, life: 1, s0: 0.2, s1: 0.2, a: 1, fade: 1, fin: 0.06, flick: 0, phase: 0,
         grav: 0, drag: 0, rot: 0, rotv: 0, swirl: 0, cx: 0, cz: 0, tile: 0, land: false,
         c0: new THREE.Color(), c1: new THREE.Color(),
       })),
@@ -229,13 +239,13 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
       new THREE.ShaderMaterial({
         uniforms: { uMap: { value: atlas }, uScale: { value: 1 } },
         vertexShader: SPRITE_VERT,
-        fragmentShader: SPRITE_FRAG,
+        fragmentShader: spriteFrag(pixel),
         transparent: true,
         depthWrite: false,
         depthTest: additive,
         blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       }),
-    [atlas, additive]
+    [atlas, additive, pixel]
   );
 
   useEffect(
@@ -249,9 +259,9 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
   useEffect(
     () =>
       bus.on((type, d) => {
-        if (type !== 'spr' || (d.add !== false) !== additive) return;
+        if (type !== 'spr' || !!d.px !== pixel || (!pixel && (d.add !== false) !== additive)) return;
         live.current = 1;
-        const { position, n = 1, tile = 0, c = ['#ffffff'], c2 = null, speed = 0, up = 0, uj = null, sphere = false, vel = [0, 0, 0], size: s0 = 0.3, size2 = s0, life = 0.6, grav = 0, drag = 0, rot = null, rotv = 0, radius = 0, inward = false, swirl = 0, a = 1, fade = 1, flick = 0, land = false, jitter = 0.05 } = d;
+        const { position, n = 1, tile = 0, c = ['#ffffff'], c2 = null, speed = 0, up = 0, uj = null, sphere = false, vel = [0, 0, 0], size: s0 = 0.3, size2 = s0, life = 0.6, grav = 0, drag = 0, rot = null, rotv = 0, radius = 0, inward = false, swirl = 0, a = 1, fade = 1, fadeIn = 0.06, flick = 0, land = false, jitter = 0.05 } = d;
         for (let i = 0; i < n; i++) {
           const p = sim[cursor.current];
           cursor.current = (cursor.current + 1) % SPRITES;
@@ -278,6 +288,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
           p.s1 = size2 * (p.s0 / s0);
           p.a = a;
           p.fade = fade;
+          p.fin = fadeIn;
           p.flick = flick;
           p.phase = Math.random() * 6.28;
           p.grav = grav;
@@ -293,7 +304,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
           p.c1.set(c2 ? c2[i % c2.length] : c[i % c.length]);
         }
       }),
-    [bus, sim, additive]
+    [bus, sim, additive, pixel]
   );
 
   useFrame((_, rawDt) => {
@@ -352,7 +363,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false }) {
       col[i * 3 + 1] = tmp.g;
       col[i * 3 + 2] = tmp.b;
       sz[i] = p.s0 + (p.s1 - p.s0) * e;
-      al[i] = p.a * Math.min(1, p.age / 0.06) * Math.pow(1 - k, p.fade) * (p.flick ? 0.55 + 0.45 * Math.sin(p.age * p.flick + p.phase) : 1);
+      al[i] = p.a * Math.min(1, p.age / p.fin) * Math.pow(1 - k, p.fade) * (p.flick ? 0.55 + 0.45 * Math.sin(p.age * p.flick + p.phase) : 1);
       tl[i] = p.tile;
       rt[i] = p.rot;
     }
@@ -925,6 +936,7 @@ export default function Spectacle({ bus = fx, clip = null }) {
       <Bolts bus={bus} />
       <SpriteLayer bus={bus} atlas={atlas} clip={clip} />
       <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel />
     </group>
   );
 }

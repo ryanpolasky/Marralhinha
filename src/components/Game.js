@@ -279,7 +279,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
 }
 
 // Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
-const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect' };
+const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect', trail: 'move trail' };
 function BoardPicker({ current, seats, onPick, onSkin }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(null);

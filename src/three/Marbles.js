@@ -7,6 +7,7 @@ import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
+import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 
 export const MARBLE_R = 0.335;
@@ -64,12 +65,14 @@ function setCursor(pointer) {
   document.body.style.cursor = pointer ? 'pointer' : '';
 }
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx }) {
+const TRAIL_GAP = 0.34;
+
+function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
   const anim = useRef(null);
-  if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey };
+  if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null };
 
   useLayoutEffect(() => {
     const a = anim.current;
@@ -112,10 +115,18 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
         const e = easeInOut(t);
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
+        if (!seg.impact) {
+          if (!a.trailAt) a.trailAt = a.pos.clone();
+          else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
+            playTrail(trail, [a.pos.x, a.pos.y - 0.08, a.pos.z], { by: seat, prev: [a.trailAt.x, a.trailAt.y - 0.08, a.trailAt.z] });
+            a.trailAt.copy(a.pos);
+          }
+        }
       }
     } else if (a.pos.distanceToSquared(target) > 1e-6) {
+      a.trailAt = null;
       a.pos.lerp(target, 1 - Math.exp(-dt * 8));
-    }
+    } else a.trailAt = null;
 
     const liftTarget = selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + (Math.sin(now * 5) * 0.5 + 0.5) * 0.14 : 0;
     a.lift += (liftTarget - a.lift) * (1 - Math.exp(-dt * 12));
@@ -244,7 +255,7 @@ function PathDots({ move, layout }) {
   });
 }
 
-export default function Marbles({ board, skins = [], killFx = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
+export default function Marbles({ board, skins = [], killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -284,6 +295,7 @@ export default function Marbles({ board, skins = [], killFx = [], moves, selecte
               onHover={(on) => setHovered(on ? { seat, marble } : null)}
               mySeat={mySeat}
               killFx={killFx}
+              trail={trails[seat]}
             />
           );
         })

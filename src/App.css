@@ -1474,7 +1474,8 @@ button.room-pill.copied {
 
 .troll-slot .thumb-marble,
 .troll-slot .thumb-dice,
-.troll-slot .thumb-fx {
+.troll-slot .thumb-fx,
+.troll-slot .thumb-trail {
   width: 26px;
   height: 26px;
   flex-shrink: 0;
@@ -4286,6 +4287,128 @@ button.room-pill.copied {
   --fx-bg: #0a0709;
 }
 
+.thumb-trail {
+  --t1: #ffd166;
+  --t2: #fff6d0;
+  --t-bg: #14222a;
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--t1) 20%, var(--t-bg)) 0%, var(--t-bg) 72%);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.thumb-trail::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  top: 58%;
+  width: 56%;
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--t1));
+  transform: rotate(-26deg);
+}
+
+.thumb-trail::after {
+  content: '';
+  position: absolute;
+  left: 60%;
+  top: 27%;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 18%, var(--t2) 40%, var(--t1) 100%);
+  box-shadow: 0 0 8px var(--t1);
+}
+
+.thumb-trail.skin-dust {
+  --t1: #cbb79b;
+  --t2: #e8dcc8;
+}
+.thumb-trail.skin-sparkle {
+  --t1: #ffe38a;
+  --t2: #fff6d0;
+}
+.thumb-trail.skin-ember {
+  --t1: #ff9a3c;
+  --t2: #ffd166;
+  --t-bg: #2a0f08;
+}
+.thumb-trail.skin-bubbles {
+  --t1: #9fdcff;
+  --t2: #e8f6ff;
+}
+.thumb-trail.skin-petals {
+  --t1: #ff9ad5;
+  --t2: #ffd1ec;
+}
+.thumb-trail.skin-snow {
+  --t1: #dff1ff;
+  --t2: #ffffff;
+}
+.thumb-trail.skin-sparks {
+  --t1: #9feaff;
+  --t2: #ffe94d;
+  --t-bg: #0b1a2a;
+}
+.thumb-trail.skin-wisp {
+  --t1: #7bf1a8;
+  --t2: #d9ffe9;
+  --t-bg: #0a1a12;
+}
+.thumb-trail.skin-rainbow {
+  --t1: #ff4fd8;
+  --t2: #b36bff;
+}
+.thumb-trail.skin-flame {
+  --t1: #ff9a3c;
+  --t2: #fff3b0;
+  --t-bg: #2a0f08;
+}
+.thumb-trail.skin-glitch {
+  --t1: #2fe6ff;
+  --t2: #ff4fd8;
+  --t-bg: #150a30;
+}
+.thumb-trail.skin-galaxy {
+  --t1: #b36bff;
+  --t2: #e3c9ff;
+  --t-bg: #12061f;
+}
+.thumb-trail.skin-comet {
+  --t1: #bfe9ff;
+  --t2: #ffffff;
+  --t-bg: #0a1420;
+}
+.thumb-trail.skin-spectrum {
+  --t1: #ffe94d;
+  --t2: #2fe6ff;
+  --t-bg: #101030;
+}
+.thumb-trail.skin-supporter {
+  --t1: #44b6ad;
+  --t2: #a7f3de;
+  --t-bg: #082d3c;
+}
+.thumb-trail.skin-halloween {
+  --t1: #b36bff;
+  --t2: #7bf1a8;
+  --t-bg: #12061f;
+}
+.thumb-trail.skin-beta {
+  --t1: #5fb8ff;
+  --t2: #d6eeff;
+  --t-bg: #0a2148;
+}
+.thumb-trail.skin-dev {
+  --t1: #ff4a5a;
+  --t2: #ffd166;
+  --t-bg: #0a0709;
+}
+
 .thumb-nameplate .plate {
   display: grid;
   place-items: center;
@@ -6167,7 +6290,8 @@ select.admin-input optgroup {
     height: 42px;
   }
 
-  .thumb-fx {
+  .thumb-fx,
+  .thumb-trail {
     width: 42px;
     height: 42px;
   }
@@ -7714,6 +7838,10 @@ textarea.report-text {
   border: 1px solid var(--glass-line);
 }
 
+.preview-stage-plain.tall .preview-stage {
+  height: 460px;
+}
+
 .preview-win-slot > .win-card {
   width: 100%;
   max-height: none;
@@ -8111,4 +8239,29 @@ textarea.report-text {
   .halloween-shop-body { padding: 16px; }
   .halloween-price { margin-left: 0; }
   .halloween-ribbon { top: 8px; left: 8px; padding: 4px 9px; font-size: 9px; }
+}
+
+.thumb-trail.skin-arcade {
+  --t1: #2fe6ff;
+  --t2: #ffe94d;
+  --t-bg: #150a30;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+.thumb-trail.skin-arcade::before {
+  height: 6px;
+  border-radius: 0;
+  background: linear-gradient(90deg, transparent, #8a6bff 30%, #ff4fd8 55%, #ffe94d);
+  background-size: 6px 6px;
+}
+.thumb-trail.skin-arcade::after {
+  border-radius: 0;
+  background: #ffe94d;
+  box-shadow: 3px 3px 0 #ff4fd8;
+}
+
+.thumb-trail.skin-rainbow::before {
+  height: 11px;
+  border-radius: 0;
+  background: linear-gradient(180deg, #ff3a3a 0 16%, #ff9a2e 16% 33%, #ffe82e 33% 50%, #4ddb4d 50% 66%, #2e9bff 66% 83%, #8a5bff 83%);
 }

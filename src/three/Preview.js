@@ -5,8 +5,10 @@ import { Lights } from './Stage';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
 import Board from './Board';
 import KillFxLayer from './KillFxLayer';
+import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
 import { playKillFx } from './killfx';
+import { playTrail } from './trails';
 import { ITEMS } from '../game/catalog';
 import { layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
@@ -47,7 +49,7 @@ function BoardPreview({ itemId }) {
   return (
     <group scale={0.19} rotation-x={0.75}>
       <Spinner speed={0.3} tilt={0}>
-        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} table={false} />
+        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} />
       </Spinner>
     </group>
   );
@@ -111,16 +113,82 @@ function FxPreview({ itemId, seat, replay }) {
   );
 }
 
+const RUN = 3;
+const RUN_HOP_TIME = 0.22;
+const RUN_PAUSE = 1.4;
+const RUN_LEG = RUN * RUN_HOP_TIME;
+const RUN_PERIOD = 2 * (RUN_LEG + RUN_PAUSE);
+const STACK_Y = 0.07 + 0.335 * 1.95;
+
+// Same lane as the kill fx stage, but the stand-in sits one cell into the path so the runner stacks onto it and hops off like a real over-jump
+function TrailPreview({ itemId, seat, replay }) {
+  const bus = useMemo(() => makeFxBus(), [replay]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skin = marbleSkin('marble.classic', seat);
+  const blockerSkin = marbleSkin('marble.classic', (seat + 1) % 4);
+  const m = useRef();
+  const last = useRef(null);
+  const prevI = useRef(-1);
+  useFrame(({ clock }) => {
+    skin.animate?.(clock.elapsedTime);
+    blockerSkin.animate?.(clock.elapsedTime);
+    const t = clock.elapsedTime % RUN_PERIOD;
+    const leg = Math.floor(t / (RUN_LEG + RUN_PAUSE));
+    const back = leg === 1;
+    const u = t - leg * (RUN_LEG + RUN_PAUSE);
+    const h = Math.min(RUN, u / RUN_HOP_TIME);
+    const i = Math.min(RUN - 1, Math.floor(h));
+    const e = Math.max(0, Math.min(1, h - i));
+    const e2 = easeInOut(e);
+    const zAt = (c) => (back ? c : RUN - c);
+    const yAt = (c) => (zAt(c) === 1 ? STACK_Y : 0.07);
+    const moving = h < RUN;
+    const z = zAt(i) + (zAt(i + 1) - zAt(i)) * e2;
+    const y = yAt(i) + (yAt(i + 1) - yAt(i)) * e2 + (moving ? Math.sin(Math.PI * e) * 0.45 : 0);
+    m.current.position.set(0, y, z);
+    if (moving) {
+      if (i !== prevI.current) {
+        prevI.current = i;
+        if (yAt(i) === STACK_Y) sfx.clack();
+      }
+      const p = m.current.position;
+      if (!last.current) last.current = p.clone();
+      else if (p.distanceTo(last.current) > 0.32) {
+        playTrail(itemId, [p.x, p.y - 0.08, p.z], { by: seat, prev: [last.current.x, last.current.y - 0.08, last.current.z] }, { emit: bus.emit });
+        last.current.copy(p);
+      }
+    } else {
+      last.current = null;
+      prevI.current = -1;
+    }
+  });
+  return (
+    <group rotation-y={-Math.PI / 2}>
+      <group position={[-2, 0, -4]}>
+        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin="board.oak" table={false} />
+      </group>
+      <mesh material={blockerSkin.material} position={[0, 0.07, 1]} castShadow>
+        <sphereGeometry args={[0.335, 40, 24]} />
+      </mesh>
+      <mesh ref={m} material={skin.material} position={[0, 0.07, RUN]} castShadow>
+        <sphereGeometry args={[0.335, 40, 24]} />
+      </mesh>
+      <Spectacle key={replay} bus={bus} />
+    </group>
+  );
+}
+
 export default function ItemPreview({ itemId, seat = 0, replay = 0 }) {
   const slot = ITEMS[itemId]?.slot;
+  const stage = slot === 'fx' || slot === 'trail';
   return (
-    <Canvas key={slot} dpr={[1, 2]} camera={{ fov: 32, position: slot === 'fx' ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, slot === 'fx' ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
-      <Lights shadowSize={slot === 'fx' ? 1024 : 512} extent={slot === 'fx' ? 7 : 4} />
+    <Canvas key={slot} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
+      <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
       <group key={`${itemId}-${seat}`}>
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}
         {slot === 'dice' && <DicePreview itemId={itemId} />}
         {slot === 'board' && <BoardPreview itemId={itemId} />}
         {slot === 'fx' && <FxPreview itemId={itemId} seat={seat} replay={replay} />}
+        {slot === 'trail' && <TrailPreview itemId={itemId} seat={seat} replay={replay} />}
       </group>
     </Canvas>
   );

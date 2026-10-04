@@ -85,7 +85,7 @@ const crisp = (tex) => {
 };
 
 // 8-bit post step: 2px ordered dither plus a 6-level-per-channel palette, run on the final pixel color
-const ARCADE_GLSL = `
+export const ARCADE_GLSL = `
 float arcadeBayer(vec2 p) {
   p = mod(floor(p), 4.0);
   vec2 lo = mod(p, 2.0);
@@ -1501,7 +1501,7 @@ function auroraCanvases() {
 
 // Both exclusive boards paint their art aligned to the board itself: canvas center is the center hole, one board unit is BOARD_R of the texture
 const BOARD_R = 0.05;
-const PLOT_CYCLE = 42;
+const PLOT_CYCLE = 10;
 
 function roundedCross(w, l, radius) {
   const corners = [[-w, -l], [w, -l], [w, -w], [l, -w], [l, w], [w, w], [w, l], [-w, l], [-w, w], [-l, w], [-l, -w], [-w, -w]];
@@ -1834,9 +1834,10 @@ const pathLength = (pts) => pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p[0]
 const textEnd = ({ str, at, size, angle }) => [at[0] + Math.cos(angle) * str.length * size * 0.55, at[1] + Math.sin(angle) * str.length * size * 0.55];
 
 function schedulePlot(items) {
+  const traced = items.filter((item) => item.trace);
   let cost = 0;
   let prev = null;
-  items.forEach((item) => {
+  traced.forEach((item) => {
     const start = item.str ? item.at : item.pts[0];
     if (prev) cost += prev.target === item.target ? Math.hypot(start[0] - prev.end[0], start[1] - prev.end[1]) * 0.1 : 2;
     item.len = item.str ? item.str.length * 0.16 : pathLength(item.pts);
@@ -1846,7 +1847,7 @@ function schedulePlot(items) {
   });
   const scale = 0.95 / cost;
   const keys = [];
-  items.forEach((item) => {
+  traced.forEach((item) => {
     item.t0 *= scale;
     item.span = item.len * scale;
     const pts = item.str ? [item.at, textEnd(item)] : item.pts;
@@ -1896,7 +1897,7 @@ function renderPlot(ctx, items, target, S, R) {
       const width = ctx.measureText(item.str).width || 1;
       let off = 0;
       [...item.str].forEach((ch) => {
-        ctx.fillStyle = plotColor(item.level, item.t0 + (off / width) * item.span);
+        ctx.fillStyle = plotColor(item.level, item.trace ? Math.max(item.t0 + (off / width) * item.span, 1e-4) : 0);
         ctx.fillText(ch, off, 0);
         off += ctx.measureText(ch).width;
       });
@@ -1920,7 +1921,7 @@ function renderPlot(ctx, items, target, S, R) {
           if (idx % 2) continue;
         }
         const lerp = (f) => [q[0] + (p[0] - q[0]) * f, q[1] + (p[1] - q[1]) * f];
-        ctx.strokeStyle = plotColor(item.level, item.t0 + (s / (item.len || 1)) * item.span);
+        ctx.strokeStyle = plotColor(item.level, item.trace ? Math.max(item.t0 + (s / (item.len || 1)) * item.span, 1e-4) : 0);
         ctx.beginPath();
         ctx.moveTo(...px(lerp(j / n)));
         ctx.lineTo(...px(lerp((j + 1) / n)));
@@ -2088,7 +2089,7 @@ function blueprintDraft(layout) {
   const L = spec.halfLength;
   const plot = makePlotter();
   const board = (pts, opts) => plot.path('board', pts, opts);
-  board(roundedCross(W - 0.16, L - 0.16, 0.5), { w: 0.034 });
+  board(roundedCross(W - 0.16, L - 0.16, 0.5), { w: 0.034, trace: true });
   board(roundedCross(W - 0.27, L - 0.27, 0.4), { w: 0.012, level: 0.55 });
   board([[-(L - 0.4), 0], [L - 0.4, 0]], { w: 0.012, level: 0.55, dash: DASH_DOT });
   board([[0, -(L - 0.4)], [0, L - 0.4]], { w: 0.012, level: 0.55, dash: DASH_DOT });
@@ -2290,13 +2291,15 @@ const blueprintShader = (R) => `{
   float top = smoothstep(0.6, 0.95, vSkinTop);
   vec4 dat = texture2D(emissiveMap, uvB);
   vec3 dd = dat.rgb / max(dat.a, 0.001);
-  float when = (floor(dd.g * 255.0 + 0.5) * 256.0 + floor(dd.b * 255.0 + 0.5)) / 65535.0;
+  float gb = floor(dd.g * 255.0 + 0.5) * 256.0 + floor(dd.b * 255.0 + 0.5);
+  float when = gb / 65535.0;
+  float traced = step(0.5, gb);
   float age = fract(uSkinTime / ${PLOT_CYCLE.toFixed(1)} - when);
   float isInk = step(0.35, dd.r);
   float line = dat.a * dd.r * isInk;
   float seal = dat.a * (1.0 - isInk);
-  float ink = pow(1.0 - age, 6.0);
-  float tip = pow(1.0 - age, 1800.0);
+  float ink = pow(1.0 - age, 6.0) * traced;
+  float tip = pow(1.0 - age, 1800.0) * traced;
   vec2 q = (uvB - 0.5) / ${R.toFixed(5)};
   vec2 dp = q - uPen.xy;
   float pr2 = dot(dp, dp);
@@ -2886,7 +2889,7 @@ function arcadeBoard(layout) {
   const k = BOARD_R * S;
   const ring = new Map(layout.RING.map(([r, c], i) => [`${r},${c}`, i]));
   const bands = ['#2a1160', '#1f0c4a', '#170838', '#10052a', '#0a031d'].map(hexRgb);
-  const [line, dot, fill, frame] = ['#160a3a', '#4a2aa0', '#140a36', '#1f6f8a'].map(hexRgb);
+  const [line, dot, fill, frame] = ['#160a3a', '#22125a', '#140a36', '#1f6f8a'].map(hexRgb);
   const at = (x, y) => {
     const c = (x + 0.5 - C) / k;
     const r = (y + 0.5 - C) / k;
@@ -2928,10 +2931,10 @@ function arcadeCarpetCanvas() {
   ctx.fillStyle = '#0a0520';
   ctx.fillRect(0, 0, S, S);
   const colors = ['#2fe6ff', '#ff4fd8', '#ffe94d', '#ff8a3d', '#8a6bff'];
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 24; i++) {
     const shape = ARCADE_SHAPES[Math.floor(rand() * ARCADE_SHAPES.length)];
     ctx.setTransform(2, 0, 0, 2, Math.floor(rand() * (S - 20)), Math.floor(rand() * (S - 20)));
-    pixelRows(ctx, shape, 0, 0, mix(colors[Math.floor(rand() * colors.length)], '#0a0520', 0.4));
+    pixelRows(ctx, shape, 0, 0, mix(colors[Math.floor(rand() * colors.length)], '#0a0520', 0.7));
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return canvas;
@@ -2962,18 +2965,10 @@ const ARCADE_BOARD_SHADER = `{
   float cut = px.y > 0.0 ? step(0.25 + px.y * 0.25, fract(px.y * 2.5 - tick * 0.6)) : 1.0;
   float sy = smoothstep(-sunR, sunR, px.y);
   vec3 sun = step(d, sunR) * cut * mix(mix(vec3(1.0, 0.75, 0.05), vec3(1.0, 0.1, 0.4), smoothstep(0.0, 0.6, sy)), vec3(0.45, 0.05, 0.6), smoothstep(0.6, 1.0, sy));
-  float halo = step(d, sunR + 0.25) * step(sunR, d) * (0.5 + 0.5 * step(0.5, fract(t * 1.5)));
   float cheb = max(abs(px.x), abs(px.y));
   float w = fract(t * 0.16);
   float pulse = step(abs(cheb - (sunR + 0.4 + w * 8.0)), 0.07) * (1.0 - w);
-  vec2 gp = fract(px);
-  vec2 gl = step(abs(gp - 0.5625), vec2(0.01));
-  float grid = max(gl.x, gl.y);
-  float node = gl.x * gl.y;
-  float h = fract(sin(dot(floor(q * 8.0), vec2(12.9898, 78.233))) * 43758.5453);
-  float star = step(0.995, h) * step(0.6, fract(t * (0.4 + h) + h * 9.0)) * (1.0 - grid);
-  vec3 field = sun * 0.5 + vec3(1.0, 0.2, 0.7) * halo * 0.2 + arcadePal(floor(t * 0.16) + 1.0) * pulse * 0.7
-    + vec3(0.35, 0.18, 0.9) * (node * 0.25 + grid * pulse * 0.6) + vec3(0.7, 0.8, 1.0) * star * 0.6;
+  vec3 field = sun * 0.4 + arcadePal(floor(t * 0.16) + 1.0) * pulse * 0.35;
   totalEmissiveRadiance = mix(vec3(1.0, 0.31, 0.85) * 0.4, mix(field, lane, tile), top);
 }`;
 
@@ -2986,9 +2981,7 @@ const arcadeDishShader = (R, dishR) => `{
   float sa = (slot + 0.5) / 16.0 * 6.2831853 - 3.14159265;
   float bulb = step(length(px - vec2(cos(sa), sin(sa)) * ${(dishR - 0.3).toFixed(3)}), 0.12);
   float lit = mod(slot - floor(t * 8.0), 4.0) < 1.0 ? 1.0 : 0.12;
-  float w = fract(t * 0.4);
-  float wave = step(abs(length(px) - w * ${(dishR - 0.5).toFixed(3)}), 0.07) * (1.0 - w);
-  totalEmissiveRadiance = (arcadePal(slot) * bulb * lit * 1.6 + vec3(0.18, 0.9, 1.0) * wave * 0.6) * top;
+  totalEmissiveRadiance = (arcadePal(slot) * bulb * lit * 1.6) * top;
 }`;
 
 const GOLD = (a) => `rgba(222,176,92,${a})`;

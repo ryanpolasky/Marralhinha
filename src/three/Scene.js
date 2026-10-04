@@ -292,6 +292,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           board={board}
           skins={cosmetics.map((c) => c?.marble)}
           killFx={cosmetics.map((c) => c?.fx)}
+          trails={cosmetics.map((c) => c?.trail)}
           moves={moves}
           selected={selected}
           setSelected={setSelected}

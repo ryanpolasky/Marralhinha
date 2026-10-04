@@ -9,7 +9,7 @@ const seq = (n, gap, fn, start = 0) => Array.from({ length: n }, (_, i) => later
 const off = (at, dx = 0, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
 const ground = (at, dx = 0, dz = 0) => [at[0] + dx, 0.1, at[2] + dz];
 const lerp3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12 };
+export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12 };
 
 // Slides a moving point from a to b, calling step(position, progress) every ~18ms
 const track = (a, b, ms, step, ease = (k) => k) => {
@@ -270,7 +270,7 @@ const KILL_FX = {
     emit('decal', { position: ground(at), kind: 'rune', color: '#7bf1a8', size: 3.2, life: 1.9, spin: -1, grow: 0.3, add: true });
     emit('dome', { position: at, color: '#b36bff', size: 1.6, life: 0.5 });
     [['#d9ffe9', 0, 1.6, -0.5], ['#e2d4ff', 160, 1.3, 0.5]].forEach(([c, ms, h, dx], i) =>
-      later(ms, () => emit('spr', { position: off(at, dx, 0.5), tile: TILE.ghost, c: [c], add: false, size: 0.6, size2: 1.7 - i * 0.2, life: 1.9, up: h, uj: 0, a: 0.85, rot: dx * 0.4, fade: 1.2 }))
+      later(ms, () => emit('spr', { position: off(at, dx, 0.5), tile: TILE.ghost, c: [c], add: false, size: 0.6, size2: 1.7 - i * 0.2, life: 1.9, up: h, uj: 0, a: 0.85, rot: 0, fade: 1.2, fadeIn: 0.35 }))
     );
     seq(10, 90, () => emit('spr', { position: off(at, 0, 0.1), n: 2, tile: TILE.glow, c: ['#7bf1a8', '#b36bff', col(victim).light], radius: 0.35, speed: 0.3, up: 1.5, size: 0.3, size2: 0.05, life: 1.2, grav: -0.05, swirl: 3, a: 0.8 }));
     emit('spr', { position: off(at, 0, 0.3), n: 9, tile: TILE.bat, c: ['#1a0a24', '#2a123a'], add: false, rot: 0, radius: 0.2, speed: 2.6, up: 2.2, uj: 1, size: 0.55, size2: 0.4, life: 1.6, grav: -0.3, drag: 0.6, swirl: 1.5, a: 0.95, fade: 0.5 });

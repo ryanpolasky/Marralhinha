@@ -28,7 +28,8 @@
     "board": { "label": "Boards", "default": "board.oak" },
     "dice": { "label": "Dice", "default": "dice.ivory" },
     "nameplate": { "label": "Nameplates", "default": "plate.basic" },
-    "fx": { "label": "Kill Effects", "default": "fx.pop" }
+    "fx": { "label": "Kill Effects", "default": "fx.pop" },
+    "trail": { "label": "Move Trails", "default": "trail.dust" }
   },
   "items": [
     { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
@@ -148,7 +149,27 @@
     { "id": "fx.halloween", "slot": "fx", "name": "Soul Snatch", "rarity": "exclusive", "tag": "halloween", "desc": "The spirits collect their due." },
     { "id": "fx.beta", "slot": "fx", "name": "Blue Screen", "rarity": "exclusive", "tag": "beta", "desc": "That marble has stopped responding." },
     { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },
-    { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." }
+    { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." },
+
+    { "id": "trail.dust", "slot": "trail", "name": "Dust", "rarity": "default", "desc": "Kicks up a little something." },
+    { "id": "trail.sparkle", "slot": "trail", "name": "Stardust", "rarity": "common", "desc": "Glitter in your wake." },
+    { "id": "trail.ember", "slot": "trail", "name": "Embers", "rarity": "common", "desc": "Too hot to touch." },
+    { "id": "trail.bubbles", "slot": "trail", "name": "Suds", "rarity": "common", "desc": "Clean getaway." },
+    { "id": "trail.petals", "slot": "trail", "name": "Petals", "rarity": "rare", "desc": "Spring rolls with you." },
+    { "id": "trail.snow", "slot": "trail", "name": "Powder", "rarity": "rare", "desc": "Cold trail, warm marble." },
+    { "id": "trail.sparks", "slot": "trail", "name": "Live Wire", "rarity": "rare", "desc": "Arcing the whole way." },
+    { "id": "trail.wisp", "slot": "trail", "name": "Fireflies", "rarity": "rare", "desc": "It follows you home." },
+    { "id": "trail.rainbow", "slot": "trail", "name": "Rainbow", "rarity": "epic", "desc": "Taste the board." },
+    { "id": "trail.flame", "slot": "trail", "name": "Firewalker", "rarity": "epic", "desc": "Scorched-earth policy." },
+    { "id": "trail.glitch", "slot": "trail", "name": "Packet Loss", "rarity": "epic", "desc": "Half your hops never arrived." },
+    { "id": "trail.galaxy", "slot": "trail", "name": "Nebula", "rarity": "legendary", "desc": "You contain multitudes." },
+    { "id": "trail.comet", "slot": "trail", "name": "Comet Tail", "rarity": "legendary", "desc": "Fifty thousand years per lap." },
+    { "id": "trail.spectrum", "slot": "trail", "name": "Prism Break", "rarity": "mythic", "desc": "The whole rainbow, weaponized." },
+    { "id": "trail.arcade", "slot": "trail", "name": "Pixel Dust", "rarity": "mythic", "desc": "Eight bits of confetti, dithered down to a handful of colors." },
+    { "id": "trail.supporter", "slot": "trail", "name": "Wake", "rarity": "exclusive", "tag": "supporter", "desc": "Even the tide makes way." },
+    { "id": "trail.halloween", "slot": "trail", "name": "Haunting", "rarity": "exclusive", "tag": "halloween", "desc": "Something follows behind." },
+    { "id": "trail.beta", "slot": "trail", "name": "Wireframe", "rarity": "exclusive", "tag": "beta", "desc": "Now with rendering issues." },
+    { "id": "trail.dev", "slot": "trail", "name": "Accretion", "rarity": "exclusive", "tag": "dev", "desc": "Whatever you pass falls in behind you." }
   ],
   "boxes": [
     {
