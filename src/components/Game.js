@@ -467,18 +467,20 @@ function ChatInput({ onSend, teams = false }) {
 
 // The chat/log feed. Game-event lines are hidden until "Show logs" is on; the live announcements
 // above the board still narrate the important moments, so nothing critical is lost when they're hidden
-export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend }) {
+export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false }) {
   const shown = open ? entries : entries.slice(0, 4);
   return (
-    <div className={`feed${open ? ' open' : ''}`}>
+    <div className={`feed${open ? ' open' : ''}${lifted ? ' lifted' : ''}`}>
       <div className="feed-tools">
         <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
-          {open ? 'Hide' : 'Chat & log'}
+          {open ? 'Hide' : onToggleLogs ? 'Chat & log' : 'Chat'}
           {unread > 0 && <span className="unread">{unread}</span>}
         </button>
-        <button type="button" className={`feed-logs${showLogs ? ' on' : ''}`} onClick={onToggleLogs} aria-pressed={showLogs} title="Show moves, rolls and captures in the chat">
-          {showLogs ? 'Hide logs' : 'Show logs'}
-        </button>
+        {onToggleLogs && (
+          <button type="button" className={`feed-logs${showLogs ? ' on' : ''}`} onClick={onToggleLogs} aria-pressed={showLogs} title="Show moves, rolls and captures in the chat">
+            {showLogs ? 'Hide logs' : 'Show logs'}
+          </button>
+        )}
       </div>
       <div className="feed-list" id="feed-list">
         {shown.map((entry, i) => (
@@ -504,15 +506,15 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
   );
 }
 
-export function ReactionBar({ onReact }) {
+export function ReactionBar({ onReact, spam = false }) {
   const [open, setOpen] = useState(false);
   const [cooling, setCooling] = useState(false);
   const send = (key) => {
     if (cooling) return;
     onReact(key);
-    setOpen(false);
+    if (!spam) setOpen(false);
     setCooling(true);
-    setTimeout(() => setCooling(false), 1200);
+    setTimeout(() => setCooling(false), spam ? 250 : 1200);
   };
   return (
     <div className={`reactions${open ? ' open' : ''}`}>
@@ -868,7 +870,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     />
   );
   const shared = rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log;
-  const log = [...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
+  const log = [...(room.chat || []), ...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
   const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
@@ -958,6 +960,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
           isMine={isMine}
           teams={teams && mySeat >= 0}
           onSend={(text, channel) => onAction('game:chat', { text, channel })}
+          lifted={showOver}
         />
 
         <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
@@ -989,7 +992,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               <Coffee />
             </button>
           )}
-          {mySeat >= 0 && <ReactionBar onReact={(key) => onAction('game:react', { key })} />}
+          {mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
 

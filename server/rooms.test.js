@@ -675,7 +675,7 @@ test('the table board can be swapped mid-game and reset to the starter', (t) => 
   assert.strictEqual(room.view().game.boardOverride, null);
 });
 
-test('chat is rate limited, open to spectators, and only once the game is on', (t) => {
+test('chat is rate limited, open to spectators, and works from the lobby on', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());
   room.chat('u1', 'one');
@@ -689,8 +689,55 @@ test('chat is rate limited, open to spectators, and only once the game is on', (
   const entry = room.game.log.at(-1);
   assert.deepStrictEqual({ seat: entry.seat, from: entry.from, spectator: entry.spectator, text: entry.text }, { seat: null, from: viewer.id, spectator: true, text: 'go ana!' });
   assert.strictEqual(reactions.length, bubbles, 'spectators have no nameplate, so no bubble');
+});
 
+test('chat works before the game starts and keeps working across rounds', (t) => {
   const lobby = new Room('LOBY', { onChange: () => {} });
+  t.after(() => lobby.dispose());
   lobby.join({ userId: 'u1', name: 'Ana' });
-  assert.throws(() => lobby.chat('u1', 'too early'), /once the game starts/);
+  lobby.join({ userId: 'u2', name: 'Rui' });
+  lobby.join({ userId: 'u3', name: 'Mia' });
+  lobby.attach('u1', 's1');
+  lobby.attach('u2', 's2');
+  lobby.attach('u3', 's3');
+  lobby.chat('u1', 'already chatting');
+  const entry = lobby.view().chat.at(-1);
+  assert.deepStrictEqual({ chat: entry.chat, seat: entry.seat, spectator: entry.spectator, text: entry.text }, { chat: true, seat: 0, spectator: false, text: 'already chatting' });
+  assert.throws(() => lobby.chat('u1', 'too fast'), UserError, 'the lobby rate limit still applies');
+
+  lobby.start('u1');
+  lobby.chat('u2', 'gl hf');
+  assert.strictEqual(lobby.game.log.at(-1).text, 'gl hf', 'mid-game lines join the game log');
+  assert.strictEqual(lobby.view().chat.at(-1).text, 'already chatting', 'lobby lines stay in the room log');
+
+  lobby.game.phase = 'over';
+  lobby.chat('u3', 'gg wp');
+  assert.strictEqual(lobby.view().chat.at(-1).text, 'gg wp', 'results banter lands in the room log');
+  assert.strictEqual(lobby.game.log.at(-1).text, 'gl hf', 'the finished game log is untouched');
+});
+
+test('beta and dev tags get a hair trigger on reactions; everyone else waits', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const reactions = [];
+  const room = new Room('SPAM', { onChange: () => {}, onReaction: (_, r) => reactions.push(r) });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana', tags: ['beta'] });
+  room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  room.start('u1');
+
+  t.mock.timers.tick(1200);
+  room.react('u1', 'gg');
+  t.mock.timers.tick(300);
+  room.react('u1', 'haha');
+  assert.strictEqual(reactions.length, 2, 'a tester fires again almost straight away');
+
+  room.react('u2', 'gg');
+  t.mock.timers.tick(300);
+  room.react('u2', 'haha');
+  assert.strictEqual(reactions.length, 3, 'everyone else still waits out the cooldown');
+  t.mock.timers.tick(900);
+  room.react('u2', 'nice');
+  assert.strictEqual(reactions.length, 4);
 });

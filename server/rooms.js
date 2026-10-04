@@ -27,11 +27,15 @@ const ROOM_TTL_MS = 15 * 60 * 1000;
 const QUICK_PLAY_TTL_MS = 4 * 60 * 1000;
 const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
+// Beta testers and Devs get a hair-trigger reactions panel for emote spam
+const TESTER_REACTION_COOLDOWN_MS = 250;
+const TESTER_TAGS = ['beta', 'dev'];
 const CHAT_MAX = 280;
 const CHAT_GAP_MS = 600;
 const CHAT_BURST = 5;
 const CHAT_WINDOW_MS = 10000;
 const TEAM_LOG_LIMIT = 100;
+const CHAT_LOG_LIMIT = 100;
 const PING_COOLDOWN_MS = 1000;
 const PING_TYPES = ['look', 'danger'];
 const PING_BOUND = 16;
@@ -83,6 +87,8 @@ class Room {
     this.lastWinners = [];
     // Team chat never enters the shared game log; each team's history only goes to that team's devices
     this.teamLogs = [[], []];
+    // Chat while no game is running (lobby, between rounds) lives here instead of game.log
+    this.chatLog = [];
     this.timer = null;
     this.timerKey = null;
     this.turnDeadline = null;
@@ -631,7 +637,8 @@ class Room {
     const { seat, player } = this.require(userId);
     if (!REACTIONS.includes(key)) throw new UserError('Unknown reaction');
     const now = Date.now();
-    if (now - (player.lastReaction || 0) < REACTION_COOLDOWN_MS) return;
+    const cooldown = (player.tags || []).some((tag) => TESTER_TAGS.includes(tag)) ? TESTER_REACTION_COOLDOWN_MS : REACTION_COOLDOWN_MS;
+    if (now - (player.lastReaction || 0) < cooldown) return;
     player.lastReaction = now;
     this.hooks.onReaction?.(this, { seat, key, t: now });
   }
@@ -643,14 +650,13 @@ class Room {
     const player = found?.player || this.spectators.get(userId);
     if (!player) throw new UserError('You are not in this room');
     const seat = found ? found.seat : null;
-    if (!this.game) throw new UserError('Chat opens once the game starts');
     const clean = cleanChat(text);
     if (!clean) return;
     const now = Date.now();
     player.chatTimes = (player.chatTimes || []).filter((t) => now - t < CHAT_WINDOW_MS);
     if (player.chatTimes.length >= CHAT_BURST || now - (player.chatTimes.at(-1) || 0) < CHAT_GAP_MS) throw new UserError('Whoa, slow down a little!');
     player.chatTimes.push(now);
-    if (channel === 'team' && seat !== null && this.game.mode === 'teams') {
+    if (channel === 'team' && seat !== null && this.game?.mode === 'teams') {
       const entry = { chat: true, team: true, seat, from: player.id, name: player.name, text: clean, t: now };
       const log = this.teamLogs[seat % 2];
       log.push(entry);
@@ -660,8 +666,15 @@ class Room {
       this.touch();
       return;
     }
-    rules.pushLog(this.game, { chat: true, seat, from: player.id, spectator: seat === null, name: player.name, text: clean, t: now });
-    if (seat !== null) this.hooks.onReaction?.(this, { seat, text: clean, t: now });
+    const entry = { chat: true, seat, from: player.id, spectator: seat === null, name: player.name, text: clean, t: now };
+    // Live rounds log chat into the game; lobby and results banter collect in the room log
+    if (this.game && this.game.phase !== 'over') {
+      rules.pushLog(this.game, entry);
+    } else {
+      this.chatLog.push(entry);
+      if (this.chatLog.length > CHAT_LOG_LIMIT) this.chatLog.splice(0, this.chatLog.length - CHAT_LOG_LIMIT);
+    }
+    if (seat !== null && this.game) this.hooks.onReaction?.(this, { seat, text: clean, t: now });
     this.changed();
   }
 
@@ -830,6 +843,7 @@ class Room {
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
+      chat: this.chatLog,
       game: this.game,
     };
   }

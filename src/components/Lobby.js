@@ -9,6 +9,7 @@ import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
 import Marquee from './Marquee';
+import { Feed } from './Game';
 import BOARDS from '../shared/boards.json';
 
 // Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go
@@ -75,6 +76,8 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(false);
+  const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
   const [screenRef, panelRef] = useFitPanel(room.activity, room, { reserveBar: true, bottom: 100 });
   const events = useSeatEvents(room, playerId);
   const act = async (fn) => {
@@ -93,6 +96,9 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
   const offered = room.swapOffers?.find((offer) => offer.fromId === playerId);
   const incoming = room.swapOffers?.filter((offer) => offer.toId === playerId) || [];
   const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${room.code}`;
+  const chatEntries = [...(room.chat || [])].reverse();
+  const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
+  const unread = feedOpen ? 0 : chatEntries.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
 
   const copy = async () => {
     try {
@@ -318,6 +324,18 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
         </div>
         </div>
       </div>
+      <Feed
+        entries={chatEntries}
+        open={feedOpen}
+        onToggle={() => {
+          setFeedOpen((o) => !o);
+          setChatSeenAt(Date.now());
+        }}
+        unread={unread}
+        isMine={isMine}
+        onSend={(text, channel) => onAction('game:chat', { text, channel })}
+        lifted
+      />
       <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
         <Bug /> Report & ideas
       </button>

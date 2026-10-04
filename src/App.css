@@ -1105,6 +1105,24 @@ button.room-pill.copied {
   padding: 10px;
 }
 
+/* Same feed floating bottom-left over non-HUD screens: the lobby, and the results overlay */
+.feed.lifted {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 21;
+}
+
+/* On the results overlay it stays a chip until opened so it never covers the win card */
+.hud .feed.lifted:not(.open) {
+  width: auto;
+}
+
+.hud .feed.lifted:not(.open) .feed-list,
+.hud .feed.lifted:not(.open) .chat-form {
+  display: none;
+}
+
 .feed-entry {
   font-size: 14px;
   padding: 4px 10px;
