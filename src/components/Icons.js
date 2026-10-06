@@ -13,6 +13,14 @@ export const Gear = ({ size = 20 }) => (
   </Icon>
 );
 
+export const Dots = ({ size = 22 }) => (
+  <Icon size={size}>
+    <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+  </Icon>
+);
+
 export const Close = () => (
   <Icon size={18}>
     <path d="M6 6l12 12M18 6L6 18" strokeWidth="2.6" />

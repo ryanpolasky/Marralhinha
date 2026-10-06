@@ -534,6 +534,7 @@ const App = () => {
       onBoards={() => setModal('boards')}
       onMail={account?.replies?.length ? () => setModal('replies') : undefined}
       onDaily={claimDaily}
+      onReport={() => setModal('report')}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
       onSignOut={async () => {
         const ok = await ask({ title: 'Sign out of Discord?', message: 'Your progress stays saved to your Discord account for next time.', confirm: 'Sign out' });

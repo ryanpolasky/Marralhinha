@@ -1,15 +1,36 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Coins, Nameplate, TagBadges } from './Economy';
 import { IS_ACTIVITY } from '../net/config';
-import { Bug, ChestIcon, GiftIcon, Hanger, Mail, Shield, Trophy, DiscordMark as DiscordLogo } from './Icons';
+import { ChestIcon, GiftIcon, Hanger, Mail, Shield, Trophy, DiscordMark as DiscordLogo } from './Icons';
 import { SettingsButton } from './Settings';
 
+// Screens pad their top by the bar's real bottom edge, so a wrapped or resized bar never covers a panel
+function useBarHeight(ref) {
+  useLayoutEffect(() => {
+    const bar = ref.current;
+    if (!bar) return undefined;
+    const root = document.documentElement.style;
+    const measure = () => root.setProperty('--bar-h', `${Math.ceil(bar.getBoundingClientRect().bottom)}px`);
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(bar);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      root.removeProperty('--bar-h');
+    };
+  }, [ref]);
+}
+
 export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin, onBoards, onReport, onMail }) {
+  const ref = useRef(null);
+  useBarHeight(ref);
   if (!account) return null;
   const daily = account.daily;
   const pct = Math.min(100, (account.into / account.need) * 100);
   return (
-    <div className="account-bar">
+    <div className="account-bar" ref={ref}>
       <Nameplate plate={account.equipped.nameplate} className="account-plate">
         <button type="button" className="account-profile-btn" onClick={onProfile} title="View your profile and stats" aria-label="View your profile and stats">
           <span className="level-badge">{account.level}</span>
@@ -67,19 +88,13 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
             <span className="mail-count">{account.replies.length}</span>
           </button>
         )}
-        {onReport && (
-          <button className="bar-btn report-btn" onClick={onReport} title="Report a bug or suggest a feature">
-            <Bug />
-            <span>Report</span>
-          </button>
-        )}
         {account.admin && (
           <button className="bar-btn admin-btn" onClick={onAdmin} title="Manage players and tags">
             <Shield />
             <span>Admin</span>
           </button>
         )}
-        <SettingsButton className="bar-btn settings-btn" />
+        <SettingsButton className="bar-btn settings-btn" onReport={onReport} />
       </div>
     </div>
   );

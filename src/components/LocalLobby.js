@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import useFitPanel from './useFitPanel';
+import useMedia, { PHONE_QUERY } from './useMedia';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
 import RulesButton from './Rules';
 import { Credit } from './About';
@@ -22,6 +23,11 @@ export default function LocalLobby({ room, onAction, onBack }) {
   const seated = room.seats.filter(Boolean).length;
   const humans = room.seats.filter((p) => p && !p.isBot).length;
   const variant = room.variant || 'classic';
+  // Round the table needs a tablet-sized screen lying flat; phones only get pass the device
+  const phone = useMedia(PHONE_QUERY);
+  useEffect(() => {
+    if (phone && room.table) onAction('local:table', { table: false });
+  }, [phone, room.table, onAction]);
 
   const start = async () => {
     try {
@@ -94,21 +100,23 @@ export default function LocalLobby({ room, onAction, onBack }) {
               </button>
             ))}
           </div>
-          <div className="mode-picker" role="radiogroup" aria-label="Seating">
-            {[
-              [false, 'Pass the device'],
-              [true, 'Round the table'],
-            ].map(([value, label]) => (
-              <button key={label} role="radio" aria-checked={room.table === value} className={`mode-option${room.table === value ? ' on' : ''}`} onClick={() => room.table !== value && onAction('local:table', { table: value })}>
-                {label}
-              </button>
-            ))}
-          </div>
+          {!phone && (
+            <div className="mode-picker" role="radiogroup" aria-label="Seating">
+              {[
+                [false, 'Pass the device'],
+                [true, 'Round the table'],
+              ].map(([value, label]) => (
+                <button key={label} role="radio" aria-checked={room.table === value} className={`mode-option${room.table === value ? ' on' : ''}`} onClick={() => room.table !== value && onAction('local:table', { table: value })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="lobby-notes">
-            {room.table ? (
+            {room.table && !phone ? (
               <>
-                <p className="lobby-mode">Lay the device flat. Everyone sits on the side that matches their colour and the camera stays put.</p>
-                {FINE_POINTER && <p className="lobby-notice tight">Heads up: this mode is built for phones and tablets lying flat on a table. It'll feel awkward on a desktop or laptop.</p>}
+                <p className="lobby-mode">Designed for a tablet lying flat on the table. Everyone sits on the side that matches their colour and the camera stays put.</p>
+                {FINE_POINTER && <p className="lobby-notice tight">Heads up: this mode is designed for a tablet lying flat. It'll feel awkward on a desktop or laptop.</p>}
               </>
             ) : (
               <p className="lobby-mode">The board turns to face whoever's turn it is. Pass the device along when the turn changes.</p>
@@ -129,7 +137,9 @@ export default function LocalLobby({ room, onAction, onBack }) {
           </div>
         </div>
       </div>
-      <Credit className="corner" />
+      <div className="screen-foot">
+        <Credit className="corner" />
+      </div>
     </div>
   );
 }

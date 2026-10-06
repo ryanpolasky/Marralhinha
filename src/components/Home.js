@@ -170,10 +170,12 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
           <LegalLinks className="inline" />
         </div>
       </div>
-      <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
-        <Bug /> Report & ideas
-      </button>
-      <Credit className="corner" />
+      <div className="screen-foot">
+        <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
+          <Bug /> Report & ideas
+        </button>
+        <Credit className="corner" />
+      </div>
     </div>
   );
 }

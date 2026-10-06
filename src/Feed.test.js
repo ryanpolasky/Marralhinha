@@ -34,3 +34,12 @@ test('the logs toggle reflects and reports its state', () => {
   logsBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   expect(calls).toBe(1);
 });
+
+test('a docked feed (phone menu sheet) shows every entry, no collapse toggle, and an empty state', () => {
+  const entries = Array.from({ length: 6 }, (_, i) => ({ t: i, seat: 0, chat: true, name: 'Ana', text: `msg ${i}` }));
+  const { container, rerender } = renderFeed(entries, { open: false, docked: true });
+  expect(container.querySelector('.feed-toggle')).toBeNull();
+  expect(container.querySelectorAll('.feed-entry')).toHaveLength(6);
+  rerender(<Feed entries={[]} open={false} docked showLogs onSend={noop} isMine={() => false} onToggle={noop} onToggleLogs={noop} />);
+  expect(container.querySelector('.feed-empty').textContent).toBe('No messages yet. Say hi!');
+});

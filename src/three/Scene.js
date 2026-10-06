@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -24,6 +24,9 @@ const _toCamera = new THREE.Vector3();
 const _homeDir = new THREE.Vector3();
 const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
 const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
+const PORTRAIT_FIT = 31;
+const PORTRAIT_ELEVATION = 0.98;
+const RAILS_FIT = 28.5;
 
 function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
   const { camera, gl, size } = useThree();
@@ -43,13 +46,17 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     const game = mode === 'game';
     // Round the table: straight down, with the board kept clear of the HUD bars on every edge of the short side
     const overhead = game && locked;
-    const elevation = overhead ? Math.PI / 2 - 1e-4 : game ? 0.86 : 0.8;
+    const portrait = game && !locked && aspect < 0.8;
+    const rails = game && !locked && size.height <= 500 && aspect > 1.2;
+    const elevation = overhead ? Math.PI / 2 - 1e-4 : game ? (portrait ? PORTRAIT_ELEVATION : 0.86) : 0.8;
     const zoom = framingExtent(layout.spec) / CLASSIC_EXTENT;
     const half = Math.min(size.width, size.height) / 2;
     const clear = half / Math.max(half - 120, half * 0.6);
     const distance = overhead
       ? (framingExtent(layout.spec) * 1.04 * clear) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.min(1, aspect)
-      : Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect) * zoom;
+      : rails
+        ? RAILS_FIT * zoom
+        : Math.max(game ? 33 : 28, (portrait ? PORTRAIT_FIT : game ? 33 : 31) / aspect) * zoom;
     controls.minPolarAngle = overhead ? 0 : 0.1;
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
@@ -78,7 +85,9 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
       if (t >= 1) tween.current = null;
     }
     const l = lens.current;
-    const goal = mode === 'game' && !locked ? size.height * 0.08 : 0;
+    // Phones have a slim bottom bar (portrait) or side rails (landscape), so there's nothing big to dodge
+    const phone = (size.height <= 500 && size.width > size.height) || (size.width <= 620 && size.width < size.height);
+    const goal = mode === 'game' && !locked && !phone ? size.height * 0.08 : 0;
     const next = l.shift + (goal - l.shift) * (1 - Math.exp(-dt * 3));
     if (Math.abs(next - l.shift) > 0.05 || l.w !== size.width || l.h !== size.height) {
       l.shift = next;
@@ -262,6 +271,43 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
+const TAP_MS = 280;
+const TAP_SLOP = 10;
+
+// On touch screens a quick tap anywhere on the table rolls; drags, pinches and long-press pings never count
+function useTapToRoll(canvasRef, canRoll, onRoll) {
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || !canRoll) return undefined;
+    const touches = new Map();
+    let multi = false;
+    const down = (e) => {
+      if (e.pointerType !== 'touch') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+      if (touches.size > 1) multi = true;
+    };
+    const release = (e) => {
+      const start = touches.get(e.pointerId);
+      touches.delete(e.pointerId);
+      const wasMulti = multi;
+      if (!touches.size) multi = false;
+      return start && !wasMulti ? start : null;
+    };
+    const up = (e) => {
+      const start = release(e);
+      if (start && performance.now() - start.t <= TAP_MS && Math.hypot(e.clientX - start.x, e.clientY - start.y) <= TAP_SLOP) onRoll();
+    };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', release);
+    return () => {
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', release);
+    };
+  }, [canvasRef, canRoll, onRoll]);
+}
+
 export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
   const layout = layoutFor(board.variant);
   const pointer = useRef(null);
@@ -284,8 +330,20 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
 
   useWinFireworks(board);
 
+  // The die and the table tap both land on one pointerup, so only the first roll in a beat goes through
+  const lastRoll = useRef(0);
+  const roll = useCallback(() => {
+    const now = performance.now();
+    if (now - lastRoll.current < 600) return;
+    lastRoll.current = now;
+    onRoll?.();
+  }, [onRoll]);
+  const canvasRef = useRef(null);
+  useTapToRoll(canvasRef, canRoll, roll);
+
   return (
     <Canvas
+      ref={canvasRef}
       shadows={SHADOWS}
       dpr={[1, quality.dpr]}
       camera={{ fov: 38, near: 0.5, far: 400, position: [0, 34, 34] }}
@@ -315,7 +373,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
         />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
-        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
+        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
     </Canvas>

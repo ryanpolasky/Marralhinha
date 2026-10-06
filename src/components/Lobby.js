@@ -336,10 +336,12 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
         onSend={(text, channel) => onAction('game:chat', { text, channel })}
         lifted
       />
-      <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
-        <Bug /> Report & ideas
-      </button>
-      <Credit className="corner" />
+      <div className="screen-foot">
+        <button type="button" className="home-report" onClick={onReport} title="Report a bug or suggest a feature">
+          <Bug /> Report & ideas
+        </button>
+        <Credit className="corner" />
+      </div>
     </div>
   );
 }

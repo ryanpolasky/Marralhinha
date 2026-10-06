@@ -6,6 +6,7 @@ import { SEAT_COLORS } from '../game/geometry';
 import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
 
 const STEP = 0.05;
+const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
 
 function VolumeSlider({ label, value, onChange, onRelease, icons: [On, Off], hint }) {
   const percent = Math.round(value * 100);
@@ -82,9 +83,13 @@ export function SettingsModal({ onClose, onReport }) {
             <span className="switch" aria-hidden="true" />
             <span className="switch-text">
               Show pings
-              <span className="switch-sub">
-                Point at a spot and press <kbd>H</kbd> (or <kbd>G</kbd> for danger); right-click or long-press also works. In 2v2 pings go to your partner, hold <kbd>Shift</kbd> to ping everyone. Your own pings always show.
-              </span>
+              {FINE_POINTER ? (
+                <span className="switch-sub">
+                  Point at a spot and press <kbd>H</kbd> (or <kbd>G</kbd> for danger); right-click or long-press also works. In 2v2 pings go to your partner, hold <kbd>Shift</kbd> to ping everyone. Your own pings always show.
+                </span>
+              ) : (
+                <span className="switch-sub">Long-press a spot on the board to drop a ping. Your own pings always show.</span>
+              )}
             </span>
           </label>
         </div>

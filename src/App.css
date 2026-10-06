@@ -1741,6 +1741,18 @@ button.room-pill.copied {
   padding: 24px;
 }
 
+.win-card:not(.activity-win-card) {
+  max-height: min(90vh, calc(100dvh - 40px));
+}
+
+.win-card::-webkit-scrollbar {
+  width: 8px;
+}
+
+.win-card::-webkit-scrollbar-track {
+  margin-block: 26px;
+}
+
 .win-intro {
   display: flex;
   flex-direction: column;
@@ -2342,6 +2354,10 @@ img.emote-glyph {
 
 .win-minor.single {
   grid-template-columns: 1fr;
+}
+
+.win-minor > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .switch-row {
@@ -4720,27 +4736,8 @@ img.emote-glyph {
   font-size: 13px;
 }
 
-@media (max-width: 560px) {
-  .screen:has(.home-report) {
-    padding-bottom: 108px;
-  }
-
-  .home-report {
-    position: fixed;
-    right: 50%;
-    bottom: 54px;
-    transform: translateX(50%);
-    white-space: nowrap;
-  }
-
-  .screen:has(.credit.corner):not(:has(.home-report)) {
-    padding-bottom: 56px;
-  }
-
-  .credit.corner {
-    right: 50%;
-    transform: translateX(50%);
-  }
+.screen-foot {
+  display: contents;
 }
 
 .heart {
@@ -5067,9 +5064,7 @@ img.emote-glyph {
   }
 
   .hud-right {
-    position: absolute;
-    right: 14px;
-    bottom: 150px;
+    order: -1;
   }
 
   .feed {
@@ -6238,8 +6233,12 @@ select.admin-input optgroup {
   /* Flex-centering clips the top of panels taller than the viewport; start from the top and let it scroll instead */
   .screen {
     align-items: flex-start;
-    padding: 84px 14px 64px;
+    --screen-top: calc(var(--bar-h, 0px) + 14px);
+    --screen-x: 14px;
+    --screen-bottom: 64px;
     -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to bottom, transparent calc(var(--bar-h, -20px) - 6px), #000 calc(var(--bar-h, -20px) + 10px));
+    mask-image: linear-gradient(to bottom, transparent calc(var(--bar-h, -20px) - 6px), #000 calc(var(--bar-h, -20px) + 10px));
   }
 
   .screen > .boot-spinner,
@@ -6288,10 +6287,6 @@ select.admin-input optgroup {
     min-width: 0;
   }
 
-  .win-card {
-    max-height: 88vh;
-  }
-
   .modal {
     max-height: 90vh;
   }
@@ -6304,22 +6299,9 @@ select.admin-input optgroup {
   }
 }
 
-@media (max-width: 620px) {
-  /* Bar wraps to two rows here */
-  .screen {
-    padding-top: 128px;
-  }
-
-  .account-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
 @media (max-width: 560px) {
   .screen {
-    padding-left: 10px;
-    padding-right: 10px;
+    --screen-x: 10px;
   }
 
   .account-name {
@@ -6384,11 +6366,6 @@ select.admin-input optgroup {
 
   .action-sub {
     font-size: 13px;
-  }
-
-  .hud-right {
-    bottom: 132px;
-    right: 10px;
   }
 
   .modal-backdrop {
@@ -6456,7 +6433,7 @@ select.admin-input optgroup {
 @media (max-height: 460px) {
   .screen {
     align-items: flex-start;
-    padding-top: 72px;
+    --screen-top: calc(var(--bar-h, 0px) + 10px);
   }
 
   .home,
@@ -6465,7 +6442,7 @@ select.admin-input optgroup {
   }
 
   .hud {
-    padding: 8px;
+    --hud-pad: 8px;
   }
 
   .roll-btn {
@@ -6486,17 +6463,13 @@ select.admin-input optgroup {
   .feed:not(.open) .feed-list {
     display: none;
   }
-
-  .hud-right {
-    bottom: 96px;
-  }
 }
 
 .lobby-table,
 .lobby-controls { display: contents; }
 
-/* Desktop web gets the activity lobby's split: seats on the left, table settings on the right */
-@media (min-width: 901px) {
+/* Desktop, tablets and landscape phones get the activity lobby's split: seats on the left, table settings on the right */
+@media (min-width: 901px), (max-height: 500px) and (orientation: landscape) {
   .lobby:not(.activity-lobby) {
     max-width: 880px;
     display: grid;
@@ -6613,6 +6586,7 @@ select.admin-input optgroup {
 
 .start-wheel-wrap {
   position: relative;
+  flex: none;
   width: 230px;
   height: 230px;
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.55));
@@ -6711,6 +6685,12 @@ select.admin-input optgroup {
   transform: none;
 }
 
+/* The hidden dot shouldn't push "Spinning..." off-center under the kicker */
+.start-intro:not(.landed) .start-name .marble-dot {
+  width: 0;
+  margin-right: -10px;
+}
+
 .start-intro.landed .start-name {
   animation: reveal-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
@@ -6734,6 +6714,20 @@ select.admin-input optgroup {
 
   .start-name {
     font-size: 22px;
+  }
+}
+
+/* Landscape phones are too short to stack wheel over card, so they sit side by side */
+@media (max-height: 500px) and (orientation: landscape) {
+  .start-intro {
+    flex-direction: row;
+    gap: 28px;
+    padding: 16px;
+  }
+
+  .start-wheel-wrap {
+    width: min(170px, 55vh);
+    height: min(170px, 55vh);
   }
 }
 
@@ -8018,6 +8012,68 @@ textarea.report-text {
   color: var(--ink-dim);
 }
 
+/* Mobile layout gallery: device-sized iframes */
+.mobile-preview-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.mobile-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-preview-chips small {
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.mobile-preview-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.mobile-frame {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 6px solid #050c0e;
+  box-shadow: 0 0 0 1px var(--glass-line), 0 20px 50px rgba(0, 0, 0, 0.5);
+  background: #0b1f24;
+  box-sizing: content-box;
+}
+
+.mobile-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: top left;
+}
+
+.mobile-preview-notes {
+  flex: 1;
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.mobile-preview-notes h3 {
+  margin: 0 0 8px;
+}
+
+.mobile-preview-notes ul {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
 /* Render quality + HUD glass comparisons */
 .preview-compare {
   display: grid;
@@ -8622,17 +8678,17 @@ body {
 }
 
 .hud {
-  padding-top: max(14px, env(safe-area-inset-top));
-  padding-right: max(14px, env(safe-area-inset-right));
-  padding-bottom: max(14px, env(safe-area-inset-bottom));
-  padding-left: max(14px, env(safe-area-inset-left));
+  padding-top: max(var(--hud-pad, 14px), env(safe-area-inset-top));
+  padding-right: max(var(--hud-pad, 14px), env(safe-area-inset-right));
+  padding-bottom: max(var(--hud-pad, 14px), env(safe-area-inset-bottom));
+  padding-left: max(var(--hud-pad, 14px), env(safe-area-inset-left));
 }
 
 .screen {
-  padding-top: max(20px, env(safe-area-inset-top));
-  padding-right: max(20px, env(safe-area-inset-right));
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-  padding-left: max(20px, env(safe-area-inset-left));
+  padding-top: max(var(--screen-top, 20px), env(safe-area-inset-top));
+  padding-right: max(var(--screen-x, 20px), env(safe-area-inset-right));
+  padding-bottom: max(var(--screen-bottom, 20px), env(safe-area-inset-bottom));
+  padding-left: max(var(--screen-x, 20px), env(safe-area-inset-left));
 }
 
 .install-steps {
@@ -8640,4 +8696,744 @@ body {
   padding-left: 20px;
   text-align: left;
   line-height: 1.6;
+}
+
+/* ---------- Phones ---------- */
+
+@media (pointer: coarse) {
+  .chat-form input {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 620px) {
+  .screen {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    --screen-bottom: 16px;
+  }
+
+  .screen > .panel {
+    flex-shrink: 0;
+  }
+
+  .screen:has(> .feed.lifted) {
+    --screen-bottom: 64px;
+  }
+
+  .screen-foot {
+    display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .screen-foot .home-report,
+  .screen-foot .credit.corner {
+    position: static;
+    transform: none;
+  }
+
+  .credit {
+    white-space: nowrap;
+  }
+
+  .home .legal-links > :nth-child(-n + 2) {
+    display: none;
+  }
+
+  .account-bar {
+    gap: 6px;
+  }
+
+  .account-bar .account-plate {
+    flex: 0 1 auto;
+    padding: 4px 10px 4px 4px;
+  }
+
+  .account-bar .account-name {
+    max-width: 84px;
+    font-size: 14px;
+  }
+
+  .account-bar .xp-bar {
+    width: 64px;
+  }
+
+  .account-actions {
+    flex: none;
+    gap: 5px;
+  }
+
+  .bar-btn,
+  .discord-signin {
+    padding: 7px;
+    border-radius: 12px;
+  }
+}
+
+/* Coins live in the shop on phones, so the bar is one even row: profile badge and buttons all 38px tall */
+@media (max-width: 620px) {
+  .account-bar .coins-pill {
+    display: none;
+  }
+
+  .account-bar .account-plate {
+    box-sizing: border-box;
+    height: 38px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .account-bar .account-plate .level-badge {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+    box-shadow: 0 2px 0 #8a6100;
+  }
+
+  .account-bar .account-plate .discord-linked {
+    width: 26px;
+    height: 26px;
+  }
+
+  .bar-btn,
+  .discord-signin {
+    box-sizing: border-box;
+    height: 38px;
+    min-width: 38px;
+    justify-content: center;
+  }
+
+  .favorite-options {
+    flex-wrap: nowrap;
+    margin-right: -4px;
+    padding: 2px 4px 8px 2px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  }
+
+  .favorite-options::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .favorite-options::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .favorite-option {
+    flex: none;
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 620px), (max-height: 500px) and (orientation: landscape) {
+  .panel.home {
+    background: rgba(6, 15, 18, 0.95);
+  }
+
+  /* Phones reach Report & ideas through Settings instead */
+  .home-report {
+    display: none;
+  }
+}
+
+/* Two-column results (landscape phones and tablets): same layout as the Activity card, but it scrolls instead of zooming */
+.win-screen.wide-win-screen {
+  padding: 12px;
+}
+
+.win-card.wide-win-card {
+  width: min(920px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+@media (max-height: 500px) {
+  .win-card.wide-win-card {
+    gap: 12px 16px;
+    padding: 16px 18px;
+  }
+
+  .wide-win-card .win-intro {
+    padding-bottom: 12px;
+  }
+
+  .wide-win-card .win-marbles .marble-dot {
+    --size: 36px;
+  }
+
+  .wide-win-card h2 {
+    font-size: 24px;
+  }
+
+  .wide-win-card .win-actions {
+    padding-top: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .account-bar .account-plate {
+    padding-right: 4px;
+  }
+
+  .account-bar .account-info {
+    display: none;
+  }
+
+  .bar-btn,
+  .discord-signin {
+    padding: 6px;
+  }
+}
+
+@media (max-width: 560px) {
+  .seat {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 8px;
+    padding: 10px;
+  }
+
+  .seat-actions {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+
+  .seat-actions:empty {
+    display: none;
+  }
+
+  .seat .marble-dot {
+    --size: 30px;
+  }
+
+  .room-code {
+    font-size: 38px;
+  }
+
+  .boxes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .box-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+    padding: 14px;
+    text-align: left;
+  }
+
+  .box-card .box-art {
+    grid-row: span 2;
+    margin: 0;
+    zoom: 0.6;
+  }
+
+  .box-card h3 {
+    align-self: end;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .box-card p {
+    align-self: start;
+    font-size: 13px;
+  }
+
+  .box-card > :nth-child(n + 4) {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .box-card .btn.big {
+    justify-self: stretch;
+    font-size: 17px;
+    padding: 10px 18px;
+  }
+
+  .item-grid.featured {
+    grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+    padding: 12px 4px 16px;
+  }
+
+  .win-player-head {
+    flex-wrap: wrap;
+    row-gap: 3px;
+  }
+
+  .win-player-name {
+    flex: 1 0 100%;
+  }
+}
+
+/* Phone HUD: portrait stacks top bar / players / bottom bar; landscape moves everything into side rails */
+.phone-hud {
+  --hud-pad: 8px;
+}
+
+.phone-hud .brand,
+.phone-hud .hud-coins {
+  display: none;
+}
+
+.phone-hud .hud-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.phone-hud .brand-chip {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 40px;
+  padding: 6px 8px;
+  border-radius: 14px;
+}
+
+.phone-hud .hud-buttons {
+  grid-column: 2;
+  grid-row: 1;
+  gap: 6px;
+}
+
+.phone-hud .icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+}
+
+.phone-hud .players-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: none;
+  padding: 0;
+  overflow: visible;
+}
+
+.phone-hud .team {
+  flex-direction: row;
+  gap: 4px;
+}
+
+.phone-hud .vs {
+  font-size: 12px;
+  padding: 0;
+}
+
+.phone-hud .chip {
+  padding: 4px 10px 4px 4px;
+  gap: 6px;
+}
+
+.phone-hud .chip-name {
+  max-width: 72px;
+}
+
+.phone-hud .chip .tag-badge,
+.phone-hud .chip .badge {
+  display: none;
+}
+
+.phone-hud .chip.mini {
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 16px;
+}
+
+.phone-hud .chip.mini .chip-name {
+  display: none;
+}
+
+.phone-hud .chip.mini .pips {
+  margin-top: 0;
+  padding: 2px 3px;
+  gap: 2px;
+}
+
+.phone-hud .chip.mini .pips span {
+  width: 5px;
+  height: 5px;
+}
+
+.phone-hud .hud-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phone-hud .more-btn {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+
+.phone-hud .more-btn .unread {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+
+.phone-hud .action-panel {
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 20px;
+}
+
+.phone-hud .action-title {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.phone-hud .action-sub {
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.phone-hud .roll-badge {
+  width: 42px;
+  height: 42px;
+  font-size: 26px;
+  border-radius: 12px;
+}
+
+.phone-hud .roll-btn {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  font-size: 13px;
+  box-shadow: 0 5px 0 #a8480f, 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+.phone-hud .roll-btn:disabled {
+  box-shadow: 0 3px 0 #333, 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.phone-hud .roll-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 380px) {
+  .phone-hud .players-bar {
+    gap: 4px;
+  }
+
+  .phone-hud .chip:not(.mini) {
+    padding-right: 8px;
+  }
+
+  .phone-hud .chip-name {
+    max-width: 58px;
+  }
+
+  .phone-hud .chip:not(.mini) .pips {
+    gap: 2px;
+  }
+
+  .phone-hud .chip:not(.mini) .pips span {
+    width: 7px;
+    height: 7px;
+  }
+}
+
+.phone-hud.landscape {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.phone-hud.landscape .hud-top {
+  display: contents;
+}
+
+.phone-hud.landscape .brand-chip {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+
+.phone-hud.landscape .players-bar {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  align-self: start;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.phone-hud.landscape .team {
+  flex-direction: column;
+}
+
+.phone-hud.landscape .vs {
+  align-self: center;
+}
+
+.phone-hud.landscape .hud-buttons {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.phone-hud.landscape .hud-bottom {
+  grid-column: 3;
+  grid-row: 3;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.phone-hud.landscape .action-panel {
+  flex: none;
+  width: 184px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.phone-hud.landscape .roll-badge {
+  align-self: center;
+}
+
+.phone-hud.landscape .roll-btn {
+  width: 100%;
+  height: 52px;
+  flex-direction: row;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.rotate-hint {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top)) + 104px);
+  left: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 99px;
+  background: var(--glass-strong);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+  animation: rotate-hint-in 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  cursor: pointer;
+}
+
+.rotate-hint svg:first-child {
+  color: var(--gold);
+  animation: rotate-hint-turn 2.4s ease-in-out infinite;
+}
+
+@keyframes rotate-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+}
+
+@keyframes rotate-hint-turn {
+  0%,
+  30% {
+    transform: rotate(0);
+  }
+  55%,
+  85% {
+    transform: rotate(-90deg);
+  }
+}
+
+/* ---------- Game menu sheet (phones) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  animation: fade-in 0.15s ease-out both;
+}
+
+.sheet {
+  width: min(560px, 100%);
+  max-height: min(80dvh, 640px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+  border: 1px solid var(--glass-line);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease-out;
+  animation: sheet-in 0.28s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.sheet-grab {
+  display: grid;
+  place-items: center;
+  padding: 10px 0 8px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sheet-grab span {
+  width: 44px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 14px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.sheet-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 1px solid var(--glass-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheet-tool:active {
+  transform: scale(0.96);
+}
+
+.sheet-tool.on {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #1b1208;
+}
+
+.sheet-label {
+  margin-right: auto;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.sheet .reactions.inline {
+  align-items: stretch;
+}
+
+.sheet .reactions.inline .reactions-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.sheet .reactions.inline .reactions-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sheet .reactions.inline .stickers {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 2px 2px;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  animation: none;
+}
+
+.sheet .feed.docked {
+  width: 100%;
+}
+
+.sheet .feed.docked .feed-tools {
+  width: 100%;
+}
+
+.sheet .feed.docked .feed-list {
+  min-height: 56px;
+  max-height: 30dvh;
+}
+
+.feed-empty {
+  margin: auto;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.sheet-spectators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-dim);
 }

@@ -6,7 +6,9 @@ import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
-import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee } from './Icons';
+import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee, Dots, Close } from './Icons';
+import HudSheet from './HudSheet';
+import useMedia, { PHONE_QUERY, WIDE_RESULTS_QUERY } from './useMedia';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf, emotesOf, emoteFor } from '../game/catalog';
 import { warmBoardSkin } from '../game/skinWarm';
@@ -183,6 +185,41 @@ const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(po
 const APP_TITLE = document.title || 'Marralhinha Online';
 const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle || p.away);
 const TABLE_SIDES = ['bottom', 'right', 'top', 'left'];
+const PORTRAIT_QUERY = '(orientation: portrait)';
+const ROTATE_KEY = 'marralhinha:rotateHint';
+
+// Shown once per device: a portrait phone game gets a nudge toward the roomier landscape layout
+function RotateHint() {
+  const [show, setShow] = useState(() => {
+    try {
+      return !localStorage.getItem(ROTATE_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const dismiss = useCallback(() => {
+    setShow(false);
+    try {
+      localStorage.setItem(ROTATE_KEY, '1');
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (!show) return undefined;
+    const t = setTimeout(dismiss, 8000);
+    return () => clearTimeout(t);
+  }, [show, dismiss]);
+  if (!show) return null;
+  return (
+    <button type="button" className="rotate-hint" onClick={dismiss} aria-label="Turn your phone sideways for a bigger board. Tap to dismiss.">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="7" y="3" width="10" height="16" rx="2" />
+        <path d="M3 14a8 8 0 0 0 6 7M21 10a8 8 0 0 0-6-7" />
+      </svg>
+      <span>Turn sideways for a bigger board</span>
+      <Close />
+    </button>
+  );
+}
 
 // Speech bubbles live in <body> and follow their chip every frame, so the scrolling (clipped) mobile
 // player bar can't hide them. Chat bubbles are capped to the chip's width so neighbours never overlap.
@@ -233,7 +270,7 @@ function TurnClock({ deadline, total }) {
   );
 }
 
-export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats }) {
+export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats, mini = false }) {
   const color = SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
@@ -260,7 +297,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
           : undefined
       }
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onView && (e.preventDefault(), e.stopPropagation(), onView())}
-      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}`}
+      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}${mini ? ' mini' : ''}`}
       style={seatVars}
     >
       {sticker && (
@@ -490,15 +527,19 @@ function ChatInput({ onSend, teams = false }) {
 
 // The chat/log feed. Game-event lines are hidden until "Show logs" is on; the live announcements
 // above the board still narrate the important moments, so nothing critical is lost when they're hidden
-export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false }) {
-  const shown = open ? entries : entries.slice(0, 4);
+export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
+  const shown = open || docked ? entries : entries.slice(0, 4);
   return (
-    <div className={`feed${open ? ' open' : ''}${lifted ? ' lifted' : ''}`}>
+    <div className={`feed${open || docked ? ' open' : ''}${lifted ? ' lifted' : ''}${docked ? ' docked' : ''}`}>
       <div className="feed-tools">
-        <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
-          {open ? 'Hide' : onToggleLogs ? 'Chat & log' : 'Chat'}
-          {unread > 0 && <span className="unread">{unread}</span>}
-        </button>
+        {docked ? (
+          <span className="sheet-label">{onToggleLogs ? 'Chat & log' : 'Chat'}</span>
+        ) : (
+          <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
+            {open ? 'Hide' : onToggleLogs ? 'Chat & log' : 'Chat'}
+            {unread > 0 && <span className="unread">{unread}</span>}
+          </button>
+        )}
         {onToggleLogs && (
           <button type="button" className={`feed-logs${showLogs ? ' on' : ''}`} onClick={onToggleLogs} aria-pressed={showLogs} title="Show moves, rolls and captures in the chat">
             {showLogs ? 'Hide logs' : 'Show logs'}
@@ -506,6 +547,7 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
         )}
       </div>
       <div className="feed-list" id="feed-list">
+        {docked && !shown.length && <div className="feed-empty">No messages yet. Say hi!</div>}
         {shown.map((entry, i) => (
           <div
             key={`${entry.t}-${i}`}
@@ -529,25 +571,27 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
   );
 }
 
-export function ReactionBar({ onReact, spam = false, emotes = [] }) {
-  const [panel, setPanel] = useState(null);
+export function ReactionBar({ onReact, spam = false, emotes = [], inline = false }) {
+  const [panel, setPanel] = useState(inline ? 'chat' : null);
   const [cooling, setCooling] = useState(false);
   const send = (key) => {
     if (cooling) return;
     onReact(key);
-    if (!spam) setPanel(null);
+    if (!spam && !inline) setPanel(null);
     setCooling(true);
     setTimeout(() => setCooling(false), spam ? 250 : 1200);
   };
-  const toggle = (next) => setPanel((cur) => (cur === next ? null : next));
+  const toggle = (next) => setPanel((cur) => (cur === next && !inline ? null : next));
   return (
-    <div className={`reactions${panel ? ' open' : ''}`}>
+    <div className={`reactions${panel ? ' open' : ''}${inline ? ' inline' : ''}`}>
       <div className="reactions-toggles">
         <button className={`icon-btn reactions-toggle${panel === 'chat' ? ' on' : ''}`} onClick={() => toggle('chat')} aria-label="Quick chat" title="Quick chat" aria-expanded={panel === 'chat'}>
           <Chat />
+          {inline && <span>Quick chat</span>}
         </button>
         <button className={`icon-btn reactions-toggle${panel === 'emotes' ? ' on' : ''}`} onClick={() => toggle('emotes')} aria-label="Emotes" title="Emotes" aria-expanded={panel === 'emotes'}>
           <Smiley />
+          {inline && <span>Emotes</span>}
         </button>
       </div>
       {panel === 'chat' && (
@@ -631,7 +675,7 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
   );
 }
 
-export function WinCard({ cardRef, activity = false, local = false, game, seats, mySeat, nameOf, isHost, coins = 0, rematch = null, playerId = null, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
+export function WinCard({ cardRef, activity = false, wide = false, local = false, game, seats, mySeat, nameOf, isHost, coins = 0, rematch = null, playerId = null, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
   const [revealed, setRevealed] = useState(false);
   const reward = game.rewards?.[mySeat];
   const iWon = !local && !!game.winners?.includes(mySeat);
@@ -648,7 +692,7 @@ export function WinCard({ cardRef, activity = false, local = false, game, seats,
   const favourite = getSettings().favoriteSeat;
   const openSeat = Number.isInteger(favourite) && !seats[favourite] ? favourite : seats.findIndex((p) => !p);
   return (
-    <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity ? ' activity-win-card' : ''}${reward ? '' : ' no-payout'}`}>
+    <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity || wide ? ' activity-win-card' : ''}${wide && !activity ? ' wide-win-card' : ''}${reward ? '' : ' no-payout'}`}>
       <div className="win-intro">
         <div className="win-marbles">
           {game.winners.map((s) => (
@@ -800,8 +844,20 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const isHost = room.hostId === playerId;
   const [rulesOpen, setRulesOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
   const [showOver, setShowOver] = useState(game.phase === 'over');
+  // Round the table spins the HUD itself, so it keeps the regular layout
+  const phone = useMedia(PHONE_QUERY) && !room.table;
+  const portrait = useMedia(PORTRAIT_QUERY);
+  const wideResults = useMedia(WIDE_RESULTS_QUERY) && !room.activity;
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setChatSeenAt(Date.now());
+  }, []);
+  useEffect(() => {
+    if (!phone) setSheetOpen(false);
+  }, [phone]);
   const [winScreenRef, winCardRef] = useFitPanel(room.activity && showOver, room, { maxWidth: 920 });
 
   // Results name the players who finished the game, not whoever grabbed a freed seat afterwards
@@ -908,26 +964,30 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     return () => delete document.body.dataset.tableSide;
   }, [side]);
   const teams = game.mode === 'teams';
-  const chip = (s) => (
-    <PlayerChip
-      key={s}
-      seat={s}
-      player={seats[s]}
-      game={game}
-      activeSeat={activeSeat}
-      mySeat={local ? -1 : mySeat}
-      reaction={reactions.find((r) => r.seat === s)}
-      clock={clock && game.turn === s ? clock : null}
-      viewing={!local && viewSeat === s && s !== Math.max(mySeat, 0)}
-      onView={local ? undefined : () => onViewSeat?.(s)}
-      onStats={!local && seats[s]?.userId && s !== mySeat ? () => onPlayerStats?.(seats[s]) : undefined}
-    />
-  );
+  const chip = (s) => {
+    const viewing = !local && viewSeat === s && s !== Math.max(mySeat, 0);
+    return (
+      <PlayerChip
+        key={s}
+        seat={s}
+        player={seats[s]}
+        game={game}
+        activeSeat={activeSeat}
+        mySeat={local ? -1 : mySeat}
+        reaction={reactions.find((r) => r.seat === s)}
+        clock={clock && game.turn === s ? clock : null}
+        viewing={viewing}
+        mini={phone && portrait && s !== activeSeat && (local || s !== mySeat) && !viewing}
+        onView={local ? undefined : () => onViewSeat?.(s)}
+        onStats={!local && seats[s]?.userId && s !== mySeat ? () => onPlayerStats?.(seats[s]) : undefined}
+      />
+    );
+  };
   const shared = rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log;
   const log = [...(room.chat || []), ...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
-  const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
+  const unread = feedOpen || sheetOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
   const iWon = local ? game.phase === 'over' : game.winners?.includes(mySeat);
 
   const announceEl = (
@@ -949,7 +1009,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       )}
       <div className="action-text">
         <div className="action-title">{status.title}</div>
-        <div className="action-sub">{status.sub}</div>
+        <div className="action-sub">{canRoll && !autoRoll && !FINE_POINTER ? status.sub.replace(/^Roll the dice/, 'Tap the board or hit Roll') : status.sub}</div>
       </div>
       {mySeat >= 0 && game.phase !== 'over' && (
         <button className={`roll-btn${canRoll ? ' ready' : ''}${autoRoll ? ' auto' : ''}`} disabled={!canRoll} onClick={roll} title={autoRoll ? 'Auto-roll is on (change in Settings)' : 'Roll (Space)'}>
@@ -965,108 +1025,80 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     </div>
   );
 
-  return (
-    <div ref={hudRef} className="hud">
-      <div className="hud-top">
-        <div className="brand-chip">
-          <span className="brand">Marralhinha</span>
-          {!room.activity && !local && <RoomCode code={room.code} />}
-          {local && <span className="room-pill local-pill">{room.table ? 'Round the table' : 'Pass & play'}</span>}
-          {mySeat < 0 && !local && <span className="badge">Spectating</span>}
-          {!local && <Coins amount={coins} className="hud-coins" />}
-        </div>
-
-        <div className="players-bar">
-          {teams ? (
-            <>
-              <div className="team">{[0, 2].map(chip)}</div>
-              <span className="vs">VS</span>
-              <div className="team">{[1, 3].map(chip)}</div>
-            </>
-          ) : (
-            game.active.map(chip)
-          )}
-        </div>
-
-        <div className="hud-buttons">
-          {isAdmin && !local && (
-            <BoardPicker
-              current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null}
-              seats={seats}
-              onPick={(item) => onAction('game:setBoard', { item })}
-              onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
-            />
-          )}
-          <SettingsButton onReport={local ? undefined : onReport} />
-          {!(local && room.table) && (
-            <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
-              <Camera />
-            </button>
-          )}
-          <button className="icon-btn" onClick={() => setRulesOpen(tableSide || true)} aria-label="How to play" title="How to play">
-            <Help />
-          </button>
-          {onLeave && (
-            <button className="icon-btn" onClick={onLeave} aria-label="Leave game" title="Leave game">
-              <Exit />
-            </button>
-          )}
-          {room.activity && isHost && game.phase !== 'over' && (
-            <button
-              className="icon-btn"
-              onClick={async () => {
-                const ok = await ask({ title: 'End this game?', message: 'Everyone returns to the lobby. This round ends without rewards.', confirm: 'End game', cancel: 'Keep playing', tone: 'danger' });
-                if (ok) onAction('game:endTable');
-              }}
-              aria-label="End game for everyone"
-              title="End game for everyone"
-            >
-              <Exit />
-            </button>
-          )}
-        </div>
-      </div>
-
+  const brandChip = (
+    <div className="brand-chip">
+      <span className="brand">Marralhinha</span>
+      {!room.activity && !local && <RoomCode code={room.code} />}
+      {local && <span className="room-pill local-pill">{room.table ? 'Round the table' : 'Pass & play'}</span>}
+      {mySeat < 0 && !local && <span className="badge">Spectating</span>}
+      {!local && <Coins amount={coins} className="hud-coins" />}
+    </div>
+  );
+  const playersBar = (
+    <div className="players-bar">
+      {teams ? (
+        <>
+          <div className="team">{[0, 2].map(chip)}</div>
+          <span className="vs">VS</span>
+          <div className="team">{[1, 3].map(chip)}</div>
+        </>
+      ) : (
+        game.active.map(chip)
+      )}
+    </div>
+  );
+  const devPicker = isAdmin && !local && (
+    <BoardPicker
+      current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null}
+      seats={seats}
+      onPick={(item) => onAction('game:setBoard', { item })}
+      onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
+    />
+  );
+  const cameraBtn = !(local && room.table) && (
+    <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
+      <Camera />
+    </button>
+  );
+  const endTable = async () => {
+    const ok = await ask({ title: 'End this game?', message: 'Everyone returns to the lobby. This round ends without rewards.', confirm: 'End game', cancel: 'Keep playing', tone: 'danger' });
+    if (ok) onAction('game:endTable');
+  };
+  const canEnd = room.activity && isHost && game.phase !== 'over';
+  const canAway = !local && mySeat >= 0 && game.phase !== 'over';
+  const spam = isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev');
+  const feed = (docked) => (
+    <Feed
+      entries={entries}
+      open={feedOpen}
+      onToggle={() => {
+        setFeedOpen((o) => !o);
+        setChatSeenAt(Date.now());
+      }}
+      showLogs={showLogs}
+      onToggleLogs={() => updateSettings({ showLogs: !showLogs })}
+      unread={unread}
+      isMine={isMine}
+      teams={teams && mySeat >= 0}
+      onSend={(text, channel) => onAction('game:chat', { text, channel })}
+      lifted={!docked && showOver}
+      docked={docked}
+    />
+  );
+  const overlays = (
+    <>
       {startPending && <StartIntro key={game.pick.t} game={game} seats={seats} mySeat={local ? -1 : mySeat} nameOf={nameOf} onDismiss={onDismissStart} />}
-
       {announceEl}
-
-      <div className="hud-bottom">
-        {local ? <span aria-hidden="true" /> : <Feed
-          entries={entries}
-          open={feedOpen}
-          onToggle={() => {
-            setFeedOpen((o) => !o);
-            setChatSeenAt(Date.now());
-          }}
-          showLogs={showLogs}
-          onToggleLogs={() => updateSettings({ showLogs: !showLogs })}
-          unread={unread}
-          isMine={isMine}
-          teams={teams && mySeat >= 0}
-          onSend={(text, channel) => onAction('game:chat', { text, channel })}
-          lifted={showOver}
-        />}
-
-        {actionPanel}
-        <div className="hud-right">
-          {!local && <Spectators spectators={room.spectators || []} playerId={playerId} />}
-          {!local && mySeat >= 0 && game.phase !== 'over' && (
-            <button className={`icon-btn away-btn${meAway ? ' on' : ''}`} onClick={() => setAway(!meAway)} aria-pressed={meAway} title={meAway ? "I'm back (B)" : 'Step away: the bot plays for you (B)'} aria-label={meAway ? "I'm back" : 'Step away'}>
-              <Coffee />
-            </button>
-          )}
-          {!local && mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
-        </div>
-      </div>
-
+    </>
+  );
+  const partner = teams ? seats[partnerOf(mySeat)] : null;
+  const endings = (
+    <>
       {meAway && !local && game.phase !== 'over' && (
         <div className="away-banner" role="status">
           <div className="away-title">You stepped away</div>
           <div className="away-sub">
-            {teams && seats[partnerOf(mySeat)] && !seats[partnerOf(mySeat)].isBot && seats[partnerOf(mySeat)].connected && !seats[partnerOf(mySeat)].away
-              ? `${seats[partnerOf(mySeat)].name} is playing your turns.`
-              : 'The bot is playing your turns.'}
+            {partner && !partner.isBot && partner.connected && !partner.away ? `${partner.name} is playing your turns.` : 'The bot is playing your turns.'}
             {!isAdmin && " If the bot plays more than half your turns this game, you won't earn rewards."}
           </div>
           <button className="btn primary big" onClick={() => setAway(false)}>
@@ -1076,11 +1108,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       )}
 
       {showOver && (
-        <div ref={winScreenRef} className={`win-screen${room.activity ? ' activity-win-screen' : ''}`}>
+        <div ref={winScreenRef} className={`win-screen${room.activity ? ' activity-win-screen' : ''}${wideResults ? ' wide-win-screen' : ''}`}>
           {iWon && <Confetti />}
           <WinCard
             cardRef={winCardRef}
             activity={room.activity}
+            wide={wideResults}
             local={local}
             game={game}
             seats={seats}
@@ -1100,6 +1133,130 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       )}
 
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
+    </>
+  );
+
+  if (phone) {
+    const watching = (room.spectators || []).filter((p) => p.connected);
+    const fromSheet = (fn) => () => {
+      closeSheet();
+      fn();
+    };
+    return (
+      <div ref={hudRef} className={`hud phone-hud ${portrait ? 'portrait' : 'landscape'}`}>
+        <div className="hud-top">
+          {brandChip}
+          {playersBar}
+          <div className="hud-buttons">
+            {devPicker}
+            {cameraBtn}
+          </div>
+        </div>
+
+        {overlays}
+        {portrait && !startPending && !room.activity && game.phase !== 'over' && <RotateHint />}
+
+        <div className="hud-bottom">
+          <button type="button" className="icon-btn more-btn" onClick={() => setSheetOpen(true)} aria-label={local ? 'Menu' : 'Menu, chat and emotes'} aria-expanded={sheetOpen} title="Menu">
+            <Dots />
+            {unread > 0 && <span className="unread">{unread}</span>}
+          </button>
+          {actionPanel}
+        </div>
+
+        <HudSheet open={sheetOpen} onClose={closeSheet}>
+          <div className="sheet-tools">
+            {canAway && (
+              <button type="button" className={`sheet-tool${meAway ? ' on' : ''}`} onClick={fromSheet(() => setAway(!meAway))} aria-pressed={meAway}>
+                <Coffee />
+                <span>{meAway ? "I'm back" : 'Step away'}</span>
+              </button>
+            )}
+            <SettingsButton className="sheet-tool" label onReport={local ? undefined : onReport} />
+            <button type="button" className="sheet-tool" onClick={fromSheet(() => setRulesOpen(true))}>
+              <Help />
+              <span>How to play</span>
+            </button>
+            {onLeave && (
+              <button type="button" className="sheet-tool" onClick={fromSheet(onLeave)}>
+                <Exit />
+                <span>Leave</span>
+              </button>
+            )}
+            {canEnd && (
+              <button type="button" className="sheet-tool" onClick={fromSheet(endTable)}>
+                <Exit />
+                <span>End game</span>
+              </button>
+            )}
+          </div>
+          {!local && mySeat >= 0 && (
+            <ReactionBar
+              inline
+              spam={spam}
+              emotes={emotesOf(seats[mySeat])}
+              onReact={(key) => {
+                onAction('game:react', { key });
+                if (!spam) closeSheet();
+              }}
+            />
+          )}
+          {!local && feed(true)}
+          {watching.length > 0 && (
+            <p className="sheet-spectators">
+              <Eye /> {watching.map((p) => (p.id === playerId ? `${p.name} (you)` : p.name)).join(', ')}
+            </p>
+          )}
+        </HudSheet>
+
+        {endings}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={hudRef} className="hud">
+      <div className="hud-top">
+        {brandChip}
+        {playersBar}
+        <div className="hud-buttons">
+          {devPicker}
+          <SettingsButton onReport={local ? undefined : onReport} />
+          {cameraBtn}
+          <button className="icon-btn" onClick={() => setRulesOpen(tableSide || true)} aria-label="How to play" title="How to play">
+            <Help />
+          </button>
+          {onLeave && (
+            <button className="icon-btn" onClick={onLeave} aria-label="Leave game" title="Leave game">
+              <Exit />
+            </button>
+          )}
+          {canEnd && (
+            <button className="icon-btn" onClick={endTable} aria-label="End game for everyone" title="End game for everyone">
+              <Exit />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {overlays}
+
+      <div className="hud-bottom">
+        {local ? <span aria-hidden="true" /> : feed(false)}
+
+        {actionPanel}
+        <div className="hud-right">
+          {!local && <Spectators spectators={room.spectators || []} playerId={playerId} />}
+          {canAway && (
+            <button className={`icon-btn away-btn${meAway ? ' on' : ''}`} onClick={() => setAway(!meAway)} aria-pressed={meAway} title={meAway ? "I'm back (B)" : 'Step away: the bot plays for you (B)'} aria-label={meAway ? "I'm back" : 'Step away'}>
+              <Coffee />
+            </button>
+          )}
+          {!local && mySeat >= 0 && <ReactionBar spam={spam} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
+        </div>
+      </div>
+
+      {endings}
     </div>
   );
 }
