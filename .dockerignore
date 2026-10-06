@@ -9,4 +9,5 @@ docs
 *.md
 !TERMS.md
 !PRIVACY.md
+!RULES.md
 npm-debug.log*
