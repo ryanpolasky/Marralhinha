@@ -14,6 +14,7 @@ const kindOf = (p) => (!p ? 'empty' : p.isBot ? 'bot' : 'human');
 
 // Where each colour sits when the camera is locked: Red bottom, Blue right, Yellow top, Green left
 const SIDES = ['bottom', 'right', 'top', 'left'];
+const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches && !window.matchMedia('(any-pointer: coarse)').matches;
 
 export default function LocalLobby({ room, onAction, onBack }) {
   const [screenRef, panelRef] = useFitPanel(false, room, { reserveBar: true, bottom: 100 });
@@ -103,14 +104,19 @@ export default function LocalLobby({ room, onAction, onBack }) {
               </button>
             ))}
           </div>
-          {room.table ? (
-            <p className="lobby-mode">Lay the device flat. Everyone sits on the side that matches their colour and the camera stays put.</p>
-          ) : (
-            <p className="lobby-mode">The board turns to face whoever's turn it is. Pass the device along when the turn changes.</p>
-          )}
-          <p className="lobby-mode">
-            {seated < 2 ? 'You need at least 2 seats filled.' : !humans ? 'Seat at least one player.' : !room.teams ? 'Every player for themselves. No Marbucks or stats on this mode.' : seated === 4 ? 'Partners sit across from each other: Red & Yellow vs Blue & Green.' : "Teams need all 4 seats filled, otherwise it's free-for-all."}
-          </p>
+          <div className="lobby-notes">
+            {room.table ? (
+              <>
+                <p className="lobby-mode">Lay the device flat. Everyone sits on the side that matches their colour and the camera stays put.</p>
+                {FINE_POINTER && <p className="lobby-notice tight">Heads up: this mode is built for phones and tablets lying flat on a table. It'll feel awkward on a desktop or laptop.</p>}
+              </>
+            ) : (
+              <p className="lobby-mode">The board turns to face whoever's turn it is. Pass the device along when the turn changes.</p>
+            )}
+            <p className="lobby-mode">
+              {seated < 2 ? 'You need at least 2 seats filled.' : !humans ? 'Seat at least one player.' : !room.teams ? 'Every player for themselves. No Marbucks or stats on this mode.' : seated === 4 ? 'Partners sit across from each other: Red & Yellow vs Blue & Green.' : "Teams need all 4 seats filled, otherwise it's free-for-all."}
+            </p>
+          </div>
           {error && <p className="lobby-notice">{error}</p>}
           <button className={`btn primary big block${seated >= 2 && humans ? ' play-btn' : ''}`} disabled={seated < 2 || !humans} onClick={start}>
             Start game
