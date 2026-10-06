@@ -3,6 +3,11 @@ export function movesForMarble(moves, seat, marble, pos) {
 }
 
 export const ROLL_REVEAL_MS = 1050;
+// Pass & play: how long a dead roll stays on screen before the turn (and camera) moves on
+export const NO_MOVES_HOLD_MS = 1800;
+// Pass & play: the marble finishes its hops, then a beat, then the board turns to the next player
+export const HANDOFF_BEAT_MS = 900;
+export const handoffMs = (mv) => 350 + (mv.path?.length || 1) * 190 + (mv.capture ? 700 : 0) + HANDOFF_BEAT_MS;
 // The "who starts" wheel: spin, then hold on the result (server bots wait this long too, see START_WHEEL_MS in server/rooms.js)
 export const START_WHEEL_MS = 8500;
 export const START_WHEEL_SPIN_MS = 4300;

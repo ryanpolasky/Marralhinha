@@ -1,6 +1,7 @@
 const { randomBytes, randomInt } = require('crypto');
 const rules = require('../src/shared/rules');
 const { chooseMove } = require('../src/shared/bot');
+const { animationMs } = require('../src/shared/timing');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -8,9 +9,6 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SEAT_ORDER = [0, 2, 1, 3];
 const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink', 'Marbo', 'Bolinha'];
 const BOT_DELAY_MS = 450;
-// How long the client shows the "who starts" wheel; bots wait for it (keep in sync with START_WHEEL_MS in src/game/moves.js)
-const START_WHEEL_MS = 8500;
-const START_WINNER_MS = 2200;
 // A disconnected player gets this much grace, once, counted from the moment they dropped — then the bot
 // plays their turns at idle speed until they're back
 const AWAY_GRACE_MS = 20000;
@@ -55,19 +53,6 @@ class UserError extends Error {}
 
 const secureDie = () => randomInt(1, 7);
 const newId = (bytes = 6) => randomBytes(bytes).toString('hex');
-
-// Bots wait for the dice and marble animations to finish before acting
-function animationMs(game, now = Date.now()) {
-  const recent = (event) => event && now - event.t < 250;
-  let ms = 0;
-  if (recent(game.lastRoll)) ms = 1300;
-  if (recent(game.lastMove)) ms = Math.max(ms, 350 + game.lastMove.path.length * 190 + (game.lastMove.capture ? 700 : 0));
-  if (game.pick) {
-    const introMs = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;
-    if (now - game.pick.t < introMs) ms = Math.max(ms, introMs - (now - game.pick.t));
-  }
-  return ms;
-}
 
 class Room {
   constructor(code, hooks, { instanceId = null, quickPlay = false } = {}) {

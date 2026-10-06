@@ -18,7 +18,7 @@ test('escapes HTML so the docs cannot inject markup', () => {
 });
 
 test('both real legal docs render with their headings', () => {
-  for (const file of ['TERMS.md', 'PRIVACY.md']) {
+  for (const file of ['TERMS.md', 'PRIVACY.md', 'RULES.md']) {
     const html = markdownToHtml(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'));
     assert.match(html, /<h1>/);
     assert.ok((html.match(/<h2>/g) || []).length >= 5, `${file} has its sections`);

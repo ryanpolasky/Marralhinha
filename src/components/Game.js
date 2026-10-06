@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
-import { coveringTurn, homeCount, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
+import { coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
@@ -18,7 +18,7 @@ import useFitPanel from './useFitPanel';
 
 const BOX_PRICE = BOXES[0].price;
 
-function useAnnouncements(game, mySeat, nameOf) {
+function useAnnouncements(game, mySeat, nameOf, local = false) {
   const [items, setItems] = useState([]);
   const prev = useRef(null);
   const latest = useRef(game);
@@ -44,8 +44,8 @@ function useAnnouncements(game, mySeat, nameOf) {
     prev.current = game;
     if (!p) return;
     const roll = game.lastRoll;
-    if (roll && roll.t !== p.lastRoll?.t && roll.seat === mySeat) {
-      if (roll.noMoves) push(`No moves`, `with a ${roll.die}${roll.die === 6 ? ', roll again!' : ''}`, 'muted', ROLL_REVEAL_MS);
+    if (roll && roll.t !== p.lastRoll?.t && (roll.seat === mySeat || (local && roll.noMoves))) {
+      if (roll.noMoves) push(`No moves`, `${local ? `${nameOf(roll.seat)} rolled a ${roll.die}` : `with a ${roll.die}`}${roll.die === 6 ? ', roll again!' : ''}`, 'muted', ROLL_REVEAL_MS);
       else if (roll.die === 6) push('Six!', 'Move, then roll again', 'gold', ROLL_REVEAL_MS, sfx.six);
     }
     const mv = game.lastMove;
@@ -62,7 +62,9 @@ function useAnnouncements(game, mySeat, nameOf) {
     if (game.phase === 'roll' && game.turn === mySeat && (p.turn !== mySeat || p.phase === 'over')) {
       const rollKey = game.lastRoll?.t;
       const justRolled = roll && roll.t !== p.lastRoll?.t;
-      push('Your turn!', 'Roll the dice', 'turn', justRolled ? ROLL_REVEAL_MS + 150 : mv && mv.t !== p.lastMove?.t ? 600 : 0, sfx.turn, (g) => g.phase === 'roll' && g.turn === mySeat && g.lastRoll?.t === rollKey);
+      const justMoved = mv && mv.t !== p.lastMove?.t;
+      const delay = justRolled ? ROLL_REVEAL_MS + (local ? NO_MOVES_HOLD_MS : 150) : justMoved ? (local ? handoffMs(mv) : 600) : 0;
+      push(local ? `${nameOf(game.turn)}'s turn!` : 'Your turn!', 'Roll the dice', 'turn', delay, sfx.turn, (g) => g.phase === 'roll' && g.turn === mySeat && g.lastRoll?.t === rollKey);
     }
     if (game.phase === 'over' && p.phase !== 'over' && mySeat >= 0) {
       setTimeout(() => {
@@ -70,12 +72,12 @@ function useAnnouncements(game, mySeat, nameOf) {
         (game.winners.includes(mySeat) ? sfx.win : sfx.lose)();
       }, 1200);
     }
-  }, [game, mySeat, nameOf, push]);
+  }, [game, mySeat, nameOf, push, local]);
 
   return items;
 }
 
-function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
+function statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false) {
   if (startPending) {
     return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'The wheel decides the first roll' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
   }
@@ -83,7 +85,17 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending) {
     const roller = game.lastRoll.seat;
     return { title: roller === mySeat ? 'Rolling…' : `${nameOf(roller)} is rolling…`, sub: 'Fingers crossed…' };
   }
+  if (stuck) {
+    const { seat, die } = game.lastRoll;
+    return { title: `No moves with a ${die}`, sub: die === 6 ? `${nameOf(seat)} rolls again` : `${nameOf(game.turn)} is up next` };
+  }
+  if (handoff) return { title: `${nameOf(game.turn)} is up next`, sub: table ? 'Get ready to roll' : 'Pass the device along' };
   const turn = game.turn;
+  if (local && game.phase !== 'over' && !seats[turn]?.isBot) {
+    const covering = game.mode === 'teams' && game.marbles[turn].length > 0 && homeCount(game.marbles[turn]) === game.marbles[turn].length;
+    const extra = covering ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
+    return game.phase === 'roll' ? { title: `${nameOf(turn)}'s turn`, sub: `Roll the dice${extra}` } : { title: `${nameOf(turn)} rolled a ${game.die}`, sub: `Pick a glowing marble${extra}` };
+  }
   const helping = game.mode === 'teams' && game.marbles[turn].length > 0 && homeCount(game.marbles[turn]) === game.marbles[turn].length;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
   if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
@@ -170,6 +182,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
 const APP_TITLE = document.title || 'Marralhinha Online';
 const isAway = (p) => !!p && !p.isBot && (!p.connected || p.idle || p.away);
+const TABLE_SIDES = ['bottom', 'right', 'top', 'left'];
 
 // Speech bubbles live in <body> and follow their chip every frame, so the scrolling (clipped) mobile
 // player bar can't hide them. Chat bubbles are capped to the chip's width so neighbours never overlap.
@@ -246,7 +259,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
             }
           : undefined
       }
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), e.stopPropagation(), onView())}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onView && (e.preventDefault(), e.stopPropagation(), onView())}
       className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}`}
       style={seatVars}
     >
@@ -618,10 +631,10 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
   );
 }
 
-export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf, isHost, coins = 0, rematch = null, playerId = null, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
+export function WinCard({ cardRef, activity = false, local = false, game, seats, mySeat, nameOf, isHost, coins = 0, rematch = null, playerId = null, onAction, onShop, onLeave, onViewBoard, onPlayerStats }) {
   const [revealed, setRevealed] = useState(false);
   const reward = game.rewards?.[mySeat];
-  const iWon = !!game.winners?.includes(mySeat);
+  const iWon = !local && !!game.winners?.includes(mySeat);
   const chests = Math.floor(coins / BOX_PRICE);
   const title = iWon ? (game.winners.length > 1 ? 'You and your partner win!' : 'You win!') : `${game.winners.map(nameOf).join(' & ')} win${game.winners.length === 1 ? 's' : ''}`;
   const nameOfId = (id) => {
@@ -698,7 +711,7 @@ export function WinCard({ cardRef, activity = false, game, seats, mySeat, nameOf
           <button className="btn ghost" onClick={onViewBoard}>
             View board
           </button>
-          {mySeat >= 0 && (
+          {mySeat >= 0 && !local && (
             <button className="btn ghost" onClick={() => onAction('lobby:spectate')} title="Step down and just watch the next round">
               Spectate
             </button>
@@ -780,8 +793,9 @@ export function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onReport, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, stuck = false, handoff = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onReport, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
+  const local = !!room.local;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
   const isHost = room.hostId === playerId;
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -792,12 +806,13 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
 
   // Results name the players who finished the game, not whoever grabbed a freed seat afterwards
   const over = game.phase === 'over';
-  const nameOf = useCallback((s) => (s === mySeat ? 'You' : (over ? game.names?.[s] : seats[s]?.name) || SEAT_COLORS[s].name), [mySeat, seats, over, game.names]);
-  const announcements = useAnnouncements(game, mySeat, nameOf);
+  const nameOf = useCallback((s) => ((s === mySeat && !local) ? 'You' : (over ? game.names?.[s] : seats[s]?.name) || SEAT_COLORS[s].name), [mySeat, local, seats, over, game.names]);
+  const announcements = useAnnouncements(game, mySeat, nameOf, local);
 
-  const activeSeat = rollPending ? game.lastRoll.seat : game.turn;
+  const held = rollPending || stuck || handoff;
+  const activeSeat = held ? game.lastRoll.seat : game.turn;
   const covering = coveringTurn(game, seats, mySeat);
-  const myTurn = (activeSeat === mySeat || (covering && !rollPending)) && game.phase !== 'over';
+  const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over';
   const meAway = !!seats[mySeat]?.away;
   const setAway = useCallback((away) => onAction('game:away', { away }), [onAction]);
 
@@ -812,7 +827,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [mySeat, game.phase, meAway, setAway]);
-  const canRoll = myTurn && game.phase === 'roll' && !rollPending && !startPending;
+  const canRoll = myTurn && game.phase === 'roll' && !held && !startPending;
   const roll = useCallback(() => canRoll && onAction('game:roll'), [canRoll, onAction]);
   const { autoRoll, showLogs } = useSettings();
 
@@ -879,7 +894,19 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     if (isAdmin) warmBoardSkin();
   }, [isAdmin]);
 
-  const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending);
+  const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, !!room.table);
+  const badge = stuck ? game.lastRoll : game.phase === 'move' && !rollPending ? { die: game.die, seat: game.turn } : null;
+  // Faces Red during the start wheel; bot turns stay facing the last human since nobody sits there
+  const tableSide = !local || !room.table ? null : startPending ? 'bottom' : TABLE_SIDES[seats[activeSeat]?.isBot ? Math.max(mySeat, 0) : activeSeat];
+  // The rules stay facing whoever opened them, even if the turn moves on underneath
+  const side = typeof rulesOpen === 'string' ? rulesOpen : tableSide;
+  const hudRef = useRef(null);
+  useEffect(() => {
+    if (!side) return undefined;
+    document.body.dataset.tableSide = side;
+    hudRef.current?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+    return () => delete document.body.dataset.tableSide;
+  }, [side]);
   const teams = game.mode === 'teams';
   const chip = (s) => (
     <PlayerChip
@@ -888,12 +915,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       player={seats[s]}
       game={game}
       activeSeat={activeSeat}
-      mySeat={mySeat}
+      mySeat={local ? -1 : mySeat}
       reaction={reactions.find((r) => r.seat === s)}
       clock={clock && game.turn === s ? clock : null}
-      viewing={viewSeat === s && s !== Math.max(mySeat, 0)}
-      onView={() => onViewSeat?.(s)}
-      onStats={seats[s]?.userId && s !== mySeat ? () => onPlayerStats?.(seats[s]) : undefined}
+      viewing={!local && viewSeat === s && s !== Math.max(mySeat, 0)}
+      onView={local ? undefined : () => onViewSeat?.(s)}
+      onStats={!local && seats[s]?.userId && s !== mySeat ? () => onPlayerStats?.(seats[s]) : undefined}
     />
   );
   const shared = rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log;
@@ -901,16 +928,52 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
   const unread = feedOpen ? 0 : log.filter((entry) => entry.chat && !isMine(entry) && entry.t > chatSeenAt).length;
-  const iWon = game.winners?.includes(mySeat);
+  const iWon = local ? game.phase === 'over' : game.winners?.includes(mySeat);
+
+  const announceEl = (
+    <div className="announcements" aria-live="polite">
+      {announcements.map((a) => (
+        <div key={a.id} className={`announce ${a.tone}`}>
+          <div className="announce-title">{a.title}</div>
+          {a.sub && <div className="announce-sub">{a.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
+  const actionPanel = (
+    <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
+      {badge && (
+        <span key={game.lastRoll?.t} className={`roll-badge${badge.die === 6 ? ' six' : ''}`} style={{ '--seat': SEAT_COLORS[badge.seat].main }}>
+          {badge.die}
+        </span>
+      )}
+      <div className="action-text">
+        <div className="action-title">{status.title}</div>
+        <div className="action-sub">{status.sub}</div>
+      </div>
+      {mySeat >= 0 && game.phase !== 'over' && (
+        <button className={`roll-btn${canRoll ? ' ready' : ''}${autoRoll ? ' auto' : ''}`} disabled={!canRoll} onClick={roll} title={autoRoll ? 'Auto-roll is on (change in Settings)' : 'Roll (Space)'}>
+          <DieIcon />
+          <span>{autoRoll && canRoll ? 'Auto' : 'Roll'}</span>
+        </button>
+      )}
+      {game.phase === 'over' && (
+        <button className="btn primary" onClick={() => setShowOver(true)}>
+          Results
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="hud">
+    <div ref={hudRef} className="hud">
       <div className="hud-top">
         <div className="brand-chip">
           <span className="brand">Marralhinha</span>
-          {!room.activity && <RoomCode code={room.code} />}
-          {mySeat < 0 && <span className="badge">Spectating</span>}
-          <Coins amount={coins} className="hud-coins" />
+          {!room.activity && !local && <RoomCode code={room.code} />}
+          {local && <span className="room-pill local-pill">{room.table ? 'Round the table' : 'Pass & play'}</span>}
+          {mySeat < 0 && !local && <span className="badge">Spectating</span>}
+          {!local && <Coins amount={coins} className="hud-coins" />}
         </div>
 
         <div className="players-bar">
@@ -926,7 +989,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         </div>
 
         <div className="hud-buttons">
-          {isAdmin && (
+          {isAdmin && !local && (
             <BoardPicker
               current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null}
               seats={seats}
@@ -934,11 +997,13 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
             />
           )}
-          <SettingsButton onReport={onReport} />
-          <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
-            <Camera />
-          </button>
-          <button className="icon-btn" onClick={() => setRulesOpen(true)} aria-label="How to play" title="How to play">
+          <SettingsButton onReport={local ? undefined : onReport} />
+          {!(local && room.table) && (
+            <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
+              <Camera />
+            </button>
+          )}
+          <button className="icon-btn" onClick={() => setRulesOpen(tableSide || true)} aria-label="How to play" title="How to play">
             <Help />
           </button>
           {onLeave && (
@@ -962,19 +1027,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         </div>
       </div>
 
-      {startPending && <StartIntro key={game.pick.t} game={game} seats={seats} mySeat={mySeat} nameOf={nameOf} onDismiss={onDismissStart} />}
+      {startPending && <StartIntro key={game.pick.t} game={game} seats={seats} mySeat={local ? -1 : mySeat} nameOf={nameOf} onDismiss={onDismissStart} />}
 
-      <div className="announcements" aria-live="polite">
-        {announcements.map((a) => (
-          <div key={a.id} className={`announce ${a.tone}`}>
-            <div className="announce-title">{a.title}</div>
-            {a.sub && <div className="announce-sub">{a.sub}</div>}
-          </div>
-        ))}
-      </div>
+      {announceEl}
 
       <div className="hud-bottom">
-        <Feed
+        {local ? <span aria-hidden="true" /> : <Feed
           entries={entries}
           open={feedOpen}
           onToggle={() => {
@@ -988,42 +1046,21 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
           teams={teams && mySeat >= 0}
           onSend={(text, channel) => onAction('game:chat', { text, channel })}
           lifted={showOver}
-        />
+        />}
 
-        <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
-          {game.phase === 'move' && !rollPending && (
-            <span key={game.lastRoll?.t} className={`roll-badge${game.die === 6 ? ' six' : ''}`} style={{ '--seat': SEAT_COLORS[game.turn].main }}>
-              {game.die}
-            </span>
-          )}
-          <div className="action-text">
-            <div className="action-title">{status.title}</div>
-            <div className="action-sub">{status.sub}</div>
-          </div>
-          {mySeat >= 0 && game.phase !== 'over' && (
-            <button className={`roll-btn${canRoll ? ' ready' : ''}${autoRoll ? ' auto' : ''}`} disabled={!canRoll} onClick={roll} title={autoRoll ? 'Auto-roll is on (change in Settings)' : 'Roll (Space)'}>
-              <DieIcon />
-              <span>{autoRoll && canRoll ? 'Auto' : 'Roll'}</span>
-            </button>
-          )}
-          {game.phase === 'over' && (
-            <button className="btn primary" onClick={() => setShowOver(true)}>
-              Results
-            </button>
-          )}
-        </div>
+        {actionPanel}
         <div className="hud-right">
-          <Spectators spectators={room.spectators || []} playerId={playerId} />
-          {mySeat >= 0 && game.phase !== 'over' && (
+          {!local && <Spectators spectators={room.spectators || []} playerId={playerId} />}
+          {!local && mySeat >= 0 && game.phase !== 'over' && (
             <button className={`icon-btn away-btn${meAway ? ' on' : ''}`} onClick={() => setAway(!meAway)} aria-pressed={meAway} title={meAway ? "I'm back (B)" : 'Step away: the bot plays for you (B)'} aria-label={meAway ? "I'm back" : 'Step away'}>
               <Coffee />
             </button>
           )}
-          {mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
+          {!local && mySeat >= 0 && <ReactionBar spam={isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev')} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
 
-      {meAway && game.phase !== 'over' && (
+      {meAway && !local && game.phase !== 'over' && (
         <div className="away-banner" role="status">
           <div className="away-title">You stepped away</div>
           <div className="away-sub">
@@ -1044,6 +1081,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
           <WinCard
             cardRef={winCardRef}
             activity={room.activity}
+            local={local}
             game={game}
             seats={seats}
             mySeat={mySeat}

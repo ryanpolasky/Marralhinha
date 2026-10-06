@@ -196,7 +196,8 @@ test('hidden tab titles the game Your turn until the turn passes', () => {
 
 test('signs in as a guest and renders the home screen with the account bar', async () => {
   render(<App />);
-  expect(await screen.findByRole('button', { name: /quick play/i })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /vs\. bots/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Local' })).toBeInTheDocument();
   expect(screen.getByLabelText(/room code/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /shop/i })).toBeInTheDocument();
   expect(screen.getByText('Tester')).toBeInTheDocument();

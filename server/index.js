@@ -132,8 +132,18 @@ app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfil
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
-  app.use(express.static(BUILD_DIR));
-  app.get('*', (req, res) => res.sendFile(path.join(BUILD_DIR, 'index.html')));
+  app.use(
+    express.static(BUILD_DIR, {
+      setHeaders: (res, file) => {
+        if (/(service-worker\.js|index\.html|manifest\.json)$/.test(file)) res.setHeader('Cache-Control', 'no-cache');
+        else if (file.includes(`${path.sep}static${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    })
+  );
+  app.get('*', (req, res) => {
+    if (/\.[a-z0-9]+$/i.test(req.path)) return res.status(404).type('text').send('Not found');
+    return res.set('Cache-Control', 'no-cache').sendFile(path.join(BUILD_DIR, 'index.html'));
+  });
 }
 
 io.use(async (socket, next) => {

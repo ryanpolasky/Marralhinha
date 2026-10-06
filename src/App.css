@@ -4625,6 +4625,30 @@ img.emote-glyph {
 .boot {
   text-align: center;
   max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.boot > h2,
+.boot > p {
+  margin: 0;
+}
+
+.boot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.home-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .home,
@@ -8510,4 +8534,97 @@ textarea.report-text {
   height: 11px;
   border-radius: 0;
   background: linear-gradient(180deg, #ff3a3a 0 16%, #ff9a2e 16% 33%, #ffe82e 33% 50%, #4ddb4d 50% 66%, #2e9bff 66% 83%, #8a5bff 83%);
+}
+
+/* ---------- Pass & play ---------- */
+
+.local-name {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+
+.local-kinds {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.local-pill {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Round the table: the HUD and every modal spin so their bottom edge faces the current player */
+body[data-table-side] .hud,
+body[data-table-side] > .modal-backdrop {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%) rotate(var(--table-rot, 0deg));
+}
+
+body[data-table-side='top'] {
+  --table-rot: 180deg;
+}
+
+body[data-table-side='left'] {
+  --table-rot: 90deg;
+}
+
+body[data-table-side='right'] {
+  --table-rot: -90deg;
+}
+
+body[data-table-side='left'] .hud,
+body[data-table-side='right'] .hud,
+body[data-table-side='left'] > .modal-backdrop,
+body[data-table-side='right'] > .modal-backdrop {
+  width: 100vh;
+  height: 100vw;
+}
+
+body[data-table-side] .action-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ---------- PWA / iPad ---------- */
+
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hud {
+  padding-top: max(14px, env(safe-area-inset-top));
+  padding-right: max(14px, env(safe-area-inset-right));
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  padding-left: max(14px, env(safe-area-inset-left));
+}
+
+.screen {
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-right: max(20px, env(safe-area-inset-right));
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  padding-left: max(20px, env(safe-area-inset-left));
+}
+
+.install-steps {
+  margin: 0;
+  padding-left: 20px;
+  text-align: left;
+  line-height: 1.6;
 }

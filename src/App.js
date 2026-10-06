@@ -12,10 +12,15 @@ import { startMusic } from './game/music';
 import { CURRENCY } from './game/catalog';
 import { warmBoardSkin } from './game/skinWarm';
 import { quality } from './three/quality';
-import { PING_LIFE_MS, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS, coveringTurn, startPendingFor } from './game/moves';
+import { PING_LIFE_MS, START_WHEEL_SPIN_MS, coveringTurn } from './game/moves';
+import { useHandoff, useRollPending, useStartPending } from './game/pending';
 import BOARDS from './shared/boards.json';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
+import LocalLobby from './components/LocalLobby';
+import { LocalRoom, loadLocal, savedGameExists } from './local/LocalRoom';
+import { applyUpdate } from './serviceWorkerRegistration';
+import { useWakeLock } from './game/wakeLock';
 import Game from './components/Game';
 import AccountBar from './components/AccountBar';
 import Shop from './components/Shop';
@@ -63,20 +68,6 @@ class SceneBoundary extends React.Component {
   }
 }
 
-function useRollPending(lastRoll) {
-  const [pendingT, setPendingT] = useState(null);
-  const seen = useRef(lastRoll?.t);
-  const t = lastRoll?.t;
-  useEffect(() => {
-    if (!t || t === seen.current) return undefined;
-    seen.current = t;
-    setPendingT(t);
-    const timer = setTimeout(() => setPendingT((p) => (p === t ? null : p)), ROLL_REVEAL_MS);
-    return () => clearTimeout(timer);
-  }, [t]);
-  return pendingT !== null && pendingT === t;
-}
-
 // The starter's board is part of the wheel's reveal: keep your own board until the wheel lands
 function useBoardRevealed(game) {
   const pick = game?.pick;
@@ -88,20 +79,6 @@ function useBoardRevealed(game) {
     return () => clearTimeout(timer);
   }, [wait > 0, pick?.t]); // eslint-disable-line react-hooks/exhaustive-deps
   return wait <= 0;
-}
-
-// True while the "who starts" intro plays for a freshly started game
-function useStartPending(game) {
-  const remaining = startPendingFor(game);
-  const pickT = game?.pick?.t;
-  const [dismissed, setDismissed] = useState(null);
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (remaining <= 0) return undefined;
-    const timer = setTimeout(() => tick((n) => n + 1), remaining + 20);
-    return () => clearTimeout(timer);
-  }, [remaining, pickT]);
-  return [remaining > 0 && dismissed !== pickT, () => setDismissed(pickT)];
 }
 
 // Favourite colour from Settings, sent whenever we take a seat so the server can give it to us if it's free
@@ -127,6 +104,8 @@ const App = () => {
   const [name, setName] = useState('');
   const [session, setSession] = useState(null);
   const [room, setRoom] = useState(null);
+  const [localView, setLocalView] = useState(null);
+  const localRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -344,7 +323,47 @@ const App = () => {
     return () => clearTimeout(t);
   }, [cleanName, account?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onAction = useCallback((event, payload) => request(event, payload).catch((err) => notify(err.message)), [notify]);
+  const onAction = useCallback(
+    (event, payload) => {
+      if (localRef.current) {
+        try {
+          return Promise.resolve(localRef.current.action(event, payload));
+        } catch (err) {
+          notify(err.message);
+          return Promise.reject(err);
+        }
+      }
+      return request(event, payload).catch((err) => notify(err.message));
+    },
+    [notify]
+  );
+
+  const openLocal = useCallback(
+    (resume = false) => {
+      localRef.current?.dispose();
+      const saved = loadLocal();
+      const local = new LocalRoom(resume ? saved : saved && { ...saved, game: null });
+      local.setSkin(account?.equipped || null);
+      local.subscribe(setLocalView);
+      localRef.current = local;
+      setLocalView(local.view());
+      setUrl(null);
+    },
+    [account?.equipped]
+  );
+
+  const closeLocal = useCallback(() => {
+    localRef.current?.dispose();
+    localRef.current = null;
+    setLocalView(null);
+    setViewOverride(null);
+  }, []);
+
+  useEffect(() => {
+    const wake = () => !document.hidden && localRef.current?.resume();
+    document.addEventListener('visibilitychange', wake);
+    return () => document.removeEventListener('visibilitychange', wake);
+  }, []);
 
   const equip = useCallback(
     async (slot, item) => {
@@ -377,14 +396,50 @@ const App = () => {
     }
   }, [account?.replies?.length]);
 
-  const inRoom = !!(session && room && room.code === session.code);
-  const mySeat = inRoom ? room.seats.findIndex((p) => p && p.id === session.playerId) : -1;
+  const view = localView || room;
+  const sess = localView ? { code: localView.code, playerId: localView.activePlayerId } : session;
+  const inRoom = !!(sess && view && view.code === sess.code);
+  const mySeat = inRoom ? view.seats.findIndex((p) => p && p.id === sess.playerId) : -1;
   mySeatRef.current = mySeat;
+  useWakeLock(!!localView?.game && localView.game.phase !== 'over');
+
+  useEffect(() => {
+    if (!localRef.current) return;
+    localRef.current.setSkin(account?.equipped || null);
+    setLocalView(localRef.current.view());
+  }, [account?.equipped]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('local') || IS_ACTIVITY) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    openLocal(savedGameExists());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [swUpdate, setSwUpdate] = useState(null);
+  useEffect(() => {
+    const on = (e) => setSwUpdate(e.detail);
+    window.addEventListener('sw-update', on);
+    return () => window.removeEventListener('sw-update', on);
+  }, []);
+  useEffect(() => {
+    if (!swUpdate || inRoom) return;
+    setSwUpdate(null);
+    ask({ title: 'Update ready', message: 'A new version of Marralhinha is ready. Reload to get it.', confirm: 'Reload', cancel: 'Later' }).then((ok) => ok && applyUpdate(swUpdate));
+  }, [swUpdate, inRoom]);
 
   const leave = async () => {
+    if (localView) {
+      if (localView.game && localView.game.phase !== 'over') {
+        const ok = await ask({ title: 'Leave this game?', message: 'Your game is saved on this device. Pick it back up from the home screen.', confirm: 'Leave game', cancel: 'Keep playing' });
+        if (!ok) return;
+      } else localRef.current?.action('local:menu');
+      closeLocal();
+      return;
+    }
     // With another device still in the room, leaving here just hands control to that device
-    const onlyDevice = (room?.seats[mySeat]?.devices ?? 1) <= 1;
-    if (mySeat >= 0 && onlyDevice && room?.game && room.game.phase !== 'over') {
+    const onlyDevice = (view?.seats[mySeat]?.devices ?? 1) <= 1;
+    if (mySeat >= 0 && onlyDevice && view?.game && view.game.phase !== 'over') {
       const ok = await ask({ title: 'Leave this game?', message: 'A bot will take over your seat and you forfeit the rewards.', confirm: 'Leave game', cancel: 'Keep playing', tone: 'danger' });
       if (!ok) return;
     }
@@ -393,25 +448,28 @@ const App = () => {
     setUrl(null);
   };
 
-  const game = inRoom ? room.game : null;
+  const game = inRoom ? view.game : null;
   // Clicking a nameplate in-game swings the board round to that player's side; cleared per game
   const [viewOverride, setViewOverride] = useState(null);
-  const gameKey = game ? `${room.code}:${game.pick?.t}` : null;
+  const gameKey = game ? `${view.code}:${game.pick?.t}` : null;
   useEffect(() => setViewOverride(null), [gameKey]);
 
   useEffect(() => {
     document.body.classList.toggle('preview', preview);
     return () => document.body.classList.remove('preview');
   }, [preview]);
-  const rollPending = useRollPending(game?.lastRoll);
+  const [rollPending, stuck] = useRollPending(game?.lastRoll, !!localView);
+  const handoff = useHandoff(game, view?.seats, !!localView);
+  const held = rollPending || stuck || handoff;
+  const heldView = useRef(0);
   const [startPending, dismissStart] = useStartPending(game);
   // The server chooses one board for everyone once a game starts; before that everyone previews their own
   const boardRevealed = useBoardRevealed(game);
   // A Dev's mid-game pick wins over the starter's board
-  const tableBoard = game?.boardOverride || (game && game.boardSeat !== null && boardRevealed ? room.seats[game.boardSeat]?.cosmetics?.board : null);
-  const boardSkinId = tableBoard || account?.equipped.board;
+  const tableBoard = game?.boardOverride || (game && game.boardSeat !== null && boardRevealed ? view.seats[game.boardSeat]?.cosmetics?.board : null);
+  const boardSkinId = tableBoard || account?.equipped?.board;
   // Build the starter's board while the wheel spins (after the camera has settled) so the reveal swaps instead of hitching
-  const pendingBoard = game && !boardRevealed && game.boardSeat !== null ? room.seats[game.boardSeat]?.cosmetics?.board : null;
+  const pendingBoard = game && !boardRevealed && game.boardSeat !== null ? view.seats[game.boardSeat]?.cosmetics?.board : null;
   useEffect(() => {
     if (!pendingBoard) return undefined;
     const t = setTimeout(() => warmBoardSkin(pendingBoard), 1600);
@@ -423,27 +481,30 @@ const App = () => {
       const cosmetics = DEMO_SKINS.map((skin, s) => (s === 0 ? account?.equipped : skin));
       return { mode: 'idle', board: DEMO_BOARD, names: NO_NAMES, viewSeat: 0, cosmetics };
     }
-    const names = room.seats.map((p) => p?.name ?? null);
-    const cosmetics = room.seats.map((p) => p?.cosmetics || null);
-    const viewSeat = Math.max(mySeat, 0);
-    if (!room.game) {
-      const active = [0, 1, 2, 3].filter((s) => room.seats[s]);
-      const spec = BOARDS[room.variant] || BOARDS.classic;
-      const marbles = [0, 1, 2, 3].map((s) => (room.seats[s] ? Array.from({ length: spec.marbles }, () => base) : []));
+    const names = view.seats.map((p) => p?.name ?? null);
+    const cosmetics = view.seats.map((p) => p?.cosmetics || null);
+    const locked = !!(view.local && view.table);
+    const viewSeat = locked ? 0 : Math.max(mySeat, 0);
+    if (!view.game) {
+      const active = [0, 1, 2, 3].filter((s) => view.seats[s]);
+      const spec = BOARDS[view.variant] || BOARDS.classic;
+      const marbles = [0, 1, 2, 3].map((s) => (view.seats[s] ? Array.from({ length: spec.marbles }, () => base) : []));
       return { mode: 'lobby', board: { variant: spec.id, active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
     }
-    const g = room.game;
-    const myTurn = (g.turn === mySeat || coveringTurn(g, room.seats, mySeat)) && g.phase !== 'over';
+    const g = view.game;
+    const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat)) && g.phase !== 'over';
+    if (!(view.local && held)) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
     return {
       mode: 'game',
-      board: rollPending ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
+      board: held ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
       names,
-      viewSeat: viewOverride ?? viewSeat,
+      viewSeat: heldView.current,
+      lockCamera: locked,
       cosmetics,
-      moves: myTurn && g.phase === 'move' && !rollPending ? g.legalMoves : undefined,
-      canRoll: myTurn && g.phase === 'roll' && !rollPending && !startPending,
+      moves: myTurn && g.phase === 'move' && !held ? g.legalMoves : undefined,
+      canRoll: myTurn && g.phase === 'roll' && !held && !startPending,
     };
-  }, [inRoom, room, mySeat, account?.equipped, rollPending, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, view, mySeat, account?.equipped, held, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   // True while the camera is panned/zoomed/orbited away from the default view (pulses the reset button)
@@ -457,10 +518,10 @@ const App = () => {
     [onAction]
   );
   // Seated players can ping; spectators only if they're Dev (the server enforces this too)
-  const canPing = !!game && (mySeat >= 0 || !!account?.admin);
+  const canPing = !!game && !localView && (mySeat >= 0 || !!account?.admin);
   const teamMode = game?.mode === 'teams' && mySeat >= 0;
   const sendPing = useCallback((ping) => onAction('game:ping', ping), [onAction]);
-  const myTeamLog = inRoom && teamLog.code === room.code && game ? teamLog.entries.filter((e) => e.t >= (game.pick?.t || 0)) : [];
+  const myTeamLog = inRoom && teamLog.code === view.code && game ? teamLog.entries.filter((e) => e.t >= (game.pick?.t || 0)) : [];
 
   const accountBar = (
     <AccountBar
@@ -485,19 +546,26 @@ const App = () => {
   );
 
   let screen;
-  if (authError) {
+  if (localView && !localView.game) {
+    screen = <LocalLobby room={localView} onAction={onAction} onBack={closeLocal} />;
+  } else if (authError && !localView) {
     screen = (
       <div className="screen">
         <div className="panel boot">
           <h2>Couldn't sign you in</h2>
           <p className="muted">{authError}</p>
-          <button className="btn primary" onClick={() => window.location.reload()}>
-            Try again
-          </button>
+          <div className="boot-actions">
+            <button className="btn primary" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+            <button className="btn secondary" onClick={() => openLocal(savedGameExists())}>
+              {savedGameExists() ? "Resume your pass & play game" : "Play pass & play offline"}
+            </button>
+          </div>
         </div>
       </div>
     );
-  } else if (!account || (IS_ACTIVITY && !inRoom)) {
+  } else if (!localView && (!account || (IS_ACTIVITY && !inRoom))) {
     screen = (
       <div className="screen">
         <div className="boot-spinner">
@@ -526,6 +594,8 @@ const App = () => {
           })
         }
         onReport={() => setModal('report')}
+        onLocal={() => openLocal(false)}
+        onResume={savedGameExists() ? () => openLocal(true) : undefined}
         onJoin={(code) =>
           run(async () => {
             await ensureName();
@@ -535,16 +605,18 @@ const App = () => {
       />
     );
   } else if (!game) {
-    screen = <Lobby room={room} playerId={session.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} onReport={() => setModal('report')} />;
+    screen = <Lobby room={view} playerId={sess.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} onReport={() => setModal('report')} />;
   } else {
     screen = (
       <Game
-        room={room}
-        playerId={session.playerId}
+        room={view}
+        playerId={sess.playerId}
         reactions={reactions}
         teamLog={myTeamLog}
-        isAdmin={!!account.admin}
+        isAdmin={!!account?.admin}
         rollPending={rollPending}
+        stuck={stuck}
+        handoff={handoff}
         startPending={startPending}
         onDismissStart={dismissStart}
         onAction={onAction}
@@ -562,7 +634,7 @@ const App = () => {
         onShop={() => setModal('shop')}
         onReport={() => setModal('report')}
         onPlayerStats={(p) => p?.userId && setPeek(p)}
-        coins={account.coins}
+        coins={account?.coins ?? 0}
       />
     );
   }
@@ -591,8 +663,8 @@ const App = () => {
         </SceneBoundary>
       </div>
       <div className="vignette" />
-      {account && !game && accountBar}
-      {account && !connected && <div className="banner">Connecting to the game server…</div>}
+      {account && !game && !localView && accountBar}
+      {account && !connected && !localView && <div className="banner">Connecting to the game server…</div>}
       {toast && <Toast key={toast.id} toast={toast} onDone={dismissToast} />}
       {screen}
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}

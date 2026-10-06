@@ -12,7 +12,7 @@ export const AUTHOR = {
 };
 
 const SITE = IS_ACTIVITY ? 'https://marralhinha.app' : '';
-export const LEGAL = { terms: `${SITE}/terms`, privacy: `${SITE}/privacy` };
+export const LEGAL = { rules: `${SITE}/how-to-play`, terms: `${SITE}/terms`, privacy: `${SITE}/privacy` };
 
 export function ExternalLink({ href, children, className }) {
   return (
@@ -34,6 +34,8 @@ export function ExternalLink({ href, children, className }) {
 export function LegalLinks({ className = '' }) {
   return (
     <div className={`legal-links ${className}`}>
+      <ExternalLink href={LEGAL.rules}>How to play</ExternalLink>
+      <span aria-hidden="true">·</span>
       <ExternalLink href={LEGAL.terms}>Terms of Service</ExternalLink>
       <span aria-hidden="true">·</span>
       <ExternalLink href={LEGAL.privacy}>Privacy Policy</ExternalLink>

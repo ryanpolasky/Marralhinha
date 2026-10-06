@@ -25,7 +25,7 @@ const _homeDir = new THREE.Vector3();
 const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
 const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 
-function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
+function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
@@ -41,17 +41,24 @@ function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
   useEffect(() => {
     const aspect = size.width / size.height;
     const game = mode === 'game';
-    const elevation = game ? 0.86 : 0.8;
+    // Round the table: straight down, with the board kept clear of the HUD bars on every edge of the short side
+    const overhead = game && locked;
+    const elevation = overhead ? Math.PI / 2 - 1e-4 : game ? 0.86 : 0.8;
     const zoom = framingExtent(layout.spec) / CLASSIC_EXTENT;
-    const distance = Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect) * zoom;
+    const half = Math.min(size.width, size.height) / 2;
+    const clear = half / Math.max(half - 120, half * 0.6);
+    const distance = overhead
+      ? (framingExtent(layout.spec) * 1.04 * clear) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.min(1, aspect)
+      : Math.max(game ? 33 : 28, (game ? 33 : 31) / aspect) * zoom;
+    controls.minPolarAngle = overhead ? 0 : 0.1;
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     home.current = { target, distance, dir: position.clone().sub(target).normalize() };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
-    controls.enabled = game;
-  }, [mode, resetKey, size.width, size.height, camera, controls, layout]);
+    controls.enabled = game && !locked;
+  }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout]);
 
   useEffect(() => {
     controls.autoRotate = mode !== 'game' || spinning;
@@ -71,7 +78,7 @@ function CameraRig({ mode, resetKey, spinning, onOffView, layout }) {
       if (t >= 1) tween.current = null;
     }
     const l = lens.current;
-    const goal = mode === 'game' ? size.height * 0.08 : 0;
+    const goal = mode === 'game' && !locked ? size.height * 0.08 : 0;
     const next = l.shift + (goal - l.shift) * (1 - Math.exp(-dt * 3));
     if (Math.abs(next - l.shift) > 0.05 || l.w !== size.width || l.h !== size.height) {
       l.shift = next;
@@ -255,7 +262,7 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, quality = defaultQuality }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
   const layout = layoutFor(board.variant);
   const pointer = useRef(null);
   usePingKeys(pointer, canPing, onPing, layout);
@@ -310,7 +317,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={onRoll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} spinning={preview || (mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
+      <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
     </Canvas>
   );
 }

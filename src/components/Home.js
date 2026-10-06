@@ -4,6 +4,7 @@ import { randomNickname } from '../game/fun';
 import RulesButton from './Rules';
 import { Bug, DieIcon } from './Icons';
 import { Credit, LegalLinks } from './About';
+import InstallButton from './Install';
 
 export function Logo() {
   return (
@@ -62,7 +63,7 @@ export function Pronunciation() {
   );
 }
 
-export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin, onReport }) {
+export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin, onReport, onLocal, onResume }) {
   const [code, setCode] = useState(initialCode || '');
   const [spin, setSpin] = useState(0);
   const nameOk = name.trim().length > 0;
@@ -119,9 +120,19 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
             <button className="btn primary big block play-btn" disabled={!nameOk || busy} onClick={onCreate}>
               Create a room for friends
             </button>
-            <button className="btn secondary block" disabled={!nameOk || busy} onClick={onQuickPlay}>
-              Quick play vs bots
-            </button>
+            <div className="home-pair">
+              <button className="btn secondary" disabled={!nameOk || busy} onClick={onQuickPlay} title="Quick play against bots">
+                vs. Bots
+              </button>
+              <button className="btn secondary" onClick={onLocal} title="Pass & play or round the table on one device">
+                Local
+              </button>
+            </div>
+            {onResume && (
+              <button className="btn ghost block" onClick={onResume}>
+                Resume your pass &amp; play game
+              </button>
+            )}
           </>
         )}
 
@@ -155,6 +166,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
         {!nameOk && <p className="hint">Pick a name (or roll one) to start playing</p>}
         <div className="home-footer">
           <RulesButton className="btn link" />
+          <InstallButton />
           <LegalLinks className="inline" />
         </div>
       </div>

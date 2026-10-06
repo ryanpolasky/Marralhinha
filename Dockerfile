@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server ./server
 COPY src/shared ./src/shared
-COPY TERMS.md PRIVACY.md ./
+COPY TERMS.md PRIVACY.md RULES.md ./
 COPY --from=build /app/build ./build
 VOLUME /app/data
 EXPOSE 3001
