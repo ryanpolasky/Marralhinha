@@ -7,7 +7,7 @@ import Board from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
-import { playKillFx } from './killfx';
+import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
 import { MARBLE_GEO } from './Marbles';
 import { ITEMS } from '../game/catalog';
@@ -69,6 +69,7 @@ const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 function FxPreview({ itemId, seat, replay }) {
   const bus = useMemo(() => makeFxBus(), [replay]); // eslint-disable-line react-hooks/exhaustive-deps
   const victim = (seat + 1) % 4;
+  useMemo(() => warmKillFx(itemId), [itemId]);
   const attackerSkin = marbleSkin('marble.classic', seat);
   const victimSkin = marbleSkin('marble.classic', victim);
   const attacker = useRef();

@@ -1,6 +1,7 @@
 import { SEAT_COLORS } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { fx } from './fx';
+import { videoFor } from './Spectacle';
 
 const col = (s) => SEAT_COLORS[s];
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -322,6 +323,9 @@ const KILL_FX = {
   },
 
 };
+
+const CLIPS = { police: '/fx/police-crash.mp4' };
+export const warmKillFx = (itemId) => CLIPS[skinKey(itemId)] && videoFor(CLIPS[skinKey(itemId)]);
 
 export const playKillFx = (itemId, info, { bus = fx, sfx = () => {} } = {}) => {
   (KILL_FX[skinKey(itemId)] || KILL_FX.pop)(bus.emit, { ...info, sfx, ...timeline(bus) });

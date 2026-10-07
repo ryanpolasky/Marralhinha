@@ -1026,7 +1026,7 @@ void main() {
 }`;
 
 const videoCache = {};
-const videoFor = (src) => {
+export const videoFor = (src) => {
   if (!videoCache[src]) {
     const el = document.createElement('video');
     Object.assign(el, { src, muted: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
