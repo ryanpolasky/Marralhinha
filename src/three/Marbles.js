@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { SEAT_COLORS, positionIn, layoutFor } from '../game/geometry';
@@ -9,6 +9,7 @@ import { fx } from './fx';
 import { playKillFx } from './killfx';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
+import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
 
 export const MARBLE_R = 0.335;
 const REST_Y = 0.07;
@@ -23,8 +24,12 @@ const GHOST_RING_GEO = new THREE.RingGeometry(0.42, 0.56, 40);
 const CAPTURE_RING_GEO = new THREE.RingGeometry(0.6, 0.68, 40);
 const PATH_DOT_GEO = new THREE.SphereGeometry(0.07, 10, 8);
 
+const FLING_HEIGHT = 3.2;
+// A dark skin just over a downed marble, so its cosmetic still shows through, only dimmed
+const SHADE_GEO = new THREE.SphereGeometry(MARBLE_R * 1.015, 32, 20);
+
 const CLASSIC_LAYOUT = layoutFor('classic');
-const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
+export const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
   const [r, c] = positionIn(seat, pos, marble, layout);
   return new THREE.Vector3(c, REST_Y, r);
 };
@@ -76,12 +81,14 @@ function setCursor(pointer) {
 
 const TRAIL_GAP = 0.34;
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail }) {
+function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
   const anim = useRef(null);
-  if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null };
+  const pickHover = useRef(false);
+  const shade = useRef();
+  if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
     const a = anim.current;
@@ -137,12 +144,22 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
       a.pos.lerp(target, 1 - Math.exp(-dt * 8));
     } else a.trailAt = null;
 
-    const liftTarget = selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + (Math.sin(now * 5) * 0.5 + 0.5) * 0.14 : 0;
+    const bob = (Math.sin(now * 5) * 0.5 + 0.5) * 0.14;
+    const liftTarget = pickable ? (pickHover.current ? 0.55 : 0.1 + bob) : selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + bob : 0;
     a.lift += (liftTarget - a.lift) * (1 - Math.exp(-dt * 12));
-    group.current.position.set(a.pos.x, a.pos.y + a.lift, a.pos.z);
+    const k = down ? downAmount(down.hit) : 0;
+    const fly = easeInOut(k);
+    const prevOffX = a.off.x;
+    const prevOffZ = a.off.z;
+    a.off.set(down ? down.shift[0] * fly : 0, Math.sin(Math.PI * k) * FLING_HEIGHT, down ? down.shift[1] * fly : 0);
+    if (shade.current) {
+      shade.current.material.opacity = 0.72 * clamp01((k - 0.15) / 0.85);
+      shade.current.visible = shade.current.material.opacity > 0.01;
+    }
+    group.current.position.set(a.pos.x + a.off.x, a.pos.y + a.lift + a.off.y, a.pos.z + a.off.z);
 
-    const dx = a.pos.x - prev.x;
-    const dz = a.pos.z - prev.z;
+    const dx = a.pos.x - prev.x + a.off.x - prevOffX;
+    const dz = a.pos.z - prev.z + a.off.z - prevOffZ;
     const dist = Math.hypot(dx, dz);
     if (dist > 1e-5) {
       axis.set(dz, 0, -dx).normalize();
@@ -155,7 +172,25 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
     }
   });
 
-  const handlers = movable
+  const handlers = pickable
+    ? {
+        onClick: (e) => {
+          e.stopPropagation();
+          setCursor(false);
+          pickHover.current = false;
+          onPick();
+        },
+        onPointerOver: (e) => {
+          e.stopPropagation();
+          setCursor(true);
+          pickHover.current = true;
+        },
+        onPointerOut: () => {
+          setCursor(false);
+          pickHover.current = false;
+        },
+      }
+    : movable
     ? {
         onClick: (e) => {
           e.stopPropagation();
@@ -177,7 +212,12 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
     <>
       <group ref={group}>
         <mesh ref={body} geometry={MARBLE_GEO} material={material} castShadow />
-        {movable && (
+        {down && (
+          <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
+            <meshBasicMaterial color="#050607" transparent opacity={0} depthWrite={false} />
+          </mesh>
+        )}
+        {(movable || pickable) && (
           <mesh geometry={HIT_GEO} {...handlers}>
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
@@ -264,6 +304,18 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
   const planKey = board.lastMove?.t;
   const focus = selected || hovered;
   const focusMoves = focus ? movesForMarble(moves, focus.seat, focus.marble, board.marbles[focus.seat][focus.marble]) : [];
+  // Dev bits ask for marbles straight off the board: every eligible marble becomes clickable and answers on the fx bus
+  const [picking, setPicking] = useState(null);
+  useEffect(() => fx.on((type, data) => type === 'pickmode' && setPicking(data)), []);
+  useEffect(() => setCursor(false), [picking]);
+  const hits = board.hits || [];
+  const downOf = (seat, marble) => {
+    const hit = [...hits].reverse().find((h) => h.victim === seat && h.victimMarble === marble);
+    // Once the game actually moves the marble the bit lets go of it, so real moves never look broken
+    if (!hit || !samePos(hit.victimAt, board.marbles[seat][marble])) return null;
+    const { to, rest } = hitGeo(hit, board);
+    return { hit, shift: [rest[0] - to[0], rest[1] - to[1]] };
+  };
 
   const clickMarble = (seat, marble, pos) => {
     const options = movesForMarble(moves, seat, marble, pos);
@@ -298,6 +350,9 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
               mySeat={mySeat}
               killFx={killFx}
               trail={trails[seat]}
+              down={downOf(seat, marble)}
+              pickable={!!picking && seat !== picking.notSeat && !picking.skip?.includes(`${seat}:${marble}`)}
+              onPick={() => fx.emit('picked', { seat, marble })}
             />
           );
         })

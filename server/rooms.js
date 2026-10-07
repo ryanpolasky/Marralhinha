@@ -33,6 +33,9 @@ const PING_COOLDOWN_MS = 1000;
 const PING_TYPES = ['look', 'danger'];
 const PING_BOUND = 16;
 const BOT_ACK_MS = 700;
+const HIT_LIMIT = 8;
+const HIT_KEEP_MS = 10000;
+const HIT_LINE_MAX = 80;
 
 const teamSeats = (seat) => [seat, rules.partnerOf(seat)];
 
@@ -72,6 +75,7 @@ class Room {
     this.timer = null;
     this.timerKey = null;
     this.turnDeadline = null;
+    this.clockOffSeat = null;
     this.hostTimer = null;
     this.banterTimers = new Set();
     this.rematchVotes = new Set();
@@ -415,6 +419,45 @@ class Room {
     this.changed();
   }
 
+  // Dev-only (checked by the caller): one marble "shoots" another. Pure theatre, the marbles never actually move
+  shoot(userId, { by, byMarble, victim, victimMarble, before, after }) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const game = this.game;
+    if (!game || game.phase === 'over') throw new UserError('Start a game first');
+    const real = (seat, marble) => game.active.includes(seat) && Number.isInteger(marble) && marble >= 0 && marble < game.marbles[seat].length;
+    if (!real(by, byMarble) || !real(victim, victimMarble) || by === victim) throw new UserError('Pick a shooter and a victim');
+    const now = Date.now();
+    const hits = (game.hits || []).filter((h) => !h.undoneAt || now - h.undoneAt < HIT_KEEP_MS);
+    // A marble the game has moved since it got hit is back in action
+    const still = (a, b) => a.zone === b.zone && a.idx === b.idx && a.slot === b.slot;
+    const down = (seat, marble) => hits.some((h) => !h.undoneAt && h.victim === seat && h.victimMarble === marble && still(h.victimAt, game.marbles[seat][marble]));
+    if (down(victim, victimMarble)) throw new UserError('That marble is already down');
+    if (down(by, byMarble)) throw new UserError('That marble is in no state to shoot anyone');
+    const line = (text) => cleanChat(text).slice(0, HIT_LINE_MAX) || null;
+    const at = (seat, marble) => ({ ...game.marbles[seat][marble] });
+    game.hits = [...hits, { id: newId(), by, byMarble, byAt: at(by, byMarble), victim, victimMarble, victimAt: at(victim, victimMarble), before: line(before), after: line(after), t: now }].slice(-HIT_LIMIT);
+    rules.addLog(game, `${this.seats[by]?.name || 'Someone'} shot ${this.seats[victim]?.name || 'someone'}'s marble`, null);
+    this.clockOffSeat = game.turn;
+    this.changed();
+  }
+
+  // Dev-only (checked by the caller): picking a bit freezes the turn clock for the rest of this turn
+  pauseClock(userId) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (!this.game || this.game.phase === 'over') throw new UserError('Start a game first');
+    this.clockOffSeat = this.game.turn;
+    this.changed();
+  }
+
+  unshoot(userId, id) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const hit = this.game?.hits?.find((h) => h.id === id && !h.undoneAt);
+    if (!hit) throw new UserError('Nothing to undo');
+    hit.undoneAt = Date.now();
+    rules.addLog(this.game, `${this.seats[hit.victim]?.name || 'Someone'}'s marble walked it off`, null);
+    this.changed();
+  }
+
   setTurnTime(userId, seconds) {
     this.requireHost(userId);
     this.requireLobby();
@@ -746,7 +789,8 @@ class Room {
     const { game } = this;
     const player = game && game.phase !== 'over' ? this.seats[game.turn] : null;
     const cover = player ? this.coverFor(game.turn) : null;
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id].join('|');
+    if (this.clockOffSeat !== game?.turn) this.clockOffSeat = null;
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
@@ -756,8 +800,8 @@ class Room {
     const human = !player.isBot;
     // Waiting on a person: the player themselves, or their partner covering while they're away
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
-    // No turn limit: connected players take as long as they like
-    if (waiting && this.turnSeconds === null) return;
+    // No turn limit, or a dev bit is playing out this turn: connected players take as long as they like
+    if (waiting && (this.turnSeconds === null || this.clockOffSeat === game.turn)) return;
     const now = Date.now();
     const base = waiting
       ? this.turnSeconds * 1000
@@ -839,7 +883,8 @@ class Room {
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       chat: this.chatLog,
-      game: this.game,
+      // Hit ages are relative too, so every client plays the bit on the same beat
+      game: this.game?.hits ? { ...this.game, hits: this.game.hits.map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })) } : this.game,
     };
   }
 

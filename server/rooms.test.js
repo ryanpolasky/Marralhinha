@@ -680,6 +680,36 @@ test('the table board can be swapped mid-game and reset to the starter', (t) => 
   assert.strictEqual(room.view().game.boardOverride, null);
 });
 
+test('a dev hit is pure theatre: marbles stay put and undo marks it walked off', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const [a, b] = room.game.active;
+  const before = JSON.stringify(room.game.marbles);
+  room.turnSeconds = 30;
+  room.changed();
+  assert.ok(room.view().turnEndsIn > 0);
+  room.pauseClock('u1');
+  assert.strictEqual(room.view().turnEndsIn, null, 'picking a bit freezes the clock right away');
+  assert.throws(() => room.shoot('stranger', { by: a, byMarble: 0, victim: b, victimMarble: 0 }), /not in this room/);
+  assert.throws(() => room.shoot('u1', { by: a, byMarble: 0, victim: a, victimMarble: 1 }), /shooter and a victim/);
+  assert.throws(() => room.shoot('u1', { by: a, byMarble: 99, victim: b, victimMarble: 0 }), /shooter and a victim/);
+  room.shoot('u1', { by: a, byMarble: 0, victim: b, victimMarble: 0, before: '  say   hello ', after: 'x'.repeat(200) });
+  assert.strictEqual(JSON.stringify(room.game.marbles), before);
+  assert.deepStrictEqual([room.game.hits[0].before, room.game.hits[0].after.length], ['say hello', 80]);
+  assert.deepStrictEqual(room.game.hits[0].victimAt, room.game.marbles[b][0]);
+  assert.strictEqual(room.view().turnEndsIn, null, 'the bit freezes the clock for this turn');
+  assert.throws(() => room.shoot('u1', { by: a, byMarble: 1, victim: b, victimMarble: 0 }), /already down/);
+  assert.throws(() => room.shoot('u1', { by: b, byMarble: 0, victim: a, victimMarble: 0 }), /no state to shoot/);
+  const [hit] = room.view().game.hits;
+  assert.deepStrictEqual({ by: hit.by, victim: hit.victim, undone: hit.undone }, { by: a, victim: b, undone: false });
+  assert.ok(hit.age >= 0 && !('t' in hit));
+  room.unshoot('u1', hit.id);
+  assert.strictEqual(room.view().game.hits[0].undone, true);
+  assert.throws(() => room.unshoot('u1', hit.id), /Nothing to undo/);
+  room.shoot('u1', { by: a, byMarble: 1, victim: b, victimMarble: 0 });
+  assert.strictEqual(room.game.hits.length, 2);
+});
+
 test('chat is rate limited, open to spectators, and works from the lobby on', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());

@@ -19,6 +19,7 @@ import { ask } from './Dialog';
 import { useSettings, updateSettings, getSettings } from '../game/settings';
 import useFitPanel from './useFitPanel';
 import Feed from './Feed';
+import { AimBanner, BITS, HitOverlay, HitTab, useMarblePick } from './Hit';
 
 const BOX_PRICE = BOXES[0].price;
 
@@ -350,10 +351,30 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
 
 // Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
 const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect', trail: 'move trail' };
-export function BoardPicker({ current, seats, onPick, onSkin, startOpen = false }) {
+export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1, onShoot, onUnshoot, onBitStart, startOpen = false }) {
   const [open, setOpen] = useState(startOpen);
   const [tab, setTab] = useState('board');
   const [edit, setEdit] = useState(null);
+  const [bit, setBit] = useState(null);
+  const [picks, setPicks] = useState(null);
+  const reopen = (nextBit) => {
+    setTab('bits');
+    setBit(nextBit);
+    setOpen(true);
+  };
+  const [aiming, startAim, cancelAim] = useMarblePick(
+    game,
+    (shot) => {
+      setPicks(shot);
+      reopen('hit');
+    },
+    () => reopen(null)
+  );
+  const aimOnBoard = () => {
+    setOpen(false);
+    startAim();
+    onBitStart?.();
+  };
   const boards = itemsForSlot('board');
   // Opening prebuilds every board on idle; hovering rushes just that one
   useEffect(() => {
@@ -372,15 +393,35 @@ export function BoardPicker({ current, seats, onPick, onSkin, startOpen = false 
   const pickTab = (key) => {
     setTab(key);
     setEdit(null);
+    setBit(null);
   };
   return (
     <div className="board-picker">
-      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Dev tools: board and skins" title="Dev tools: board and skins" aria-expanded={open}>
+      <button
+        className="icon-btn"
+        onClick={() => {
+          cancelAim();
+          setOpen((o) => !o);
+        }}
+        aria-label="Dev tools: board and skins"
+        title="Dev tools: board and skins"
+        aria-expanded={open}
+      >
         <BoardIcon />
       </button>
+      {aiming && (
+        <AimBanner
+          step={aiming}
+          seats={seats}
+          onCancel={() => {
+            cancelAim();
+            reopen(null);
+          }}
+        />
+      )}
       {open &&
         createPortal(
-          <div className="board-picker-backdrop" onClick={() => setOpen(false)}>
+          <div className={`board-picker-backdrop${tab === 'bits' && bit ? ' see-through' : ''}`} onClick={() => setOpen(false)}>
             <div className="board-picker-pop" role="dialog" aria-label="Dev tools" onClick={(e) => e.stopPropagation()}>
               <div className="dev-head">
                 <h2>Dev tools</h2>
@@ -393,6 +434,7 @@ export function BoardPicker({ current, seats, onPick, onSkin, startOpen = false 
                 {[
                   ['board', 'Table board'],
                   ['dress', 'Dress the table'],
+                  ...(game && onShoot ? [['bits', 'Bits']] : []),
                 ].map(([key, label]) => (
                   <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => pickTab(key)}>
                     {label}
@@ -413,6 +455,41 @@ export function BoardPicker({ current, seats, onPick, onSkin, startOpen = false 
                     <button className="btn tiny ghost" onClick={() => onPick(null)}>
                       Back to the starter's board
                     </button>
+                  </>
+                )}
+                {tab === 'bits' && !bit && (
+                  <div className="bit-list">
+                    {BITS.map((b) => (
+                      <button key={b.key} className="bit-card" onClick={b.key === 'hit' ? aimOnBoard : () => setBit(b.key)}>
+                        <b>{b.name}</b>
+                        <span>{b.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {tab === 'bits' && bit === 'hit' && game && (
+                  <>
+                    <div className="board-picker-head">
+                      <span>The hit</span>
+                      <button className="btn tiny ghost" onClick={() => setBit(null)}>
+                        Back
+                      </button>
+                    </div>
+                    <HitTab
+                      key={JSON.stringify(picks)}
+                      game={game}
+                      seats={seats}
+                      mySeat={mySeat}
+                      initial={picks}
+                      onRepick={aimOnBoard}
+                      onShoot={(shot) => {
+                        onShoot(shot);
+                        setOpen(false);
+                        setBit(null);
+                        setPicks(null);
+                      }}
+                      onUnshoot={onUnshoot}
+                    />
                   </>
                 )}
                 {tab === 'dress' && edit && (
@@ -1006,6 +1083,11 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       seats={seats}
       onPick={(item) => onAction('game:setBoard', { item })}
       onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
+      game={game}
+      mySeat={mySeat}
+      onShoot={(shot) => onAction('game:shoot', shot)}
+      onUnshoot={(id) => onAction('game:unshoot', { id })}
+      onBitStart={() => onAction('game:pauseClock')}
     />
   );
   const cameraBtn = !(local && room.table) && (
@@ -1042,6 +1124,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     <>
       {startPending && <StartIntro key={game.pick.t} game={game} seats={seats} mySeat={local ? -1 : mySeat} nameOf={nameOf} onDismiss={onDismissStart} />}
       {announceEl}
+      {!!game.hits?.length && <HitOverlay hits={game.hits} names={seats.map((p) => p?.name)} onUndo={isAdmin && !local ? (id) => onAction('game:unshoot', { id }) : undefined} />}
     </>
   );
   const partner = teams ? seats[partnerOf(mySeat)] : null;

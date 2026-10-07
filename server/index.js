@@ -287,6 +287,18 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can restyle the table');
     current().setSkin(userId, { seat, slot, item: typeof item === 'string' ? item : null });
   });
+  handle('game:shoot', (shot) => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can pull the trigger');
+    current().shoot(userId, shot);
+  });
+  handle('game:pauseClock', () => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can pause the clock');
+    current().pauseClock(userId);
+  });
+  handle('game:unshoot', ({ id }) => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can undo a hit');
+    current().unshoot(userId, id);
+  });
   handle('game:ping', (payload) => current().ping(userId, payload, { admin: accounts.isAdmin(accounts.getUser(userId) || {}) }));
   handle('game:rematch', () => current().rematch(userId));
 

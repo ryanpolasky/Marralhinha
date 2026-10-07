@@ -74,6 +74,82 @@ function noise({ dur = 0.05, vol = 0.2, freq = 2000, to = null, q = 1.2, delay =
 
 const jitter = (n, amt) => n * (1 + (Math.random() - 0.5) * amt);
 
+// Recorded clips are decoded into the same AudioContext as every other effect, so they unlock and mix the same way
+const samples = {};
+const decoded = {};
+export function loadSample(name) {
+  const ac = audioContext();
+  if (!ac) return Promise.resolve(null);
+  samples[name] ??= fetch(`${process.env.PUBLIC_URL}/audio/${name}.mp3`)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then((data) => new Promise((resolve, reject) => ac.decodeAudioData(data, resolve, reject)))
+    .then((buffer) => (decoded[name] = buffer))
+    .catch((error) => {
+      console.warn(`Couldn't load ${name}.mp3`, error);
+      delete samples[name];
+      return null;
+    });
+  return samples[name];
+}
+
+// Plays right away if decoded; otherwise the fallback covers this time and the clip is ready for the next
+function sample(name, vol = 1, fallback = null) {
+  const ac = audio();
+  if (!ac) return;
+  const buffer = decoded[name];
+  if (!buffer) {
+    loadSample(name);
+    fallback?.();
+    return;
+  }
+  const src = ac.createBufferSource();
+  const gain = ac.createGain();
+  src.buffer = buffer;
+  gain.gain.value = vol;
+  src.connect(gain).connect(master);
+  src.start();
+}
+
+// Looping rain bed for the hit; a long noise buffer so the loop point doesn't flutter
+let rain = null;
+let rainBuffer = null;
+export function setRain(on) {
+  const ac = audio();
+  if (on && !rain && ac) {
+    if (!rainBuffer) {
+      rainBuffer = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
+      const data = rainBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = rainBuffer;
+    src.loop = true;
+    const high = ac.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 500;
+    const low = ac.createBiquadFilter();
+    low.type = 'lowpass';
+    low.frequency.value = 2600;
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.0001, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.14, ac.currentTime + 2.5);
+    src.connect(high).connect(low).connect(gain).connect(master);
+    src.start();
+    rain = { src, gain };
+  } else if (!on && rain) {
+    const { src, gain } = rain;
+    rain = null;
+    const t = ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    src.stop(t + 1.3);
+  }
+}
+
 export const sfx = {
   hop: () => {
     tone({ freq: jitter(2100, 0.2), type: 'triangle', dur: 0.05, vol: 0.07 });
@@ -142,6 +218,33 @@ export const sfx = {
   boardSwap: () => {
     noise({ dur: 0.7, vol: 0.14, freq: 500, to: 4200, q: 0.6 });
     [659, 988, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.35, vol: 0.07, delay: 0.12 + i * 0.07 }));
+  },
+  // The dev hit bit: record scratch as the music dies, the cock, the shot, a sad note, and the tape rewinding on undo
+  scratch: () => {
+    noise({ dur: 0.22, vol: 0.22, freq: 3200, to: 500, q: 1.1 });
+    tone({ freq: 520, to: 70, type: 'sawtooth', dur: 0.4, vol: 0.04 });
+  },
+  cock: () => {
+    [0, 0.2].forEach((d, i) => {
+      noise({ dur: 0.03, vol: 0.3, freq: i ? 4200 : 2600, q: 3, delay: d });
+      tone({ freq: i ? 2400 : 1500, type: 'square', dur: 0.03, vol: 0.05, delay: d });
+    });
+  },
+  gunshot: () =>
+    sample('gunshot', 1.6, () => {
+      noise({ dur: 0.3, vol: 0.6, freq: 2200, to: 300, q: 0.4 });
+      tone({ freq: 160, to: 35, type: 'sine', dur: 0.45, vol: 0.6 });
+      noise({ dur: 1.4, vol: 0.12, freq: 700, to: 160, q: 0.5, delay: 0.06 });
+    }),
+  mourn: () => {
+    tone({ freq: 196, type: 'triangle', dur: 3.2, vol: 0.12 });
+    tone({ freq: 233, type: 'sine', dur: 2.8, vol: 0.07, delay: 0.5 });
+    tone({ freq: 147, type: 'sine', dur: 3.4, vol: 0.08, delay: 1 });
+  },
+  rewind: () => {
+    noise({ dur: 0.9, vol: 0.12, freq: 700, to: 6000, q: 1.5 });
+    tone({ freq: 180, to: 1600, type: 'sawtooth', dur: 0.9, vol: 0.04 });
+    [0.15, 0.32, 0.46, 0.57, 0.66, 0.73].forEach((d) => tone({ freq: jitter(2800, 0.3), type: 'square', dur: 0.025, vol: 0.04, delay: d }));
   },
   tick: (urgent = false) => {
     tone({ freq: urgent ? 1400 : 1000, type: 'square', dur: 0.035, vol: urgent ? 0.07 : 0.045 });

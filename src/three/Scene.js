@@ -6,6 +6,7 @@ import Board from './Board';
 import Marbles from './Marbles';
 import Die from './Die';
 import KillFxLayer from './KillFxLayer';
+import Hits from './Hits';
 import LoadoutWarmer from './LoadoutWarmer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
@@ -23,6 +24,8 @@ const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 /
 
 const _toCamera = new THREE.Vector3();
 const _homeDir = new THREE.Vector3();
+const _orbit = new THREE.Spherical();
+const ORBIT_SPEED = 0.16;
 const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
 const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 const PORTRAIT_FIT = 31;
@@ -68,6 +71,44 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     controls.enabled = game && !locked;
   }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout]);
 
+  // The dev hit: a slow push in on a point of the board, a cinematic orbit around it after the shot, then home
+  const orbit = useRef(null);
+  useEffect(() => {
+    let back = null;
+    const go = (position, target, dur) => (tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null, dur });
+    const release = () => {
+      if (orbit.current) controls.enabled = orbit.current.enabled;
+      orbit.current = null;
+    };
+    const off = fx.on((type, data) => {
+      const h = home.current;
+      if (!['focus', 'orbit', 'unfocus'].includes(type) || !h || locked) return;
+      const goHome = () => {
+        release();
+        go(h.target.clone().addScaledVector(h.dir, h.distance), h.target.clone(), 2);
+      };
+      clearTimeout(back);
+      if (type === 'unfocus') return goHome();
+      const target = new THREE.Vector3(data.at[0], 0, data.at[2]);
+      if (type === 'focus') {
+        release();
+        go(target.clone().addScaledVector(h.dir, h.distance * 0.56), target, data.dur || 2.2);
+      } else {
+        tween.current = null;
+        orbit.current = { target, radius: h.distance * 0.58, phi: 0.98, speed: 0, enabled: orbit.current?.enabled ?? controls.enabled };
+        controls.enabled = false;
+      }
+      // No hold means it lasts until someone says unfocus
+      if (data.hold != null) back = setTimeout(goHome, Math.max(0, data.hold) * 1000);
+      return undefined;
+    });
+    return () => {
+      off();
+      clearTimeout(back);
+      release();
+    };
+  }, [camera, controls, locked]);
+
   useEffect(() => {
     controls.autoRotate = mode !== 'game' || spinning;
     controls.autoRotateSpeed = spinning ? 0.6 : 0.35;
@@ -79,11 +120,22 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     const tw = tween.current;
     if (tw) {
       if (tw.start === null) tw.start = clock.elapsedTime;
-      const t = Math.min(1, (clock.elapsedTime - tw.start) / 1.4);
+      const t = Math.min(1, (clock.elapsedTime - tw.start) / (tw.dur || 1.4));
       const e = easeInOutCubic(t);
       camera.position.lerpVectors(tw.fromPos, tw.position, e);
       controls.target.lerpVectors(tw.fromTarget, tw.target, e);
       if (t >= 1) tween.current = null;
+    }
+    const o = orbit.current;
+    if (o && !tween.current) {
+      const ease = 1 - Math.exp(-dt * 1.5);
+      o.speed = Math.min(ORBIT_SPEED, o.speed + dt * ORBIT_SPEED * 0.8);
+      _orbit.setFromVector3(_toCamera.copy(camera.position).sub(o.target));
+      _orbit.radius += (o.radius - _orbit.radius) * ease;
+      _orbit.phi += (o.phi - _orbit.phi) * ease;
+      _orbit.theta += o.speed * dt;
+      camera.position.copy(o.target).add(_toCamera.setFromSpherical(_orbit));
+      controls.target.copy(o.target);
     }
     const l = lens.current;
     // Phones have a slim bottom bar (portrait) or side rails (landscape), so there's nothing big to dodge
@@ -371,6 +423,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           mySeat={mySeat}
           layout={layout}
         />
+        <Hits hits={board.hits} board={board} layout={layout} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}

@@ -46,6 +46,19 @@ export function duckMusic(ms = 3000, level = 0.25) {
   }, ms);
 }
 
+// Silence that holds until unduckMusic; works before the track exists too, since startMusic reads duck
+export function muteMusic() {
+  clearTimeout(duckTimer);
+  duck = 0;
+  fadeTo(targetVolume(), 250);
+}
+
+export function unduckMusic(ms = 600) {
+  clearTimeout(duckTimer);
+  duck = 1;
+  fadeTo(targetVolume(), ms);
+}
+
 // Called on every user gesture: if an earlier play() was blocked by autoplay rules, the next gesture retries it
 export function startMusic() {
   if (track) return applySettings();
