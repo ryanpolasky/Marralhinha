@@ -269,7 +269,7 @@
       { "key": "window", "img": "/emotes/kermit/window.gif", "hint": "Watching" },
       { "key": "kermit", "img": "/emotes/kermit/kermit.png", "hint": "Kermit" }
     ] },
-    { "id": "emotes.thebob", "slot": "emotes", "name": "The Bob", "rarity": "epic", "desc": "Decades of react face, in six frames.", "emotes": [
+    { "id": "emotes.thebob", "slot": "emotes", "name": "The Bob", "rarity": "legendary", "desc": "Decades of react face, in six frames.", "emotes": [
       { "key": "lost", "img": "/emotes/thebob/lost.png", "hint": "Lost" },
       { "key": "closeup", "img": "/emotes/thebob/closeup.png", "hint": "Too close" },
       { "key": "speed", "img": "/emotes/thebob/speed.png", "hint": "Speed" },
@@ -284,6 +284,14 @@
       { "key": "shhh", "img": "/emotes/joe/shhh.png", "hint": "Shhh" },
       { "key": "nojoe", "img": "/emotes/joe/nojoe.gif", "hint": "No Joe" },
       { "key": "cool", "img": "/emotes/joe/cool.gif", "hint": "Joe Cool" }
+    ] },
+    { "id": "emotes.clash", "slot": "emotes", "name": "Clash", "rarity": "epic", "desc": "Royalty, laughing at your luck.", "emotes": [
+      { "key": "goblin", "img": "/emotes/clash/goblin-laugh.gif", "hint": "Heheheha" },
+      { "key": "laugh", "img": "/emotes/clash/king-laugh.gif", "hint": "Cackling" },
+      { "key": "cry", "img": "/emotes/clash/king-cry.gif", "hint": "Bawling" },
+      { "key": "angry", "img": "/emotes/clash/king-angry.gif", "hint": "Royal rage" },
+      { "key": "thumbsup", "img": "/emotes/clash/king-thumbs-up.gif", "hint": "Good game" },
+      { "key": "chicken", "img": "/emotes/clash/royale-chicken.gif", "hint": "Chicken!" }
     ] }
   ],
   "boxes": [
