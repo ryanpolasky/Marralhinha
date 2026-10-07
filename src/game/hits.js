@@ -15,6 +15,7 @@ const startOf = (key, age) => {
   return starts.get(key);
 };
 export const hitClock = (hit, now = nowS()) => now - startOf(hit.id, hit.age);
+export const sinceClock = (key, age, now = nowS()) => now - startOf(key, age);
 export const undoClock = (hit, now = nowS()) => (hit.undone ? now - startOf(`${hit.id}:undo`, hit.undoneAge) : null);
 
 export const clamp01 = (x) => Math.min(1, Math.max(0, x));

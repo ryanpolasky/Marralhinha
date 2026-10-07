@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { Room, RoomManager, UserError } = require('./rooms');
+const rules = require('../src/shared/rules');
 
 function startedRoom() {
   const reactions = [];
@@ -708,6 +709,34 @@ test('a dev hit is pure theatre: marbles stay put and undo marks it walked off',
   assert.throws(() => room.unshoot('u1', hit.id), /Nothing to undo/);
   room.shoot('u1', { by: a, byMarble: 1, victim: b, victimMarble: 0 });
   assert.strictEqual(room.game.hits.length, 2);
+});
+
+test('dev stunts are theatre: one at a time, a Rocky run ends in its home row, and cut ends it early', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const [a] = room.game.active;
+  const before = JSON.stringify(room.game.marbles);
+  assert.throws(() => room.stunt('stranger', { kind: 'flash', seat: a, marble: 0 }), /not in this room/);
+  assert.throws(() => room.stunt('u1', { kind: 'nope', seat: a, marble: 0 }), /Unknown bit/);
+  assert.throws(() => room.stunt('u1', { kind: 'rocky', seat: a, marble: 99 }), /Pick a marble/);
+  room.stunt('u1', { kind: 'rocky', seat: a, marble: 0 });
+  assert.strictEqual(JSON.stringify(room.game.marbles), before);
+  const { path } = room.game.stunts[0];
+  assert.strictEqual(room.game.marbles[a][0].zone, 'base');
+  assert.deepStrictEqual(path[0], { zone: 'track', idx: rules.entryIdx(a) });
+  assert.deepStrictEqual(path.at(-1), { zone: 'home', slot: rules.HOME_LEN - 1 });
+  assert.strictEqual(path.length, 1 + rules.LAST_TRACK + rules.HOME_LEN);
+  assert.throws(() => room.stunt('u1', { kind: 'flash', seat: a, marble: 1 }), /Cut the last bit/);
+  const realAt = Date.now;
+  Date.now = () => realAt() + 10 * 60 * 1000;
+  assert.throws(() => room.stunt('u1', { kind: 'flash', seat: a, marble: 1 }), /Cut the last bit/, 'Rocky keeps celebrating until cut');
+  Date.now = realAt;
+  const [stunt] = room.view().game.stunts;
+  assert.ok(stunt.age >= 0 && !stunt.cut && !('t' in stunt));
+  room.cutStunt('u1', stunt.id);
+  assert.strictEqual(room.view().game.stunts[0].cut, true);
+  room.stunt('u1', { kind: 'flash', seat: a, marble: 1 });
+  assert.deepStrictEqual(room.game.stunts.map((s) => s.kind), ['flash']);
 });
 
 test('chat is rate limited, open to spectators, and works from the lobby on', (t) => {

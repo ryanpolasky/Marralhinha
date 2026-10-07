@@ -2024,6 +2024,72 @@ body.hit-grim .hud {
   }
 }
 
+.stunt-overlay.cine .hit-bar {
+  transform: none;
+  transition-duration: 0.9s;
+}
+
+body.stunt-rocky .scene-layer {
+  filter: sepia(0.28) saturate(1.35) contrast(1.08) brightness(1.06) hue-rotate(-8deg);
+  transition-duration: 1.2s;
+}
+
+body.stunt-rocky .hud,
+body.stunt-flashed .hud {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+
+body.stunt-flashed .scene-layer {
+  animation: stunt-flashed 7.2s ease-out both;
+}
+
+@keyframes stunt-flashed {
+  0%,
+  30% {
+    filter: blur(14px) brightness(2.2) saturate(0.2);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+.stunt-white {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #fff;
+  animation: stunt-white 7.2s linear forwards;
+}
+
+@keyframes stunt-white {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.hit-caption.rocky b {
+  font-family: Impact, 'Arial Black', sans-serif;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: #ffd166;
+  text-shadow: 0 3px 0 #8a3b00, 0 4px 20px #000;
+}
+
+.hit-caption.rocky span {
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+}
+
 .board-option.on {
   border-color: var(--gold);
   background: rgba(246, 195, 67, 0.14);

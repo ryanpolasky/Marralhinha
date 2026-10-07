@@ -6,7 +6,11 @@ import { muteMusic, unduckMusic } from '../game/music';
 import { HIT, LINE_MAX, downMarbles, hitClock, liveHits, marbleLabel, pickShot } from '../game/hits';
 import { fx } from '../three/fx';
 
-export const BITS = [{ key: 'hit', name: 'The hit', desc: 'One marble pulls a gun on another. Grim music cut, letterbox, a cinematic orbit, then Undo walks it off.' }];
+export const BITS = [
+  { key: 'hit', name: 'The hit', desc: 'One marble pulls a gun on another. Grim music cut, letterbox, a cinematic orbit, then Undo walks it off.' },
+  { key: 'flash', name: 'Flashbang', desc: 'One marble lobs a flashbang. Everyone gets whited out with their ears ringing, and the whole table is left dazed.', prompt: 'Click the marble with the flashbang' },
+  { key: 'rocky', name: 'Gonna Fly Now', desc: 'One marble goes the distance: a training montage lap of the board with a chase cam, then the steps celebration at home.', prompt: 'Click the marble going the distance' },
+];
 
 // The HUD half of the dev hit: music cut, the grim grade, letterbox, muzzle flash, captions and the rewind on undo
 export function HitOverlay({ hits = [], names = [], onUndo }) {
@@ -121,7 +125,7 @@ export function HitOverlay({ hits = [], names = [], onUndo }) {
   );
 }
 
-// Two clicks straight on the board, shooter then victim; Escape bails out
+// Clicks straight on the board: shooter then victim for the hit, a single marble for the other bits; Escape bails out
 export function useMarblePick(game, onDone, onCancel) {
   const [step, setStep] = useState(null);
   const latest = useRef({ game, onDone, onCancel });
@@ -133,9 +137,13 @@ export function useMarblePick(game, onDone, onCancel) {
     fx.emit('aim', step.by ? { by: step.by } : null);
     const off = fx.on((type, spot) => {
       if (type !== 'picked') return;
-      if (!step.by) return setStep({ by: spot });
+      if (step.bit !== 'hit') {
+        setStep(null);
+        return latest.current.onDone({ seat: spot.seat, marble: spot.marble }, step.bit);
+      }
+      if (!step.by) return setStep({ bit: 'hit', by: spot });
       setStep(null);
-      return latest.current.onDone({ by: step.by.seat, byMarble: step.by.marble, victim: spot.seat, victimMarble: spot.marble });
+      return latest.current.onDone({ by: step.by.seat, byMarble: step.by.marble, victim: spot.seat, victimMarble: spot.marble }, 'hit');
     });
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
@@ -154,14 +162,15 @@ export function useMarblePick(game, onDone, onCancel) {
     setStep(null);
     fx.emit('aim', null);
   };
-  return [step, () => setStep({ by: null }), cancel];
+  return [step, (bit = 'hit') => setStep({ bit, by: null }), cancel];
 }
 
 export function AimBanner({ step, seats, onCancel }) {
   const by = step.by;
+  const prompt = BITS.find((b) => b.key === step.bit)?.prompt;
   return createPortal(
-    <div className="hit-aim-banner" role="status" style={by ? { '--seat': SEAT_COLORS[by.seat].main } : undefined}>
-      <b>{by ? 'Now click the victim' : "Click the shooter's marble"}</b>
+    <div className="hit-aim-banner" role="status" style={by ? { '--seat': SEAT_COLORS[by.seat].main } : prompt ? { '--seat': 'var(--gold)' } : undefined}>
+      <b>{prompt || (by ? 'Now click the victim' : "Click the shooter's marble")}</b>
       <span>{by ? `${seats[by.seat]?.name || SEAT_COLORS[by.seat].name} is armed. Pick anyone else's marble.` : 'Any marble on the board. Esc to cancel.'}</span>
       <button className="btn tiny ghost" onClick={onCancel}>
         Cancel

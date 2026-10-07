@@ -86,13 +86,14 @@ function Gun() {
 
 const BUBBLE_W = 2.6;
 
-function Bubble({ hit, text, color, at, from, until }) {
+// clock returns the bit's time in seconds, or null once it's been called off
+export function Bubble({ clock, text, color, at, from, until }) {
   const ref = useRef();
   const tex = useMemo(() => makeBubbleTexture(text, color), [text, color]);
   useEffect(() => () => tex.dispose(), [tex]);
   useFrame(() => {
-    const t = hitClock(hit);
-    const s = undoClock(hit) !== null ? 0 : backOut(clamp01((t - from) / 0.3)) * (1 - clamp01((t - until) / 0.2));
+    const t = clock();
+    const s = t === null ? 0 : backOut(clamp01((t - from) / 0.3)) * (1 - clamp01((t - until) / 0.2));
     ref.current.visible = s > 0.001;
     ref.current.scale.set(BUBBLE_W * Math.max(0.001, s), BUBBLE_W * BUBBLE_ASPECT * Math.max(0.001, s), 1);
   });
@@ -191,10 +192,11 @@ function HitFx({ hit, board, layout }) {
 
   const mouth = [from.x, 0.55, from.z];
   const color = SEAT_COLORS[hit.by].main;
+  const clock = () => (undoClock(hit) !== null ? null : hitClock(hit));
   return (
     <group ref={root}>
-      {hit.before && <Bubble hit={hit} text={hit.before} color={color} at={mouth} from={HIT.say} until={HIT.sayEnd} />}
-      {hit.after && <Bubble hit={hit} text={hit.after} color={color} at={mouth} from={HIT.quip} until={HIT.quipEnd} />}
+      {hit.before && <Bubble clock={clock} text={hit.before} color={color} at={mouth} from={HIT.say} until={HIT.sayEnd} />}
+      {hit.after && <Bubble clock={clock} text={hit.after} color={color} at={mouth} from={HIT.quip} until={HIT.quipEnd} />}
       <group position={[from.x, 0, from.z]} rotation-y={yaw}>
         <group ref={gun} visible={false}>
           <Gun />

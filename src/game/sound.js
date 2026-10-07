@@ -4,9 +4,12 @@ const BASE_GAIN = 0.55;
 
 let ctx = null;
 let master = null;
+let muffler = null;
+let clear = null;
 
 onSettingsChange((s) => {
   if (master) master.gain.value = BASE_GAIN * s.sound;
+  if (clear) clear.gain.value = BASE_GAIN * s.sound;
 });
 
 // One AudioContext shared by sound effects and music; created lazily on the first user gesture
@@ -17,7 +20,14 @@ export function audioContext() {
     ctx = new AudioCtx();
     master = ctx.createGain();
     master.gain.value = BASE_GAIN * getSettings().sound;
-    master.connect(ctx.destination);
+    muffler = ctx.createBiquadFilter();
+    muffler.type = 'lowpass';
+    muffler.frequency.value = 20000;
+    master.connect(muffler).connect(ctx.destination);
+    // Skips the muffler, so the flashbang ring cuts through while everything else is underwater
+    clear = ctx.createGain();
+    clear.gain.value = BASE_GAIN * getSettings().sound;
+    clear.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
@@ -30,7 +40,7 @@ function audio() {
 
 export const unlockAudio = () => audioContext();
 
-function tone({ freq, to = null, type = 'sine', dur = 0.15, vol = 0.2, delay = 0 }) {
+function tone({ freq, to = null, type = 'sine', dur = 0.15, vol = 0.2, delay = 0, attack = 0.006, out = null }) {
   const ac = audio();
   if (!ac) return;
   const t0 = ac.currentTime + delay;
@@ -40,11 +50,29 @@ function tone({ freq, to = null, type = 'sine', dur = 0.15, vol = 0.2, delay = 0
   osc.frequency.setValueAtTime(freq, t0);
   if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
   gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  osc.connect(gain).connect(master);
+  osc.connect(gain).connect(out || master);
   osc.start(t0);
   osc.stop(t0 + dur + 0.02);
+}
+
+// A steady tone that holds at full volume before it fades, unlike tone() which starts dying right away
+function ring({ freq, vol, hold, fade, delay = 0, type = 'sine', out = null }) {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.03);
+  gain.gain.setValueAtTime(vol, t0 + hold);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + hold + fade);
+  osc.connect(gain).connect(out || master);
+  osc.start(t0);
+  osc.stop(t0 + hold + fade + 0.05);
 }
 
 let noiseBuffer = null;
@@ -111,6 +139,185 @@ function sample(name, vol = 1, fallback = null) {
   gain.gain.value = vol;
   src.connect(gain).connect(master);
   src.start();
+}
+
+// Seconds into a clip where it first gets loud, so a hit in the file can be lined up with a beat
+const onsets = {};
+function onsetOf(name, buffer) {
+  if (onsets[name] == null) {
+    const data = buffer.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    let i = 0;
+    while (i < data.length && Math.abs(data[i]) < peak * 0.25) i++;
+    onsets[name] = Math.max(0, i / buffer.sampleRate - 0.01);
+  }
+  return onsets[name];
+}
+
+// Where flashbang.mp3 has settled into a clean, steady ring (seconds into the file), and roughly how long a loop to cut from it
+const RING_FROM = 1.5;
+const RING_LEN = 0.1;
+const XFADE = 0.03;
+
+const rmsAt = (x, s, len) => {
+  let e = 0;
+  for (let i = s; i < s + len; i++) e += x[i] * x[i];
+  return Math.sqrt(e / len) || 1e-6;
+};
+
+// A loop of the ring whose length lands on a matching cycle, its own decay flattened out and the seam crossfaded, so it sustains with no click or pulse
+let ringLoop = null;
+function ringLoopOf(ac, buffer) {
+  if (ringLoop?.source === buffer) return ringLoop;
+  const sr = buffer.sampleRate;
+  const a = Math.round(RING_FROM * sr);
+  const probe = buffer.getChannelData(0);
+  const n = Math.round(0.03 * sr);
+  let best = { r: -2, lag: Math.round(RING_LEN * sr) };
+  for (let lag = best.lag - 120; lag <= best.lag + 120; lag++) {
+    let c = 0;
+    let e0 = 0;
+    let e1 = 0;
+    for (let i = a; i < a + n; i++) {
+      c += probe[i] * probe[i + lag];
+      e0 += probe[i] * probe[i];
+      e1 += probe[i + lag] * probe[i + lag];
+    }
+    const r = c / Math.sqrt(e0 * e1 + 1e-12);
+    if (r > best.r) best = { r, lag };
+  }
+  const { lag } = best;
+  const f = Math.round(XFADE * sr);
+  const w = Math.round(0.02 * sr);
+  const g = rmsAt(probe, a, w) / rmsAt(probe, a + lag - w, w);
+  const loop = ac.createBuffer(buffer.numberOfChannels, lag, sr);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const x = buffer.getChannelData(ch);
+    const out = loop.getChannelData(ch);
+    for (let i = 0; i < lag; i++) out[i] = (i < f ? x[a + i] * (i / f) + x[a + lag + i] * g * (1 - i / f) : x[a + i]) * g ** (i / lag);
+  }
+  ringLoop = { source: buffer, loop, at: (a + lag) / sr };
+  return ringLoop;
+}
+
+// The recorded bang from its first transient, running straight into the looped ring, which holds then fades with the whiteout; false if not loaded yet
+function flashClip({ vol = 1, hold, fade, out }) {
+  const ac = audio();
+  const buffer = decoded.flashbang;
+  if (!ac || !buffer) {
+    loadSample('flashbang');
+    return false;
+  }
+  const from = onsetOf('flashbang', buffer);
+  const { loop, at } = ringLoopOf(ac, buffer);
+  const t0 = ac.currentTime + 0.02;
+  const switchAt = t0 + (at - from);
+  const end = t0 + hold + fade;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.setValueAtTime(vol, t0 + hold);
+  gain.gain.exponentialRampToValueAtTime(0.001, end);
+  gain.gain.linearRampToValueAtTime(0, end + 0.05);
+  gain.connect(out);
+  const head = ac.createBufferSource();
+  head.buffer = buffer;
+  head.connect(gain);
+  head.start(t0, from, at - from);
+  const ring = ac.createBufferSource();
+  ring.buffer = loop;
+  ring.loop = true;
+  ring.connect(gain);
+  ring.start(switchAt);
+  ring.stop(end + 0.1);
+  flashBus.sources = [head, ring];
+  return true;
+}
+
+// Bus for the last flashbang's own audio, so cutting the bit can silence it
+let flashBus = null;
+
+// Pulls the table back out from underwater and kills any flashbang still ringing
+export function stopFlashbang(fade = 0.3) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  muffler.frequency.cancelScheduledValues(t);
+  muffler.frequency.setValueAtTime(muffler.frequency.value, t);
+  muffler.frequency.exponentialRampToValueAtTime(20000, t + fade);
+  if (!flashBus) return;
+  const bus = flashBus;
+  flashBus = null;
+  bus.gain.cancelScheduledValues(t);
+  bus.gain.setValueAtTime(bus.gain.value, t);
+  bus.gain.linearRampToValueAtTime(0, t + fade);
+  (bus.sources || []).forEach((src) => src.stop(t + fade + 0.05));
+  setTimeout(() => bus.disconnect(), (fade + 0.1) * 1000);
+}
+
+// A bus whose fade-out cuts off whatever was scheduled into it
+function fader(ac, vol = 1) {
+  const bus = ac.createGain();
+  bus.gain.value = vol;
+  bus.connect(master);
+  const stop = (fade = 0.8) => {
+    const t = ac.currentTime;
+    bus.gain.cancelScheduledValues(t);
+    bus.gain.setValueAtTime(bus.gain.value, t);
+    bus.gain.linearRampToValueAtTime(0, t + fade);
+    setTimeout(() => bus.disconnect(), (fade + 0.1) * 1000);
+  };
+  return { bus, stop };
+}
+
+// A longer clip that can start partway in (so late joiners stay on the beat) and fade out on demand; resolves to its stop()
+export function playClip(name, { vol = 1, offset = 0, fallback = null } = {}) {
+  return loadSample(name).then((buffer) => {
+    const ac = audio();
+    if (!ac) return () => {};
+    if (!buffer) return fallback?.(ac) || (() => {});
+    const at = typeof offset === 'function' ? offset() : offset;
+    if (at >= buffer.duration) return () => {};
+    const { bus, stop } = fader(ac, vol);
+    const src = ac.createBufferSource();
+    src.buffer = buffer;
+    src.connect(bus);
+    src.start(0, Math.max(0, at));
+    return stop;
+  });
+}
+
+// Stand-in brass for Gonna Fly Now when the real track isn't in public/audio
+const A4 = 440;
+const note = (semis) => A4 * 2 ** (semis / 12);
+const FANFARE = [
+  [0, 0.17], [0, 0.17], [4, 0.66], [2, 0.17], [2, 0.17], [5, 0.66], [4, 0.17], [4, 0.17], [7, 0.66], [5, 0.25], [4, 0.25], [2, 0.25], [0, 1.1],
+];
+export function fanfare(ac, bars = 4) {
+  const { bus, stop } = fader(ac, 1);
+  const barLen = FANFARE.reduce((sum, [, dur]) => sum + dur, 0) + 0.3;
+  for (let bar = 0; bar < bars; bar++) {
+    const lift = bar % 2 ? 2 : 0;
+    const start = 0.05 + bar * barLen;
+    let at = start;
+    for (const [semis, dur] of FANFARE) {
+      tone({ freq: note(semis + lift), type: 'sawtooth', dur: dur * 0.95, vol: 0.05, delay: at, attack: 0.02, out: bus });
+      tone({ freq: note(semis + lift - 12), type: 'square', dur: dur * 0.9, vol: 0.025, delay: at, attack: 0.02, out: bus });
+      at += dur;
+    }
+    for (let i = 0; i * 0.6 < barLen - 0.3; i++) tone({ freq: note(lift - 24 + (i % 2 ? 7 : 0)), type: 'triangle', dur: 0.5, vol: 0.08, delay: start + i * 0.6, out: bus });
+  }
+  return stop;
+}
+
+// Everything but the clear bus goes underwater, then surfaces over `sec`
+export function muffle(sec = 6, delay = 0.06) {
+  const ac = audio();
+  if (!ac) return;
+  const t = ac.currentTime + delay;
+  muffler.frequency.cancelScheduledValues(t);
+  muffler.frequency.setValueAtTime(260, t);
+  muffler.frequency.setValueAtTime(260, t + sec * 0.35);
+  muffler.frequency.exponentialRampToValueAtTime(20000, t + sec);
 }
 
 // Looping rain bed for the hit; a long noise buffer so the loop point doesn't flutter
@@ -240,6 +447,41 @@ export const sfx = {
     noise({ dur: 0.9, vol: 0.12, freq: 700, to: 6000, q: 1.5 });
     tone({ freq: 180, to: 1600, type: 'sawtooth', dur: 0.9, vol: 0.04 });
     [0.15, 0.32, 0.46, 0.57, 0.66, 0.73].forEach((d) => tone({ freq: jitter(2800, 0.3), type: 'square', dur: 0.025, vol: 0.04, delay: d }));
+  },
+  // The flashbang bit: pin, toss, the can bouncing, then the bang with everything muffled under a ringing ear
+  pin: () => {
+    tone({ freq: 4200, type: 'triangle', dur: 0.3, vol: 0.06 });
+    tone({ freq: 6300, dur: 0.22, vol: 0.03, delay: 0.01 });
+    noise({ dur: 0.04, vol: 0.12, freq: 5200, q: 3 });
+  },
+  toss: () => noise({ dur: 0.32, vol: 0.09, freq: 700, to: 2600, q: 0.9 }),
+  tink: (vol = 1) => {
+    tone({ freq: jitter(2900, 0.1), type: 'triangle', dur: 0.09, vol: 0.1 * vol });
+    tone({ freq: jitter(4400, 0.1), dur: 0.06, vol: 0.05 * vol, delay: 0.008 });
+    noise({ dur: 0.03, vol: 0.12 * vol, freq: 5200, q: 2 });
+  },
+  // The recorded bang over everything muffled; until it's loaded, a synth crack and tinnitus whine stand in
+  // hold and fade match the whiteout: the ring sits at full while the screen is white and dies away as it clears
+  flashbang: ({ hold = 2.2, fade = 5 } = {}) => {
+    const ac = audio();
+    if (!ac) return;
+    stopFlashbang(0.05);
+    muffle(hold + fade + 0.3);
+    const out = (flashBus = ac.createGain());
+    out.connect(clear);
+    if (flashClip({ hold, fade, out })) return;
+    noise({ dur: 0.12, vol: 1, freq: 4200, q: 0.25 });
+    noise({ dur: 0.35, vol: 0.8, freq: 1600, to: 300, q: 0.3 });
+    tone({ freq: 95, to: 32, type: 'sine', dur: 0.6, vol: 0.7 });
+    noise({ dur: 1.2, vol: 0.12, freq: 600, to: 150, q: 0.4, delay: 0.04 });
+    ring({ freq: 3520, vol: 0.24, hold, fade, delay: 0.03, out });
+    ring({ freq: 3527, vol: 0.09, hold, fade, delay: 0.03, out });
+    ring({ freq: 7040, vol: 0.015, hold: hold * 0.5, fade: fade * 0.5, delay: 0.03, out });
+  },
+  // A crowd going up as the run ends
+  cheer: () => {
+    for (let i = 0; i < 14; i++) noise({ dur: 1.6, vol: 0.07, freq: jitter(1100, 0.6), q: 0.6, delay: i * 0.22 });
+    [0.3, 1.1, 2].forEach((d) => tone({ freq: 2200, to: 2900, dur: 0.35, vol: 0.03, delay: d }));
   },
   tick: (urgent = false) => {
     tone({ freq: urgent ? 1400 : 1000, type: 'square', dur: 0.035, vol: urgent ? 0.07 : 0.045 });

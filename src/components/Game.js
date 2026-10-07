@@ -20,6 +20,7 @@ import { useSettings, updateSettings, getSettings } from '../game/settings';
 import useFitPanel from './useFitPanel';
 import Feed from './Feed';
 import { AimBanner, BITS, HitOverlay, HitTab, useMarblePick } from './Hit';
+import { StuntOverlay } from './Stunt';
 
 const BOX_PRICE = BOXES[0].price;
 
@@ -351,7 +352,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
 
 // Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
 const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect', trail: 'move trail' };
-export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1, onShoot, onUnshoot, onBitStart, startOpen = false }) {
+export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1, onShoot, onUnshoot, onStunt, onBitStart, startOpen = false }) {
   const [open, setOpen] = useState(startOpen);
   const [tab, setTab] = useState('board');
   const [edit, setEdit] = useState(null);
@@ -364,15 +365,16 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
   };
   const [aiming, startAim, cancelAim] = useMarblePick(
     game,
-    (shot) => {
-      setPicks(shot);
+    (pick, key) => {
+      if (key !== 'hit') return onStunt?.({ kind: key, ...pick });
+      setPicks(pick);
       reopen('hit');
     },
     () => reopen(null)
   );
-  const aimOnBoard = () => {
+  const aimOnBoard = (key = 'hit') => {
     setOpen(false);
-    startAim();
+    startAim(key);
     onBitStart?.();
   };
   const boards = itemsForSlot('board');
@@ -460,7 +462,7 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
                 {tab === 'bits' && !bit && (
                   <div className="bit-list">
                     {BITS.map((b) => (
-                      <button key={b.key} className="bit-card" onClick={b.key === 'hit' ? aimOnBoard : () => setBit(b.key)}>
+                      <button key={b.key} className="bit-card" onClick={() => aimOnBoard(b.key)}>
                         <b>{b.name}</b>
                         <span>{b.desc}</span>
                       </button>
@@ -481,7 +483,7 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
                       seats={seats}
                       mySeat={mySeat}
                       initial={picks}
-                      onRepick={aimOnBoard}
+                      onRepick={() => aimOnBoard('hit')}
                       onShoot={(shot) => {
                         onShoot(shot);
                         setOpen(false);
@@ -1087,6 +1089,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       mySeat={mySeat}
       onShoot={(shot) => onAction('game:shoot', shot)}
       onUnshoot={(id) => onAction('game:unshoot', { id })}
+      onStunt={(stunt) => onAction('game:stunt', stunt)}
       onBitStart={() => onAction('game:pauseClock')}
     />
   );
@@ -1125,6 +1128,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       {startPending && <StartIntro key={game.pick.t} game={game} seats={seats} mySeat={local ? -1 : mySeat} nameOf={nameOf} onDismiss={onDismissStart} />}
       {announceEl}
       {!!game.hits?.length && <HitOverlay hits={game.hits} names={seats.map((p) => p?.name)} onUndo={isAdmin && !local ? (id) => onAction('game:unshoot', { id }) : undefined} />}
+      {!!game.stunts?.length && <StuntOverlay stunts={game.stunts} names={seats.map((p) => p?.name)} onCut={isAdmin && !local ? (id) => onAction('game:cutStunt', { id }) : undefined} />}
     </>
   );
   const partner = teams ? seats[partnerOf(mySeat)] : null;

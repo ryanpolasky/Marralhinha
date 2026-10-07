@@ -7,6 +7,7 @@ import Marbles from './Marbles';
 import Die from './Die';
 import KillFxLayer from './KillFxLayer';
 import Hits from './Hits';
+import Stunts from './Stunts';
 import LoadoutWarmer from './LoadoutWarmer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
@@ -28,6 +29,11 @@ const _orbit = new THREE.Spherical();
 const ORBIT_SPEED = 0.16;
 // Just inside the controls' 1.05 polar limit, so they don't yank the camera back up
 const SHOT_ELEVATION = 0.55;
+// Follow cam framings as [ahead, left, height] around the running marble
+const FOLLOW_SHOTS = { face: [2.8, 0.6, 1.3], chase: [-4.4, 0, 2.2], side: [-0.6, 4.4, 1.6], lead: [4, 1, 1.6] };
+const FOLLOW_POLAR = 1.42;
+const _goal = new THREE.Vector3();
+const _left = new THREE.Vector3();
 const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
 const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 const PORTRAIT_FIT = 31;
@@ -75,24 +81,37 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
 
   // The dev hit: a slow push in on a point of the board, a cinematic orbit around it after the shot, then home
   const orbit = useRef(null);
+  const follow = useRef(null);
   useEffect(() => {
     let back = null;
-    // Distance of the side-on shot (so the orbit keeps that framing) and the zoom limit it had to relax
+    // Distance of the side-on shot (so the orbit keeps that framing), plus the limits and input it had to take over
     let shot = null;
-    let minDistance = null;
+    let limits = null;
+    let held = null;
     const go = (position, target, dur) => (tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null, dur });
+    const hold = () => {
+      held ??= controls.enabled;
+      controls.enabled = false;
+    };
     const release = () => {
-      if (orbit.current) controls.enabled = orbit.current.enabled;
       orbit.current = null;
+      follow.current = null;
+      if (held !== null) controls.enabled = held;
+      held = null;
+    };
+    const relax = (minDistance, maxPolar = 0) => {
+      limits ??= { minDistance: controls.minDistance, maxPolar: controls.maxPolarAngle };
+      controls.minDistance = Math.min(limits.minDistance, minDistance);
+      controls.maxPolarAngle = Math.max(limits.maxPolar, maxPolar);
     };
     const restore = () => {
-      if (minDistance !== null) controls.minDistance = minDistance;
-      minDistance = null;
+      if (limits) Object.assign(controls, { minDistance: limits.minDistance, maxPolarAngle: limits.maxPolar });
+      limits = null;
       shot = null;
     };
     const off = fx.on((type, data) => {
       const h = home.current;
-      if (!['focus', 'orbit', 'unfocus'].includes(type) || !h || locked) return;
+      if (!['focus', 'orbit', 'follow', 'unfocus'].includes(type) || !h || locked) return;
       const goHome = () => {
         release();
         restore();
@@ -100,21 +119,30 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
       };
       clearTimeout(back);
       if (type === 'unfocus') return goHome();
-      const target = new THREE.Vector3(data.at[0], 0, data.at[2]);
+      if (type === 'follow') {
+        release();
+        tween.current = null;
+        relax(1.5, FOLLOW_POLAR);
+        hold();
+        follow.current = { track: data.track, dir: data.track.dir.clone(), offset: camera.position.clone().sub(data.track.pos) };
+        return undefined;
+      }
+      const target = new THREE.Vector3(data.at[0], data.y ?? 0, data.at[2]);
       if (type === 'focus') {
         release();
         // Side-on: the camera sits square to the line of fire, so the shooter is on the left and the victim on the right for everyone
         const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
         shot = THREE.MathUtils.clamp((data.span / 2 + 2.4) / Math.tan(hfov / 2), 7, h.distance * 1.1);
-        minDistance ??= controls.minDistance;
-        controls.minDistance = Math.min(minDistance, shot * 0.8);
+        relax(shot * 0.8);
         const side = new THREE.Vector3(data.side[0], 0, data.side[2]).normalize();
         const offset = side.multiplyScalar(Math.cos(SHOT_ELEVATION)).setY(Math.sin(SHOT_ELEVATION));
         go(target.clone().addScaledVector(offset, shot), target, data.dur || 2.2);
       } else {
         tween.current = null;
-        orbit.current = { target, radius: shot ? shot * 1.25 : h.distance * 0.58, phi: shot ? Math.PI / 2 - SHOT_ELEVATION : 0.98, speed: 0, enabled: orbit.current?.enabled ?? controls.enabled };
-        controls.enabled = false;
+        follow.current = null;
+        if (data.radius) relax(data.radius * 0.8, data.phi);
+        orbit.current = { target, radius: data.radius ?? (shot ? shot * 1.25 : h.distance * 0.58), phi: data.phi ?? (shot ? Math.PI / 2 - SHOT_ELEVATION : 0.98), speed: 0, max: data.speed ?? ORBIT_SPEED };
+        hold();
       }
       // No hold means it lasts until someone says unfocus
       if (data.hold != null) back = setTimeout(goHome, Math.max(0, data.hold) * 1000);
@@ -145,10 +173,21 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
       controls.target.lerpVectors(tw.fromTarget, tw.target, e);
       if (t >= 1) tween.current = null;
     }
+    // Locked to the marble so it never leaves frame; only the angle around it eases between shots and round corners
+    const f = follow.current;
+    if (f) {
+      const { pos, dir, shot } = f.track;
+      f.dir.lerp(dir, 1 - Math.exp(-dt * 2)).setY(0).normalize();
+      const [ahead, left, up] = FOLLOW_SHOTS[shot] || FOLLOW_SHOTS.chase;
+      _goal.copy(f.dir).multiplyScalar(ahead).add(_left.set(f.dir.z, 0, -f.dir.x).multiplyScalar(left)).setY(up);
+      f.offset.lerp(_goal, 1 - Math.exp(-dt * 1.6));
+      controls.target.copy(pos);
+      camera.position.copy(pos).add(f.offset);
+    }
     const o = orbit.current;
     if (o && !tween.current) {
       const ease = 1 - Math.exp(-dt * 1.5);
-      o.speed = Math.min(ORBIT_SPEED, o.speed + dt * ORBIT_SPEED * 0.8);
+      o.speed = Math.min(o.max, o.speed + dt * o.max * 0.8);
       _orbit.setFromVector3(_toCamera.copy(camera.position).sub(o.target));
       _orbit.radius += (o.radius - _orbit.radius) * ease;
       _orbit.phi += (o.phi - _orbit.phi) * ease;
@@ -170,7 +209,7 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     const panLimit = layout.spec.halfLength + 0.25;
     controls.target.x = THREE.MathUtils.clamp(controls.target.x, -panLimit, panLimit);
     controls.target.z = THREE.MathUtils.clamp(controls.target.z, -panLimit, panLimit);
-    controls.target.y = 0;
+    controls.target.y = f ? 0.55 : o ? o.target.y : 0;
     controls.update();
 
     // Tell the HUD when you've wandered off the default view (panned, zoomed or orbited away), so it
@@ -443,6 +482,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           layout={layout}
         />
         <Hits hits={board.hits} board={board} layout={layout} />
+        <Stunts stunts={board.stunts} board={board} layout={layout} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}

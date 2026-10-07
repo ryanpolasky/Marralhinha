@@ -299,6 +299,14 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can undo a hit');
     current().unshoot(userId, id);
   });
+  handle('game:stunt', ({ kind, seat, marble } = {}) => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can pull a bit');
+    current().stunt(userId, { kind, seat, marble });
+  });
+  handle('game:cutStunt', ({ id } = {}) => {
+    if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can cut a bit');
+    current().cutStunt(userId, id);
+  });
   handle('game:ping', (payload) => current().ping(userId, payload, { admin: accounts.isAdmin(accounts.getUser(userId) || {}) }));
   handle('game:rematch', () => current().rematch(userId));
 

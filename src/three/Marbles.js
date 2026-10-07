@@ -10,6 +10,7 @@ import { playKillFx } from './killfx';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
+import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive } from '../game/stunts';
 
 export const MARBLE_R = 0.335;
 const REST_Y = 0.07;
@@ -27,6 +28,8 @@ const PATH_DOT_GEO = new THREE.SphereGeometry(0.07, 10, 8);
 const FLING_HEIGHT = 3.2;
 // A dark skin just over a downed marble, so its cosmetic still shows through, only dimmed
 const SHADE_GEO = new THREE.SphereGeometry(MARBLE_R * 1.015, 32, 20);
+const UP = new THREE.Vector3(0, 1, 0);
+const _sway = new THREE.Vector3();
 
 const CLASSIC_LAYOUT = layoutFor('classic');
 export const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
@@ -81,13 +84,82 @@ function setCursor(pointer) {
 
 const TRAIL_GAP = 0.34;
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick }) {
+const limb = (r, len) => new THREE.CylinderGeometry(r, r * 0.85, len, 10).translate(0, -len / 2, 0);
+const THIGH_GEO = limb(0.045, 0.2);
+const SHIN_GEO = limb(0.04, 0.2);
+const UPPER_ARM_GEO = limb(0.034, 0.15);
+const FOREARM_GEO = limb(0.03, 0.13);
+const SHOE_GEO = new THREE.BoxGeometry(0.1, 0.05, 0.17);
+const GLOVE_GEO = new THREE.SphereGeometry(0.065, 14, 10);
+const SWEATS = new THREE.MeshStandardMaterial({ color: '#8b8e95', roughness: 0.95 });
+const SHOE = new THREE.MeshStandardMaterial({ color: '#f1f1ee', roughness: 0.6 });
+const GLOVE = new THREE.MeshStandardMaterial({ color: '#c8102e', roughness: 0.35, metalness: 0.05 });
+
+// Gray sweats, sneakers and red gloves; the joints are pivots that poseLimbs swings each frame
+function Limbs({ rig }) {
+  const set = (key, i) => (el) => {
+    rig.current[key] ??= [];
+    rig.current[key][i] = el;
+  };
+  return (
+    <group ref={(el) => (rig.current.root = el)} visible={false}>
+      {[-1, 1].map((side, i) => (
+        <group key={side}>
+          <group ref={set('hips', i)} position={[side * 0.12, -0.26, 0]}>
+            <mesh geometry={THIGH_GEO} material={SWEATS} castShadow />
+            <group ref={set('knees', i)} position-y={-0.2}>
+              <mesh geometry={SHIN_GEO} material={SWEATS} castShadow />
+              <mesh geometry={SHOE_GEO} material={SHOE} position={[0, -0.215, 0.035]} castShadow />
+            </group>
+          </group>
+          <group ref={set('shoulders', i)} position={[side * 0.31, 0.04, 0]}>
+            <mesh geometry={UPPER_ARM_GEO} material={SWEATS} castShadow />
+            <group ref={set('elbows', i)} position-y={-0.15}>
+              <mesh geometry={FOREARM_GEO} material={SWEATS} castShadow />
+              <mesh geometry={GLOVE_GEO} material={GLOVE} position-y={-0.16} castShadow />
+            </group>
+          </group>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function poseLimbs(r, pose) {
+  if (!r.root) return;
+  r.root.visible = !!pose && pose.legs > 0.01;
+  if (!r.root.visible) return;
+  r.root.scale.setScalar(pose.legs);
+  r.root.rotation.y = Math.atan2(pose.dir.x, pose.dir.z) + pose.spin;
+  const running = pose.arms === 'run' && pose.stride > 0;
+  [-1, 1].forEach((side, i) => {
+    const phase = pose.stride + i * Math.PI;
+    const swing = running ? Math.sin(phase) : 0;
+    r.hips[i].rotation.x = -swing * 0.9;
+    r.knees[i].rotation.x = running ? Math.max(0, Math.cos(phase)) * 1.4 : 0.05;
+    if (pose.arms === 'up') {
+      r.shoulders[i].rotation.set(0, 0, side * (Math.PI - 0.35 + Math.sin(pose.clock * 7 + i) * 0.12));
+      r.elbows[i].rotation.x = -0.15;
+    } else if (pose.arms === 'jab') {
+      const punch = Math.max(0, Math.sin(pose.clock * 6 + i * Math.PI)) ** 2;
+      r.shoulders[i].rotation.set(-0.7 - punch * 0.85, 0, side * 0.3 * (1 - punch));
+      r.elbows[i].rotation.x = -(1.7 - punch * 1.6);
+    } else {
+      r.shoulders[i].rotation.set(swing * 0.8, 0, side * 0.18);
+      r.elbows[i].rotation.x = -1.3;
+    }
+  });
+}
+
+function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
   const anim = useRef(null);
   const pickHover = useRef(false);
   const shade = useRef();
+  const rig = useRef({});
+  const rocky = star && stunt?.kind === 'rocky';
   if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
@@ -106,7 +178,26 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
     const a = anim.current;
     const now = state.clock.elapsedTime;
     prev.copy(a.pos);
-    if (a.segs.length) {
+    const dropTrail = (drop = 0.08) => {
+      if (!a.trailAt) a.trailAt = a.pos.clone();
+      else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
+        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
+        a.trailAt.copy(a.pos);
+      }
+    };
+    const st = stunt && stuntClock(stunt);
+    const pose = rocky ? rockyPose(stunt, layout, st) : null;
+    const sway = stunt?.kind === 'flash' && !stunt.cut ? flashSway(st, star, seed) : null;
+    const knocked = knock && !stunt?.cut ? knockOffset(knock, st) : null;
+    poseLimbs(rig.current, pose);
+    if (pose) {
+      a.pos.set(pose.pos.x, pose.y, pose.pos.z);
+      a.returning = true;
+      if (pose.shot === 'face' || pose.shot === 'steps') a.trailAt = null;
+      else dropTrail(pose.y - 0.08);
+      body.current.quaternion.premultiply(spin.setFromAxisAngle(UP, pose.spin - (a.spin || 0)));
+      a.spin = pose.spin;
+    } else if (a.segs.length) {
       const seg = a.segs[0];
       if (seg.start === null) {
         seg.start = now + (seg.delay || 0);
@@ -131,27 +222,29 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
         const e = easeInOut(t);
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
-        if (!seg.impact) {
-          if (!a.trailAt) a.trailAt = a.pos.clone();
-          else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
-            playTrail(trail, [a.pos.x, a.pos.y - 0.08, a.pos.z], { by: seat, prev: [a.trailAt.x, a.trailAt.y - 0.08, a.trailAt.z] });
-            a.trailAt.copy(a.pos);
-          }
-        }
+        if (!seg.impact) dropTrail();
       }
     } else if (a.pos.distanceToSquared(target) > 1e-6) {
       a.trailAt = null;
-      a.pos.lerp(target, 1 - Math.exp(-dt * 8));
+      a.spin = 0;
+      // Coming back from a bit can be clear across the board, so take it slower than a sync nudge
+      a.pos.lerp(target, 1 - Math.exp(-dt * (a.returning ? 3 : 8)));
+      if (a.returning && a.pos.distanceToSquared(target) < 0.01) a.returning = false;
     } else a.trailAt = null;
 
     const bob = (Math.sin(now * 5) * 0.5 + 0.5) * 0.14;
-    const liftTarget = pickable ? (pickHover.current ? 0.55 : 0.1 + bob) : selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + bob : 0;
+    const arc = a.returning && !pose ? Math.min(1.6, a.pos.distanceTo(target) * 0.35) : 0;
+    const liftTarget = pose ? 0 : arc + (pickable ? (pickHover.current ? 0.55 : 0.1 + bob) : selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + bob : 0);
     a.lift += (liftTarget - a.lift) * (1 - Math.exp(-dt * 12));
     const k = down ? downAmount(down.hit) : 0;
     const fly = easeInOut(k);
     const prevOffX = a.off.x;
     const prevOffZ = a.off.z;
     a.off.set(down ? down.shift[0] * fly : 0, Math.sin(Math.PI * k) * FLING_HEIGHT, down ? down.shift[1] * fly : 0);
+    if (sway) a.off.add(_sway.set(sway.x, sway.y, sway.z));
+    if (knocked) a.off.add(_sway.set(knocked.x, knocked.y, knocked.z));
+    group.current.visible = knocked ? knocked.visible : true;
+    if (knocked?.tumble) body.current.rotation.x += dt * 14;
     if (shade.current) {
       shade.current.material.opacity = 0.72 * clamp01((k - 0.15) / 0.85);
       shade.current.visible = shade.current.material.opacity > 0.01;
@@ -161,7 +254,8 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
     const dx = a.pos.x - prev.x + a.off.x - prevOffX;
     const dz = a.pos.z - prev.z + a.off.z - prevOffZ;
     const dist = Math.hypot(dx, dz);
-    if (dist > 1e-5) {
+    // Up on its legs it runs, it doesn't roll
+    if (dist > 1e-5 && !pose && !knocked) {
       axis.set(dz, 0, -dx).normalize();
       body.current.quaternion.premultiply(spin.setFromAxisAngle(axis, dist / MARBLE_R));
     }
@@ -212,6 +306,7 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
     <>
       <group ref={group}>
         <mesh ref={body} geometry={MARBLE_GEO} material={material} castShadow />
+        {rocky && <Limbs rig={rig} />}
         {down && (
           <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
             <meshBasicMaterial color="#050607" transparent opacity={0} depthWrite={false} />
@@ -316,6 +411,10 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
     const { to, rest } = hitGeo(hit, board);
     return { hit, shift: [rest[0] - to[0], rest[1] - to[1]] };
   };
+  // A cut Rocky stays on a moment longer so its limbs can shrink away before it heads home
+  const stunt = (board.stunts || []).find((s) => stuntLive(s) || (s.kind === 'rocky' && s.cut && cutClock(s) < CUT_HOLD)) || null;
+  const starring = starOf(stunt, board);
+  const knocks = stunt?.kind === 'rocky' && starring ? rockyKnocks(stunt, layout, board.marbles) : [];
 
   const clickMarble = (seat, marble, pos) => {
     const options = movesForMarble(moves, seat, marble, pos);
@@ -353,6 +452,11 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
               down={downOf(seat, marble)}
               pickable={!!picking && seat !== picking.notSeat && !picking.skip?.includes(`${seat}:${marble}`)}
               onPick={() => fx.emit('picked', { seat, marble })}
+              stunt={stunt}
+              star={starring && stunt.seat === seat && stunt.marble === marble}
+              knock={knocks.find((k) => k.seat === seat && k.marble === marble && samePos(k.from, pos))}
+              seed={seat * 5 + marble}
+              layout={layout}
             />
           );
         })

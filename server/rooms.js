@@ -3,6 +3,7 @@ const rules = require('../src/shared/rules');
 const { chooseMove } = require('../src/shared/bot');
 const { animationMs, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
 const { REACTION_KEYS } = require('../src/shared/reactions');
+const { STUNT_KINDS, rockyPath, stuntSeconds } = require('../src/shared/stunts');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -458,6 +459,36 @@ class Room {
     this.changed();
   }
 
+  // Dev-only (checked by the caller): one marble pulls a one-person bit (flashbang, Rocky run). Theatre too, nothing moves for real
+  stunt(userId, { kind, seat, marble }) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const game = this.game;
+    if (!game || game.phase === 'over') throw new UserError('Start a game first');
+    if (!STUNT_KINDS.includes(kind)) throw new UserError('Unknown bit');
+    if (!game.active.includes(seat) || !Number.isInteger(marble) || marble < 0 || marble >= game.marbles[seat].length) throw new UserError('Pick a marble');
+    const now = Date.now();
+    const still = (a, b) => a.zone === b.zone && a.idx === b.idx && a.slot === b.slot;
+    if ((game.hits || []).some((h) => !h.undoneAt && h.victim === seat && h.victimMarble === marble && still(h.victimAt, game.marbles[seat][marble]))) throw new UserError('That marble is in no state for that');
+    // Rocky celebrates until cut, unless the game has since moved its marble for real
+    const running = (s) => !s.cutAt && now - s.t < stuntSeconds(s) * 1000 && (s.kind !== 'rocky' || still(s.at, game.marbles[s.seat][s.marble]));
+    if ((game.stunts || []).some(running)) throw new UserError('Cut the last bit first');
+    const stunt = { id: newId(), kind, seat, marble, at: { ...game.marbles[seat][marble] }, t: now };
+    if (kind === 'rocky') stunt.path = rockyPath(seat, marble, game.marbles, game.variant);
+    game.stunts = [stunt];
+    const who = this.seats[seat]?.name || 'Someone';
+    rules.addLog(game, kind === 'flash' ? `${who} threw a flashbang` : `${who} went the distance`, null);
+    this.clockOffSeat = game.turn;
+    this.changed();
+  }
+
+  cutStunt(userId, id) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const stunt = this.game?.stunts?.find((s) => s.id === id && !s.cutAt);
+    if (!stunt) throw new UserError('Nothing to cut');
+    stunt.cutAt = Date.now();
+    this.changed();
+  }
+
   setTurnTime(userId, seconds) {
     this.requireHost(userId);
     this.requireLobby();
@@ -883,8 +914,15 @@ class Room {
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       chat: this.chatLog,
-      // Hit ages are relative too, so every client plays the bit on the same beat
-      game: this.game?.hits ? { ...this.game, hits: this.game.hits.map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })) } : this.game,
+      // Hit and stunt ages are relative too, so every client plays the bit on the same beat
+      game:
+        this.game?.hits || this.game?.stunts
+          ? {
+              ...this.game,
+              hits: (this.game.hits || []).map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })),
+              stunts: (this.game.stunts || []).map(({ t, cutAt, ...s }) => ({ ...s, age: now - t, cut: !!cutAt, cutAge: cutAt ? now - cutAt : null })),
+            }
+          : this.game,
     };
   }
 
