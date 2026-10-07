@@ -79,7 +79,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
               <b className="board-value">{board[2](u)}</b>
             </button>
           ))}
-          {data && rows.length === 0 && <p className="muted center match-empty">Nobody here yet — be the first!</p>}
+          {data && rows.length === 0 && <p className="muted center match-empty">Nobody here yet, be the first!</p>}
         </div>
       </div>
     </div>

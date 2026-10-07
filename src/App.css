@@ -92,10 +92,42 @@ input {
 }
 
 /* Discord's preview tile gets the bare board */
-body.preview .app > :not(.scene-layer):not(.vignette),
+body.preview .app > :not(.scene-layer):not(.vignette):not(.preview-turn),
 body.preview > .modal-backdrop,
 body.preview > .floating {
   display: none;
+}
+
+body.preview .app {
+  container-type: inline-size;
+}
+
+.preview-turn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  transform: translate(-50%, -50%);
+  padding: 0.25em 0.8em;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: clamp(12px, 11cqw, 64px);
+  max-width: calc(100% - 12px);
+  box-sizing: border-box;
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #1b1208;
+  background: var(--gold);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 28px color-mix(in srgb, var(--gold) 60%, transparent);
+  pointer-events: none;
+  animation: preview-turn-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes preview-turn-pulse {
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
 }
 
 .scene-error {
@@ -881,12 +913,13 @@ button.room-pill.copied {
   background: var(--glass);
   border: 2px solid transparent;
   backdrop-filter: blur(10px);
-  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1), border-color 0.2s, box-shadow 0.2s;
+  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1), zoom 0.3s ease-out, border-color 0.2s, box-shadow 0.2s;
 }
 
 .chip.turn {
   border-color: var(--seat);
-  transform: translateY(2px) scale(1.07);
+  transform: translateY(2px);
+  zoom: 1.07;
   box-shadow: 0 0 24px color-mix(in srgb, var(--seat) 55%, transparent);
 }
 
@@ -1349,6 +1382,19 @@ button.room-pill.copied {
   backdrop-filter: blur(10px);
   pointer-events: auto;
   animation: dialog-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.preview-stage-plain .players-bar .chip {
+  flex-shrink: 0;
+}
+
+.away-banner.cover {
+  top: 24%;
+  padding: 12px 16px;
+}
+
+.away-banner.cover .away-title {
+  font-size: 18px;
 }
 
 .away-title {
@@ -5292,6 +5338,7 @@ img.emote-glyph {
 
 .tag-badge {
   --tag: #5dff9d;
+  font-family: var(--font);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -8140,240 +8187,6 @@ textarea.report-text {
 
 .profile-loadout.peek .thumb {
   transform: scale(0.8);
-}
-
-/* ---------- Preview gallery (#preview) ---------- */
-
-.preview-shell {
-  height: 100vh;
-  overflow-y: auto;
-  box-sizing: border-box;
-  min-height: 100vh;
-  padding: 26px;
-  background: radial-gradient(ellipse at 50% 0%, #173c36, #0b1f24 70%);
-  color: var(--ink);
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.preview-shell h1 {
-  margin: 0 0 4px;
-}
-
-.preview-shell > p {
-  margin: 0 0 20px;
-}
-
-.preview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
-  max-width: 1100px;
-}
-
-.preview-grid a {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--ink);
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 17px;
-  transition: border-color 0.15s, background 0.15s, transform 0.15s;
-}
-
-.preview-grid a:hover {
-  border-color: var(--gold);
-  background: rgba(255, 255, 255, 0.09);
-  transform: translateY(-2px);
-}
-
-.preview-grid a span {
-  font-weight: 400;
-  font-size: 13px;
-  color: var(--ink-dim);
-}
-
-.preview-stage-plain {
-  padding: 26px;
-  border-radius: 22px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-line);
-}
-
-.preview-stage-plain.tall .preview-stage {
-  height: 460px;
-}
-
-.preview-win-slot > .win-card {
-  width: 100%;
-  max-height: none;
-}
-
-/* ?still: freeze animations at their end state for headless screenshots */
-.preview-shell.still *,
-.preview-shell.still *::before,
-.preview-shell.still *::after {
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  animation-iteration-count: 1 !important;
-}
-
-.preview-note {
-  margin: 14px 0 0;
-  font-size: 12px;
-  color: var(--ink-dim);
-}
-
-/* Mobile layout gallery: device-sized iframes */
-.mobile-preview-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.mobile-preview-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.mobile-preview-chips small {
-  opacity: 0.7;
-  font-weight: 500;
-}
-
-.mobile-preview-body {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 24px;
-}
-
-.mobile-frame {
-  position: relative;
-  flex: none;
-  overflow: hidden;
-  border-radius: 22px;
-  border: 6px solid #050c0e;
-  box-shadow: 0 0 0 1px var(--glass-line), 0 20px 50px rgba(0, 0, 0, 0.5);
-  background: #0b1f24;
-  box-sizing: content-box;
-}
-
-.mobile-frame iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border: 0;
-  transform-origin: top left;
-}
-
-.mobile-preview-notes {
-  flex: 1;
-  min-width: 260px;
-  max-width: 420px;
-}
-
-.mobile-preview-notes h3 {
-  margin: 0 0 8px;
-}
-
-.mobile-preview-notes ul {
-  margin: 0 0 14px;
-  padding-left: 18px;
-  line-height: 1.5;
-  font-size: 14px;
-}
-
-/* Render quality + HUD glass comparisons */
-.preview-compare {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.preview-compare h3 {
-  margin: 10px 0 2px;
-  font-size: 15px;
-}
-
-.preview-compare small {
-  color: var(--ink-dim);
-}
-
-.preview-canvas {
-  position: relative;
-  height: 420px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #0b1f24;
-}
-
-.preview-canvas.tall {
-  height: 600px;
-}
-
-.preview-toggles {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  font-size: 14px;
-}
-
-.preview-toggles label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.glass-compare {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  padding: 18px;
-  pointer-events: none;
-}
-
-.glass-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  min-width: 0;
-}
-
-.glass-side > .glass-label {
-  font-weight: 700;
-  color: var(--gold);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
-}
-
-.glass-side > .panel {
-  padding: 16px 18px;
-  animation: none;
-}
-
-.glass-side .action-panel {
-  min-width: 0;
-  width: 100%;
-  max-width: 420px;
-}
-
-@media (max-width: 900px) {
-  .preview-compare,
-  .glass-compare {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ---------- Flat glass: no backdrop blur over the live canvas (toggled by quality.glass) ---------- */

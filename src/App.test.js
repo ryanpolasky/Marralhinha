@@ -83,8 +83,8 @@ test('Supporter pack does not unlock until the profile carries a verified tag', 
   const { rerender } = render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
   expect(screen.getByRole('button', { name: /Discord checkout coming soon/i })).toBeDisabled();
   expect(screen.getByText(/from the bottom of my heart/i)).toBeInTheDocument();
-  expect(screen.getByText('— Ryan :)')).toHaveClass('supporter-signature');
-  expect(screen.getByText('— Ryan :)').closest('.supporter-actions')).toContainElement(screen.getByRole('button', { name: /Discord checkout coming soon/i }));
+  expect(screen.getByText('- Ryan :)')).toHaveClass('supporter-signature');
+  expect(screen.getByText('- Ryan :)').closest('.supporter-actions')).toContainElement(screen.getByRole('button', { name: /Discord checkout coming soon/i }));
   expect(screen.getByRole('img', { name: /Tideglass marble and Beacon die/i })).toHaveAttribute('width', '680');
   expect(document.querySelector('.item-grid.featured').compareDocumentPosition(document.querySelector('.supporter-shop')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   rerender(<Shop account={{ ...account, tags: ['supporter'] }} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);

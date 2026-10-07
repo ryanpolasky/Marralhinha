@@ -192,11 +192,6 @@ const App = () => {
       setUrl(null);
       if (reason) notify(reason, 'good');
     };
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('connect_error', onConnectError);
-    socket.on('room:state', setRoom);
-    socket.on('room:reaction', onReaction);
     // Newest two pings per sender; your own always show, others respect the "Show pings" setting
     const onPing = (ping) => {
       const mine = ping.seat !== null && ping.seat === mySeatRef.current;
@@ -230,15 +225,23 @@ const App = () => {
       notify(id === sessionRef.current?.playerId ? 'You ended the game. Back to lobby.' : `${name} ended the game. Back to lobby.`, 'good');
       sfx.pop();
     };
-    socket.on('room:ping', onPing);
-    socket.on('room:teamChat', onTeamChat);
-    socket.on('room:teamLog', onTeamLog);
-    socket.on('room:left', onRoomLeft);
-    socket.on('room:host', onHost);
-    socket.on('room:rematch', onRematchVote);
-    socket.on('room:tableEnded', onTableEnded);
-    socket.on('account:update', setAccount);
-    socket.on('luckiest:change', onLuckyChange);
+    const listeners = {
+      connect: onConnect,
+      disconnect: onDisconnect,
+      connect_error: onConnectError,
+      'room:state': setRoom,
+      'room:reaction': onReaction,
+      'room:ping': onPing,
+      'room:teamChat': onTeamChat,
+      'room:teamLog': onTeamLog,
+      'room:left': onRoomLeft,
+      'room:host': onHost,
+      'room:rematch': onRematchVote,
+      'room:tableEnded': onTableEnded,
+      'account:update': setAccount,
+      'luckiest:change': onLuckyChange,
+    };
+    Object.entries(listeners).forEach(([event, fn]) => socket.on(event, fn));
 
     bootstrapAuth()
       .then(({ profile, notice, instanceId }) => {
@@ -256,20 +259,7 @@ const App = () => {
     return () => {
       cancelled = true;
       unPreview();
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('connect_error', onConnectError);
-      socket.off('room:state', setRoom);
-      socket.off('room:reaction', onReaction);
-      socket.off('room:left', onRoomLeft);
-      socket.off('room:host', onHost);
-      socket.off('room:rematch', onRematchVote);
-      socket.off('room:tableEnded', onTableEnded);
-      socket.off('room:ping', onPing);
-      socket.off('room:teamChat', onTeamChat);
-      socket.off('room:teamLog', onTeamLog);
-      socket.off('account:update', setAccount);
-      socket.off('luckiest:change', onLuckyChange);
+      Object.entries(listeners).forEach(([event, fn]) => socket.off(event, fn));
       socket.disconnect();
     };
   }, [enter, saveSession, notify]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -664,6 +654,7 @@ const App = () => {
         </SceneBoundary>
       </div>
       <div className="vignette" />
+      {preview && sceneProps.mode === 'game' && (sceneProps.canRoll || sceneProps.moves) && <div className="preview-turn">Your Turn!</div>}
       {account && !game && !localView && accountBar}
       {account && !connected && !localView && <div className="banner">Connecting to the game server…</div>}
       {toast && <Toast key={toast.id} toast={toast} onDone={dismissToast} />}

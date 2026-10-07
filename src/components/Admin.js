@@ -242,7 +242,7 @@ function ReportEditor({ report, onDone, notify }) {
     try {
       const res = await post(`/admin/reports/${report.id}/resolve`, { response, gift });
       sfx.pop();
-      notify(`Resolved${gift ? ` with ${giftLabel(gift)}` : ''} — ${report.userName || 'the player'} sees it next login`, 'good');
+      notify(`Resolved${gift ? ` with ${giftLabel(gift)}` : ''}. ${report.userName || 'the player'} sees it next login`, 'good');
       onDone(res.report);
     } catch (err) {
       notify(err.message);

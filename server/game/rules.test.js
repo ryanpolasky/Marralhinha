@@ -227,3 +227,16 @@ test('bots can play full games to completion', () => {
     }
   }
 });
+
+test('only a present, connected partner covers an away seat in 2v2', () => {
+  const game = { mode: 'teams', turn: 0 };
+  const partner = { id: 'b', connected: true };
+  const table = [{ id: 'a', away: true, coveredBy: 'b' }, null, partner, null];
+  assert.strictEqual(rules.coverFor(game, table, 0), partner);
+  assert.strictEqual(rules.coverFor(game, [{ id: 'a', away: true }, null, partner, null], 0), null, 'the partner must opt in');
+  assert.strictEqual(rules.coverFor({ ...game, mode: 'ffa' }, table, 0), null);
+  assert.strictEqual(rules.coverFor(game, [{ id: 'a' }, null, partner, null], 0), null);
+  for (const p of [{ ...partner, idle: true }, { ...partner, away: true }, { ...partner, connected: false }, { ...partner, isBot: true }]) {
+    assert.strictEqual(rules.coverFor(game, [table[0], null, p, null], 0), null);
+  }
+});

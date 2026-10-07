@@ -11,7 +11,6 @@ export const ago = (t) => {
   return new Date(t).toLocaleDateString();
 };
 
-// The lifetime numbers we track per account — shared between your profile and other players' cards
 export function StatGrid({ stats }) {
   const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
   const tiles = [
@@ -92,7 +91,7 @@ export function LuckiestPanel({ lucky }) {
 // Compact per-match rows: result, mode, who was at the table and when
 export function MatchHistory({ matches, meId }) {
   if (!matches) return <div className="muted small-text center match-empty">Loading games…</div>;
-  if (!matches.length) return <div className="muted small-text center match-empty">No games yet — match history shows up after the first game.</div>;
+  if (!matches.length) return <div className="muted small-text center match-empty">No games yet. Match history shows up after the first game.</div>;
   return (
     <div className="match-list">
       {matches.map((m) => (

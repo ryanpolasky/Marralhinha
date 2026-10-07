@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { Feed } from './components/Game';
+import Feed from './components/Feed';
 
 const noop = () => {};
 

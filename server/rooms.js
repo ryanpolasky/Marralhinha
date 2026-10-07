@@ -1,7 +1,8 @@
 const { randomBytes, randomInt } = require('crypto');
 const rules = require('../src/shared/rules');
 const { chooseMove } = require('../src/shared/bot');
-const { animationMs } = require('../src/shared/timing');
+const { animationMs, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
+const { REACTION_KEYS } = require('../src/shared/reactions');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -9,13 +10,8 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SEAT_ORDER = [0, 2, 1, 3];
 const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink', 'Marbo', 'Bolinha'];
 const BOT_DELAY_MS = 450;
-// A disconnected player gets this much grace, once, counted from the moment they dropped — then the bot
-// plays their turns at idle speed until they're back
+// One-time grace for a dropped player, then the bot plays their turns at idle speed until they're back
 const AWAY_GRACE_MS = 20000;
-// Connected players get this long per roll/move before the game plays for them. The host picks it in the
-// lobby: 15-45s in 5s steps, or null for no limit (keep in sync with TURN_SECONDS in src/game/moves.js)
-const TURN_SECONDS_DEFAULT = 30;
-const TURN_SECONDS_OPTIONS = [15, 20, 25, 30, 35, 40, 45];
 // After this many timed-out turns in a row a player counts as away and gets played for quickly
 const IDLE_MISSES = 2;
 const IDLE_DELAY_MS = 2500;
@@ -23,7 +19,6 @@ const IDLE_DELAY_MS = 2500;
 const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 15 * 60 * 1000;
 const QUICK_PLAY_TTL_MS = 4 * 60 * 1000;
-const REACTIONS = ['nice', 'ouch', 'haha', 'hurry', 'lucky', 'gg'];
 const REACTION_COOLDOWN_MS = 1200;
 // Beta testers and Devs get a hair-trigger reactions panel for emote spam
 const TESTER_REACTION_COOLDOWN_MS = 250;
@@ -39,8 +34,7 @@ const PING_TYPES = ['look', 'danger'];
 const PING_BOUND = 16;
 const BOT_ACK_MS = 700;
 
-// In 2v2, partners sit across from each other
-const teamSeats = (seat) => [seat, (seat + 2) % 4];
+const teamSeats = (seat) => [seat, rules.partnerOf(seat)];
 
 const cleanChat = (text) =>
   String(text ?? '')
@@ -424,7 +418,7 @@ class Room {
   setTurnTime(userId, seconds) {
     this.requireHost(userId);
     this.requireLobby();
-    if (seconds !== null && !TURN_SECONDS_OPTIONS.includes(seconds)) throw new UserError('Pick 15 to 45 seconds, or no limit');
+    if (!TURN_SECONDS.includes(seconds)) throw new UserError('Pick 15 to 45 seconds, or no limit');
     this.turnSeconds = seconds;
     this.changed();
   }
@@ -548,11 +542,8 @@ class Room {
     }
   }
 
-  // The partner who can take an away player's turn in 2v2: seated, human, present and not away themselves
   coverFor(seat) {
-    if (this.game?.mode !== 'teams' || !this.seats[seat]?.away) return null;
-    const partner = this.seats[(seat + 2) % 4];
-    return partner && !partner.isBot && partner.connected && !partner.away && !partner.idle ? partner : null;
+    return rules.coverFor(this.game, this.seats, seat);
   }
 
   // Returns who is acting for the turn: 'self', or 'partner' when covering for an away teammate.
@@ -562,7 +553,7 @@ class Room {
     const turn = this.game?.turn;
     const kind = turn === seat ? 'self' : turn !== undefined && this.coverFor(turn) === player ? 'partner' : null;
     if (!kind) throw new UserError("It's not your turn");
-    Object.assign(player, { missed: 0, idle: false }, kind === 'self' ? { away: false } : {});
+    Object.assign(player, { missed: 0, idle: false }, kind === 'self' ? { away: false, coveredBy: null } : {});
     return kind;
   }
 
@@ -606,8 +597,23 @@ class Room {
     const { player } = this.require(userId);
     if (!this.game || this.game.phase === 'over') throw new UserError('You can only step away during a game');
     if (!!player.away === away) return;
-    Object.assign(player, { away }, away ? {} : { idle: false, missed: 0 });
+    Object.assign(player, { away, coveredBy: null }, away ? {} : { idle: false, missed: 0 });
+    const mate = this.seats[rules.partnerOf(this.seats.indexOf(player))];
+    if (mate?.coveredBy === player.id) mate.coveredBy = null;
     rules.addLog(this.game, away ? `${player.name} stepped away` : `${player.name} is back`);
+    this.changed();
+  }
+
+  // 2v2: the bot plays for an away player unless their teammate opts in to play for them
+  coverTeammate(userId, on) {
+    const { seat, player } = this.require(userId);
+    const mate = this.seats[rules.partnerOf(seat)];
+    if (this.game?.mode !== 'teams' || this.game.phase === 'over') throw new UserError('Only in a 2v2 game');
+    if (!mate || mate.isBot || !mate.away) throw new UserError("Your teammate hasn't stepped away");
+    if (player.away || player.idle) throw new UserError("You're away yourself");
+    if ((mate.coveredBy === player.id) === on) return;
+    mate.coveredBy = on ? player.id : null;
+    rules.addLog(this.game, on ? `${player.name} is playing for ${mate.name}` : `${player.name} handed ${mate.name} back to the bot`);
     this.changed();
   }
 
@@ -623,7 +629,7 @@ class Room {
     const { seat, player } = this.require(userId);
     const pack = ITEMS.get(player.cosmetics?.emotes || DEFAULTS.emotes);
     const emote = pack?.slot === 'emotes' && (pack.emotes || []).some((e) => e.key === key);
-    if (!REACTIONS.includes(key) && !emote) throw new UserError('Unknown reaction');
+    if (!REACTION_KEYS.includes(key) && !emote) throw new UserError('Unknown reaction');
     const now = Date.now();
     const cooldown = (player.tags || []).some((tag) => TESTER_TAGS.includes(tag)) ? TESTER_REACTION_COOLDOWN_MS : REACTION_COOLDOWN_MS;
     if (now - (player.lastReaction || 0) < cooldown) return;
@@ -699,11 +705,11 @@ class Room {
     const ping = { id: newId(), seat, name: player.name, x: Math.round(px * 100) / 100, z: Math.round(pz * 100) / 100, type: PING_TYPES.includes(type) ? type : 'look', scope: toTeam ? 'team' : 'all', dev: !found, t: now };
     this.touch();
     this.hooks.onPing?.(this, ping, toTeam ? teamSeats(seat) : null);
-    const partner = toTeam ? this.seats[(seat + 2) % 4] : null;
+    const partner = toTeam ? this.seats[rules.partnerOf(seat)] : null;
     if (partner?.isBot) {
       const timer = setTimeout(() => {
         this.banterTimers.delete(timer);
-        this.hooks.onPing?.(this, { ...ping, id: newId(), seat: (seat + 2) % 4, name: partner.name, type: 'ack', t: Date.now() }, teamSeats(seat));
+        this.hooks.onPing?.(this, { ...ping, id: newId(), seat: rules.partnerOf(seat), name: partner.name, type: 'ack', t: Date.now() }, teamSeats(seat));
       }, BOT_ACK_MS);
       this.banterTimers.add(timer);
     }
@@ -821,6 +827,7 @@ class Room {
         coverGrace: p.connected || p.away || p.isBot ? 0 : Math.max(0, (p.goneAt ?? now) + AWAY_GRACE_MS - now),
         idle: !!p.idle,
         away: !!p.away,
+        coveredBy: p.coveredBy ?? null,
         devices: p.sockets?.size || 0,
         cosmetics: p.troll ? { ...p.cosmetics, ...p.troll } : p.cosmetics,
         level: p.level,

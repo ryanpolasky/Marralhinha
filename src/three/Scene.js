@@ -170,8 +170,7 @@ function useKeyboardMoves(moves, movesKey, onMove, setSelected) {
       setKeyMove(move.id);
       setSelected({ seat: move.seat, marble: move.marble });
     };
-    // Movable marbles in move order — numbers map to these, not to the flat move list, so a marble
-    // with two options still counts as one "marble" to tap through
+    // Number keys pick marbles, not moves, so a marble with two options is still one key
     const marbleOrder = [...new Set(moves.map((m) => `${m.seat}:${m.marble}`))];
     const onKey = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;

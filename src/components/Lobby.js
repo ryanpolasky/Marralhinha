@@ -9,7 +9,7 @@ import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
 import Marquee from './Marquee';
-import { Feed } from './Game';
+import Feed from './Feed';
 import BOARDS from '../shared/boards.json';
 
 // Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go

@@ -19,7 +19,6 @@ export const giftLabel = (gift) => {
 
 export const StatusPill = ({ status }) => <span className={`report-status ${status}`}>{status}</span>;
 
-// "Report a bug / suggest a feature" — the player's own reports show underneath with their status
 export function ReportModal({ onClose, notify, reports }) {
   const [kind, setKind] = useState('bug');
   const [text, setText] = useState('');
@@ -144,7 +143,7 @@ export function RepliesModal({ replies: incoming, onClose, onClaim }) {
       if (r.gift) {
         const res = await post(`/reports/${r.id}/claim`);
         const got = res.result?.item ? ITEMS[res.result.item]?.name : giftLabel(r.gift);
-        setResults((m) => ({ ...m, [r.id]: res.result?.duplicate ? `${got} (dupe — refunded ${res.result.refund} ${CURRENCY})` : `Claimed ${got}!` }));
+        setResults((m) => ({ ...m, [r.id]: res.result?.duplicate ? `${got} (dupe, refunded ${res.result.refund} ${CURRENCY})` : `Claimed ${got}!` }));
         sfx.coins();
         onClaim?.(res.profile);
       } else {

@@ -232,7 +232,7 @@ test('reconnect: a disconnected player gets one grace window, then the bot plays
   Object.assign(room.game, { turn: 0, phase: 'roll' });
   room.changed();
   t.mock.timers.tick(2500);
-  assert.strictEqual(room.game.played[0].botRolls, 2, 'after grace, turns come at bot speed — no 20s wait each time');
+  assert.strictEqual(room.game.played[0].botRolls, 2, 'after grace, turns come at bot speed, no 20s wait each time');
 
   // She can still walk back in and take over
   room.attach('u1', 's1b');

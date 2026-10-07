@@ -1,19 +1,19 @@
+import timing from '../shared/timing';
+import rules from '../shared/rules';
+
 export function movesForMarble(moves, seat, marble, pos) {
   return moves.filter((m) => m.seat === seat && (m.marble === marble || (m.kind === 'enter' && pos.zone === 'base')));
 }
+
+export const { START_WHEEL_MS, START_WHEEL_SPIN_MS, START_WINNER_MS, TURN_SECONDS } = timing;
+export const { partnerOf, coverFor } = rules;
 
 export const ROLL_REVEAL_MS = 1050;
 // Pass & play: how long a dead roll stays on screen before the turn (and camera) moves on
 export const NO_MOVES_HOLD_MS = 1800;
 // Pass & play: the marble finishes its hops, then a beat, then the board turns to the next player
 export const HANDOFF_BEAT_MS = 900;
-export const handoffMs = (mv) => 350 + (mv.path?.length || 1) * 190 + (mv.capture ? 700 : 0) + HANDOFF_BEAT_MS;
-// The "who starts" wheel: spin, then hold on the result (server bots wait this long too, see START_WHEEL_MS in server/rooms.js)
-export const START_WHEEL_MS = 8500;
-export const START_WHEEL_SPIN_MS = 4300;
-export const START_WINNER_MS = 2200;
-// Turn timer choices the host can pick in the lobby; null means no limit (see TURN_SECONDS_OPTIONS in server/rooms.js)
-export const TURN_SECONDS = [15, 20, 25, 30, 35, 40, 45, null];
+export const handoffMs = (mv) => timing.moveAnimMs(mv) + HANDOFF_BEAT_MS;
 // How long a ping arrow stays on the board
 export const PING_LIFE_MS = 3000;
 export const startPendingFor = (game, now = Date.now()) => {
@@ -23,8 +23,5 @@ export const startPendingFor = (game, now = Date.now()) => {
 };
 
 export const homeCount = (marbles) => marbles.filter((p) => p.zone === 'home').length;
-export const partnerOf = (seat) => (seat + 2) % 4;
 
-// 2v2: your partner stepped away and it's their turn, so you play it for them (mirrors coverFor in server/rooms.js)
-export const coveringTurn = (game, seats, mySeat) =>
-  !!game && game.mode === 'teams' && mySeat >= 0 && game.turn === partnerOf(mySeat) && !!seats[game.turn]?.away && !seats[mySeat]?.away;
+export const coveringTurn = (game, seats, mySeat) => !!game && mySeat >= 0 && !!seats[mySeat] && rules.coverFor(game, seats, game.turn) === seats[mySeat];

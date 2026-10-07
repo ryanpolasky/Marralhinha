@@ -624,6 +624,11 @@ test('step away: in 2v2 the partner covers your turns, otherwise the bot plays t
   assert.strictEqual(room.view().seats[0].away, true);
   assert.match(room.game.log.at(-1).text, /stepped away/);
   assert.throws(() => room.roll('u1'), /not your turn/, 'opponents cannot cover');
+  assert.throws(() => room.roll('u2'), /not your turn/, 'the partner must opt in first');
+  assert.strictEqual(room.view().turnEndsIn, null, 'the bot plays by default');
+  assert.throws(() => room.coverTeammate('u1', true), /hasn't stepped away/);
+  room.coverTeammate('u2', true);
+  assert.strictEqual(room.view().seats[0].coveredBy, room.seats[2].id);
   assert.ok(room.view().turnEndsIn > 0, 'the covering partner gets the normal turn clock');
   room.roll('u2');
   assert.strictEqual(room.game.played[0].rolls, 1);

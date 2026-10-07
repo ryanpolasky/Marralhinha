@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
-import { coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
+import { coverFor, coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
 import { RulesModal } from './Rules';
 import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee, Dots, Close } from './Icons';
 import HudSheet from './HudSheet';
+import Marquee from './Marquee';
 import useMedia, { PHONE_QUERY, WIDE_RESULTS_QUERY } from './useMedia';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf, emotesOf, emoteFor } from '../game/catalog';
@@ -17,6 +18,7 @@ import { SettingsButton } from './Settings';
 import { ask } from './Dialog';
 import { useSettings, updateSettings, getSettings } from '../game/settings';
 import useFitPanel from './useFitPanel';
+import Feed from './Feed';
 
 const BOX_PRICE = BOXES[0].price;
 
@@ -86,7 +88,7 @@ function useAnnouncements(game, mySeat, nameOf, local = false) {
   return items;
 }
 
-function statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false) {
+function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false }) {
   if (startPending) {
     return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'The wheel decides the first roll' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
   }
@@ -115,7 +117,10 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local
       : { title: `You rolled a ${game.die} for ${partner}`, sub: 'Pick one of their glowing marbles' };
   }
   if (turn === mySeat) {
-    if (seats[mySeat]?.away) return { title: 'Your turn (you stepped away)', sub: "The bot's got it. Hit I'm back or roll to take over." };
+    if (seats[mySeat]?.away) {
+      const cover = coverFor(game, seats, mySeat);
+      return { title: 'Your turn (you stepped away)', sub: `${cover ? `${cover.name} is playing your turn for you.` : "The bot's got it."} Hit I'm back or roll to take over.` };
+    }
     if (seats[mySeat]?.idle) return { title: 'Your turn!', sub: "You ran out of time, so we've been playing for you. Make a move to take back over." };
     return game.phase === 'roll'
       ? { title: 'Your turn!', sub: `Roll the dice${helpText}` }
@@ -123,9 +128,7 @@ function statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local
   }
   const p = seats[turn];
   if (p?.away && !p.isBot) {
-    const cover = game.mode === 'teams' ? seats[partnerOf(turn)] : null;
-    const covered = cover && !cover.isBot && cover.connected && !cover.away && !cover.idle;
-    return { title: `${p.name} stepped away`, sub: covered ? `${nameOf(partnerOf(turn))} ${partnerOf(turn) === mySeat ? 'are' : 'is'} playing for them…` : 'A bot is playing for them…' };
+    return { title: `${p.name} stepped away`, sub: coverFor(game, seats, turn) ? `${nameOf(partnerOf(turn))} ${partnerOf(turn) === mySeat ? 'are' : 'is'} playing for them…` : 'A bot is playing for them…' };
   }
   if (isAway(p)) return { title: `${p.name} is away`, sub: p.connected ? 'Playing for them until they’re back…' : p.coverGrace > 0 ? 'A bot will cover for them if they don’t reconnect…' : 'The bot is playing for them…' };
   return game.phase === 'roll'
@@ -330,7 +333,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
       </span>
       <div className="chip-body">
         <div className="chip-name">
-          <span className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</span>
+          <Marquee className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</Marquee>
           <TagBadges tags={player?.tags} small />
           {player?.isBot && <span className="badge">bot</span>}
           {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
@@ -507,100 +510,6 @@ function RoomCode({ code }) {
     <button type="button" className={`room-pill${copied ? ' copied' : ''}`} onClick={copy} title="Copy room code" aria-label={`Room code ${code}, click to copy`}>
       {copied ? 'Copied!' : code}
     </button>
-  );
-}
-
-// In 2v2 the chat has a Team / All channel: Tab (while typing) or the pill switches it, and
-// "/t message" or "/a message" sends one message to a channel without switching
-function ChatInput({ onSend, teams = false }) {
-  const [text, setText] = useState('');
-  const [channel, setChannel] = useState('all');
-  const active = teams ? channel : 'all';
-  const toggle = () => setChannel((c) => (c === 'team' ? 'all' : 'team'));
-  const submit = async (e) => {
-    e.preventDefault();
-    let message = text.trim();
-    let target = active;
-    const shortcut = teams && message.match(/^\/(t|a)\s+(.+)/i);
-    if (shortcut) {
-      target = shortcut[1].toLowerCase() === 't' ? 'team' : 'all';
-      message = shortcut[2].trim();
-    }
-    if (!message) return;
-    if (await onSend(message, target)) setText((current) => (current.trim() === text.trim() ? '' : current));
-  };
-  return (
-    <form className={`chat-form${active === 'team' ? ' team' : ''}`} onSubmit={submit}>
-      {teams && (
-        <button type="button" className={`chat-channel ${active}`} onClick={toggle} title="Switch between team and all chat (Tab)" aria-label={`Chatting to ${active === 'team' ? 'your team' : 'everyone'}, click to switch`}>
-          {active === 'team' ? 'Team' : 'All'}
-        </button>
-      )}
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (teams && e.key === 'Tab') {
-            e.preventDefault();
-            toggle();
-          }
-        }}
-        maxLength={280}
-        placeholder={active === 'team' ? 'Message your team… (Tab: all)' : teams ? 'Message everyone… (Tab: team)' : 'Say something…'}
-        aria-label={active === 'team' ? 'Team chat message' : 'Chat message'}
-      />
-      <button className="chat-send" type="submit" disabled={!text.trim()} aria-label="Send message">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 12h15M13 6l6 6-6 6" />
-        </svg>
-      </button>
-    </form>
-  );
-}
-
-// The chat/log feed. Game-event lines are hidden until "Show logs" is on; the live announcements
-// above the board still narrate the important moments, so nothing critical is lost when they're hidden
-export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
-  const shown = open || docked ? entries : entries.slice(0, 4);
-  return (
-    <div className={`feed${open || docked ? ' open' : ''}${lifted ? ' lifted' : ''}${docked ? ' docked' : ''}`}>
-      <div className="feed-tools">
-        {docked ? (
-          <span className="sheet-label">{onToggleLogs ? 'Chat & log' : 'Chat'}</span>
-        ) : (
-          <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
-            {open ? 'Hide' : onToggleLogs ? 'Chat & log' : 'Chat'}
-            {unread > 0 && <span className="unread">{unread}</span>}
-          </button>
-        )}
-        {onToggleLogs && (
-          <button type="button" className={`feed-logs${showLogs ? ' on' : ''}`} onClick={onToggleLogs} aria-pressed={showLogs} title="Show moves, rolls and captures in the chat">
-            {showLogs ? 'Hide logs' : 'Show logs'}
-          </button>
-        )}
-      </div>
-      <div className="feed-list" id="feed-list">
-        {docked && !shown.length && <div className="feed-empty">No messages yet. Say hi!</div>}
-        {shown.map((entry, i) => (
-          <div
-            key={`${entry.t}-${i}`}
-            className={`feed-entry${entry.chat ? ' chat' : ''}${entry.team ? ' team' : ''}`}
-            style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}
-          >
-            {entry.chat && (
-              <b className="chat-name">
-                {entry.team && <span className="chat-team-tag">Team</span>}
-                {entry.spectator && '👻 '}
-                {isMine(entry) ? 'You' : entry.name}
-                {' '}
-              </b>
-            )}
-            {entry.text}
-          </div>
-        ))}
-      </div>
-      <ChatInput teams={teams} onSend={onSend} />
-    </div>
   );
 }
 
@@ -992,7 +901,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     if (isAdmin) warmBoardSkin();
   }, [isAdmin]);
 
-  const status = statusFor(game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, !!room.table);
+  const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table });
   const badge = stuck ? game.lastRoll : game.phase === 'move' && !rollPending ? { die: game.die, seat: game.turn } : null;
   // Faces Red during the start wheel; bot turns stay facing the last human since nobody sits there
   const tableSide = !local || !room.table ? null : startPending ? 'bottom' : TABLE_SIDES[seats[activeSeat]?.isBot ? Math.max(mySeat, 0) : activeSeat];
@@ -1134,13 +1043,25 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     </>
   );
   const partner = teams ? seats[partnerOf(mySeat)] : null;
+  const partnerCovers = !!partner && !!seats[mySeat] && coverFor(game, seats, mySeat) === partner;
+  const canCover = teams && !local && !meAway && !seats[mySeat]?.idle && !!partner && !partner.isBot && partner.away && game.phase !== 'over';
+  const coverOn = canCover && partner.coveredBy === seats[mySeat]?.id;
   const endings = (
     <>
+      {canCover && (
+        <div className="away-banner cover" role="status">
+          <div className="away-title">{partner.name} stepped away</div>
+          <div className="away-sub">{coverOn ? "You're playing their turns." : 'A bot is playing their turns.'}</div>
+          <button className="btn primary" onClick={() => onAction('game:cover', { on: !coverOn })}>
+            {coverOn ? 'Let the bot play' : `Play for ${partner.name}`}
+          </button>
+        </div>
+      )}
       {meAway && !local && game.phase !== 'over' && (
         <div className="away-banner" role="status">
           <div className="away-title">You stepped away</div>
           <div className="away-sub">
-            {partner && !partner.isBot && partner.connected && !partner.away ? `${partner.name} is playing your turns.` : 'The bot is playing your turns.'}
+            {partnerCovers ? `${partner.name} is playing your turn for you.` : 'The bot is playing your turns.'}
             {!isAdmin && " If the bot plays more than half your turns this game, you won't earn rewards."}
           </div>
           <button className="btn primary big" onClick={() => setAway(false)}>

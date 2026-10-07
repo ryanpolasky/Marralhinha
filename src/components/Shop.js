@@ -327,7 +327,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                         </button>
                       )}
                       {shop?.supporter && account.discordLinked && !hasSupporter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('supporter')}>{syncing === 'supporter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
-                      <span className="supporter-signature">— Ryan :)</span>
+                      <span className="supporter-signature">- Ryan :)</span>
                     </div>
                     <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
                   </div>

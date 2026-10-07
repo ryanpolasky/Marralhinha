@@ -1,12 +1,14 @@
-// Keep these keys in sync with REACTIONS in server/rooms.js
-export const REACTIONS = [
-  { key: 'nice', label: 'Nice!', hint: 'Nice one!', color: '#3fc1b0', tilt: -4 },
-  { key: 'ouch', label: 'Ouch!', hint: 'That hurt', color: '#ff5a5f', tilt: 3 },
-  { key: 'haha', label: 'Haha!', hint: 'Haha!', color: '#ffd166', tilt: -2 },
-  { key: 'hurry', label: 'Hurry up!', hint: 'Your turn, pal', color: '#ff8a3d', tilt: 4 },
-  { key: 'lucky', label: 'So lucky!', hint: 'Suspicious dice...', color: '#b98cff', tilt: -3 },
-  { key: 'gg', label: 'GG', hint: 'Good game', color: '#8cc2ff', tilt: 2 },
-];
+import reactions from '../shared/reactions';
+
+const REACTION_STYLES = {
+  nice: { label: 'Nice!', hint: 'Nice one!', color: '#3fc1b0', tilt: -4 },
+  ouch: { label: 'Ouch!', hint: 'That hurt', color: '#ff5a5f', tilt: 3 },
+  haha: { label: 'Haha!', hint: 'Haha!', color: '#ffd166', tilt: -2 },
+  hurry: { label: 'Hurry up!', hint: 'Your turn, pal', color: '#ff8a3d', tilt: 4 },
+  lucky: { label: 'So lucky!', hint: 'Suspicious dice...', color: '#b98cff', tilt: -3 },
+  gg: { label: 'GG', hint: 'Good game', color: '#8cc2ff', tilt: 2 },
+};
+export const REACTIONS = reactions.REACTION_KEYS.map((key) => ({ key, ...REACTION_STYLES[key] }));
 export const REACTION_BY_KEY = Object.fromEntries(REACTIONS.map((r) => [r.key, r]));
 
 const FIRST = ['Captain', 'Lucky', 'Speedy', 'Sneaky', 'Mighty', 'Turbo', 'Little', 'Big', 'Sir', 'Dr.', 'Grandma', 'Professor'];

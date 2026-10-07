@@ -22,6 +22,13 @@ const progressOf = (seat, idx, spec = CLASSIC) => (idx - entryIdx(seat, spec) + 
 const idxOf = (seat, progress, spec = CLASSIC) => (entryIdx(seat, spec) + progress) % spec.trackLen;
 const partnerOf = (seat) => (seat + 2) % 4;
 
+// In 2v2 a present partner plays an away player's turn, but only once they've opted in (otherwise the bot does)
+const coverFor = (game, seats, seat) => {
+  if (game?.mode !== 'teams' || !seats[seat]?.away) return null;
+  const partner = seats[partnerOf(seat)];
+  return partner && seats[seat].coveredBy === partner.id && !partner.isBot && partner.connected && !partner.away && !partner.idle ? partner : null;
+};
+
 const cellKey = (seat, pos) => {
   if (pos.zone === 'track') return `t${pos.idx}`;
   if (pos.zone === 'center') return 'c';
@@ -190,7 +197,7 @@ function roll(state, rng = rollDie) {
   const noMoves = state.legalMoves.length === 0;
   state.lastRoll = { seat: state.turn, die, noMoves, t: Date.now() };
   const helping = controlledSeat(state) !== state.turn ? ` (for ${state.names[controlledSeat(state)]})` : '';
-  addLog(state, `${state.names[state.turn]} rolled a ${die}${helping}${noMoves ? ' — no moves' : ''}`, state.turn);
+  addLog(state, `${state.names[state.turn]} rolled a ${die}${helping}${noMoves ? ', no moves' : ''}`, state.turn);
   if (noMoves) endTurn(state, die === 6);
   return state;
 }
@@ -211,7 +218,7 @@ function move(state, moveId) {
 
   const who = state.names[seat];
   const verb = { enter: 'brought a marble into play', enterCenter: 'jumped into the center', exitCenter: 'took the shortcut out of the center', step: `moved ${state.die}` }[mv.kind];
-  addLog(state, `${who} ${verb}${to.zone === 'home' && mv.from.zone !== 'home' ? ' — reached home!' : ''}${capture ? ` and captured ${state.names[capture.seat]}!` : ''}`, seat);
+  addLog(state, `${who} ${verb}${to.zone === 'home' && mv.from.zone !== 'home' ? ' and reached home!' : ''}${capture ? ` and captured ${state.names[capture.seat]}!` : ''}`, seat);
 
   if (isFinished(state, seat) && mv.from.zone !== 'home') addLog(state, `${who} has all ${specOf(state).marbles} marbles home!`, seat);
 
@@ -254,6 +261,7 @@ module.exports = {
   progressOf,
   idxOf,
   partnerOf,
+  coverFor,
   createGame,
   computeLegalMoves,
   controlledSeat,
