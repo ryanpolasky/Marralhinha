@@ -604,9 +604,12 @@ export function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, 
   );
 }
 
-export function ReactionBar({ onReact, spam = false, emotes = [], inline = false }) {
+export function ReactionBar({ onReact, spam = false, emotes = [], inline = false, collapse = false }) {
   const [panel, setPanel] = useState(inline ? 'chat' : null);
   const [cooling, setCooling] = useState(false);
+  useEffect(() => {
+    if (collapse && !inline) setPanel(null);
+  }, [collapse, inline]);
   const send = (key) => {
     if (cooling) return;
     onReact(key);
@@ -926,6 +929,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     const t = setTimeout(roll, 650);
     return () => clearTimeout(t);
   }, [autoRoll, canRoll, roll, game.lastRoll?.t, meAway]);
+
+  useEffect(() => {
+    if (!showOver) return;
+    setFeedOpen(false);
+    closeSheet();
+  }, [showOver, closeSheet]);
 
   useEffect(() => {
     if (game.phase !== 'over') {
@@ -1285,7 +1294,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               <Coffee />
             </button>
           )}
-          {!local && mySeat >= 0 && <ReactionBar spam={spam} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
+          {!local && mySeat >= 0 && <ReactionBar collapse={showOver} spam={spam} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
 

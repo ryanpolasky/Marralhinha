@@ -1001,6 +1001,112 @@ function Decals({ bus, clip = null }) {
   );
 }
 
+const VIDEO_VERT = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const VIDEO_FRAG = `
+uniform sampler2D uMap;
+uniform float uOpacity;
+varying vec2 vUv;
+void main() {
+  vec4 t = texture2D(uMap, vUv);
+  float spill = t.g - max(t.r, t.b);
+  float key = spill / max(t.g, 0.004);
+  float a = (1.0 - smoothstep(0.3, 0.6, key)) * uOpacity;
+  vec2 q = abs(vUv - 0.5) - vec2(0.5 - 0.22);
+  a *= 1.0 - smoothstep(0.0, 0.05, length(max(q, 0.0)) - 0.22);
+  if (a < 0.01) discard;
+  t.g = min(t.g, max(t.r, t.b) + 0.02);
+  gl_FragColor = vec4(t.rgb, a);
+  #include <colorspace_fragment>
+}`;
+
+const videoCache = {};
+const videoFor = (src) => {
+  if (!videoCache[src]) {
+    const el = document.createElement('video');
+    Object.assign(el, { src, muted: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
+    const tex = new THREE.VideoTexture(el);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    videoCache[src] = { el, tex };
+  }
+  return videoCache[src];
+};
+
+// Green screen clip played on a camera-facing quad with the green keyed out
+function VideoClip({ bus }) {
+  const { camera } = useThree();
+  const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const mat = useMemo(
+    () => new THREE.ShaderMaterial({ uniforms: { uMap: { value: null }, uOpacity: { value: 1 } }, vertexShader: VIDEO_VERT, fragmentShader: VIDEO_FRAG, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
+    []
+  );
+  const mesh = useRef();
+  const clip = useRef(null);
+  const q = useMemo(() => new THREE.Quaternion(), []);
+
+  useEffect(
+    () => () => {
+      clip.current?.el.pause();
+      geo.dispose();
+      mat.dispose();
+    },
+    [geo, mat]
+  );
+
+  useEffect(
+    () =>
+      bus.on((type, d) => {
+        if (type !== 'video') return;
+        const { el, tex } = videoFor(d.src);
+        const start = () => {
+          el.currentTime = 0;
+          el.playbackRate = d.rate || 1;
+          el.play().catch(() => {});
+        };
+        clip.current = { el, size: d.size || 6, home: d.position, trim: d.trim || 0, t: -(d.delay || 0), started: false };
+        mat.uniforms.uMap.value = tex;
+        if (!d.delay) {
+          clip.current.started = true;
+          start();
+        } else clip.current.start = start;
+      }),
+    [bus, mat]
+  );
+
+  useFrame((_, dt) => {
+    const c = clip.current;
+    const m = mesh.current;
+    if (!c || !m) return;
+    if (!c.started) {
+      c.t += Math.min(dt, 0.05);
+      if (c.t < 0) return void (m.visible = false);
+      c.started = true;
+      c.start();
+    }
+    const { el } = c;
+    const done = el.ended || (el.duration > 0 && el.currentTime >= el.duration - c.trim);
+    const ready = !el.seeking && el.readyState >= 2 && el.videoWidth > 0 && !done;
+    m.visible = ready;
+    if (done) {
+      el.pause();
+      clip.current = null;
+    }
+    if (!ready) return;
+    const aspect = el.videoWidth / el.videoHeight;
+    m.scale.set(c.size * aspect, c.size, 1);
+    m.parent.getWorldQuaternion(q).invert().multiply(camera.quaternion);
+    m.quaternion.copy(q);
+    m.position.set(...c.home);
+  });
+
+  return <mesh ref={mesh} geometry={geo} material={mat} visible={false} renderOrder={6} frustumCulled={false} />;
+}
+
 // Compiles hidden pooled meshes and uploads textures on mount so the first kill doesn't hitch
 export const useWarmup = () => {
   const { gl, camera, scene } = useThree();
@@ -1026,6 +1132,7 @@ export default function Spectacle({ bus = fx, clip = null }) {
       <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />
       <Bolts bus={bus} />
+      <VideoClip bus={bus} />
       <SpriteLayer bus={bus} atlas={atlas} clip={clip} />
       <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive />
       <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel />

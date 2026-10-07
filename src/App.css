@@ -989,6 +989,7 @@ button.room-pill.copied {
 }
 
 .action-panel {
+  grid-column: 2;
   pointer-events: auto;
   display: flex;
   align-items: center;

@@ -147,6 +147,7 @@
     { "id": "fx.phoenix", "slot": "fx", "name": "Phoenix", "rarity": "legendary", "desc": "Rises from every capture." },
     { "id": "fx.meteor", "slot": "fx", "name": "Meteor", "rarity": "legendary", "desc": "An extinction-level event." },
     { "id": "fx.pixel", "slot": "fx", "name": "Wasted", "rarity": "mythic", "desc": "8 bits of disrespect." },
+    { "id": "fx.police", "slot": "fx", "name": "Officer Down", "rarity": "mythic", "desc": "Unexpected backup." },
     { "id": "fx.halloween", "slot": "fx", "name": "Soul Snatch", "rarity": "exclusive", "tag": "halloween", "desc": "The spirits collect their due." },
     { "id": "fx.beta", "slot": "fx", "name": "Blue Screen", "rarity": "exclusive", "tag": "beta", "desc": "That marble has stopped responding." },
     { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },

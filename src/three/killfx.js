@@ -294,6 +294,12 @@ const KILL_FX = {
     sfx('glitch');
   },
 
+  // Janky green screen cop car crash, chroma keyed over the table
+  police: (emit, { at }) => {
+    emit('video', { src: '/fx/police-crash.mp4', position: off(at, 0, -0.3), size: 2.8, rate: 1.4, trim: 0.25 });
+    emit('shake', { amount: 0.15 });
+  },
+
   // Everything collapses inward, then the whole table goes supernova
   dev: (emit, { at, by, sfx, later, seq }) => {
     const core = off(at, 0, 0.1);
