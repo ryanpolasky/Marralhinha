@@ -34,8 +34,6 @@ export function ExternalLink({ href, children, className }) {
 export function LegalLinks({ className = '' }) {
   return (
     <div className={`legal-links ${className}`}>
-      <ExternalLink href={LEGAL.rules}>How to play</ExternalLink>
-      <span aria-hidden="true">·</span>
       <ExternalLink href={LEGAL.terms}>Terms of Service</ExternalLink>
       <span aria-hidden="true">·</span>
       <ExternalLink href={LEGAL.privacy}>Privacy Policy</ExternalLink>
