@@ -1064,7 +1064,7 @@ function VideoClip({ bus }) {
         if (type !== 'video') return;
         const { el, tex } = videoFor(d.src);
         const start = () => {
-          el.currentTime = 0;
+          el.currentTime = d.from || 0;
           el.playbackRate = d.rate || 1;
           el.play().catch(() => {});
         };

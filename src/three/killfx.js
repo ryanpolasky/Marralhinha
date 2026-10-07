@@ -296,7 +296,7 @@ const KILL_FX = {
 
   // Janky green screen cop car crash, chroma keyed over the table
   police: (emit, { at }) => {
-    emit('video', { src: '/fx/police-crash.mp4', position: off(at, 0, -0.3), size: 2.8, rate: 1.4, trim: 0.25 });
+    emit('video', { src: '/fx/police-crash.mp4', position: off(at, 0, -0.3), size: 2.8, rate: 1.4, from: 0.5, trim: 0.25 });
     emit('shake', { amount: 0.15 });
   },
 

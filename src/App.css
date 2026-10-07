@@ -4000,6 +4000,11 @@ img.emote-glyph {
   text-align: center;
 }
 
+.locker-preview .preview-stage {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .locker-preview .preview-stage + .locker-item-info {
   margin-top: 14px;
 }
