@@ -104,9 +104,9 @@ export function HitOverlay({ hits = [], names = [], onUndo }) {
       <div className="hit-shade" aria-hidden="true" />
       <div className="hit-bar top" />
       <div className="hit-bar bottom" />
-      {flash > 0 && <div key={flash} className="hit-flash" />}
+      {flash > 0 && <div key={`flash-${flash}`} className="hit-flash" />}
       {rewind > 0 && (
-        <div key={rewind} className="hit-rewind">
+        <div key={`rewind-${rewind}`} className="hit-rewind">
           <span>◂◂ REWIND</span>
         </div>
       )}
