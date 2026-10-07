@@ -170,12 +170,24 @@ function TrailPreview({ itemId, seat, replay }) {
   );
 }
 
-export default function ItemPreview({ itemId, seat = 0, replay = 0 }) {
+function ReadySignal({ onReady, itemId }) {
+  const frames = useRef({ itemId, n: 0 });
+  useFrame(() => {
+    const f = frames.current;
+    if (f.itemId !== itemId) Object.assign(f, { itemId, n: 0 });
+    f.n += 1;
+    if (f.n === 3) onReady?.();
+  });
+  return null;
+}
+
+export default function ItemPreview({ itemId, seat = 0, replay = 0, onReady }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
   return (
     <Canvas key={stage ? 'stage' : 'item'} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
+      <ReadySignal onReady={onReady} itemId={itemId} />
       <group key={`${itemId}-${seat}`}>
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}
         {slot === 'dice' && <DicePreview itemId={itemId} />}

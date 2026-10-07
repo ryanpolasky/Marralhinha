@@ -373,7 +373,7 @@ function ReportList({ notify }) {
   const current = selected && (reports || []).find((r) => r.id === selected.id);
 
   return (
-    <div className="admin-body">
+    <div className={`admin-body${current ? ' has-selection' : ''}`}>
       <div className="admin-list">
         <label className="switch-row compact">
           <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
@@ -395,7 +395,18 @@ function ReportList({ notify }) {
           </button>
         ))}
       </div>
-      {current ? <ReportEditor report={current} onDone={onDone} notify={notify} /> : <div className="admin-editor muted center admin-empty">Pick a report to reply or attach a thank-you gift.</div>}
+      <div className="admin-detail">
+        {current ? (
+          <>
+            <button className="btn tiny ghost admin-back" onClick={() => setSelected(null)}>
+              ← Reports
+            </button>
+            <ReportEditor report={current} onDone={onDone} notify={notify} />
+          </>
+        ) : (
+          <div className="admin-editor muted center admin-empty">Pick a report to reply or attach a thank-you gift.</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -439,23 +450,23 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="panel modal admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Admin">
-        <div className="modal-head">
+        <div className="modal-head admin-head">
           <h2>Admin</h2>
-          <div className="admin-tabs" role="tablist">
-            {[
-              ['players', 'Players'],
-              ['reports', 'Reports'],
-              ['games', 'Games'],
-            ].map(([key, label]) => (
-              <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => setTab(key)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="muted">{result && tab === 'players' ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
+          <span className="muted admin-count">{result && tab === 'players' ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
             <Close />
           </button>
+        </div>
+        <div className="admin-tabs" role="tablist">
+          {[
+            ['players', 'Players'],
+            ['reports', 'Reports'],
+            ['games', 'Games'],
+          ].map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
         </div>
 
         {tab === 'games' && <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />}
@@ -475,7 +486,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
               </button>
             </label>
 
-            <div className="admin-body">
+            <div className={`admin-body${current ? ' has-selection' : ''}`}>
               <div className={`admin-list${loading ? ' loading' : ''}`}>
                 {users.length === 0 && !loading && <div className="muted center admin-empty">No players match.{!guests && ' Drive-by guests are hidden; hit Guests to include them.'}</div>}
                 {users.map((u) => (
@@ -491,7 +502,18 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
                   </button>
                 ))}
               </div>
-              {current ? <UserEditor user={current} me={account} onChange={onChange} notify={notify} /> : <div className="admin-editor muted center admin-empty">Pick a player to manage their tags, {CURRENCY} and items.</div>}
+              <div className="admin-detail">
+                {current ? (
+                  <>
+                    <button className="btn tiny ghost admin-back" onClick={() => setSelected(null)}>
+                      ← Players
+                    </button>
+                    <UserEditor user={current} me={account} onChange={onChange} notify={notify} />
+                  </>
+                ) : (
+                  <div className="admin-editor muted center admin-empty">Pick a player to manage their tags, {CURRENCY} and items.</div>
+                )}
+              </div>
             </div>
           </>
         )}

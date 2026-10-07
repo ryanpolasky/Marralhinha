@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
-import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin } from './Economy';
+import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
 import { Chevron, Close } from './Icons';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 import { IS_ACTIVITY } from '../net/config';
@@ -122,6 +122,10 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const refreshIn = useCountdown(shop?.refreshAt);
   const slides = 2;
   const go = (next) => setSlide(Math.max(0, Math.min(slides - 1, next)));
+
+  useEffect(() => {
+    preloadEmoteImages();
+  }, []);
 
   useEffect(() => {
     api('/shop')

@@ -211,7 +211,7 @@ const WAVE_R = 13;
 
 // Program compile only needs the material, so a plane stands in for the real board mesh
 const WARM_GEO = new THREE.PlaneGeometry(1, 1);
-const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 900 }) : setTimeout(fn, 80));
+export const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 900 }) : setTimeout(fn, 80));
 
 // Glowing shockwave that sweeps out from the center while the board skin changes underneath it
 function SwapWave({ wave }) {

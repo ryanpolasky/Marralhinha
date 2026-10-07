@@ -6,6 +6,7 @@ import Board from './Board';
 import Marbles from './Marbles';
 import Die from './Die';
 import KillFxLayer from './KillFxLayer';
+import LoadoutWarmer from './LoadoutWarmer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
@@ -371,6 +372,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
           mySeat={mySeat}
           layout={layout}
         />
+        <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />

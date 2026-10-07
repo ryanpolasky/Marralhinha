@@ -92,6 +92,28 @@ export function EmoteGlyph({ emote }) {
   return emote.img ? <img className="emote-glyph" src={emote.img} alt={emote.hint || ''} draggable={false} /> : <span className="emote-glyph">{emote.emoji}</span>;
 }
 
+const preloaded = new Set();
+export function preloadEmoteImages() {
+  Object.values(ITEMS).forEach((item) => {
+    (item.emotes || []).forEach((e) => {
+      if (!e.img || preloaded.has(e.img)) return;
+      preloaded.add(e.img);
+      new Image().src = e.img;
+    });
+  });
+}
+
+const LOADER_DELAY = 180;
+const LOADER_MIN = 400;
+
+export function PreviewLoader({ out = false }) {
+  return (
+    <div className={`preview-loader${out ? ' out' : ''}`} role="status" aria-label="Loading preview">
+      <span className="preview-loader-marble" />
+    </div>
+  );
+}
+
 export function ItemThumb({ itemId, seat = 0 }) {
   const item = ITEMS[itemId];
   const key = skinKey(itemId);
@@ -137,11 +159,41 @@ export function PreviewStage({ itemId, seat = 0, playerName, replay = 0 }) {
       </div>
     );
   }
+  return <ModelStage itemId={itemId} seat={seat} replay={replay} />;
+}
+
+function ModelStage({ itemId, seat, replay }) {
+  const [ready, setReady] = useState(false);
+  const [loaderOn, setLoaderOn] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const shownAt = useRef(0);
+
+  useEffect(() => {
+    setReady(false);
+    setLoaderOn(false);
+    setRevealed(false);
+    const t = setTimeout(() => {
+      shownAt.current = Date.now();
+      setLoaderOn(true);
+    }, LOADER_DELAY);
+    return () => clearTimeout(t);
+  }, [itemId]);
+
+  useEffect(() => {
+    if (!ready) return undefined;
+    const wait = loaderOn ? Math.max(0, LOADER_MIN - (Date.now() - shownAt.current)) : 0;
+    const t = setTimeout(() => setRevealed(true), wait);
+    return () => clearTimeout(t);
+  }, [ready, loaderOn]);
+
   return (
     <div className="preview-stage">
-      <Suspense fallback={<ItemThumb itemId={itemId} seat={seat} />}>
-        <ItemPreview itemId={itemId} seat={seat} replay={replay} />
-      </Suspense>
+      <div className={`preview-canvas${revealed ? ' in' : ''}`}>
+        <Suspense fallback={null}>
+          <ItemPreview itemId={itemId} seat={seat} replay={replay} onReady={() => setReady(true)} />
+        </Suspense>
+      </div>
+      {loaderOn && <PreviewLoader out={revealed} />}
     </div>
   );
 }

@@ -1373,24 +1373,76 @@ button.room-pill.copied {
 .board-picker-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 25;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .board-picker-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 26;
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(460px, calc(100vh - 120px));
-  overflow-y: auto;
-  padding: 10px;
-  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  width: min(820px, 96vw);
+  max-height: min(640px, 88vh);
+  padding: 20px 24px;
+  border-radius: 24px;
   background: var(--glass-strong);
   border: 1px solid var(--glass-line);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   animation: dialog-pop 0.16s ease-out both;
+}
+
+.dev-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.dev-head h2 {
+  margin: 0;
+  font-size: 26px;
+  color: var(--gold);
+}
+
+.board-picker-pop > .admin-tabs {
+  flex-shrink: 0;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--glass-line);
+}
+
+.board-picker-pop > .admin-tabs .board-tab {
+  padding: 9px 20px;
+  font-size: 15px;
+}
+
+.dev-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dev-body .board-picker-head {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 760px) {
+  .board-picker-backdrop {
+    padding: 0;
+  }
+
+  .board-picker-pop {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    padding: 14px 12px;
+  }
 }
 
 .board-picker-head {
@@ -1407,9 +1459,9 @@ button.room-pill.copied {
 
 .board-picker-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .board-option {
@@ -1470,8 +1522,9 @@ button.room-pill.copied {
 }
 
 .troll-slots {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
 }
 
 .troll-slot {
@@ -1530,10 +1583,8 @@ button.room-pill.copied {
 .troll-actions {
   display: flex;
   gap: 6px;
-}
-
-.troll-actions .btn {
-  flex: 1;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .board-option.on {
@@ -3746,6 +3797,57 @@ img.emote-glyph {
   font-size: 52px;
   line-height: 1;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+
+.preview-stage > .preview-loader {
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+.preview-stage > .preview-loader.out {
+  opacity: 0;
+}
+
+.preview-stage > .preview-canvas {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.preview-stage > .preview-canvas.in {
+  opacity: 1;
+}
+
+.preview-loader-marble {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  animation: preview-spin 0.9s linear infinite;
+}
+
+.preview-loader-marble::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff 0 10%, #9ad0ff 32%, #3d6fd1 72%, #1b3578);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .preview-stage > div:not(.plate) {
@@ -5984,8 +6086,63 @@ img.emote-glyph {
 /* ---------- Admin panel ---------- */
 
 .admin-modal {
-  width: min(960px, 96vw);
+  width: min(1180px, 96vw);
   max-width: none;
+  height: min(820px, 90vh);
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 22px 26px;
+}
+
+.admin-head {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.admin-modal > .admin-tabs {
+  flex-shrink: 0;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--glass-line);
+}
+
+.admin-modal > .admin-tabs .board-tab {
+  padding: 9px 20px;
+  font-size: 15px;
+}
+
+.admin-modal > .admin-search {
+  flex-shrink: 0;
+}
+
+.admin-modal > .admin-games,
+.admin-modal > .admin-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-modal > .admin-games {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.admin-modal > .admin-games .admin-games-list {
+  flex: 1;
+  max-height: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+  gap: 10px;
+}
+
+.admin-detail {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .admin-search {
@@ -6017,16 +6174,17 @@ img.emote-glyph {
 
 .admin-body {
   display: grid;
-  grid-template-columns: minmax(220px, 300px) 1fr;
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: minmax(240px, 340px) 1fr;
+  gap: 20px;
+  align-items: stretch;
 }
 
 .admin-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 60vh;
+  min-height: 0;
+  height: 100%;
   overflow-y: auto;
   padding-right: 4px;
   transition: opacity 0.15s;
@@ -6219,13 +6377,62 @@ select.admin-input optgroup {
   color: var(--ink-dim);
 }
 
-@media (max-width: 720px) {
+.admin-back {
+  display: none;
+  justify-self: start;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 760px) {
+  .modal-backdrop:has(.admin-modal) {
+    padding: 0;
+  }
+
+  .admin-modal {
+    width: 100vw !important;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    padding: 14px 12px;
+  }
+
+  .admin-modal h2 {
+    font-size: 24px;
+  }
+
   .admin-body {
     grid-template-columns: 1fr;
   }
 
-  .admin-list {
-    max-height: 26vh;
+  .admin-body.has-selection > .admin-list {
+    display: none;
+  }
+
+  .admin-body:not(.has-selection) > .admin-detail {
+    display: none;
+  }
+
+  .admin-back {
+    display: inline-flex;
+  }
+
+  .admin-editor {
+    padding: 14px 12px;
+  }
+
+  .admin-user-name {
+    font-size: 19px;
+    flex-wrap: wrap;
+  }
+
+  .admin-input,
+  .admin-input.grow {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .admin-count {
+    display: none;
   }
 }
 
@@ -7356,9 +7563,7 @@ select.admin-input optgroup {
   flex-wrap: wrap;
 }
 
-.modal-head .admin-tabs {
-  margin-left: 4px;
-}
+
 
 .board-tab {
   padding: 6px 13px;

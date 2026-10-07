@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
+import { useWarmup } from './Spectacle';
 
 const MAX = 600;
 const GRAVITY = -9;
@@ -28,6 +29,7 @@ export default function Particles({ bus = fx }) {
   const live = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
+  const root = useWarmup();
 
   useLayoutEffect(() => {
     for (let i = 0; i < MAX; i++) mesh.current.setMatrixAt(i, HIDDEN);
@@ -87,9 +89,11 @@ export default function Particles({ bus = fx }) {
   });
 
   return (
-    <instancedMesh ref={mesh} args={[null, null, MAX]} frustumCulled={false} visible={false}>
-      <octahedronGeometry args={[1, 0]} />
-      <meshBasicMaterial toneMapped={false} />
-    </instancedMesh>
+    <group ref={root}>
+      <instancedMesh ref={mesh} args={[null, null, MAX]} frustumCulled={false} visible={false}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshBasicMaterial toneMapped={false} />
+      </instancedMesh>
+    </group>
   );
 }

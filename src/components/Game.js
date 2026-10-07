@@ -26,17 +26,24 @@ function useAnnouncements(game, mySeat, nameOf, local = false) {
   const latest = useRef(game);
   latest.current = game;
   const timers = useRef([]);
+  const busyUntil = useRef(0);
 
   const push = useCallback((title, sub, tone = 'info', delay = 0, sound = null, stillValid = null) => {
-    const t1 = setTimeout(() => {
+    const fire = () => {
       if (stillValid && !stillValid(latest.current)) return;
+      const wait = busyUntil.current - Date.now();
+      if (wait > 0) {
+        timers.current.push(setTimeout(fire, wait));
+        return;
+      }
+      busyUntil.current = Date.now() + 1900 + 250;
       const id = `${Date.now()}-${Math.random()}`;
       setItems((list) => [...list.slice(-1), { id, title, sub, tone }]);
       if (sound) sound();
       const t2 = setTimeout(() => setItems((list) => list.filter((i) => i.id !== id)), 1900);
       timers.current.push(t2);
-    }, delay);
-    timers.current.push(t1);
+    };
+    timers.current.push(setTimeout(fire, delay));
   }, []);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -340,97 +347,123 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
 
 // Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
 const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect', trail: 'move trail' };
-function BoardPicker({ current, seats, onPick, onSkin }) {
-  const [open, setOpen] = useState(false);
+export function BoardPicker({ current, seats, onPick, onSkin, startOpen = false }) {
+  const [open, setOpen] = useState(startOpen);
+  const [tab, setTab] = useState('board');
   const [edit, setEdit] = useState(null);
   const boards = itemsForSlot('board');
   // Opening prebuilds every board on idle; hovering rushes just that one
   useEffect(() => {
     if (open) warmBoardSkin();
   }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
   const items = edit ? itemsForSlot(edit.slot) : [];
   const victim = edit && seats[edit.seat];
   const slotLabel = TROLL_SLOTS[edit?.slot];
   const worn = victim ? cosmeticsOf(victim)[edit.slot] : null;
+  const pickTab = (key) => {
+    setTab(key);
+    setEdit(null);
+  };
   return (
     <div className="board-picker">
       <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Dev tools: board and skins" title="Dev tools: board and skins" aria-expanded={open}>
         <BoardIcon />
       </button>
-      {open && (
-        <>
-          <div className="board-picker-backdrop" onClick={() => setOpen(false)} />
-          <div className="board-picker-pop" role="menu" aria-label="Dev tools">
-            {edit ? (
-              <>
-                <div className="board-picker-head" style={{ '--seat': SEAT_COLORS[edit.seat].main }}>
-                  <span className="picker-victim">
-                    {victim?.name}'s {slotLabel}
-                  </span>
-                  <TagBadge tag="dev" small />
-                </div>
-                <div className="board-picker-grid">
-                  {items.map((b) => (
-                    <button key={b.id} role="menuitemradio" aria-checked={worn === b.id} className={`board-option${worn === b.id ? ' on' : ''}`} onClick={() => onSkin(edit.seat, edit.slot, b.id)} title={b.desc}>
-                      <ItemThumb itemId={b.id} seat={edit.seat} />
-                      <span>{b.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="troll-actions">
-                  <button className="btn tiny ghost" onClick={() => setEdit(null)}>
-                    Back
-                  </button>
-                  <button className="btn tiny ghost" onClick={() => onSkin(edit.seat, edit.slot, null)}>
-                    Their own {slotLabel}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="board-picker-head">
-                  <span>Table board</span>
-                  <TagBadge tag="dev" small />
-                </div>
-                <div className="board-picker-grid">
-                  {boards.map((b) => (
-                    <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} onPointerEnter={() => warmBoardSkin(b.id)} title={b.desc}>
-                      <ItemThumb itemId={b.id} />
-                      <span>{b.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <button className="btn tiny ghost block" onClick={() => onPick(null)}>
-                  Back to the starter's board
+      {open &&
+        createPortal(
+          <div className="board-picker-backdrop" onClick={() => setOpen(false)}>
+            <div className="board-picker-pop" role="dialog" aria-label="Dev tools" onClick={(e) => e.stopPropagation()}>
+              <div className="dev-head">
+                <h2>Dev tools</h2>
+                <TagBadge tag="dev" small />
+                <button className="icon-close" onClick={() => setOpen(false)} aria-label="Close">
+                  <Close />
                 </button>
-                <div className="board-picker-head troll-head">
-                  <span>Dress the table</span>
-                </div>
-                <div className="troll-list">
-                  {seats.map((p, s) =>
-                    p ? (
-                      <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
-                        <span className="troll-name">{p.name}</span>
-                        <div className="troll-slots">
-                          {Object.keys(TROLL_SLOTS).map((slot) => (
-                            <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${TROLL_SLOTS[slot]}`} title={`${p.name}'s ${TROLL_SLOTS[slot]}`} onClick={() => setEdit({ seat: s, slot })}>
-                              <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
-                              <span className="troll-slot-info">
-                                <b>{TROLL_SLOTS[slot][0].toUpperCase() + TROLL_SLOTS[slot].slice(1)}</b>
-                                <span>{ITEMS[cosmeticsOf(p)[slot]]?.name || 'None'}</span>
-                              </span>
-                            </button>
-                          ))}
+              </div>
+              <div className="admin-tabs" role="tablist">
+                {[
+                  ['board', 'Table board'],
+                  ['dress', 'Dress the table'],
+                ].map(([key, label]) => (
+                  <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => pickTab(key)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="dev-body">
+                {tab === 'board' && (
+                  <>
+                    <div className="board-picker-grid">
+                      {boards.map((b) => (
+                        <button key={b.id} role="menuitemradio" aria-checked={current === b.id} className={`board-option${current === b.id ? ' on' : ''}`} onClick={() => onPick(b.id)} onPointerEnter={() => warmBoardSkin(b.id)} title={b.desc}>
+                          <ItemThumb itemId={b.id} />
+                          <span>{b.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button className="btn tiny ghost" onClick={() => onPick(null)}>
+                      Back to the starter's board
+                    </button>
+                  </>
+                )}
+                {tab === 'dress' && edit && (
+                  <>
+                    <div className="board-picker-head" style={{ '--seat': SEAT_COLORS[edit.seat].main }}>
+                      <span className="picker-victim">
+                        {victim?.name}'s {slotLabel}
+                      </span>
+                      <span className="troll-actions">
+                        <button className="btn tiny ghost" onClick={() => setEdit(null)}>
+                          Back
+                        </button>
+                        <button className="btn tiny ghost" onClick={() => onSkin(edit.seat, edit.slot, null)}>
+                          Their own {slotLabel}
+                        </button>
+                      </span>
+                    </div>
+                    <div className="board-picker-grid">
+                      {items.map((b) => (
+                        <button key={b.id} role="menuitemradio" aria-checked={worn === b.id} className={`board-option${worn === b.id ? ' on' : ''}`} onClick={() => onSkin(edit.seat, edit.slot, b.id)} title={b.desc}>
+                          <ItemThumb itemId={b.id} seat={edit.seat} />
+                          <span>{b.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {tab === 'dress' && !edit && (
+                  <div className="troll-list">
+                    {seats.map((p, s) =>
+                      p ? (
+                        <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
+                          <span className="troll-name">{p.name}</span>
+                          <div className="troll-slots">
+                            {Object.keys(TROLL_SLOTS).map((slot) => (
+                              <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${TROLL_SLOTS[slot]}`} title={`${p.name}'s ${TROLL_SLOTS[slot]}`} onClick={() => setEdit({ seat: s, slot })}>
+                                <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
+                                <span className="troll-slot-info">
+                                  <b>{TROLL_SLOTS[slot][0].toUpperCase() + TROLL_SLOTS[slot].slice(1)}</b>
+                                  <span>{ITEMS[cosmeticsOf(p)[slot]]?.name || 'None'}</span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
+                      ) : null
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
