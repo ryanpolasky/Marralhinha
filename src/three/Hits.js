@@ -69,6 +69,7 @@ const MUZZLE_X = 0.4;
 const backOut = (t) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
 const easeOut = (t) => 1 - (1 - t) ** 3;
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 
 function Gun() {
   return (
@@ -141,7 +142,13 @@ function HitFx({ hit, board, layout }) {
       fn();
     };
     const along = (k) => root.current.localToWorld(_v.set(from.x + (to.x - from.x) * k, 0, from.z + (to.z - from.z) * k)).toArray();
-    fire('focus', () => fx.emit('focus', { at: along(0.25), dur: HIT.pushDur }));
+    fire('focus', () => {
+      const at = along(0.5);
+      // Line of fire in world space (the turntable may be rotated); the camera sits off to its left-hand side
+      const shotDir = root.current.localToWorld(_v.set(from.x + dir[0], 0, from.z + dir[1])).sub(root.current.localToWorld(_v2.set(from.x, 0, from.z)));
+      const span = Math.hypot(to.x - from.x, to.z - from.z);
+      fx.emit('focus', { at, side: [-shotDir.z, 0, shotDir.x], span, dur: HIT.pushDur });
+    });
     fire('orbit', () => fx.emit('orbit', { at: along(0.5) }));
     if (u !== null && (fired.current.has('focus') || fired.current.has('orbit')) && !fired.current.has('unfocus')) {
       fired.current.add('unfocus');

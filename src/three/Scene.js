@@ -26,6 +26,8 @@ const _toCamera = new THREE.Vector3();
 const _homeDir = new THREE.Vector3();
 const _orbit = new THREE.Spherical();
 const ORBIT_SPEED = 0.16;
+// Just inside the controls' 1.05 polar limit, so they don't yank the camera back up
+const SHOT_ELEVATION = 0.55;
 const framingExtent = ({ halfLength, baseCenter, dishR, dieSpot }) => Math.max(halfLength, baseCenter[0] + dishR, dieSpot[0] + 0.6);
 const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 const PORTRAIT_FIT = 31;
@@ -75,16 +77,25 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
   const orbit = useRef(null);
   useEffect(() => {
     let back = null;
+    // Distance of the side-on shot (so the orbit keeps that framing) and the zoom limit it had to relax
+    let shot = null;
+    let minDistance = null;
     const go = (position, target, dur) => (tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null, dur });
     const release = () => {
       if (orbit.current) controls.enabled = orbit.current.enabled;
       orbit.current = null;
+    };
+    const restore = () => {
+      if (minDistance !== null) controls.minDistance = minDistance;
+      minDistance = null;
+      shot = null;
     };
     const off = fx.on((type, data) => {
       const h = home.current;
       if (!['focus', 'orbit', 'unfocus'].includes(type) || !h || locked) return;
       const goHome = () => {
         release();
+        restore();
         go(h.target.clone().addScaledVector(h.dir, h.distance), h.target.clone(), 2);
       };
       clearTimeout(back);
@@ -92,10 +103,17 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
       const target = new THREE.Vector3(data.at[0], 0, data.at[2]);
       if (type === 'focus') {
         release();
-        go(target.clone().addScaledVector(h.dir, h.distance * 0.56), target, data.dur || 2.2);
+        // Side-on: the camera sits square to the line of fire, so the shooter is on the left and the victim on the right for everyone
+        const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+        shot = THREE.MathUtils.clamp((data.span / 2 + 2.4) / Math.tan(hfov / 2), 7, h.distance * 1.1);
+        minDistance ??= controls.minDistance;
+        controls.minDistance = Math.min(minDistance, shot * 0.8);
+        const side = new THREE.Vector3(data.side[0], 0, data.side[2]).normalize();
+        const offset = side.multiplyScalar(Math.cos(SHOT_ELEVATION)).setY(Math.sin(SHOT_ELEVATION));
+        go(target.clone().addScaledVector(offset, shot), target, data.dur || 2.2);
       } else {
         tween.current = null;
-        orbit.current = { target, radius: h.distance * 0.58, phi: 0.98, speed: 0, enabled: orbit.current?.enabled ?? controls.enabled };
+        orbit.current = { target, radius: shot ? shot * 1.25 : h.distance * 0.58, phi: shot ? Math.PI / 2 - SHOT_ELEVATION : 0.98, speed: 0, enabled: orbit.current?.enabled ?? controls.enabled };
         controls.enabled = false;
       }
       // No hold means it lasts until someone says unfocus
@@ -106,6 +124,7 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
       off();
       clearTimeout(back);
       release();
+      restore();
     };
   }, [camera, controls, locked]);
 
