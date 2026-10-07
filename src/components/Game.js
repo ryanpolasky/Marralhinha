@@ -791,7 +791,9 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const [feedOpen, setFeedOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
-  const [showOver, setShowOver] = useState(game.phase === 'over');
+  const [overOpen, setShowOver] = useState(game.phase === 'over');
+  // The state lags a render behind a rematch, so gate on the live phase or WinCard renders a game with no winners
+  const showOver = overOpen && game.phase === 'over';
   // Round the table spins the HUD itself, so it keeps the regular layout
   const phone = useMedia(PHONE_QUERY) && !room.table;
   const portrait = useMedia(PORTRAIT_QUERY);
