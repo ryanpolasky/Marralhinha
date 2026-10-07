@@ -188,7 +188,7 @@ function ModelStage({ itemId, seat, replay }) {
 
   return (
     <div className="preview-stage">
-      <div className={`preview-canvas${revealed ? ' in' : ''}`}>
+      <div className={`preview-fade${revealed ? ' in' : ''}`}>
         <Suspense fallback={null}>
           <ItemPreview itemId={itemId} seat={seat} replay={replay} onReady={() => setReady(true)} />
         </Suspense>

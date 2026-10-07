@@ -3814,12 +3814,12 @@ img.emote-glyph {
   opacity: 0;
 }
 
-.preview-stage > .preview-canvas {
+.preview-stage > .preview-fade {
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
-.preview-stage > .preview-canvas.in {
+.preview-stage > .preview-fade.in {
   opacity: 1;
 }
 
@@ -3998,6 +3998,10 @@ img.emote-glyph {
   align-items: center;
   gap: 6px;
   text-align: center;
+}
+
+.locker-preview .preview-stage + .locker-item-info {
+  margin-top: 14px;
 }
 
 .locker-item-info h3 {
