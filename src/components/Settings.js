@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
 import { SEAT_COLORS } from '../game/geometry';
-import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff } from './Icons';
+import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff, DiscordMark } from './Icons';
+import { DISCORD_INVITE, ExternalLink } from './About';
+import { IS_ACTIVITY } from '../net/config';
 
 const STEP = 0.05;
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
@@ -93,12 +95,19 @@ export function SettingsModal({ onClose, onReport }) {
             </span>
           </label>
         </div>
-        {onReport && (
+        {(onReport || !IS_ACTIVITY) && (
           <div className="settings-group">
             <h3>Support</h3>
-            <button className="btn secondary block" onClick={() => { onClose(); onReport(); }}>
-              <Bug /> Report & ideas
-            </button>
+            {onReport && (
+              <button className="btn secondary block" onClick={() => { onClose(); onReport(); }}>
+                <Bug /> Report & ideas
+              </button>
+            )}
+            {!IS_ACTIVITY && (
+              <ExternalLink className="btn secondary block" href={DISCORD_INVITE}>
+                <DiscordMark /> Join the official Discord
+              </ExternalLink>
+            )}
           </div>
         )}
       </div>

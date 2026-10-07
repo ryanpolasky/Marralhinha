@@ -13,6 +13,7 @@ export const AUTHOR = {
 
 const SITE = IS_ACTIVITY ? 'https://marralhinha.app' : '';
 export const LEGAL = { rules: `${SITE}/how-to-play`, terms: `${SITE}/terms`, privacy: `${SITE}/privacy` };
+export const DISCORD_INVITE = 'https://discord.gg/T4Efqprrd8';
 
 export function ExternalLink({ href, children, className }) {
   return (
