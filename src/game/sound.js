@@ -236,11 +236,6 @@ export const sfx = {
       tone({ freq: 160, to: 35, type: 'sine', dur: 0.45, vol: 0.6 });
       noise({ dur: 1.4, vol: 0.12, freq: 700, to: 160, q: 0.5, delay: 0.06 });
     }),
-  mourn: () => {
-    tone({ freq: 196, type: 'triangle', dur: 3.2, vol: 0.12 });
-    tone({ freq: 233, type: 'sine', dur: 2.8, vol: 0.07, delay: 0.5 });
-    tone({ freq: 147, type: 'sine', dur: 3.4, vol: 0.08, delay: 1 });
-  },
   rewind: () => {
     noise({ dur: 0.9, vol: 0.12, freq: 700, to: 6000, q: 1.5 });
     tone({ freq: 180, to: 1600, type: 'sawtooth', dur: 0.9, vol: 0.04 });

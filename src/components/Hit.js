@@ -22,7 +22,13 @@ export function HitOverlay({ hits = [], names = [], onUndo }) {
   useEffect(() => {
     loadSample('gunshot');
     const all = timers.current;
-    return () => all.forEach((list) => list.forEach(clearTimeout));
+    const seenHits = seen.current;
+    // Forget what we've played too, or StrictMode's remount clears the beats and never reschedules them
+    return () => {
+      all.forEach((list) => list.forEach(clearTimeout));
+      all.clear();
+      seenHits.clear();
+    };
   }, []);
 
   // The grade, rain and silence hold for as long as any hit is live
@@ -61,10 +67,7 @@ export function HitOverlay({ hits = [], names = [], onUndo }) {
       });
       at(HIT.shot + HIT.knock, sfx.land);
       if (t > HIT.rip) setCaption(rip);
-      else at(HIT.rip, () => {
-        sfx.mourn();
-        setCaption(rip);
-      });
+      else at(HIT.rip, () => setCaption(rip));
     };
     const undo = (hit) => {
       (timers.current.get(hit.id) || []).forEach(clearTimeout);
