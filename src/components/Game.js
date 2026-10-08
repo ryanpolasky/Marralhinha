@@ -895,10 +895,10 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const held = rollPending || stuck || handoff;
   const activeSeat = held ? game.lastRoll.seat : game.turn;
   const covering = coveringTurn(game, seats, mySeat);
-  const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over';
+  const paused = !!room.paused && !local && game.phase !== 'over';
+  const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over' && !paused;
   const meAway = !!seats[mySeat]?.away;
   const setAway = useCallback((away) => onAction('game:away', { away }), [onAction]);
-  const paused = !!room.paused && !local && game.phase !== 'over';
   const pauseEnd = useMemo(() => (room.pauseEndsIn != null ? Date.now() + room.pauseEndsIn : null), [room.paused]); // eslint-disable-line react-hooks/exhaustive-deps
   const [, setPauseTick] = useState(0);
   useEffect(() => {

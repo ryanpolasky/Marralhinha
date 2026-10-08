@@ -482,7 +482,7 @@ const App = () => {
       return { mode: 'lobby', board: { variant: spec.id, active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
     }
     const g = view.game;
-    const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat)) && g.phase !== 'over';
+    const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat)) && g.phase !== 'over' && !view.paused;
     if (!(view.local && held)) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
     return {
       mode: 'game',
