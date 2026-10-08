@@ -47,6 +47,21 @@ test('Supporter is ordered above Luckiest and cannot be granted as a stored tag'
   assert.ok(DROPPABLE.every((item) => item.tag !== 'supporter'));
 });
 
+test('admin-granted packs unlock the tag and cosmetics without an entitlement', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Gifted' });
+  accounts.setPack(id, 'supporter', true);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['supporter']);
+  assert.equal(accounts.owns(id, 'marble.supporter'), true);
+  assert.equal(accounts.owns(id, 'marble.halloween'), false);
+  assert.equal(accounts.adminView(accounts.getUser(id)).packs.supporter, true);
+  accounts.setTags(id, ['beta']);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta', 'supporter'], 'tag edits keep the pack');
+  accounts.setPack(id, 'supporter', false);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
+  assert.throws(() => accounts.setPack(id, 'nope', true), /Unknown pack/);
+});
+
 test('Discord entitlement verification grants and revokes the entire Supporter set', async () => {
   const env = ['DISCORD_CLIENT_ID', 'DISCORD_BOT_TOKEN', 'DISCORD_SUPPORTER_SKU_ID'];
   const previous = env.map((key) => process.env[key]);

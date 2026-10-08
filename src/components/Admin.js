@@ -4,7 +4,7 @@ import { CURRENCY, BOXES, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, ra
 import { sfx } from '../game/sound';
 import { Coin, Coins, TagBadges } from './Economy';
 import { Close, Search, DiscordMark, Bug } from './Icons';
-import { giftLabel, KIND_LABEL, StatusPill } from './Reports';
+import { giftLabel, KIND_LABEL, PACK_LABEL, StatusPill } from './Reports';
 import { SEAT_COLORS } from '../game/geometry';
 import BOARDS from '../shared/boards.json';
 
@@ -164,6 +164,22 @@ function UserEditor({ user, me, onChange, notify }) {
       </div>
 
       <div className="admin-section">
+        <h4>Packs</h4>
+        <div className="tag-toggles">
+          {Object.keys(PACK_LABEL).map((pack) => {
+            const on = !!user.packs?.[pack];
+            return (
+              <button key={pack} className={`tag-toggle${on ? ' on' : ''}`} style={{ '--tag': TAGS[pack].color }} disabled={busy} onClick={() => act('/packs', { pack, granted: !on }, `${PACK_LABEL[pack]} ${on ? 'removed from' : 'granted to'} ${user.name}`)} title={TAGS[pack].blurb}>
+                <span className="tag-toggle-dot" />
+                {PACK_LABEL[pack]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted small-text">Same tag and cosmetics as buying it. Real purchases are unaffected.</p>
+      </div>
+
+      <div className="admin-section">
         <h4>{CURRENCY}</h4>
         <div className="admin-row-inline">
           <input type="number" className="admin-input" value={amount} min={-1000000} max={1000000} onChange={(e) => setAmount(Number(e.target.value))} aria-label="Amount" />
@@ -223,6 +239,7 @@ function ReportEditor({ report, onDone, notify }) {
   const [giftAmount, setGiftAmount] = useState(report.gift?.amount || 250);
   const [giftItem, setGiftItem] = useState(report.gift?.item || DROPPABLE[0].id);
   const [giftBox, setGiftBox] = useState(report.gift?.box || BOXES[0].id);
+  const [giftPack, setGiftPack] = useState(report.gift?.pack || 'supporter');
   const [busy, setBusy] = useState(false);
   const grouped = useMemo(() => SLOT_KEYS.map((slot) => [slot, DROPPABLE.filter((i) => i.slot === slot)]), []);
 
@@ -232,10 +249,11 @@ function ReportEditor({ report, onDone, notify }) {
     if (report.gift?.amount) setGiftAmount(report.gift.amount);
     if (report.gift?.item) setGiftItem(report.gift.item);
     if (report.gift?.box) setGiftBox(report.gift.box);
+    if (report.gift?.pack) setGiftPack(report.gift.pack);
   }, [report.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gift =
-    giftType === 'coins' ? { type: 'coins', amount: giftAmount } : giftType === 'box' ? { type: 'box', box: giftBox } : giftType === 'item' ? { type: 'item', item: giftItem } : null;
+    giftType === 'coins' ? { type: 'coins', amount: giftAmount } : giftType === 'box' ? { type: 'box', box: giftBox } : giftType === 'item' ? { type: 'item', item: giftItem } : giftType === 'pack' ? { type: 'pack', pack: giftPack } : null;
 
   const resolve = async () => {
     setBusy(true);
@@ -302,7 +320,17 @@ function ReportEditor({ report, onDone, notify }) {
             <option value="coins">{CURRENCY}</option>
             <option value="box">Chest</option>
             <option value="item">Cosmetic</option>
+            <option value="pack">Pack</option>
           </select>
+          {giftType === 'pack' && (
+            <select className="admin-input" value={giftPack} onChange={(e) => setGiftPack(e.target.value)} aria-label="Pack">
+              {Object.entries(PACK_LABEL).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          )}
           {giftType === 'coins' && <input type="number" className="admin-input" min={1} max={100000} value={giftAmount} onChange={(e) => setGiftAmount(Number(e.target.value))} aria-label="Coin amount" />}
           {giftType === 'box' && (
             <select className="admin-input" value={giftBox} onChange={(e) => setGiftBox(e.target.value)} aria-label="Chest">

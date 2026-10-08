@@ -7,6 +7,7 @@ const MAX_LEN = 600;
 // An open-report cap per player so one person can't bury the queue
 const MAX_OPEN = 8;
 const MAX_COIN_GIFT = 100000;
+const PACKS = ['supporter', 'halloween'];
 
 const cleanText = (text) =>
   String(text ?? '')
@@ -33,6 +34,10 @@ function cleanGift(gift) {
     const item = ITEMS.get(gift.item);
     if (!item || item.rarity === 'default' || item.tag) throw new ReportError('Pick a giftable cosmetic');
     return { type: 'item', item: item.id };
+  }
+  if (gift.type === 'pack') {
+    if (!PACKS.includes(gift.pack)) throw new ReportError('Unknown pack');
+    return { type: 'pack', pack: gift.pack };
   }
   throw new ReportError('Unknown gift type');
 }

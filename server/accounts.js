@@ -32,10 +32,11 @@ const parse = (json, fallback) => {
 };
 // Discord user ids that get the dev tag automatically when they log in (comma-separated env var)
 const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').split(',').map((s) => s.trim()).filter(Boolean));
+const PACKS = ['supporter', 'halloween'];
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
 const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.includes(tag));
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
-const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]')";
+const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]' AND granted_packs = '[]')";
 
 // CDN url for a linked account's Discord avatar; Discord picks a default from the id when none is set
 function avatarUrl(user) {
@@ -77,6 +78,7 @@ class Accounts {
       setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
       setSupporter: db.prepare('UPDATE users SET supporter_entitlement_id = ? WHERE id = ?'),
       setHalloween: db.prepare('UPDATE users SET halloween_entitlement_id = ? WHERE id = ?'),
+      setPacks: db.prepare('UPDATE users SET granted_packs = ? WHERE id = ?'),
       purchaserAccounts: db.prepare('SELECT id, discord_id FROM users WHERE (supporter_entitlement_id IS NOT NULL OR halloween_entitlement_id IS NOT NULL) AND discord_id IS NOT NULL'),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
@@ -166,7 +168,19 @@ class Accounts {
 
   tags(user) {
     const stored = storableTags(parse(user.tags, []));
-    return normalizeTags([...stored, ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(user.halloween_entitlement_id && discord.halloweenConfigured() ? ['halloween'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+    return normalizeTags([...stored, ...this.grantedPacks(user), ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(user.halloween_entitlement_id && discord.halloweenConfigured() ? ['halloween'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+  }
+
+  grantedPacks(user) {
+    return parse(user.granted_packs, []).filter((pack) => PACKS.includes(pack));
+  }
+
+  // Admin-given packs: the same tag and cosmetics a purchase unlocks, without a Discord entitlement
+  setPack(userId, pack, granted) {
+    if (!PACKS.includes(pack)) throw new AccountError('Unknown pack');
+    const user = this.requireUser(userId);
+    const rest = this.grantedPacks(user).filter((p) => p !== pack);
+    this.q.setPacks.run(JSON.stringify(granted ? [...rest, pack] : rest), userId);
   }
 
   luckyHolder() {
@@ -374,6 +388,7 @@ class Accounts {
     this.q.moveMatchPlayers.run(intoId, guest.id);
     this.q.moveReigns.run(intoId, guest.id);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
+    this.q.setPacks.run(JSON.stringify([...new Set([...this.grantedPacks(into), ...this.grantedPacks(guest)])]), intoId);
     this.q.deleteUser.run(guest.id);
   }
 
@@ -435,6 +450,7 @@ class Accounts {
       coins: user.coins,
       level: levelInfo(user.xp).level,
       tags: this.tags(user),
+      packs: Object.fromEntries(PACKS.map((pack) => [pack, this.grantedPacks(user).includes(pack)])),
       equipped: this.equipped(user),
       items: this.inventory(user.id).length,
       stats: this.statLine(user),

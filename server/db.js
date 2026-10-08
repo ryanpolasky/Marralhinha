@@ -113,6 +113,7 @@ const MIGRATIONS = [
   ['users', 'golden_die_unlocked_at', 'INTEGER'],
   ['users', 'supporter_entitlement_id', 'TEXT'],
   ['users', 'halloween_entitlement_id', 'TEXT'],
+  ['users', 'granted_packs', "TEXT NOT NULL DEFAULT '[]'"],
   ['match_players', 'roll_count', 'INTEGER'],
   ['match_players', 'six_count', 'INTEGER'],
 ];

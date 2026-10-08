@@ -259,7 +259,7 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       else if (gift?.type === 'item') {
         accounts.grantItem(req.user.id, gift.item);
         result = { item: gift.item };
-      }
+      } else if (gift?.type === 'pack') accounts.setPack(req.user.id, gift.pack, true);
       return { gift, result, profile: changed(req.user.id) };
     })
   );
@@ -356,6 +356,17 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     handle((req) => {
       const user = target(req);
       accounts.grantItem(user.id, String(req.body?.item || ''));
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/packs',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.setPack(user.id, String(req.body?.pack || ''), !!req.body?.granted);
       return adminResult(user);
     })
   );

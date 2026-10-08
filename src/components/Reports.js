@@ -8,12 +8,15 @@ import { ago } from './Stats';
 
 export const KIND_LABEL = { bug: 'Bug report', idea: 'Feature idea' };
 
+export const PACK_LABEL = { supporter: 'Supporter Pack', halloween: 'Halloween Pack' };
+
 // Human-readable label for a resolution gift
 export const giftLabel = (gift) => {
   if (!gift) return null;
   if (gift.type === 'coins') return `${Number(gift.amount).toLocaleString()} ${CURRENCY}`;
   if (gift.type === 'box') return BOXES.find((b) => b.id === gift.box)?.name || 'a chest';
   if (gift.type === 'item') return ITEMS[gift.item]?.name || 'a cosmetic';
+  if (gift.type === 'pack') return PACK_LABEL[gift.pack] || 'a pack';
   return null;
 };
 
