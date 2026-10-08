@@ -90,7 +90,7 @@ function useAnnouncements(game, mySeat, nameOf, local = false) {
   return items;
 }
 
-function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false }) {
+function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false, paused = false }) {
   if (startPending) {
     return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'The wheel decides the first roll' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
   }
@@ -112,6 +112,7 @@ function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, loc
   const helping = game.mode === 'teams' && game.marbles[turn].length > 0 && homeCount(game.marbles[turn]) === game.marbles[turn].length;
   const helpText = helping ? ` · moving ${nameOf(partnerOf(turn))}'s marbles` : '';
   if (game.phase === 'over') return { title: 'Game over', sub: `${game.winners.map(nameOf).join(' & ')} won` };
+  if (paused) return { title: 'Game paused', sub: 'Everyone stepped away. Waiting for someone to come back…' };
   if (coveringTurn(game, seats, mySeat)) {
     const partner = seats[turn]?.name || 'your partner';
     return game.phase === 'roll'
@@ -897,6 +898,15 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over';
   const meAway = !!seats[mySeat]?.away;
   const setAway = useCallback((away) => onAction('game:away', { away }), [onAction]);
+  const paused = !!room.paused && !local && game.phase !== 'over';
+  const pauseEnd = useMemo(() => (room.pauseEndsIn != null ? Date.now() + room.pauseEndsIn : null), [room.paused]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [, setPauseTick] = useState(0);
+  useEffect(() => {
+    if (!paused || !pauseEnd) return undefined;
+    const t = setInterval(() => setPauseTick((n) => n + 1), 15000);
+    return () => clearInterval(t);
+  }, [paused, pauseEnd]);
+  const pauseMins = pauseEnd ? Math.max(1, Math.ceil((pauseEnd - Date.now()) / 60000)) : null;
 
   // B toggles stepping away (not while typing or in a dialog)
   useEffect(() => {
@@ -982,7 +992,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     if (isAdmin) warmBoardSkin();
   }, [isAdmin]);
 
-  const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table });
+  const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table, paused });
   const badge = stuck ? game.lastRoll : game.phase === 'move' && !rollPending ? { die: game.die, seat: game.turn } : null;
   // Faces Red during the start wheel; bot turns stay facing the last human since nobody sits there
   const tableSide = !local || !room.table ? null : startPending ? 'bottom' : TABLE_SIDES[seats[activeSeat]?.isBot ? Math.max(mySeat, 0) : activeSeat];
@@ -1146,7 +1156,21 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
           </button>
         </div>
       )}
-      {meAway && !local && game.phase !== 'over' && (
+      {paused && (
+        <div className="away-banner" role="status">
+          <div className="away-title">Game paused</div>
+          <div className="away-sub">
+            Everyone stepped away, so nothing moves until someone's back.
+            {pauseMins && ` The table closes in ${pauseMins} min if nobody returns.`}
+          </div>
+          {meAway && (
+            <button className="btn primary big" onClick={() => setAway(false)}>
+              I'm back
+            </button>
+          )}
+        </div>
+      )}
+      {meAway && !paused && !local && game.phase !== 'over' && (
         <div className="away-banner" role="status">
           <div className="away-title">You stepped away</div>
           <div className="away-sub">

@@ -177,7 +177,7 @@ const SLIDES = [
   },
   {
     title: 'Stepping away',
-    text: "Need a break? Hit the coffee cup (or B) and your nameplate shows brb while the bot plays your turns. In teams, your partner plays them for you instead. Hit I'm back, or just roll, to jump back in. The catch: if the bot plays more than half your turns you earn nothing that game, and sixes or captures made for you never count toward your stats.",
+    text: "Need a break? Hit the coffee cup (or B) and your nameplate shows brb while the bot plays your turns. In teams, your partner plays them for you instead. Hit I'm back, or just roll, to jump back in. If everyone steps away, the game pauses until someone's back (the table closes after 20 minutes). The catch: if the bot plays more than half your turns you earn nothing that game, and sixes or captures made for you never count toward your stats.",
     art: (id) => (
       <svg className="tutorial-art" viewBox="0 -0.2 12 6.6" role="img" aria-hidden="true">
         <Defs id={id} />

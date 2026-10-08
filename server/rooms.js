@@ -20,6 +20,8 @@ const IDLE_DELAY_MS = 2500;
 const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 15 * 60 * 1000;
 const QUICK_PLAY_TTL_MS = 4 * 60 * 1000;
+// A table where everyone stepped away closes after this long instead of idling forever
+const PAUSE_TTL_MS = 20 * 60 * 1000;
 const REACTION_COOLDOWN_MS = 1200;
 // Beta testers and Devs get a hair-trigger reactions panel for emote spam
 const TESTER_REACTION_COOLDOWN_MS = 250;
@@ -77,6 +79,7 @@ class Room {
     this.timerKey = null;
     this.turnDeadline = null;
     this.clockOffSeat = null;
+    this.pausedAt = null;
     this.hostTimer = null;
     this.banterTimers = new Set();
     this.rematchVotes = new Set();
@@ -810,8 +813,26 @@ class Room {
 
   changed() {
     this.touch();
+    this.updatePause();
     this.scheduleAutoplay();
     this.hooks.onChange(this);
+  }
+
+  get paused() {
+    return this.pausedAt !== null;
+  }
+
+  // Every connected player stepped away: nothing moves until someone's back
+  updatePause() {
+    const live = this.game && this.game.phase !== 'over';
+    const here = live ? this.seats.filter((p) => p && !p.isBot && p.connected) : [];
+    const paused = here.length > 0 && here.every((p) => p.away);
+    if (paused === this.paused) return;
+    const now = Date.now();
+    // The pause shouldn't eat into a dropped player's reconnect grace
+    if (!paused) this.seats.forEach((p) => p?.goneAt != null && (p.goneAt += now - Math.max(p.goneAt, this.pausedAt)));
+    this.pausedAt = paused ? now : null;
+    if (live) rules.addLog(this.game, paused ? 'Game paused' : 'Game resumed');
   }
 
   // Bots, away players and idle players get played for. Unrelated updates (chat, reactions, spectators)
@@ -821,13 +842,13 @@ class Room {
     const player = game && game.phase !== 'over' ? this.seats[game.turn] : null;
     const cover = player ? this.coverFor(game.turn) : null;
     if (this.clockOffSeat !== game?.turn) this.clockOffSeat = null;
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat].join('|');
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
     this.timerKey = key;
     this.turnDeadline = null;
-    if (!player) return;
+    if (!player || this.paused) return;
     const human = !player.isBot;
     // Waiting on a person: the player themselves, or their partner covering while they're away
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
@@ -871,6 +892,7 @@ class Room {
 
   isAbandoned(now = Date.now()) {
     if (!this.hasHumans()) return true;
+    if (this.paused && now - this.pausedAt > PAUSE_TTL_MS) return true;
     if (this.anyoneConnected()) return false;
     // Everyone's gone: the room dies ROOM_TTL_MS after the last human left, even if bots keep moving marbles
     return now - (this.emptyAt ?? this.lastActive) > (this.quickPlay ? QUICK_PLAY_TTL_MS : ROOM_TTL_MS);
@@ -899,7 +921,7 @@ class Room {
         isBot: p.isBot,
         connected: p.connected,
         // ms until a disconnected player's reconnect grace runs out and the bot plays at normal speed
-        coverGrace: p.connected || p.away || p.isBot ? 0 : Math.max(0, (p.goneAt ?? now) + AWAY_GRACE_MS - now),
+        coverGrace: p.connected || p.away || p.isBot ? 0 : Math.max(0, Math.min(AWAY_GRACE_MS, (p.goneAt ?? now) + AWAY_GRACE_MS - (this.paused ? this.pausedAt : now))),
         idle: !!p.idle,
         away: !!p.away,
         coveredBy: p.coveredBy ?? null,
@@ -910,6 +932,8 @@ class Room {
       }),
       // Relative, so client clock skew doesn't matter
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
+      paused: this.paused,
+      pauseEndsIn: this.paused ? Math.max(0, this.pausedAt + PAUSE_TTL_MS - Date.now()) : null,
       spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,

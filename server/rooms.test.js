@@ -650,6 +650,63 @@ test('step away: in 2v2 the partner covers your turns, otherwise the bot plays t
   assert.throws(() => room.stepAway('stranger', true), /not in this room/);
 });
 
+function pausableRoom(t, code) {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room(code, { onChange: () => {} });
+  t.after(() => room.dispose());
+  ['u1', 'u2', 'u3'].forEach((userId, i) => {
+    room.join({ userId, name: `P${i}` });
+    room.attach(userId, `s${i}`);
+  });
+  room.pickStarter = () => ({ seat: 0, reason: 'winner' });
+  room.start('u1');
+  return room;
+}
+
+test('everyone stepping away pauses the game; one player back resumes it with a fresh clock', (t) => {
+  const room = pausableRoom(t, 'PAUSE');
+  room.stepAway('u1', true);
+  room.stepAway('u2', true);
+  assert.strictEqual(room.view().paused, false, 'one player still here keeps it going');
+  room.stepAway('u3', true);
+  assert.strictEqual(room.view().paused, true);
+  assert.strictEqual(room.view().turnEndsIn, null);
+  assert.match(room.game.log.at(-1).text, /Game paused/);
+  const rolls = room.game.played[0].rolls;
+  t.mock.timers.tick(10 * 60 * 1000);
+  assert.strictEqual(room.game.played[0].rolls, rolls, 'nothing moves while paused');
+  assert.ok(room.view().pauseEndsIn <= 10 * 60 * 1000);
+
+  room.stepAway('u1', false);
+  assert.strictEqual(room.view().paused, false);
+  assert.match(room.game.log.at(-1).text, /Game resumed/);
+  assert.ok(room.view().turnEndsIn >= 30000, 'a fresh turn clock');
+  assert.strictEqual(room.seats[2].away, true, 'the rest stay away');
+});
+
+test('a dropped player does not block the pause, and reconnecting resumes it', (t) => {
+  const room = pausableRoom(t, 'PDROP');
+  room.stepAway('u2', true);
+  room.stepAway('u3', true);
+  room.detach('u1', 's0');
+  assert.strictEqual(room.view().paused, true);
+  t.mock.timers.tick(5 * 60 * 1000);
+  assert.strictEqual(room.game.played[0].rolls, 0, 'the dropped player is not played for while paused');
+  assert.ok(room.view().seats[0].coverGrace > 0, 'their reconnect grace is untouched');
+  room.attach('u1', 's0b');
+  assert.strictEqual(room.view().paused, false);
+});
+
+test('a paused table closes after the pause limit, and leaving the game clears it', (t) => {
+  const room = pausableRoom(t, 'PTTL');
+  ['u1', 'u2', 'u3'].forEach((u) => room.stepAway(u, true));
+  assert.strictEqual(room.isAbandoned(), false);
+  assert.strictEqual(room.isAbandoned(Date.now() + 21 * 60 * 1000), true);
+  room.game.phase = 'over';
+  room.changed();
+  assert.strictEqual(room.view().paused, false);
+});
+
 test('favourite colour: you get it when free, and anyone can swap straight into a bot seat', (t) => {
   const room = new Room('FAVE', { onChange: () => {} });
   t.after(() => room.dispose());
