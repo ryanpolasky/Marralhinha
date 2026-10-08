@@ -57,7 +57,7 @@ export default function Feed({ entries, open, onToggle, showLogs, onToggleLogs, 
           <span className="sheet-label">{onToggleLogs ? 'Chat & log' : 'Chat'}</span>
         ) : (
           <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
-            {open ? 'Hide' : onToggleLogs ? 'Chat & log' : 'Chat'}
+            {open ? 'Hide' : 'View all'}
             {unread > 0 && <span className="unread">{unread}</span>}
           </button>
         )}
