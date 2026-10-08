@@ -158,6 +158,14 @@ function ghostFace(ctx, x, y, s, color) {
   ctx.fill();
 }
 
+// Seat order is Red, Blue, Yellow, Green; pockets stay a deep shade of the seat so no two phases read alike
+const GEM_PHASES = [
+  { deep: '#2a0006', mid: '#a5001a', bright: '#ff2a40', glint: '#ff9aa6' },
+  { deep: '#030b33', mid: '#0a3cc0', bright: '#2f8dff', glint: '#a8d6ff' },
+  { deep: '#2e1500', mid: '#c27400', bright: '#ffc61f', glint: '#fff1a6' },
+  { deep: '#00221a', mid: '#008a4c', bright: '#1fe582', glint: '#a6ffd2' },
+];
+
 const MARBLES = {
   arcade: (c, seat) => {
     const [base, glow] = arcadeMarbleCanvases(c, seat);
@@ -191,6 +199,47 @@ const MARBLES = {
       onBeforeCompile,
       customProgramCacheKey: () => 'marble-arcade-8bit',
       animate: (m, t) => (uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 0.7),
+    };
+  },
+  // Defuse set: Doppler-style anodized gem, one phase per seat, painted in object space so it rolls with the marble
+  defuse: (c, seat) => {
+    const gem = GEM_PHASES[seat];
+    const color = (hex) => ({ value: new THREE.Color(hex) });
+    const uniforms = { uTime: { value: 0 }, uSeed: { value: seat * 7.31 + 2.0 }, uDeep: color(gem.deep), uMid: color(gem.mid), uBright: color(gem.bright), uGlint: color(gem.glint) };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vGemPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGemPos = normalize(position);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uSeed;\nuniform vec3 uDeep;\nuniform vec3 uMid;\nuniform vec3 uBright;\nuniform vec3 uGlint;\nvarying vec3 vGemPos;\n${SKIN_NOISE_GLSL}`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          vec3 gp = vGemPos * 1.5 + uSeed;
+          vec3 warp = vec3(skFbm3(gp), skFbm3(gp + 5.2), skFbm3(gp + 9.7));
+          float flow = skFbm3(vGemPos * 2.1 + warp * 2.6 + uSeed * 0.5);
+          float vein = pow(1.0 - abs(sin(flow * 15.0 + warp.x * 4.0)), 10.0);
+          vec3 gemCol = mix(uDeep, uMid, smoothstep(0.32, 0.5, flow));
+          gemCol = mix(gemCol, uBright, smoothstep(0.5, 0.66, flow));
+          gemCol += uGlint * vein * smoothstep(0.42, 0.6, flow) * 0.35;
+          diffuseColor.rgb = gemCol;`)
+        .replace('#include <emissivemap_fragment>', `{
+          vec3 n = normalize(normal);
+          float ndv = max(dot(n, normalize(vViewPosition)), 0.0);
+          float rim = pow(1.0 - ndv, 3.0);
+          float sweep = pow(0.5 + 0.5 * sin(dot(n, normalize(vec3(0.6, 0.8, 0.2))) * 5.0 - uTime * 0.9), 10.0);
+          totalEmissiveRadiance = uMid * 0.07 + uGlint * (rim * 0.4 + sweep * 0.14);
+        }`);
+    };
+    return {
+      metalness: 0.62,
+      roughness: 0.17,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      envMapIntensity: 1.5,
+      onBeforeCompile,
+      customProgramCacheKey: () => 'marble-defuse-gem',
+      animate: (m, t) => (uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 1.1),
     };
   },
   classic: (c, seat) => ({ map: finishMarble(makeSwirlCanvas(c, 11 + seat * 7)), roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.04 }),
@@ -1052,10 +1101,71 @@ const DICE = {
   supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
   arcade: { bg: 'arcade', pip: '#ffe94d', one: '#ff4fd8', roughness: 0.4, clearcoat: 0.3 },
   halloween: { bg: 'halloween', pip: '#ffcf80', one: '#ffe2a8', roughness: 0.16, metalness: 0.12, clearcoat: 1, extra: { iridescence: 0.2, envMapIntensity: 1.3 } },
+  defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse'];
+
+// Segments a-g, as [x, y, w, h] in a 1x2 cell
+const SEG_RECTS = { a: [0.15, 0, 0.7, 0.14], b: [0.86, 0.1, 0.14, 0.8], c: [0.86, 1.1, 0.14, 0.8], d: [0.15, 1.86, 0.7, 0.14], e: [0, 1.1, 0.14, 0.8], f: [0, 0.1, 0.14, 0.8], g: [0.15, 0.93, 0.7, 0.14] };
+const SEG_DIGITS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
+const BOMB_CODE = '7355608';
+
+function sevenSeg(ctx, digit, x, y, w, color) {
+  ctx.fillStyle = color;
+  [...(digit === null ? 'abcdefg' : SEG_DIGITS[digit])].forEach((s) => {
+    const [sx, sy, sw, sh] = SEG_RECTS[s];
+    ctx.fillRect(x + sx * w, y + sy * w, sw * w, sh * w);
+  });
+}
+
+const BOMB_LCD = { x: 66, y: 7, w: 124, h: 24 };
+
+function bombCode(ctx, data) {
+  const { x, y, w, h } = BOMB_LCD;
+  const cell = w / BOMB_CODE.length;
+  const dw = cell * 0.62;
+  [...BOMB_CODE].forEach((ch, i) => {
+    const dx = x + i * cell + (cell - dw) / 2;
+    const dy = y + (h - dw * 2) / 2;
+    if (data) sevenSeg(ctx, +ch, dx, dy, dw, `rgb(255,${Math.round(((i + 0.5) / BOMB_CODE.length) * 255)},0)`);
+    else sevenSeg(ctx, null, dx, dy, dw, '#3d0d09');
+  });
+}
+
+function keypadPips(ctx, value, size, color) {
+  const r = value === 1 ? 30 : 21;
+  PIPS[value].forEach(([px, py]) => {
+    const x = px * size - r;
+    const y = py * size - r;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    roundRectPath(ctx, x + 1, y + 4, x + r * 2 + 1, y + r * 2 + 4, 7);
+    ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + r * 2);
+    g.addColorStop(0, mix(color, '#ffffff', 0.35));
+    g.addColorStop(1, mix(color, '#000000', 0.25));
+    ctx.fillStyle = g;
+    roundRectPath(ctx, x, y, x + r * 2, y + r * 2, 7);
+    ctx.fill();
+    ctx.strokeStyle = mix(color, '#000000', 0.5);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+function defuseDieData(size) {
+  const [canvas, ctx] = makeCanvas(size, size);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  bombCode(ctx, true);
+  ctx.fillStyle = '#0000ff';
+  ctx.beginPath();
+  ctx.arc(214, 19, 6, 0, TAU);
+  ctx.fill();
+  return canvas;
+}
 
 function grid(ctx, size, step, color, width = 1) {
   ctx.strokeStyle = color;
@@ -1143,6 +1253,44 @@ function dieBackground(ctx, style, size, value) {
       ctx.closePath();
       ctx.fill();
     });
+  } else if (style === 'defuse') {
+    ctx.fillStyle = '#bba97e';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 18; i++) softBlob(ctx, rand() * size, rand() * size, 30 + rand() * 60, i % 2 ? '#a8956a' : '#cdbd93', 0.35);
+    for (let i = 0; i < 1400; i++) {
+      ctx.fillStyle = `rgba(${rand() > 0.5 ? '70,58,35' : '235,225,195'},${rand() * 0.18})`;
+      ctx.fillRect(rand() * size, rand() * size, 1 + rand() * 2, 1 + rand() * 2);
+    }
+    [[0, 36], [size - 34, 34]].forEach(([y, h]) => {
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, '#1f1f1e');
+      g.addColorStop(0.45, '#3a3a38');
+      g.addColorStop(1, '#232322');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, size, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      for (let x = 0; x < size; x += 9) ctx.fillRect(x, y + 2, 1, h - 4);
+    });
+    [['#c42a22', 226], ['#e0b81c', 240]].forEach(([color, y0]) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-4, y0);
+      ctx.bezierCurveTo(size * 0.35, y0 - 7, size * 0.6, y0 + 8, size + 4, y0 - 2);
+      ctx.stroke();
+    });
+    const { x, y, w, h } = BOMB_LCD;
+    ctx.fillStyle = '#0a0605';
+    roundRectPath(ctx, x - 4, y - 3, x + w + 4, y + h + 3, 3);
+    ctx.fill();
+    ctx.fillStyle = '#1c0907';
+    ctx.fillRect(x, y, w, h);
+    bombCode(ctx, false);
+    ctx.fillStyle = '#4a0b08';
+    ctx.beginPath();
+    ctx.arc(214, 19, 6, 0, TAU);
+    ctx.fill();
   } else if (style === 'dev') {
     // Obsidian with a thin molten frame; the pips do the glowing
     ctx.fillStyle = '#0a0709';
@@ -1266,7 +1414,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      (key === 'arcade' ? blockPips : drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1292,14 +1440,14 @@ export function diceSkin(itemId) {
           mctx.fill();
         });
         params.emissiveMap?.dispose();
-        params.emissiveMap = new THREE.CanvasTexture(mask);
+        params.emissiveMap = new THREE.CanvasTexture(key === 'defuse' ? defuseDieData(size) : mask);
         params.emissive = '#ffffff';
         params.emissiveIntensity = 1;
       }
       const material = new THREE.MeshPhysicalMaterial(params);
       if (ANIMATED_DICE.includes(key)) {
         material.userData.skinTime = time;
-        if (key === 'supporter' || key === 'arcade' || key === 'halloween') material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (MOTION_SAFE_DICE.includes(key)) material.userData.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
         material.customProgramCacheKey = () => `dice-${key}-animated`;
         material.onBeforeCompile = (shader) => {
           shader.uniforms.uSkinTime = time;
@@ -1307,7 +1455,14 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'arcade' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'defuse' ? `{
+              vec3 lcd = texture2D(emissiveMap, vEmissiveMapUv).rgb;
+              float cyc = mod(uSkinTime + uFacePhase * 3.0, 6.0);
+              float typed = step(lcd.g, cyc / 3.2);
+              float hold = cyc > 3.2 ? step(0.5, fract(cyc * 2.0)) : 1.0;
+              float led = fract(uSkinTime * 1.1 + uFacePhase) < 0.14 ? 1.0 : 0.06;
+              totalEmissiveRadiance = vec3(1.0, 0.16, 0.08) * lcd.r * typed * hold * 1.8 + vec3(1.0, 0.12, 0.05) * lcd.b * led * 3.0;
+            }` : key === 'arcade' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               vec2 p = uv - 0.5;
@@ -3273,7 +3428,471 @@ const ouijaDishShader = (R) => `{
   totalEmissiveRadiance = em * top;
 }`;
 
+const SAND = '#c8ab7c';
+const SITE_PAINT = '#b8231c';
+// Seat 0's tray is A, seat 2's is B; the two in between straddle the split and act as spawns
+const DEFUSE_DISHES = ['A', 'spawn', 'B', 'spawn'];
+
+// Draws in the current transform, so h and maxW are in board units
+function sprayText(ctx, text, x, y, h, color, rand, { blur = 0, maxW = Infinity, alpha = 0.92, drips = 0 } = {}) {
+  ctx.save();
+  ctx.translate(x, y);
+  const s = h / 100;
+  ctx.scale(s, s);
+  ctx.font = '900 100px Impact, "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text)?.width || 60 * text.length;
+  if (w * s > maxW) ctx.scale(maxW / (w * s), 1);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+  ctx.fillText(text, 0, 4);
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < drips; i++) {
+    const dx = (rand() - 0.5) * Math.min(w, 70);
+    const len = 12 + rand() * 28;
+    ctx.fillRect(dx - 1.5, 30, 3, len);
+    ctx.beginPath();
+    ctx.arc(dx, 30 + len, 2.6, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function sprayArrow(ctx, x, y, angle, len, color, blur) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+  ctx.fillRect(-len / 2, -len * 0.07, len * 0.62, len * 0.14);
+  ctx.beginPath();
+  ctx.moveTo(len / 2, 0);
+  ctx.lineTo(len * 0.1, -len * 0.26);
+  ctx.lineTo(len * 0.1, len * 0.26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// Arm rects in board units for one seat, as [x0, y0, x1, y1] with x = column and y = row
+const armRect = (seat, W, L) => [[-W, W, W, L], [W, -W, L, W], [-W, -L, W, -W], [-L, -W, -W, W]][seat];
+
+function clipRect(ctx, [x0, y0, x1, y1]) {
+  ctx.beginPath();
+  ctx.rect(x0, y0, x1 - x0, y1 - y0);
+  ctx.clip();
+}
+
+// Big pale flagstones, one per hole so the track reads as laid into the floor
+function paintSlabs(ctx, rand, rect) {
+  ctx.save();
+  clipRect(ctx, rect);
+  ctx.fillStyle = '#d3bc90';
+  ctx.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+  for (let gy = -10; gy < 10; gy++) {
+    for (let gx = -10; gx < 10; gx++) {
+      const v = rand();
+      ctx.fillStyle = v > 0.5 ? `rgba(255,244,218,${(v - 0.5) * 0.3})` : `rgba(110,80,45,${(0.5 - v) * 0.24})`;
+      ctx.fillRect(gx + 0.5, gy + 0.5, 1, 1);
+    }
+  }
+  [['rgba(92,68,40,0.55)', 0.035, 0], ['rgba(255,248,226,0.3)', 0.014, 0.032]].forEach(([color, width, o]) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (let n = -10; n <= 10; n++) {
+      ctx.moveTo(n + 0.5 + o, -10);
+      ctx.lineTo(n + 0.5 + o, 10);
+      ctx.moveTo(-10, n + 0.5 + o);
+      ctx.lineTo(10, n + 0.5 + o);
+    }
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// Running-bond brick pavers, long side across the arm
+function paintBricks(ctx, rand, rect, across) {
+  ctx.save();
+  clipRect(ctx, rect);
+  ctx.fillStyle = '#7e5c3c';
+  ctx.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+  const [bw, bh] = [0.5, 0.25];
+  const colors = ['#b97d4c', '#a96d40', '#c68c58', '#b3784a', '#9c653d', '#cf9a66'];
+  for (let row = -44; row < 44; row++) {
+    for (let col = -24; col < 24; col++) {
+      const u = col * bw + (row % 2 ? bw / 2 : 0);
+      const v = row * bh;
+      const [x, y, w, h] = across ? [u, v, bw, bh] : [v, u, bh, bw];
+      ctx.fillStyle = colors[Math.floor(rand() * colors.length)];
+      ctx.fillRect(x + 0.02, y + 0.02, w - 0.04, h - 0.04);
+      ctx.fillStyle = `rgba(255,235,200,${rand() * 0.12})`;
+      ctx.fillRect(x + 0.02, y + 0.02, w - 0.04, 0.03);
+    }
+  }
+  ctx.restore();
+}
+
+// Rounded cobbles packed tight with dark grit between them
+function paintCobbles(ctx, rand, rect) {
+  ctx.save();
+  clipRect(ctx, rect);
+  ctx.fillStyle = '#6f604b';
+  ctx.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+  const step = 0.3;
+  for (let y = rect[1] - step; y < rect[3] + step; y += step * 0.87) {
+    for (let x = rect[0] - step; x < rect[2] + step; x += step) {
+      const cx = x + (Math.round(y / (step * 0.87)) % 2 ? step / 2 : 0) + (rand() - 0.5) * 0.06;
+      const cy = y + (rand() - 0.5) * 0.06;
+      const r = step * (0.4 + rand() * 0.08);
+      const tone = 150 + Math.floor(rand() * 50);
+      ctx.fillStyle = `rgb(${tone + 22},${tone + 8},${tone - 18})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r, r * (0.85 + rand() * 0.2), rand() * TAU, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,250,235,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(cx - r * 0.25, cy - r * 0.3, r * 0.45, r * 0.3, 0, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function scorch(ctx, rand, x, y, r) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, 'rgba(20,14,8,0.75)');
+  g.addColorStop(0.5, 'rgba(30,20,10,0.4)');
+  g.addColorStop(1, 'rgba(30,20,10,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(25,16,8,0.45)';
+  ctx.lineWidth = 0.025;
+  for (let i = 0; i < 14; i++) {
+    const a = rand() * TAU;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r * 0.3, y + Math.sin(a) * r * 0.3);
+    ctx.lineTo(x + Math.cos(a) * r * (0.9 + rand() * 0.6), y + Math.sin(a) * r * (0.9 + rand() * 0.6));
+    ctx.stroke();
+  }
+}
+
+function bulletHoles(ctx, rand, x, y, spread, n) {
+  for (let i = 0; i < n; i++) {
+    const hx = x + (rand() - 0.5) * spread;
+    const hy = y + (rand() - 0.5) * spread;
+    ctx.fillStyle = 'rgba(255,245,225,0.45)';
+    ctx.beginPath();
+    ctx.arc(hx, hy, 0.055, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(25,18,10,0.9)';
+    ctx.beginPath();
+    ctx.arc(hx, hy, 0.03, 0, TAU);
+    ctx.fill();
+  }
+}
+
+// Reads like a map overview: cobbled mid, slab-paved A arms, brick B arms, a curb wall around the whole thing, sand piled in the corners and the scars of a few rounds
+function defuseBoard(layout) {
+  const S = 2048;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(7355);
+  const { halfWidth: W, halfLength: L, baseCenter } = layout.spec;
+  ctx.fillStyle = SAND;
+  ctx.fillRect(0, 0, S, S);
+
+  ctx.setTransform(k, 0, 0, k, C, C);
+  paintCobbles(ctx, rand, [-W, -W, W, W]);
+  [0, 1].forEach((seat) => paintSlabs(ctx, rand, armRect(seat, W, L)));
+  [2, 3].forEach((seat) => paintBricks(ctx, rand, armRect(seat, W, L), seat === 2));
+
+  ctx.strokeStyle = 'rgba(60,44,26,0.6)';
+  ctx.lineWidth = 0.1;
+  [[-W, W, W, W], [W, -W, W, W], [-W, -W, W, -W], [-W, -W, -W, W]].forEach(([x0, y0, x1, y1]) => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  });
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < 40; i++) {
+    const [cx, cy] = [[W, W], [W, -W], [-W, W], [-W, -W]][i % 4];
+    softBlob(ctx, C + (cx + (rand() - 0.5) * 1.4) * k, C + (cy + (rand() - 0.5) * 1.4) * k, (0.4 + rand() * 0.6) * k, '#e3cea0', 0.5);
+  }
+  for (let i = 0; i < 50; i++) softBlob(ctx, rand() * S, rand() * S, (0.6 + rand() * 1.8) * k, i % 2 ? '#e0c99a' : '#5a4630', i % 2 ? 0.18 : 0.08);
+  ctx.setTransform(k, 0, 0, k, C, C);
+
+  ctx.beginPath();
+  roundedCross(W - 0.14, L - 0.14, 0.5).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.strokeStyle = '#e6d6b2';
+  ctx.lineWidth = 0.24;
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,250,236,0.45)';
+  ctx.lineWidth = 0.05;
+  ctx.stroke();
+  ctx.beginPath();
+  roundedCross(W - 0.3, L - 0.3, 0.45).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.strokeStyle = 'rgba(55,38,20,0.4)';
+  ctx.lineWidth = 0.07;
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(60,42,24,0.32)';
+  ctx.lineWidth = 0.09;
+  layout.RING.forEach(([r, c]) => {
+    ctx.beginPath();
+    ctx.arc(c, r, TRACK_HOLE_R + 0.09, 0, TAU);
+    ctx.stroke();
+  });
+
+  scorch(ctx, rand, 1.15, L * 0.62, 0.5);
+  scorch(ctx, rand, -L * 0.55, -1.2, 0.42);
+  scorch(ctx, rand, 0.9, -0.95, 0.38);
+  for (let seat = 0; seat < 4; seat++) {
+    ctx.save();
+    ctx.rotate((-seat * Math.PI) / 2);
+    bulletHoles(ctx, rand, W - 0.32, L * 0.5 + seat * 0.3, 0.5, 6);
+    bulletHoles(ctx, rand, -(W - 0.32), 3 + seat * 0.2, 0.4, 4);
+    for (let i = 0; i < 5; i++) {
+      ctx.save();
+      ctx.translate((rand() < 0.5 ? -1 : 1) * (0.75 + rand() * 0.75), 2.6 + rand() * (L - 3.4));
+      ctx.rotate(rand() * TAU);
+      ctx.fillStyle = '#d6aa4a';
+      ctx.fillRect(-0.06, -0.022, 0.12, 0.044);
+      ctx.fillStyle = '#7a5418';
+      ctx.fillRect(0.045, -0.022, 0.018, 0.044);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < 30000; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(255,248,230,${rand() * 0.16})` : `rgba(70,50,28,${rand() * 0.16})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+  }
+  ctx.setTransform(k, 0, 0, k, C, C);
+
+  const lo = 2.55;
+  const hi = L - 1.2;
+  const len = hi - lo;
+  const mid = (lo + hi) / 2;
+  const blur = 0.025 * k;
+  for (let seat = 0; seat < 4; seat++) {
+    [1, -1].forEach((side) => {
+      const kind = DEFUSE_DISHES[side > 0 ? seat : (seat + 3) % 4];
+      if (kind === 'spawn') return;
+      const x = side * 1.05;
+      const ly = mid - Math.min(0.7, len * 0.21);
+      const ay = mid + Math.min(0.6, len * 0.28);
+      ctx.save();
+      ctx.rotate((-seat * Math.PI) / 2);
+      sprayText(ctx, kind, x, ly, len > 3 ? 1.0 : 0.9, SITE_PAINT, rand, { blur, maxW: 0.95 });
+      sprayArrow(ctx, x, ay, Math.atan2(baseCenter[0] - ay, side * baseCenter[1] - x), 0.8, SITE_PAINT, blur);
+      ctx.restore();
+    });
+  }
+  return canvas;
+}
+
+function plantedBomb(ctx, glow, x, y, scale) {
+  [ctx, glow].forEach((g, i) => {
+    g.save();
+    g.translate(x, y);
+    g.rotate(0.25);
+    g.scale(scale, scale);
+    if (i) {
+      const halo = g.createRadialGradient(0.18, -0.03, 0, 0.18, -0.03, 0.12);
+      halo.addColorStop(0, 'rgba(255,0,0,1)');
+      halo.addColorStop(0.35, 'rgba(255,0,0,0.6)');
+      halo.addColorStop(1, 'rgba(255,0,0,0)');
+      g.fillStyle = halo;
+      g.fillRect(0.04, -0.17, 0.28, 0.28);
+      g.restore();
+      return;
+    }
+    g.fillStyle = 'rgba(30,20,10,0.4)';
+    roundRectPath(g, -0.3, -0.17, 0.34, 0.25, 0.05);
+    g.fill();
+    [-0.13, 0, 0.13].forEach((sy) => {
+      g.fillStyle = '#c2b184';
+      roundRectPath(g, -0.32, sy - 0.065, 0.32, sy + 0.065, 0.05);
+      g.fill();
+      g.strokeStyle = '#6e6140';
+      g.lineWidth = 0.012;
+      g.stroke();
+    });
+    g.fillStyle = '#262624';
+    [-0.2, 0.22].forEach((tx) => g.fillRect(tx - 0.035, -0.21, 0.07, 0.42));
+    g.fillStyle = '#1b1c1a';
+    roundRectPath(g, -0.13, -0.12, 0.12, 0.08, 0.02);
+    g.fill();
+    g.fillStyle = '#2a0b08';
+    g.fillRect(-0.1, -0.09, 0.19, 0.05);
+    g.fillStyle = '#8a8676';
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) g.fillRect(-0.1 + c * 0.05, -0.02 + r * 0.045, 0.035, 0.03);
+    g.fillStyle = '#5a0c08';
+    g.beginPath();
+    g.arc(0.18, -0.03, 0.035, 0, TAU);
+    g.fill();
+    g.strokeStyle = '#c42a22';
+    g.lineWidth = 0.02;
+    g.beginPath();
+    g.moveTo(-0.32, 0.1);
+    g.bezierCurveTo(-0.45, 0.2, -0.38, 0.32, -0.25, 0.3);
+    g.stroke();
+    g.restore();
+  });
+}
+
+// One canvas per seat tray, drawn in seat 0's frame and turned to match how that seat's base holes are rotated
+function defuseDishes(layout) {
+  const S = 512;
+  const { dishR } = layout.spec;
+  const R = 0.5 / (dishR + 0.1);
+  const k = R * S;
+  const C = S / 2;
+  const trays = DEFUSE_DISHES.map((kind, seat) => {
+    const [base, b] = makeCanvas(S, S);
+    const [glow, g] = makeCanvas(S, S);
+    const rand = seeded(91 + seat * 13);
+    const spawn = kind === 'spawn';
+    b.fillStyle = spawn ? '#a99a7c' : '#c9b38a';
+    b.fillRect(0, 0, S, S);
+    for (let i = 0; i < 14; i++) softBlob(b, rand() * S, rand() * S, (0.4 + rand() * 0.9) * k, i % 2 ? '#b49f78' : '#d8c59d', 0.35);
+    for (let i = 0; i < 2500; i++) {
+      b.fillStyle = rand() > 0.5 ? `rgba(255,248,230,${rand() * 0.14})` : `rgba(70,50,28,${rand() * 0.14})`;
+      b.fillRect(rand() * S, rand() * S, 1 + rand(), 1 + rand());
+    }
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, S, S);
+    [b, g].forEach((ctx) => {
+      ctx.setTransform(k, 0, 0, k, C, C);
+      ctx.rotate((-seat * Math.PI) / 2);
+    });
+    b.strokeStyle = 'rgba(84,62,36,0.4)';
+    b.lineWidth = 0.025;
+    b.beginPath();
+    b.arc(0, 0, dishR * 0.55, 0, TAU);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * TAU + Math.PI / 4;
+      b.moveTo(Math.cos(a) * dishR * 0.55, Math.sin(a) * dishR * 0.55);
+      b.lineTo(Math.cos(a) * dishR, Math.sin(a) * dishR);
+    }
+    b.stroke();
+    if (spawn) {
+      b.save();
+      b.beginPath();
+      b.arc(0, 0, dishR - 0.32, 0, TAU);
+      b.arc(0, 0, dishR - 0.6, 0, TAU, true);
+      b.clip();
+      b.rotate(Math.PI / 4);
+      b.fillStyle = '#e1b326';
+      b.fillRect(-dishR, -dishR, dishR * 2, dishR * 2);
+      b.fillStyle = '#1d1a16';
+      for (let x = -dishR * 1.5; x < dishR * 1.5; x += 0.3) b.fillRect(x, -dishR, 0.14, dishR * 2);
+      b.restore();
+    } else {
+      b.save();
+      b.globalAlpha = 0.75;
+      b.strokeStyle = SITE_PAINT;
+      b.lineWidth = 0.06;
+      b.setLineDash([0.22, 0.12]);
+      b.beginPath();
+      b.arc(0, 0, dishR - 0.45, 0, TAU);
+      b.stroke();
+      b.restore();
+      if (kind === 'A') plantedBomb(b, g, dishR * 0.6, 0.02, dishR / 2.2);
+    }
+    return [base, glow];
+  });
+  return [trays.map((t) => t[0]), trays.map((t) => t[1]), R];
+}
+
+function sandFeltCanvas() {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(608);
+  ctx.fillStyle = '#7b6546';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 24; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 40 + rand() * 120;
+    const color = ['#88714f', '#6c573c', '#937e5b'][i % 3];
+    [-S, 0, S].forEach((dx) => [-S, 0, S].forEach((dy) => softBlob(ctx, x + dx, y + dy, r, color, 0.35)));
+  }
+  for (let i = 0; i < 1600; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(220,200,160,${rand() * 0.3})` : `rgba(40,28,15,${rand() * 0.3})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+  }
+  for (let i = 0; i < 12; i++) {
+    ctx.save();
+    ctx.translate(20 + rand() * (S - 40), 20 + rand() * (S - 40));
+    ctx.rotate(rand() * TAU);
+    const g = ctx.createLinearGradient(0, -1.5, 0, 1.5);
+    g.addColorStop(0, '#f2d27a');
+    g.addColorStop(1, '#8a6420');
+    ctx.fillStyle = g;
+    ctx.fillRect(-4, -1.5, 8, 3);
+    ctx.fillStyle = '#5a4214';
+    ctx.fillRect(3, -1.5, 1.2, 3);
+    ctx.restore();
+  }
+  return canvas;
+}
+
+// A smoke grenade blooms somewhere near mid every so often, greys the stone under it, then thins out
+const DEFUSE_SHADER = `{
+  vec2 q = (vMapUv - 0.5) / ${BOARD_R};
+  float t = uSkinTime;
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  float cyc = t / 18.0;
+  float id = floor(cyc);
+  float ph = fract(cyc);
+  vec2 at = (vec2(skHash(vec2(id, 1.3)), skHash(vec2(id, 7.1))) - 0.5) * 5.0 + vec2(ph * 0.8, -ph * 0.5);
+  float grow = smoothstep(0.0, 0.12, ph);
+  float thin = 1.0 - smoothstep(0.5, 0.95, ph);
+  float radius = 0.6 + 2.4 * grow;
+  float edge = length(q - at) + (skFbm3(vec3(q * 0.8, t * 0.12)) - 0.5) * 1.6;
+  float body = 1.0 - smoothstep(radius * 0.5, radius, edge);
+  float puffs = smoothstep(0.3, 0.6, skFbm3(vec3(q * 1.1 + t * 0.05, t * 0.08)) + 0.2);
+  float smoke = body * puffs * grow * thin * top;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.79, 0.76), smoke * 0.72);
+  totalEmissiveRadiance = vec3(0.05, 0.05, 0.048) * smoke;
+}`;
+
+// The planted charge on A beeps faster and faster, then starts over
+const DEFUSE_DISH_SHADER = `{
+  float led = texture2D(emissiveMap, vEmissiveMapUv).r;
+  float s = mod(uSkinTime, 10.0);
+  float on = step(fract(s + 0.2 * s * s), 0.16);
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  totalEmissiveRadiance = vec3(1.0, 0.1, 0.05) * led * (0.08 + on * 3.0) * top;
+}`;
+
 const SPECIAL_BOARDS = {
+  defuse: (layout) => {
+    const [dishCanvases, dishGlowCanvases, dishRepeat] = defuseDishes(layout);
+    return {
+      canvas: defuseBoard(layout), repeat: BOARD_R, roughness: 0.82,
+      dishCanvases, dishGlowCanvases, dishRepeat,
+      dish: '#c9b38a', feltCanvas: sandFeltCanvas(), cup: '#3a2c1c',
+      accent: { color: '#c99a45', metalness: 0.9, roughness: 0.35 },
+      shaderCommon: SKIN_NOISE_GLSL,
+      shader: DEFUSE_SHADER,
+      dishShader: DEFUSE_DISH_SHADER,
+    };
+  },
   halloween: (layout) => {
     const [base, data] = velvetBoard(layout);
     const [dishBase, dishGlow, dishRepeat] = ouijaDish(layout);
@@ -3392,7 +4011,7 @@ const SPECIAL_BOARDS = {
   },
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
@@ -3439,23 +4058,30 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       boardParams.map = map;
     } else boardParams.color = spec.color;
     if (spec.glowCanvas) Object.assign(boardParams, { emissiveMap: glowTexture(spec.glowCanvas, spec.repeat, spec.glowData, spec.pixel), emissive: '#ffffff', emissiveIntensity: spec.glowIntensity ?? 0.9 });
-    const dishParams = { color: spec.dish, roughness: 0.5, clearcoat: spec.clearcoat || 0 };
-    if (wood) {
-      const dishMap = finish(makeWoodCanvas({ base: spec.dish, grain: '40,25,15', seed: 21 }));
-      dishMap.repeat.set(0.2, 0.2);
-      dishMap.offset.set(0.5, 0.5);
-      Object.assign(dishParams, { map: dishMap, color: '#ffffff' });
-    } else if (spec.dishCanvas) {
-      Object.assign(dishParams, { map: glowTexture(spec.dishCanvas, spec.dishRepeat, false, spec.pixel), color: '#ffffff' });
-      if (spec.dishGlowCanvas) Object.assign(dishParams, { emissiveMap: glowTexture(spec.dishGlowCanvas, spec.dishRepeat, spec.dishGlowData), emissive: '#ffffff', emissiveIntensity: 1 });
-    }
+    const makeDish = (canvas, glowCanvas) => {
+      const dishParams = { color: spec.dish, roughness: 0.5, clearcoat: spec.clearcoat || 0 };
+      if (wood) {
+        const dishMap = finish(makeWoodCanvas({ base: spec.dish, grain: '40,25,15', seed: 21 }));
+        dishMap.repeat.set(0.2, 0.2);
+        dishMap.offset.set(0.5, 0.5);
+        Object.assign(dishParams, { map: dishMap, color: '#ffffff' });
+      } else if (canvas) {
+        Object.assign(dishParams, { map: glowTexture(canvas, spec.dishRepeat, false, spec.pixel), color: '#ffffff' });
+        if (glowCanvas) Object.assign(dishParams, { emissiveMap: glowTexture(glowCanvas, spec.dishRepeat, spec.dishGlowData), emissive: '#ffffff', emissiveIntensity: 1 });
+      }
+      const material = new THREE.MeshPhysicalMaterial(dishParams);
+      if (spec.dishShader) patchSkinShader(material, { body: spec.dishShader, common: spec.shaderCommon, uniforms: spec.dishUniforms, post: spec.post, key: `dish-${resolved}${variant}-animated` });
+      return material;
+    };
     const board = new THREE.MeshPhysicalMaterial(boardParams);
     if (spec.shader) patchSkinShader(board, { body: spec.shader, common: spec.shaderCommon, uniforms: spec.uniforms, post: spec.post, key: `board-${resolved}${variant}-animated` });
-    const dish = new THREE.MeshPhysicalMaterial(dishParams);
-    if (spec.dishShader) patchSkinShader(dish, { body: spec.dishShader, common: spec.shaderCommon, uniforms: spec.dishUniforms, post: spec.post, key: `dish-${resolved}${variant}-animated` });
+    const dishes = spec.dishCanvases?.map((canvas, i) => makeDish(canvas, spec.dishGlowCanvases?.[i]));
+    const dish = dishes ? dishes[0] : makeDish(spec.dishCanvas, spec.dishGlowCanvas);
     const mats = {
       board,
       dish,
+      dishes: dishes || [dish, dish, dish, dish],
+      surfaces: [board, ...(dishes || [dish])],
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
@@ -3467,7 +4093,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
 }
 
 export function animateBoardSkin(materials, t) {
-  [materials.board, materials.dish].forEach((m) => {
+  materials.surfaces.forEach((m) => {
     const time = m.userData.skinTime;
     if (time) time.value = m.userData.reducedMotion?.matches ? 0 : t;
   });

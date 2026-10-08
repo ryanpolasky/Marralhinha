@@ -454,6 +454,13 @@ export const sfx = {
     tone({ freq: 6300, dur: 0.22, vol: 0.03, delay: 0.01 });
     noise({ dur: 0.04, vol: 0.12, freq: 5200, q: 3 });
   },
+  // Suppressed crack, then a bright metallic ping off the helmet
+  onetap: () => {
+    noise({ dur: 0.07, vol: 0.45, freq: 2600, to: 900, q: 0.6 });
+    tone({ freq: 220, to: 60, type: 'sine', dur: 0.12, vol: 0.25 });
+    [[2480, 0.14], [3725, 0.07], [5210, 0.035]].forEach(([freq, vol]) => tone({ freq: jitter(freq, 0.02), type: 'sine', dur: 0.55, vol, delay: 0.09, attack: 0.002 }));
+    noise({ dur: 0.03, vol: 0.18, freq: 6500, q: 2.5, delay: 0.09 });
+  },
   toss: () => noise({ dur: 0.32, vol: 0.09, freq: 700, to: 2600, q: 0.9 }),
   tink: (vol = 1) => {
     tone({ freq: jitter(2900, 0.1), type: 'triangle', dur: 0.09, vol: 0.1 * vol });

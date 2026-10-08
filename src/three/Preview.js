@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Lights } from './Stage';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
-import Board from './Board';
+import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
@@ -48,7 +48,7 @@ function DicePreview({ itemId }) {
 
 function BoardPreview({ itemId }) {
   return (
-    <group scale={0.19} rotation-x={0.75}>
+    <group scale={hasBoardProps(itemId) ? 0.15 : 0.19} rotation-x={0.75}>
       <Spinner speed={0.3} tilt={0}>
         <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} />
       </Spinner>

@@ -47,6 +47,34 @@ test('Supporter materials animate their accents without animating pip colors und
   }
 });
 
+test('Defuse skins give every seat its own gem and every tray its own art on both board sizes', () => {
+  const gradient = { addColorStop: () => {} };
+  const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+  try {
+    const gems = [0, 1, 2, 3].map((seat) => marbleSkin('marble.defuse', seat));
+    const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <emissivemap_fragment>' };
+    gems[0].material.onBeforeCompile(shader);
+    expect(shader.fragmentShader).toContain('diffuseColor.rgb = gemCol');
+    expect(shader.vertexShader).toContain('vGemPos');
+    expect(new Set(gems.map((g) => g.material)).size).toBe(4);
+
+    const dice = diceSkin('dice.defuse');
+    const dieShader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    dice[0].onBeforeCompile(dieShader);
+    expect(dieShader.fragmentShader).toContain('lcd.r');
+
+    const classic = boardSkin('board.defuse', layoutFor('classic'));
+    const blitz = boardSkin('board.defuse', layoutFor('blitz'));
+    expect(new Set(classic.dishes).size).toBe(4);
+    expect(classic.surfaces).toHaveLength(5);
+    expect(blitz.board).not.toBe(classic.board);
+    expect(() => animateBoardSkin(blitz, 3)).not.toThrow();
+  } finally {
+    getContext.mockRestore();
+  }
+});
+
 test('Halloween skins build for every slot and keep their motion behind reduced-motion', () => {
   const gradient = { addColorStop: () => {} };
   const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });

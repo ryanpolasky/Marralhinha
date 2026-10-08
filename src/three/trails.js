@@ -2,6 +2,7 @@ import { SEAT_COLORS } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 import { TILE } from './killfx';
+import { sfx } from '../game/sound';
 
 const col = (s) => SEAT_COLORS[s];
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -127,6 +128,13 @@ const TRAILS = {
   dev: (emit, p) => {
     emit('spr', { position: p, n: 3, tile: TILE.glow, c: ['#ffd166', '#ff7a3c', '#ff4a5a'], radius: 0.55, inward: true, speed: 1.1, size: 0.24, size2: 0.04, life: 0.5, swirl: 4 });
     emit('spr', { position: p, tile: TILE.flare, c: ['#ffffff'], size: 0.22, size2: 0, life: 0.35 });
+  },
+
+  // spent casings kicked out to the side, plus a faint tracer back along the hop
+  defuse: (emit, p, { prev, n }) => {
+    emit('shard', { shape: 'shell', position: p, colors: ['#d9b048', '#c99a35', '#e8c35c'], n: n % 2 ? 1 : 2, speed: 1.4, up: 2.2, size: 0.13, life: 1.6, bounce: 0.45, spin: 14 });
+    if (prev) emit('bolt', { from: prev, to: p, color: '#ffd98a', radius: 0.006, life: 0.16, jag: 0, branches: 0 });
+    if (n % 3 === 0) sfx.tink(0.3);
   },
 
   // chunky 8-bit confetti, dithered and quantized like the rest of the arcade set

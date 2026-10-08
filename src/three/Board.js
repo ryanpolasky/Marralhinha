@@ -4,7 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
 import { boardSkin, animateBoardSkin } from './skins';
-import { itemsForSlot } from '../game/catalog';
+import { itemsForSlot, skinKey } from '../game/catalog';
+import DefuseProps from './DefuseProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -205,6 +206,10 @@ function Table({ texture }) {
   );
 }
 
+// Boards that dress the table around them, not just the board itself
+const BOARD_PROPS = { defuse: DefuseProps };
+export const hasBoardProps = (id) => !!BOARD_PROPS[skinKey(id)];
+
 const SWAP_MS = 150;
 const WAVE_S = 0.9;
 const WAVE_R = 13;
@@ -313,7 +318,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
       if (!warmed.current.has(key)) {
         warmed.current.add(key);
         const scratch = new THREE.Scene();
-        [mats.board, mats.dish].forEach((m) => {
+        mats.surfaces.forEach((m) => {
           const probe = new THREE.Mesh(WARM_GEO, m);
           probe.castShadow = probe.receiveShadow = true;
           scratch.add(probe);
@@ -322,13 +327,13 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
       }
       if (upload && !uploaded.current.has(key)) {
         uploaded.current.add(key);
-        [mats.board, mats.dish].forEach((m) => [m.map, m.emissiveMap].forEach((t) => t && gl.initTexture(t)));
+        mats.surfaces.forEach((m) => [m.map, m.emissiveMap].forEach((t) => t && gl.initTexture(t)));
       }
       // Best-effort wait for parallel shader compile; capped so an unmount can't spin forever
       return new Promise((resolve) => {
         let tries = 40;
         const check = () => {
-          const pending = [mats.board, mats.dish].some((m) => {
+          const pending = mats.surfaces.some((m) => {
             const p = gl.properties?.get(m)?.currentProgram;
             return p && p.isReady && !p.isReady();
           });
@@ -388,10 +393,12 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
 
   if (!materials) return <group />;
+  const Props = table && BOARD_PROPS[skinKey(shownSkin)];
 
   return (
     <group>
       {table && <Table texture={materials.felt} />}
+      {Props && <Props layout={layout} y={TABLE_Y} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
       <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.core || materials.cup} receiveShadow>
@@ -408,7 +415,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
               <meshStandardMaterial color={seatColor(s, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
             </mesh>
             <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.09} color={seatColor(s, seated)} />
-            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dish} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
+            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dishes[s]} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
           </group>
         );
       })}

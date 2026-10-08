@@ -295,6 +295,24 @@ const KILL_FX = {
     sfx('glitch');
   },
 
+  // Crosshair snaps onto the victim, a tracer comes in from somewhere far away, the helmet flies off
+  defuse: (emit, { at, sfx, later }) => {
+    const base = ground(at);
+    emit('decal', { position: off(base, 0, 0.01), kind: 'crosshair', color: '#7dff8a', size: 1.5, grow: 2.6, angle: 0, life: 0.75, add: true });
+    later(260, () => {
+      emit('bolt', { from: off(at, -7.5, 5.5, -6), to: at, color: '#ffe9a0', radius: 0.014, life: 0.12, jag: 0, branches: 0 });
+      emit('spr', { position: at, tile: TILE.flare, c: ['#ffffff'], size: 0.4, size2: 2.6, life: 0.18, rot: 0 });
+      emit('shard', { shape: 'helmet', position: off(at, 0, 0.15), colors: ['#5d6b45'], n: 1, speed: 1.6, up: 6, size: 0.42, life: 1.7, bounce: 0.35, spin: 12 });
+      emit('shard', { position: at, colors: ['#e8e2d8', '#c8ab7c', '#ffffff'], n: 14, speed: 3, up: 2.6, size: 0.07, life: 1.1, bounce: 0.4 });
+      emit('spr', { position: at, n: 12, tile: TILE.smoke, c: ['#d8c49c', '#bfa77c'], add: false, speed: 1.6, up: 0.6, size: 0.4, size2: 1.3, life: 0.8, a: 0.6, drag: 2 });
+      emit('spr', { position: at, n: 10, tile: TILE.star, c: ['#fff3c0', '#ffffff'], sphere: true, speed: 3.2, size: 0.25, size2: 0.02, life: 0.35, drag: 2, flick: 40 });
+      emit('decal', { position: off(at, 0, 1.6), kind: 'headshot', size: 1.1, grow: 0.5, life: 1.3 });
+      emit('ring', { position: base, color: '#ffffff', size: 1.6, life: 0.3 });
+      emit('shake', { amount: 0.32 });
+      sfx('onetap');
+    });
+  },
+
   // Janky green screen cop car crash, chroma keyed over the table
   police: (emit, { at }) => {
     emit('video', { src: '/fx/police-crash.mp4', position: off(at, 0, -0.3), size: 2.8, rate: 1.4, from: 0.5, trim: 0.25 });

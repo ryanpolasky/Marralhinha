@@ -636,18 +636,20 @@ function Bolts({ bus }) {
 }
 
 const SHARDS = 220;
+const SHARD_SHAPES = ['tetra', 'box', 'shell', 'helmet'];
+const HELMETS = 4;
 
 function Shards({ bus, clip = null }) {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
   const kinds = useMemo(
     () =>
-      ['tetra', 'box'].map((shape) => ({
+      SHARD_SHAPES.map((shape) => ({
         shape,
         cursor: { current: 0 },
         live: 1,
         mesh: null,
-        pool: Array.from({ length: SHARDS }, () => ({ alive: false, shown: true, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), age: 0, life: 1, size: 0.1, grav: 1, bounce: 0.45 })),
+        pool: Array.from({ length: shape === 'helmet' ? HELMETS : SHARDS }, () => ({ alive: false, shown: true, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), age: 0, life: 1, size: 0.1, grav: 1, bounce: 0.45 })),
       })),
     []
   );
@@ -656,7 +658,7 @@ function Shards({ bus, clip = null }) {
     () =>
       bus.on((type, d) => {
         if (type !== 'shard') return;
-        const kind = kinds[d.shape === 'box' ? 1 : 0];
+        const kind = kinds[Math.max(0, SHARD_SHAPES.indexOf(d.shape))];
         if (!kind.mesh) return;
         kind.live = 1;
         const { position, colors, n = 12, speed = 3, up = 3, size = 0.1, life = 1.4, grav = 1, bounce = 0.45, spin = 9 } = d;
@@ -727,6 +729,14 @@ function Shards({ bus, clip = null }) {
       <instancedMesh ref={(m) => (kinds[1].mesh = m)} args={[null, null, SHARDS]} frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial roughness={0.45} metalness={0.05} />
+      </instancedMesh>
+      <instancedMesh ref={(m) => (kinds[2].mesh = m)} args={[null, null, SHARDS]} frustumCulled={false}>
+        <cylinderGeometry args={[0.18, 0.18, 1, 8]} />
+        <meshStandardMaterial roughness={0.3} metalness={0.85} />
+      </instancedMesh>
+      <instancedMesh ref={(m) => (kinds[3].mesh = m)} args={[null, null, HELMETS]} frustumCulled={false}>
+        <sphereGeometry args={[0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial roughness={0.75} metalness={0.1} side={THREE.DoubleSide} />
       </instancedMesh>
     </group>
   );
@@ -913,7 +923,67 @@ const DECALS = {
   }],
 };
 
-const PANELS = { bsod: 512 / 352 };
+DECALS.crosshair = [256, 256, (g, w) => {
+  const c = w / 2;
+  g.strokeStyle = '#fff';
+  g.fillStyle = '#fff';
+  g.lineWidth = 9;
+  g.lineCap = 'butt';
+  [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
+    g.beginPath();
+    g.moveTo(c + dx * 26, c + dy * 26);
+    g.lineTo(c + dx * 92, c + dy * 92);
+    g.stroke();
+  });
+  g.fillRect(c - 5, c - 5, 10, 10);
+  g.lineWidth = 4;
+  g.beginPath();
+  g.arc(c, c, 112, 0, 6.28);
+  g.stroke();
+}];
+
+DECALS.headshot = [256, 256, (g, w) => {
+  const c = w / 2;
+  g.fillStyle = '#fff';
+  g.beginPath();
+  g.ellipse(c, c - 14, 74, 70, 0, 0, 6.28);
+  g.fill();
+  g.fillRect(c - 44, c + 30, 88, 52);
+  g.globalCompositeOperation = 'destination-out';
+  [[-30, -6], [30, -6]].forEach(([dx, dy]) => {
+    g.beginPath();
+    g.ellipse(c + dx, c + dy, 21, 24, 0, 0, 6.28);
+    g.fill();
+  });
+  g.beginPath();
+  g.moveTo(c, c + 18);
+  g.lineTo(c - 11, c + 40);
+  g.lineTo(c + 11, c + 40);
+  g.closePath();
+  g.fill();
+  for (let i = -2; i <= 2; i++) g.fillRect(c + i * 17 - 3, c + 54, 6, 28);
+  g.beginPath();
+  g.arc(c + 34, c - 50, 11, 0, 6.28);
+  g.fill();
+  g.lineWidth = 4;
+  g.strokeStyle = '#000';
+  g.beginPath();
+  g.moveTo(c + 34, c - 50);
+  g.lineTo(c + 12, c - 66);
+  g.moveTo(c + 34, c - 50);
+  g.lineTo(c + 58, c - 70);
+  g.moveTo(c + 34, c - 50);
+  g.lineTo(c + 50, c - 24);
+  g.stroke();
+  g.globalCompositeOperation = 'source-over';
+  g.strokeStyle = '#ff3a2e';
+  g.lineWidth = 8;
+  g.beginPath();
+  g.arc(c, c, 118, 0, 6.28);
+  g.stroke();
+}];
+
+const PANELS = { bsod: 512 / 352, headshot: 1 };
 const DECAL_POOL = 6;
 const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
@@ -950,7 +1020,7 @@ function Decals({ bus, clip = null }) {
         const s = state[i];
         const kind = d.kind;
         const billboard = kind in PANELS;
-        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, home: d.position });
+        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, home: d.position });
         const m = mats[i];
         m.map = decalTexture(kind);
         m.color.set(d.color || '#ffffff');
@@ -984,7 +1054,7 @@ function Decals({ bus, clip = null }) {
         mesh.quaternion.copy(q);
         const jit = Math.random() < 0.18 ? s.jitter : 0;
         mesh.position.set(s.home[0] + rand(-jit, jit), s.home[1] + rand(-jit, jit) * 0.5, s.home[2]);
-        mesh.visible = !(Math.random() < 0.06 && k > 0.2);
+        mesh.visible = !(s.jitter && Math.random() < 0.06 && k > 0.2);
       } else {
         mesh.rotation.z = s.angle + s.spin * s.t;
       }
