@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Lights } from './Stage';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
@@ -171,15 +171,49 @@ function TrailPreview({ itemId, seat, replay }) {
   );
 }
 
-function ReadySignal({ onReady, itemId }) {
-  const frames = useRef({ itemId, n: 0 });
+function ReadySignal({ onReady }) {
+  const frames = useRef(0);
   useFrame(() => {
-    const f = frames.current;
-    if (f.itemId !== itemId) Object.assign(f, { itemId, n: 0 });
-    f.n += 1;
-    if (f.n === 3) onReady?.();
+    frames.current += 1;
+    if (frames.current === 3) onReady?.();
   });
   return null;
+}
+
+// Drawing a fresh material blocks the main thread until the driver finishes compiling it, so compile in parallel while hidden
+function CompileGate({ children, onReady }) {
+  const ref = useRef();
+  const { gl, camera, scene } = useThree();
+  const [compiled, setCompiled] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    gl.compileAsync(ref.current, camera, scene)
+      .then((root) => {
+        const programs = new Set();
+        root.traverse((o) => [o.material].flat().forEach((m) => m && programs.add(gl.properties.get(m).currentProgram)));
+        // First use reads back shader logs synchronously, so pay that one program per task instead of all in one frame
+        const queue = [...programs].filter(Boolean);
+        return new Promise((resolve) => {
+          const step = () => {
+            if (!alive || !queue.length) return resolve();
+            queue.shift().getUniforms();
+            setTimeout(step, 0);
+          };
+          step();
+        });
+      })
+      .catch(() => {})
+      .then(() => alive && setCompiled(true));
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <group ref={ref} visible={compiled}>
+      {compiled && <ReadySignal onReady={onReady} />}
+      {children}
+    </group>
+  );
 }
 
 export default function ItemPreview({ itemId, seat = 0, replay = 0, onReady }) {
@@ -188,14 +222,13 @@ export default function ItemPreview({ itemId, seat = 0, replay = 0, onReady }) {
   return (
     <Canvas key={stage ? 'stage' : 'item'} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
-      <ReadySignal onReady={onReady} itemId={itemId} />
-      <group key={`${itemId}-${seat}`}>
+      <CompileGate key={`${itemId}-${seat}`} onReady={onReady}>
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}
         {slot === 'dice' && <DicePreview itemId={itemId} />}
         {slot === 'board' && <BoardPreview itemId={itemId} />}
         {slot === 'fx' && <FxPreview itemId={itemId} seat={seat} replay={replay} />}
         {slot === 'trail' && <TrailPreview itemId={itemId} seat={seat} replay={replay} />}
-      </group>
+      </CompileGate>
     </Canvas>
   );
 }

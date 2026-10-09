@@ -63,16 +63,26 @@ export function makeWoodCanvas({ base = '#c9894a', grain = '96,52,20', seed = 7,
   return canvas;
 }
 
-export function makeFeltTexture(color = '#1c4d44') {
+// The speckles don't depend on the felt color, so they're painted once and stamped onto each felt
+let feltSpeckles = null;
+function speckleLayer() {
+  if (feltSpeckles) return feltSpeckles;
   const [canvas, ctx] = makeCanvas(512, 512);
   const rand = seeded(3);
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 512, 512);
   for (let i = 0; i < 26000; i++) {
     const light = rand() > 0.5;
     ctx.fillStyle = light ? `rgba(120,200,170,${rand() * 0.07})` : `rgba(0,0,0,${rand() * 0.12})`;
     ctx.fillRect(rand() * 512, rand() * 512, 1 + rand() * 1.5, 1 + rand() * 1.5);
   }
+  feltSpeckles = canvas;
+  return canvas;
+}
+
+export function makeFeltTexture(color = '#1c4d44') {
+  const [canvas, ctx] = makeCanvas(512, 512);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 512, 512);
+  ctx.drawImage(speckleLayer(), 0, 0);
   return finish(canvas, 10);
 }
 

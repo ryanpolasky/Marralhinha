@@ -92,6 +92,21 @@ function buildHomeStripGeometry(layout) {
   return new THREE.ShapeGeometry(shape, 24).rotateX(-Math.PI / 2);
 }
 
+// Extruding the board is slow and previews remount it on every pick, so each layout is built once and shared
+const geometryCache = new Map();
+const layoutGeometries = (layout) => {
+  const id = layout.spec.id;
+  if (!geometryCache.has(id)) {
+    geometryCache.set(id, {
+      board: buildBoardGeometry(layout),
+      dishes: SEATS.map((s) => buildDishGeometry(s, layout)),
+      strip: buildHomeStripGeometry(layout),
+      blanket: buildBlanketGeometry(layout),
+    });
+  }
+  return geometryCache.get(id);
+};
+
 // The seat color follows the bevel into the hole; neutral holes keep their original bowls
 const DIVOT_LIPPED_GEO = new THREE.LatheGeometry([
   [0.405, 0.007], [0.368, 0.007], [0.36, -0.002], [0.316, -0.015],
@@ -384,10 +399,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   const [shownSkin, wave] = useSkinTransition(skin, table, prepareSkin);
   const materials = useMemo(() => (shownSkin === null ? null : boardSkin(shownSkin, layout)), [shownSkin, layout]);
   useFrame(({ clock }) => materials && animateBoardSkin(materials, clock.elapsedTime));
-  const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
-  const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
-  const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);
-  const blanketGeometry = useMemo(() => buildBlanketGeometry(layout), [layout]);
+  const { board: boardGeometry, dishes: dishGeometries, strip: stripGeometry, blanket: blanketGeometry } = layoutGeometries(layout);
   const seatHoles = useMemo(
     () => SEATS.map((s) => [[...layout.RING[entryIdx(s, layout)]], ...layout.HOME[s], ...layout.BASE[s]]),
     [layout]
@@ -397,10 +409,6 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
     return layout.RING.filter((_, i) => !entries.has(i));
   }, [layout]);
   const accentHoles = useMemo(() => [...layout.INNER_CORNERS.map((i) => layout.RING[i]), CENTER], [layout]);
-  useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
-  useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
-  useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
-  useEffect(() => () => blanketGeometry.dispose(), [blanketGeometry]);
 
   if (!materials) return <group />;
   const Props = table && BOARD_PROPS[skinKey(shownSkin)];

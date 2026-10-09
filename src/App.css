@@ -3221,6 +3221,13 @@ img.emote-glyph {
   box-shadow: none;
 }
 
+.thumb-loading {
+  border-radius: 14px;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.05) 70%);
+  background-size: 250% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
 @keyframes skeleton-shimmer {
   from {
     background-position: 100% 0;

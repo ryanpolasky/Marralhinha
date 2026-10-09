@@ -5,6 +5,8 @@ import { ItemCard, PreviewStage, RarityTag, TagBadge } from './Economy';
 import { warmBoardSkin } from '../game/skinWarm';
 import { Close } from './Icons';
 
+const THUMB_BATCH = 6;
+
 export default function Locker({ account, onClose, onEquip, onShop }) {
   const [slot, setSlot] = useState('marble');
   const [selected, setSelected] = useState(account.equipped.marble);
@@ -16,8 +18,19 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
   };
 
   useEffect(() => setSelected(account.equipped[slot]), [slot]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [shown, setShown] = useState(0);
   useEffect(() => {
-    if (slot === 'board') warmBoardSkin();
+    setShown(0);
+    let frame;
+    let n = 0;
+    const total = itemsForSlot(slot).length;
+    const step = () => {
+      n += THUMB_BATCH;
+      setShown(n);
+      if (n < total) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
   }, [slot]);
 
   useEffect(() => {
@@ -91,8 +104,8 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
             )}
           </div>
           <div className="item-grid">
-            {itemsForSlot(slot).map((i) => (
-              <ItemCard key={i.id} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => pick(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
+            {itemsForSlot(slot).map((i, idx) => (
+              <ItemCard key={i.id} thumbLoading={idx >= shown} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => pick(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
             ))}
           </div>
         </div>

@@ -198,7 +198,7 @@ function ModelStage({ itemId, seat, replay }) {
   );
 }
 
-export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, onPointerEnter, footer, seat = 0, label, disabled = false }) {
+export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, onPointerEnter, footer, seat = 0, label, disabled = false, thumbLoading = false }) {
   const item = ITEMS[itemId];
   const rarity = rarityOf(item);
   return (
@@ -212,7 +212,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       aria-label={label}
       aria-disabled={disabled || undefined}
     >
-      <ItemThumb itemId={itemId} seat={seat} />
+      {thumbLoading ? <span className="thumb thumb-loading" /> : <ItemThumb itemId={itemId} seat={seat} />}
       <span className="item-name">{item.name}</span>
       <span className="item-rarity">{rarity.short || rarity.label}</span>
       {equipped && <span className="item-badge">Equipped</span>}
