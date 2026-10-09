@@ -407,20 +407,24 @@ function melonCanvas() {
   g.fillStyle = gr;
   g.fillRect(0, 0, S, S);
   const rand = seeded(12);
-  for (let i = 0; i < 9; i++) {
-    const r = (0.35 + rand() * 0.35) * MELON_R;
-    const a = (rand() - 0.5) * MELON_A * 0.75;
-    g.save();
-    g.translate(S / 2 + Math.cos(a) * r * k, S / 2 - Math.sin(a) * r * k);
-    g.rotate(-a);
-    g.fillStyle = '#1a0d08';
-    g.beginPath();
-    g.ellipse(0, 0, 7, 3.5, 0, 0, TAU);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.4)';
-    g.fillRect(-2, -2, 3, 1);
-    g.restore();
-  }
+  [[0.42, 3], [0.66, 4]].forEach(([row, n]) => {
+    for (let i = 0; i < n; i++) {
+      const r = (row + (rand() - 0.5) * 0.04) * MELON_R;
+      const a = ((i + 0.5) / n - 0.5) * MELON_A * 0.6 + (rand() - 0.5) * 0.04;
+      g.save();
+      g.translate(S / 2 + Math.cos(a) * r * k, S / 2 - Math.sin(a) * r * k);
+      g.rotate(-a);
+      g.fillStyle = '#1a0d08';
+      g.beginPath();
+      g.moveTo(-8, 0);
+      g.bezierCurveTo(-4, -5, 4, -4.5, 8, 0);
+      g.bezierCurveTo(4, 4.5, -4, 5, -8, 0);
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.fillRect(-2, -2, 4, 1);
+      g.restore();
+    }
+  });
   return c;
 }
 
@@ -493,16 +497,22 @@ function Grapes({ position, rot = 0, scale = 1 }) {
         const n = Math.max(1, Math.ceil((TAU * ring) / 0.16));
         for (let i = 0; i < n; i++) {
           const a = (i / n) * TAU + l * 0.6;
-          out.push([l * 0.12, Math.max(0.09, 0.1 + rr + Math.sin(a) * ring), Math.cos(a) * ring, 0.09 + rand() * 0.02]);
+          const j = () => (rand() - 0.5) * 0.05;
+          out.push([l * 0.12 + j(), Math.max(0.09, 0.1 + rr + Math.sin(a) * ring + j()), Math.cos(a) * ring + j(), 0.07 + rand() * 0.04, rand()]);
         }
       });
     }
-    return out;
+    return out.filter(() => rand() > 0.12);
   }, []);
   useLayoutEffect(() => {
     const m = new THREE.Matrix4();
-    berries.forEach(([x, y, z, r], i) => ref.current.setMatrixAt(i, m.makeScale(r, r, r).setPosition(x, y, z)));
+    const c = new THREE.Color();
+    berries.forEach(([x, y, z, r, tint], i) => {
+      ref.current.setMatrixAt(i, m.makeScale(r, r * (0.9 + tint * 0.2), r).setPosition(x, y, z));
+      ref.current.setColorAt(i, c.setHSL(0.75 + (tint - 0.5) * 0.1, 0.3, 0.6 + tint * 0.4));
+    });
     ref.current.instanceMatrix.needsUpdate = true;
+    ref.current.instanceColor.needsUpdate = true;
   }, [berries]);
   return (
     <group position={position} rotation-y={rot} scale={scale}>
