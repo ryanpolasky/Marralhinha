@@ -596,7 +596,7 @@ const App = () => {
       />
     );
   } else if (!game) {
-    screen = <Lobby room={view} playerId={sess.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} onReport={() => setModal('report')} />;
+    screen = <Lobby room={view} playerId={sess.playerId} isAdmin={account.admin} onAction={onAction} onLeave={IS_ACTIVITY ? null : leave} onReport={() => setModal('report')} onPlayerStats={(p) => p?.userId && setPeek(p)} />;
   } else {
     screen = (
       <Game

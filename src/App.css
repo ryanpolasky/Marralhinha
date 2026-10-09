@@ -8653,13 +8653,6 @@ textarea.report-text {
   margin-top: 14px;
 }
 
-.profile-loadout.peek .profile-slot-thumb {
-  height: 46px;
-}
-
-.profile-loadout.peek .thumb {
-  transform: scale(0.8);
-}
 
 /* ---------- Flat glass: no backdrop blur over the live canvas (toggled by quality.glass) ---------- */
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { ITEMS, SLOTS, SLOT_KEYS, canUse, collectible } from '../game/catalog';
 import { ItemThumb, Nameplate, TagBadges } from './Economy';
-import { StatGrid, MatchHistory, LuckiestPanel } from './Stats';
+import { StatGrid, MatchHistory, LuckiestPanel, MATCH_LIMIT } from './Stats';
 import { Close } from './Icons';
 
 export default function Profile({ account, onClose, onLocker, onReport, history }) {
@@ -60,7 +60,7 @@ export default function Profile({ account, onClose, onLocker, onReport, history 
 
         <LuckiestPanel lucky={account.lucky} />
 
-        <h3 className="profile-section">Match history</h3>
+        <h3 className="profile-section">Match history <span className="muted small-text">(last {MATCH_LIMIT})</span></h3>
         <MatchHistory matches={matches} meId={account.id} />
 
         <h3 className="profile-section">Loadout</h3>

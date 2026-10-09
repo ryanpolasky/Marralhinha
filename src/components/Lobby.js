@@ -72,7 +72,7 @@ function TurnTimer({ seconds, isHost, onChange }) {
   );
 }
 
-export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onReport }) {
+export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onReport, onPlayerStats }) {
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -165,8 +165,14 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
             const p = room.seats[s];
             const color = SEAT_COLORS[s];
             const mine = p && p.id === playerId;
+            const viewable = p && !p.isBot && p.userId && !mine && onPlayerStats;
             return (
-              <div key={s} className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}`} style={{ '--seat': color.main, '--seat-light': color.light }}>
+              <div
+                key={s}
+                className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}${viewable ? ' viewable' : ''}`}
+                style={{ '--seat': color.main, '--seat-light': color.light, ...(viewable ? { cursor: 'pointer' } : null) }}
+                onClick={viewable ? (e) => !e.target.closest('button') && onPlayerStats(p) : undefined}
+              >
                 <span className="seat-dot">
                   <span className="marble-dot" />
                   {p && p.id === room.hostId && <Crown />}

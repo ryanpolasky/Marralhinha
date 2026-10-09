@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { ITEMS, SLOT_KEYS, SLOTS } from '../game/catalog';
 import { ItemThumb, Nameplate, TagBadges } from './Economy';
-import { StatGrid, MatchHistory, LuckiestPanel } from './Stats';
+import { StatGrid, MatchHistory, LuckiestPanel, MATCH_LIMIT } from './Stats';
 import { Close } from './Icons';
 
 // The "peek at another player" card: their look, lifetime stats and recent games.
@@ -61,10 +61,12 @@ export default function PlayerCard({ userId, hint, data, onClose }) {
                 {SLOT_KEYS.map((slot) => {
                   const item = ITEMS[player.equipped[slot]];
                   return item ? (
-                    <div key={slot} className="profile-slot" title={SLOTS[slot].label}>
+                    <div key={slot} className="profile-slot">
                       <span className="profile-slot-thumb">
                         <ItemThumb itemId={item.id} />
                       </span>
+                      <span className="profile-slot-name">{item.name}</span>
+                      <span className="muted small-text">{SLOTS[slot].label}</span>
                     </div>
                   ) : null;
                 })}
@@ -73,7 +75,7 @@ export default function PlayerCard({ userId, hint, data, onClose }) {
           </>
         )}
 
-        <h3 className="profile-section">Recent games</h3>
+        <h3 className="profile-section">Recent games <span className="muted small-text">(last {MATCH_LIMIT})</span></h3>
         {info ? <MatchHistory matches={info.matches} meId={userId} /> : !error && <div className="muted small-text center match-empty">Loading…</div>}
       </div>
     </div>

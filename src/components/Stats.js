@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
 import { TagBadge } from './Economy';
 
@@ -89,12 +89,16 @@ export function LuckiestPanel({ lucky }) {
 }
 
 // Compact per-match rows: result, mode, who was at the table and when
-export function MatchHistory({ matches, meId }) {
+export const MATCH_LIMIT = 20;
+
+export function MatchHistory({ matches, meId, preview = 3 }) {
+  const [open, setOpen] = useState(false);
   if (!matches) return <div className="muted small-text center match-empty">Loading games…</div>;
   if (!matches.length) return <div className="muted small-text center match-empty">No games yet. Match history shows up after the first game.</div>;
+  const shown = open ? matches : matches.slice(0, preview);
   return (
     <div className="match-list">
-      {matches.map((m) => (
+      {shown.map((m) => (
         <div key={m.id} className={`match${m.won ? ' won' : ''}`}>
           <span className={`match-result${m.won ? ' won' : ''}`}>{m.won ? 'Won' : 'Lost'}</span>
           <div className="match-body">
@@ -115,6 +119,11 @@ export function MatchHistory({ matches, meId }) {
           <span className="match-when muted">{ago(m.endedAt)}</span>
         </div>
       ))}
+      {matches.length > preview && (
+        <button className="btn link" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? 'Show less' : `Show all ${matches.length} games`}
+        </button>
+      )}
     </div>
   );
 }
