@@ -3851,24 +3851,9 @@ function sandFeltCanvas() {
   return canvas;
 }
 
-// A smoke grenade blooms somewhere near mid every so often, greys the stone under it, then thins out
 const DEFUSE_SHADER = `{
-  vec2 q = (vMapUv - 0.5) / ${BOARD_R};
-  float t = uSkinTime;
-  float top = smoothstep(0.6, 0.95, vSkinTop);
-  float cyc = t / 18.0;
-  float id = floor(cyc);
-  float ph = fract(cyc);
-  vec2 at = (vec2(skHash(vec2(id, 1.3)), skHash(vec2(id, 7.1))) - 0.5) * 5.0 + vec2(ph * 0.8, -ph * 0.5);
-  float grow = smoothstep(0.0, 0.12, ph);
-  float thin = 1.0 - smoothstep(0.5, 0.95, ph);
-  float radius = 0.6 + 2.4 * grow;
-  float edge = length(q - at) + (skFbm3(vec3(q * 0.8, t * 0.12)) - 0.5) * 1.6;
-  float body = 1.0 - smoothstep(radius * 0.5, radius, edge);
-  float puffs = smoothstep(0.3, 0.6, skFbm3(vec3(q * 1.1 + t * 0.05, t * 0.08)) + 0.2);
-  float smoke = body * puffs * grow * thin * top;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.79, 0.76), smoke * 0.72);
-  totalEmissiveRadiance = vec3(0.05, 0.05, 0.048) * smoke;
+  // side walls land on the A/B paint band, so shift them onto the clean centerline
+  if (vSkinTop < 0.99) diffuseColor.rgb = diffuse * texture2D(map, vMapUv - vec2(0.0, 0.8 * ${BOARD_R})).rgb;
 }`;
 
 // The planted charge on A beeps faster and faster, then starts over
@@ -3878,6 +3863,217 @@ const DEFUSE_DISH_SHADER = `{
   float on = step(fract(s + 0.2 * s * s), 0.16);
   float top = smoothstep(0.6, 0.95, vSkinTop);
   totalEmissiveRadiance = vec3(1.0, 0.1, 0.05) * led * (0.08 + on * 3.0) * top;
+}`;
+
+// Red gingham that tiles clean: crossed bands go near-solid like the real weave
+export function ginghamCanvas() {
+  const S = 512;
+  const band = 64;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.fillStyle = '#fbf5ea';
+  ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = 'rgba(204,30,42,0.56)';
+  for (let i = 0; i < S; i += band * 2) {
+    ctx.fillRect(i, 0, band, S);
+    ctx.fillRect(0, i, S, band);
+  }
+  for (let i = 0; i < S; i += 4) {
+    ctx.fillStyle = 'rgba(70,10,10,0.05)';
+    ctx.fillRect(i, 0, 1, S);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(0, i + 2, S, 1);
+  }
+  const rand = seeded(88);
+  for (let i = 0; i < 7000; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(255,255,255,${rand() * 0.12})` : `rgba(110,20,20,${rand() * 0.08})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1);
+  }
+  return canvas;
+}
+
+function grassCanvas() {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(733);
+  ctx.fillStyle = '#4a7a33';
+  ctx.fillRect(0, 0, S, S);
+  const wrapped = (fn) => [-S, 0, S].forEach((dx) => [-S, 0, S].forEach((dy) => fn(dx, dy)));
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 40 + rand() * 110;
+    wrapped((dx, dy) => softBlob(ctx, x + dx, y + dy, r, i % 2 ? '#5c9140' : '#3a632a', 0.45));
+  }
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 5200; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const len = 3 + rand() * 7;
+    const lean = (rand() - 0.5) * 4;
+    ctx.strokeStyle = rand() > 0.45 ? `rgba(160,215,110,${0.15 + rand() * 0.3})` : `rgba(20,45,12,${0.15 + rand() * 0.3})`;
+    ctx.lineWidth = 0.8 + rand();
+    wrapped((dx, dy) => {
+      ctx.beginPath();
+      ctx.moveTo(x + dx, y + dy);
+      ctx.lineTo(x + dx + lean, y + dy - len);
+      ctx.stroke();
+    });
+  }
+  for (let i = 0; i < 18; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    wrapped((dx, dy) => {
+      ctx.fillStyle = 'rgba(255,255,250,0.9)';
+      for (let p = 0; p < 6; p++) {
+        ctx.beginPath();
+        ctx.arc(x + dx + Math.cos((p * TAU) / 6) * 2.6, y + dy + Math.sin((p * TAU) / 6) * 2.6, 1.8, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#f2c230';
+      ctx.beginPath();
+      ctx.arc(x + dx, y + dy, 1.7, 0, TAU);
+      ctx.fill();
+    });
+  }
+  return canvas;
+}
+
+// Wicker weave for the base trays and the hamper: little picnic baskets
+export function basketCanvas(cell = 32) {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.fillStyle = '#7a5226';
+  ctx.fillRect(0, 0, S, S);
+  const step = cell / 5;
+  for (let r = 0; r < S / cell; r++) {
+    for (let c = 0; c < S / cell; c++) {
+      const over = (r + c) % 2 === 0;
+      const x = c * cell;
+      const y = r * cell;
+      const g = over ? ctx.createLinearGradient(x, y, x, y + cell) : ctx.createLinearGradient(x, y, x + cell, y);
+      g.addColorStop(0, '#9a6a34');
+      g.addColorStop(0.5, '#d9b06e');
+      g.addColorStop(1, '#86592a');
+      ctx.fillStyle = g;
+      ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+      ctx.strokeStyle = 'rgba(50,30,10,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+      ctx.strokeStyle = 'rgba(90,55,20,0.25)';
+      ctx.lineWidth = 1;
+      for (let k = 1; k < 5; k++) {
+        ctx.beginPath();
+        if (over) {
+          ctx.moveTo(x + 2, y + k * step);
+          ctx.lineTo(x + cell - 2, y + k * step);
+        } else {
+          ctx.moveTo(x + k * step, y + 2);
+          ctx.lineTo(x + k * step, y + cell - 2);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+  return canvas;
+}
+
+// The serving board everyone actually used: knife scars, wine rings, crumbs, and a sign the ants ignored
+function picnicBoardCanvas(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.drawImage(makeWoodCanvas({ base: '#d8ac6c', grain: '120,70,25', seed: 311, size: S }), 0, 0);
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  ctx.setTransform(k, 0, 0, k, C, C);
+  ctx.lineCap = 'round';
+  [[W - 0.34, L - 0.34, 'rgba(96,58,22,0.55)', 0.09], [W - 0.44, L - 0.44, 'rgba(255,220,160,0.22)', 0.03]].forEach(([w, l, stroke, width]) => {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    roundedCross(w, l, 0.42).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.stroke();
+  });
+  const rand = seeded(97);
+  for (let n = 0; n < 16; n++) {
+    const cx = (rand() - 0.5) * 2 * L * 0.8;
+    const cy = (rand() - 0.5) * 2 * W;
+    const [x0, y0] = n % 2 ? [cy, cx] : [cx, cy];
+    const a = rand() * Math.PI;
+    for (let i = 0; i < 3 + rand() * 4; i++) {
+      const len = 0.5 + rand() * 1.4;
+      const ox = x0 + (rand() - 0.5) * 0.5;
+      const oy = y0 + (rand() - 0.5) * 0.5;
+      const aa = a + (rand() - 0.5) * 0.25;
+      const [dx, dy] = [Math.cos(aa) * len, Math.sin(aa) * len];
+      ctx.lineWidth = 0.018;
+      ctx.strokeStyle = 'rgba(95,55,20,0.4)';
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ox + dx, oy + dy);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,235,195,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(ox + 0.02, oy + 0.02);
+      ctx.lineTo(ox + dx + 0.02, oy + dy + 0.02);
+      ctx.stroke();
+    }
+  }
+  [[1.05, 3.15 - L, 0.42], [3.35 - L, 1.05, 0.4], [-1.05, 1.7 - L, 0.36]].forEach(([x, y, r]) => {
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = `rgba(110,20,45,${0.32 - i * 0.08})`;
+      ctx.lineWidth = 0.05 - i * 0.012;
+      ctx.beginPath();
+      const a0 = rand() * TAU;
+      ctx.arc(x + i * 0.03, y - i * 0.02, r - i * 0.015, a0, a0 + TAU * (0.65 + rand() * 0.3));
+      ctx.stroke();
+    }
+    softBlob(ctx, x + r * 0.7, y + r * 0.5, 0.12, 'rgb(110,20,45)', 0.25);
+  });
+  ctx.save();
+  ctx.translate(-1.05, (L + 0.65) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.scale(0.01, 0.01);
+  ctx.font = `700 ${Math.min(62, (L - 3.35) * 20)}px Fredoka, "Arial Rounded MT Bold", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,230,190,0.35)';
+  ctx.fillText('NO ANTS', 2.5, 3);
+  ctx.fillStyle = 'rgba(90,48,16,0.72)';
+  ctx.fillText('NO ANTS', 0, 0);
+  ctx.restore();
+  for (let i = 0; i < 260; i++) {
+    const x = (rand() - 0.5) * 2 * L;
+    const y = (rand() - 0.5) * 2 * L;
+    ctx.fillStyle = rand() > 0.5 ? `rgba(130,80,30,${0.4 + rand() * 0.4})` : `rgba(240,212,150,${0.5 + rand() * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 0.015 + rand() * 0.035, 0, TAU);
+    ctx.fill();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+// Red hem with white stitching, and the creases from living folded in a hamper all winter
+const PICNIC_BLANKET_SHADER = `{
+  vec2 p = vSkinPos.xz;
+  float r = uExtent * 0.22;
+  vec2 q = abs(p) - vec2(uExtent - r);
+  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.6, 0.06, 0.08), smoothstep(-0.66, -0.62, d));
+  vec2 a = abs(p);
+  float along = a.x > a.y ? p.y : p.x;
+  float stitch = (1.0 - smoothstep(0.02, 0.04, abs(d + 0.82))) * step(0.45, fract(along * 2.6));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.98, 0.95, 0.88), stitch * 0.95);
+  float crease = 0.0;
+  float shine = 0.0;
+  for (int i = -1; i <= 1; i++) {
+    float c = float(i) * uExtent * 0.5;
+    crease += exp(-abs(p.x - c) * 6.0) + exp(-abs(p.y - c) * 6.0);
+    shine += exp(-abs(p.x - c - 0.22) * 10.0) + exp(-abs(p.y - c - 0.22) * 10.0);
+  }
+  diffuseColor.rgb *= 1.0 - 0.12 * min(crease, 1.5) + 0.05 * min(shine, 1.0);
 }`;
 
 const SPECIAL_BOARDS = {
@@ -4009,9 +4205,16 @@ const SPECIAL_BOARDS = {
       },
     };
   },
+  picnic: (layout) => ({
+    canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
+    dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
+    dish: '#8a5f2e', feltCanvas: grassCanvas(), cup: '#33200f', core: '#f0a020',
+    accent: { color: '#cf2a35', metalness: 0.15, roughness: 0.5 },
+    blanket: { canvas: ginghamCanvas(), extent: layout.spec.halfLength * 1.72 },
+  }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
@@ -4021,10 +4224,10 @@ function patchSkinShader(material, { body, common = '', uniforms = {}, key, post
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, { uSkinTime: time });
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vSkinTop;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSkinTop = normal.y;');
+      .replace('#include <common>', '#include <common>\nvarying float vSkinTop;\nvarying vec3 vSkinPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSkinTop = normal.y;\nvSkinPos = transformed;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nvarying float vSkinTop;\n${common}`)
+      .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nvarying float vSkinTop;\nvarying vec3 vSkinPos;\n${common}`)
       .replace('#include <emissivemap_fragment>', body)
       .replace('#include <dithering_fragment>', post ? ARCADE_POST : '#include <dithering_fragment>');
   };
@@ -4086,6 +4289,17 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
     };
+    if (spec.blanket) {
+      const blanket = new THREE.MeshStandardMaterial({ map: finish(spec.blanket.canvas, 1 / 6), roughness: 0.94 });
+      patchSkinShader(blanket, {
+        body: PICNIC_BLANKET_SHADER,
+        common: 'uniform float uExtent;',
+        uniforms: { uExtent: { value: spec.blanket.extent } },
+        key: `blanket-${resolved}${variant}`,
+      });
+      mats.blanket = blanket;
+      mats.surfaces.push(blanket);
+    }
     if (spec.core) mats.core = new THREE.MeshBasicMaterial({ color: spec.core });
     if (spec.animate) mats.animate = spec.animate;
     return mats;

@@ -6,6 +6,7 @@ import { makeLabelTexture } from './textures';
 import { boardSkin, animateBoardSkin } from './skins';
 import { itemsForSlot, skinKey } from '../game/catalog';
 import DefuseProps from './DefuseProps';
+import PicnicProps from './PicnicProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -71,6 +72,13 @@ function buildDishGeometry(seat, layout) {
   const [tr, tc] = layout.BASE_TRAY[seat];
   layout.BASE[seat].forEach(([r, c]) => shape.holes.push(holePath([c - tc, -(r - tr)], HOLE_R)));
   return flatten(new THREE.ExtrudeGeometry(shape, { ...EXTRUDE, curveSegments: 40 }));
+}
+
+function buildBlanketGeometry(layout) {
+  const h = layout.spec.halfLength * 1.72;
+  const shape = new THREE.Shape();
+  roundedPolygon(shape, [[-h, -h], [h, -h], [h, h], [-h, h]], h * 0.22);
+  return new THREE.ShapeGeometry(shape, 24).rotateX(-Math.PI / 2);
 }
 
 function buildHomeStripGeometry(layout) {
@@ -207,7 +215,7 @@ function Table({ texture }) {
 }
 
 // Boards that dress the table around them, not just the board itself
-const BOARD_PROPS = { defuse: DefuseProps };
+const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps };
 export const hasBoardProps = (id) => !!BOARD_PROPS[skinKey(id)];
 
 const SWAP_MS = 150;
@@ -379,6 +387,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   const boardGeometry = useMemo(() => buildBoardGeometry(layout), [layout]);
   const dishGeometries = useMemo(() => SEATS.map((s) => buildDishGeometry(s, layout)), [layout]);
   const stripGeometry = useMemo(() => buildHomeStripGeometry(layout), [layout]);
+  const blanketGeometry = useMemo(() => buildBlanketGeometry(layout), [layout]);
   const seatHoles = useMemo(
     () => SEATS.map((s) => [[...layout.RING[entryIdx(s, layout)]], ...layout.HOME[s], ...layout.BASE[s]]),
     [layout]
@@ -391,6 +400,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   useEffect(() => () => boardGeometry.dispose(), [boardGeometry]);
   useEffect(() => () => dishGeometries.forEach((g) => g.dispose()), [dishGeometries]);
   useEffect(() => () => stripGeometry.dispose(), [stripGeometry]);
+  useEffect(() => () => blanketGeometry.dispose(), [blanketGeometry]);
 
   if (!materials) return <group />;
   const Props = table && BOARD_PROPS[skinKey(shownSkin)];
@@ -398,6 +408,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
   return (
     <group>
       {table && <Table texture={materials.felt} />}
+      {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
       {Props && <Props layout={layout} y={TABLE_Y} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />

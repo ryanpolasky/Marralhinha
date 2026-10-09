@@ -85,6 +85,7 @@
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
+    { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "mythic", "desc": "Ants (ants)" },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },

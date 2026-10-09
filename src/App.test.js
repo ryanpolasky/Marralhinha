@@ -69,7 +69,7 @@ test('Luckiest starts collapsed with a ten-game bar and reveals readable stats o
   expect(screen.getByText('10 / 10 games')).toBeInTheDocument();
 });
 
-test('locker lists ordinary rarities before Luckiest, Supporter, Haunted, Beta and Dev', () => {
+test('locker lists ordinary rarities before Luckiest, Supporter, Haunted, Beta, Ants and Dev', () => {
   const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'beta', 'dev'];
   for (const slot of ['marble', 'board', 'dice', 'nameplate', 'fx', 'trail']) {
     const order = itemsForSlot(slot).map((item) => item.tag || item.rarity);

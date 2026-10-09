@@ -8904,13 +8904,39 @@ textarea.report-text {
   content: '';
   position: absolute;
   inset: 0;
-  background: conic-gradient(from var(--mw-spin), rgba(140, 255, 200, 0.9), transparent 7%, transparent 50%, rgba(140, 255, 200, 0.4) 54%, transparent 60%);
-  -webkit-mask: radial-gradient(circle, transparent 0 24%, #000 30%, #000 58%, transparent 74%);
-  mask: radial-gradient(circle, transparent 0 24%, #000 30%, #000 58%, transparent 74%);
-  animation: mw-spin 4s linear infinite;
+  background: repeating-conic-gradient(from 5deg, #ffb347 0 7deg, transparent 7deg 15deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 15px, #000 15.5px 18.5px, transparent 19px);
+  mask: radial-gradient(circle, transparent 0 15px, #000 15.5px 18.5px, transparent 19px);
+  animation: halloween-candles 1.6s ease-in-out infinite;
 }
 
-.item-card.locked .thumb-board.skin-halloween::before { animation: none; }
+.thumb-board.skin-halloween::after {
+  content: '';
+  position: absolute;
+  top: 27px;
+  left: 27px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d8ffee;
+  box-shadow: 0 0 5px 2px rgba(140, 255, 200, 0.9);
+  animation: halloween-wisp 3.6s linear infinite;
+}
+
+@keyframes halloween-candles {
+  0%, 100% { opacity: 0.9; }
+  30% { opacity: 0.5; }
+  55% { opacity: 0.8; }
+  75% { opacity: 0.45; }
+}
+
+@keyframes halloween-wisp {
+  from { transform: rotate(0deg) translateX(17px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(17px) rotate(-360deg); }
+}
+
+.item-card.locked .thumb-board.skin-halloween::before,
+.item-card.locked .thumb-board.skin-halloween::after { animation: none; }
 
 .thumb-dice.skin-halloween {
   --face: radial-gradient(circle at 30% 24%, rgba(190, 130, 255, 0.4), transparent 60%), linear-gradient(135deg, #3a1658, #1f0b33 55%, #10051c);
@@ -9051,6 +9077,8 @@ textarea.report-text {
   .thumb-marble.skin-halloween,
   .thumb-marble.skin-halloween::before,
   .thumb-board.skin-halloween::before,
+  .thumb-board.skin-halloween::after,
+  .thumb-board.skin-picnic::before,
   .thumb-dice.skin-halloween,
   .tag-badge.tag-halloween,
   .plate-halloween,
@@ -9126,10 +9154,55 @@ textarea.report-text {
 }
 
 .thumb-board.skin-defuse {
-  background: radial-gradient(circle at 70% 70%, rgba(184, 35, 28, 0.6) 0 9%, transparent 10%),
-    linear-gradient(rgba(84, 62, 36, 0.35) 0 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(84, 62, 36, 0.35) 0 1px, transparent 1px) 0 0 / 6px 6px,
+  position: relative;
+  background: linear-gradient(rgba(84, 62, 36, 0.35) 0 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(84, 62, 36, 0.35) 0 1px, transparent 1px) 0 0 / 6px 6px,
     linear-gradient(135deg, #b9a88a, #c8ab7c 50%, #d6a96a);
 }
+
+.thumb-board.skin-defuse::before {
+  content: 'A';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  border: 2px solid #b8231c;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b8231c;
+  font: 900 13px/1 Georgia, serif;
+}
+
+.thumb-board.skin-picnic {
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(0deg, rgba(200, 40, 40, 0.38) 0 6px, transparent 6px 12px), repeating-linear-gradient(90deg, rgba(200, 40, 40, 0.38) 0 6px, transparent 6px 12px), #f6ecd8;
+}
+
+.thumb-board.skin-picnic::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: 0;
+  width: 14px;
+  height: 6px;
+  background: radial-gradient(circle at 2.5px 3px, #2a1608 0 2.5px, transparent 3px), radial-gradient(circle at 7px 3px, #2a1608 0 2.2px, transparent 2.7px), radial-gradient(circle at 11.5px 3px, #2a1608 0 2.8px, transparent 3.3px);
+  animation: picnic-ant 5s linear infinite;
+}
+
+@keyframes picnic-ant {
+  0% { transform: translate(-14px, 4px); }
+  25% { transform: translate(14px, -3px); }
+  50% { transform: translate(34px, 3px); }
+  75% { transform: translate(52px, -2px); }
+  100% { transform: translate(74px, 3px); }
+}
+
+.item-card.locked .thumb-board.skin-picnic::before { animation: none; transform: translate(24px, 0); }
 
 .thumb-dice.skin-defuse {
   --face: linear-gradient(#2b2b2a 0 14%, transparent 14% 86%, #2b2b2a 86%), #bba97e;
