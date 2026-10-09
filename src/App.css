@@ -3985,6 +3985,27 @@ img.emote-glyph {
   align-items: center;
 }
 
+.rates-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.rates-pop {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(240px, 100%);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #162326;
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
 .small-text {
   font-size: 13px;
 }

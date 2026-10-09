@@ -33,7 +33,6 @@ function featuredFor(day) {
     seed = (seed * 1103515245 + 12345) % 2147483648;
     return seed % n;
   };
-  // Mythics are chest-only, never for sale
   const pool = DROPPABLE.filter((i) => catalog.featured.prices[i.rarity]);
   const picks = [];
   const fancy = pool.filter((i) => i.rarity === 'epic' || i.rarity === 'legendary');
@@ -42,7 +41,13 @@ function featuredFor(day) {
     const item = pool[rand(pool.length)];
     if (!picks.includes(item)) picks.push(item);
   }
-  return picks.map((item) => ({ id: item.id, price: catalog.featured.prices[item.rarity] }));
+  const offers = picks.map((item) => ({ id: item.id, price: catalog.featured.prices[item.rarity] }));
+  const { price, chance } = catalog.featured.mythic;
+  if (rand(100) < chance) {
+    const mythics = itemsOfRarity('mythic');
+    offers[offers.length - 1] = { id: mythics[rand(mythics.length)].id, price };
+  }
+  return offers;
 }
 
 class Economy {

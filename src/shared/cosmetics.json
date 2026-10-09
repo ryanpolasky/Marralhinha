@@ -319,7 +319,7 @@
       "pity": { "epic": 5, "legendary": 25 }
     }
   ],
-  "featured": { "count": 4, "prices": { "common": 250, "rare": 600, "epic": 1500, "legendary": 3500 } },
+  "featured": { "count": 4, "prices": { "common": 250, "rare": 600, "epic": 1500, "legendary": 3500 }, "mythic": { "price": 9000, "chance": 12 } },
   "rewards": {
     "finish": 30,
     "win": 60,

@@ -114,7 +114,7 @@ function BoxOpening({ opening, account, onAgain, onEquip, onDone }) {
 export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [shop, setShop] = useState(null);
   const [opening, setOpening] = useState(null);
-  const [showRates, setShowRates] = useState(null);
+  const [showRates, setShowRates] = useState({});
   const [buying, setBuying] = useState(null);
   const [syncing, setSyncing] = useState(null);
   const [slide, setSlide] = useState(0);
@@ -247,21 +247,23 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                 <button className="btn primary big block" disabled={account.coins < box.price || !!opening} onClick={() => openBox(box)}>
                   Open <Coin /> {box.price}
                 </button>
-                <button className="btn link" onClick={() => setShowRates(showRates === box.id ? null : box.id)}>
-                  {showRates === box.id ? 'Hide drop rates' : 'Drop rates'}
-                </button>
-                {showRates === box.id && (
-                  <ul className="rates">
-                    {Object.entries(box.weights)
-                      .filter(([, w]) => w > 0)
-                      .map(([rarity, w]) => (
-                        <li key={rarity}>
-                          <RarityTag rarity={rarity} /> <span>{w}%</span>
-                        </li>
-                      ))}
-                    <li className="muted small-text">Duplicates convert to {CURRENCY}.</li>
-                  </ul>
-                )}
+                <div className="rates-wrap">
+                  <button className="btn link" aria-expanded={!!showRates[box.id]} onClick={() => setShowRates((s) => ({ ...s, [box.id]: !s[box.id] }))}>
+                    {showRates[box.id] ? 'Hide drop rates' : 'Drop rates'}
+                  </button>
+                  {showRates[box.id] && (
+                    <ul className="rates rates-pop">
+                      {Object.entries(box.weights)
+                        .filter(([, w]) => w > 0)
+                        .map(([rarity, w]) => (
+                          <li key={rarity}>
+                            <RarityTag rarity={rarity} /> <span>{w}%</span>
+                          </li>
+                        ))}
+                      <li className="muted small-text">Duplicates convert to {CURRENCY}.</li>
+                    </ul>
+                  )}
+                </div>
               </div>
             );
           })}
