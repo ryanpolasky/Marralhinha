@@ -212,7 +212,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       aria-label={label}
       aria-disabled={disabled || undefined}
     >
-      {thumbLoading ? <span className="thumb thumb-loading" /> : <ItemThumb itemId={itemId} seat={seat} />}
+      <span className="item-thumb-slot">{thumbLoading ? <span className="thumb thumb-loading" /> : <ItemThumb itemId={itemId} seat={seat} />}</span>
       <span className="item-name">{item.name}</span>
       <span className="item-rarity">{rarity.short || rarity.label}</span>
       {equipped && <span className="item-badge">Equipped</span>}
