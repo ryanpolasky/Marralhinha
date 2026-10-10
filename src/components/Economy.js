@@ -198,7 +198,7 @@ function ModelStage({ itemId, seat, replay }) {
   );
 }
 
-export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, onPointerEnter, footer, seat = 0, label, disabled = false, thumbLoading = false }) {
+export function ItemCard({ itemId, owned = true, equipped = false, selected = false, onClick, onPointerEnter, onPointerLeave, onFocus, onBlur, footer, seat = 0, label, disabled = false, thumbLoading = false }) {
   const item = ITEMS[itemId];
   const rarity = rarityOf(item);
   return (
@@ -208,6 +208,9 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       style={{ '--rarity': rarity.color }}
       onClick={onClick}
       onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
       title={item.desc}
       aria-label={label}
       aria-disabled={disabled || undefined}

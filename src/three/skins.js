@@ -4209,7 +4209,7 @@ const SPECIAL_BOARDS = {
     canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
     dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
     dish: '#8a5f2e', feltCanvas: grassCanvas(), cup: '#33200f', core: '#f0a020',
-    accent: { color: '#cf2a35', metalness: 0.15, roughness: 0.5 },
+    accent: { color: '#f1e6c8', metalness: 0.15, roughness: 0.5 },
     blanket: { canvas: ginghamCanvas(), extent: layout.spec.halfLength * 1.72 },
   }),
 };

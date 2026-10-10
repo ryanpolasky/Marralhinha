@@ -9094,7 +9094,7 @@ textarea.report-text {
 .halloween-shop-body p { margin: 10px 0 0; line-height: 1.5; color: #f1e4ff; }
 .halloween-shop-body .halloween-note { max-width: 720px; margin-top: 14px; color: #e6d6f7; }
 
-.pack-items { display: flex; justify-content: safe center; gap: 10px 22px; margin: 16px 0 6px; padding: 2px 2px 8px; overflow-x: auto; }
+.pack-items { display: flex; justify-content: safe center; gap: 10px 22px; margin: -4px 0 -10px; padding: 20px 18px 24px; overflow-x: auto; }
 .pack-item { flex-shrink: 0; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; min-width: 96px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; }
 .pack-item small { color: #c9a8ea; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
 .supporter-shop .pack-item { color: #d6fff3; }
@@ -10189,3 +10189,5 @@ body {
 .mail-count.inline {
   position: static;
 }
+
+.featured-peek { position: fixed; z-index: 80; width: 240px; padding: 8px; border-radius: 16px; background: var(--glass-strong); border: 1px solid var(--glass-line); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); pointer-events: none; }

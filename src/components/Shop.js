@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
@@ -118,6 +119,12 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [buying, setBuying] = useState(null);
   const [syncing, setSyncing] = useState(null);
   const [slide, setSlide] = useState(0);
+  const [peek, setPeek] = useState(null);
+  const showPeek = (id, el) => {
+    const r = el.getBoundingClientRect();
+    const below = r.top < 250;
+    setPeek({ id, x: Math.min(Math.max(r.left + r.width / 2, 130), window.innerWidth - 130), y: below ? r.bottom + 8 : r.top - 8, below });
+  };
   const swipeStart = useRef(null);
   const refreshIn = useCountdown(shop?.refreshAt);
   const slides = 2;
@@ -289,6 +296,10 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
               <ItemCard
                 key={offer.id}
                 itemId={offer.id}
+                onPointerEnter={(e) => showPeek(offer.id, e.currentTarget)}
+                onPointerLeave={() => setPeek(null)}
+                onFocus={(e) => showPeek(offer.id, e.currentTarget)}
+                onBlur={() => setPeek(null)}
                 owned
                 footer={
                   owned ? (
@@ -306,6 +317,12 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
             );
           })}
         </div>
+        {peek && createPortal(
+          <div className="featured-peek" style={{ left: peek.x, top: peek.y, transform: `translate(-50%, ${peek.below ? '0' : '-100%'})` }} aria-hidden="true">
+            <PreviewStage itemId={peek.id} playerName={account.name} />
+          </div>,
+          document.body
+        )}
         <p className="muted small-text center">Featured items and chests use {CURRENCY} earned by playing. No pay-to-win.</p>
 
         <div className="shop-carousel" role="group" aria-roledescription="carousel" aria-label="Packs" onKeyDown={onCarouselKey}>

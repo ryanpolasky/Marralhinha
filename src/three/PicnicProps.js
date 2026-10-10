@@ -652,6 +652,9 @@ function Hamper({ position, rot = 0, scale = 1 }) {
   );
 }
 
+const SANDWICH_K = 0.7;
+const HAMPER_K = 1.35;
+const CHEESE_K = 0.75;
 const HOLE_AT = 0.75;
 const holeY = (r) => (0.34 * (0.85 - r)) / 0.73;
 
@@ -702,7 +705,7 @@ export function picnicLayout(spec) {
     { pts: [...exit(holes.melon), g(A + 1, -A + 3), g(A + 1, 0.4 * C), g(along(props.melons[0].at, props.melons[0].rot, melonR + 1.2)[0], props.melons[0].at[1] - 0.5 * F), g(...along(props.melons[0].at, props.melons[0].rot - 0.25, melonR + 1.0))], loot: '#e8323f', count: 2 },
     { pts: [...exit(holes.cheese), g(C + 1.7 * F, -C - 0.4 * F), g(...along(props.cheese.at, props.cheese.rot, -0.75))], loot: '#f5cd4a' },
     { pts: [...exit(holes.charcuterie), g(A - 2 * F, top), g(-3, top), g(gap, gap), g(-M + 0.9 * F, -C * 0.45), g(-M + 0.2 * F, -2.05 * F)], loot: '#a3202e' },
-    { pts: [...exit(holes.hamper), g(A - 2.4 * F, north), g(-C + 2.6 * F, north), g(-C + 1.4 * F, -C - 2.3 * F), g(...along(props.hamper.at, props.hamper.rot, 0.9 * F + 0.8))], loot: '#e8c27a' },
+    { pts: [...exit(holes.hamper), g(A - 2.4 * F, north), g(-C + 2.6 * F, north), g(-C + 1.4 * F, -C - 2.3 * F), g(...along(props.hamper.at, props.hamper.rot, 0.9 * F * HAMPER_K + 0.8))], loot: '#e8c27a' },
   ];
   const circle = (at, r) => ({ type: 'circle', at, r });
   const obstacles = [
@@ -712,9 +715,9 @@ export function picnicLayout(spec) {
     circle([M - 0.15 * F, -1.4 * F], 1.75 * F),
     circle([M + 0.15 * F, 0.25 * F], 1.15 * F),
     circle([M + 1.15 * F, 0.35 * F], 0.3 * F),
-    circle(props.sandwich.at, 0.7 * F),
-    { type: 'box', at: props.hamper.at, rot: props.hamper.rot, half: [0.9 * F + 0.15, 0.55 * F + 0.1] },
-    circle(along(props.cheese.at, props.cheese.rot, 0.55 * 1.3 * F), 0.56 * 1.3 * F),
+    circle(props.sandwich.at, 0.7 * F * SANDWICH_K),
+    { type: 'box', at: props.hamper.at, rot: props.hamper.rot, half: [0.9 * F * HAMPER_K + 0.15, 0.55 * F * HAMPER_K + 0.1] },
+    circle(along(props.cheese.at, props.cheese.rot, 0.55 * 1.3 * F * CHEESE_K), 0.56 * 1.3 * F * CHEESE_K),
     circle(along(props.grapes.at, props.grapes.rot, 0.4 * F), 0.5 * F),
     ...props.melons.map((m) => circle(along(m.at, m.rot, 0.5 * melonR), 0.63 * melonR)),
   ];
@@ -733,9 +736,9 @@ export default function PicnicProps({ layout, y }) {
       {props.melons.map((m, i) => (
         <Watermelon key={i} position={g(...m.at)} rot={m.rot} scale={F} />
       ))}
-      <Sandwich position={g(...props.sandwich.at)} rot={props.sandwich.rot} scale={F} />
-      <Hamper position={g(...props.hamper.at)} rot={props.hamper.rot} scale={F} />
-      <Cheese position={g(...props.cheese.at)} rot={props.cheese.rot} scale={F} />
+      <Sandwich position={g(...props.sandwich.at)} rot={props.sandwich.rot} scale={F * SANDWICH_K} />
+      <Hamper position={g(...props.hamper.at)} rot={props.hamper.rot} scale={F * HAMPER_K} />
+      <Cheese position={g(...props.cheese.at)} rot={props.cheese.rot} scale={F * CHEESE_K} />
       <Grapes position={g(...props.grapes.at)} rot={props.grapes.rot} scale={F} />
     </group>
   );
