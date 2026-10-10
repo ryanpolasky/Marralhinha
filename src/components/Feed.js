@@ -50,13 +50,14 @@ function ChatInput({ onSend, teams = false }) {
 
 export default function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
   const shown = open || docked ? entries : entries.slice(0, 4);
+  const empty = !open && !entries.length;
   return (
     <div className={`feed${open || docked ? ' open' : ''}${lifted ? ' lifted' : ''}${docked ? ' docked' : ''}`}>
       <div className="feed-tools">
         {docked ? (
           <span className="sheet-label">{onToggleLogs ? 'Chat & log' : 'Chat'}</span>
         ) : (
-          <button type="button" className="feed-toggle" onClick={onToggle} aria-expanded={open} aria-controls="feed-list">
+          <button type="button" className="feed-toggle" onClick={empty ? undefined : onToggle} aria-disabled={empty} aria-expanded={open} aria-controls="feed-list" title={empty ? "There's nothing in the chat yet!" : undefined}>
             {open ? 'Hide' : 'View all'}
             {unread > 0 && <span className="unread">{unread}</span>}
           </button>

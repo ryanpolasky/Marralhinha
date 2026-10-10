@@ -35,6 +35,7 @@ const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').sp
 const PACKS = ['supporter', 'halloween'];
 const MAX_SHORTHANDS = 2;
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
+const pickableTags = (held) => (held.includes('dev') ? TAG_KEYS : held);
 const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.includes(tag));
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
 const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]' AND granted_packs = '[]' AND banned_at IS NULL)";
@@ -179,19 +180,21 @@ class Accounts {
     const stored = storableTags(parse(user.tags, []));
     const all = normalizeTags([...stored, ...this.grantedPacks(user), ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(user.halloween_entitlement_id && discord.halloweenConfigured() ? ['halloween'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
     const { main, shorthands } = this.tagLoadout(user, all);
-    const lead = main || all.find((t) => !shorthands.includes(t));
-    return [...new Set([lead, ...shorthands, ...all].filter(Boolean))];
+    const shown = all.includes('dev') ? normalizeTags([...all, main, ...shorthands]) : all;
+    const lead = main || shown.find((t) => !shorthands.includes(t));
+    return [...new Set([lead, ...shorthands, ...shown].filter(Boolean))];
   }
 
   tagLoadout(user, held = this.tags(user)) {
-    const main = held.includes(user.featured_tag) ? user.featured_tag : null;
-    const shorthands = [...new Set(parse(user.shorthand_tags, []))].filter((t) => t !== main && held.includes(t)).slice(0, MAX_SHORTHANDS);
+    const pick = pickableTags(held);
+    const main = pick.includes(user.featured_tag) ? user.featured_tag : null;
+    const shorthands = [...new Set(parse(user.shorthand_tags, []))].filter((t) => t !== main && pick.includes(t)).slice(0, MAX_SHORTHANDS);
     return { main, shorthands };
   }
 
   setTagLoadout(userId, main, shorthands) {
     const user = this.requireUser(userId);
-    const held = this.tags(user);
+    const held = pickableTags(this.tags(user));
     const list = Array.isArray(shorthands) ? [...new Set(shorthands)] : [];
     if ((main !== null && !held.includes(main)) || list.some((t) => !held.includes(t))) throw new AccountError("You don't have that tag");
     if (list.length > MAX_SHORTHANDS) throw new AccountError(`Pick up to ${MAX_SHORTHANDS} shorthand tags`);

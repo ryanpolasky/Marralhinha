@@ -86,7 +86,7 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
           <button className={`tab${slot === TAGS_TAB ? ' active' : ''}`} onClick={() => setSlot(TAGS_TAB)}>
             Tags
             <span className="tab-count">
-              {(account.tags || []).filter((t) => TAGS[t]).length}/{TAG_KEYS.length}
+              {(account.tags || []).includes('dev') ? TAG_KEYS.length : (account.tags || []).filter((t) => TAGS[t]).length}/{TAG_KEYS.length}
             </span>
           </button>
         </div>
@@ -141,8 +141,9 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
 
 function TagsPane({ account, ownedTags, onTagLoadout }) {
   const [selected, setSelected] = useState(ownedTags[0] || TAG_KEYS[0]);
-  const held = (tag) => (account.tags || []).includes(tag);
-  const hidden = (tag) => held(tag) && !ownedTags.includes(tag);
+  const isDev = (account.tags || []).includes('dev');
+  const held = (tag) => isDev || (account.tags || []).includes(tag);
+  const hidden = (tag) => isDev && tag === 'beta';
   const featured = ownedTags[0];
   const shown = shownTags(account.tags);
   const { main, shorthands } = account.tagLoadout || { main: null, shorthands: [] };

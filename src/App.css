@@ -1124,6 +1124,11 @@ button.room-pill.copied {
   cursor: pointer;
 }
 
+.feed-toggle[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .feed-list {
   display: flex;
   flex-direction: column;
@@ -1246,6 +1251,9 @@ button.room-pill.copied {
 
 .chat-channel {
   flex: none;
+  display: grid;
+  place-items: center;
+  line-height: 1;
   min-width: 52px;
   border: 1px solid var(--glass-line);
   border-radius: 12px;
@@ -5863,6 +5871,8 @@ img.emote-glyph {
 
 .tag-badge.icon-only {
   gap: 0;
+  letter-spacing: 0;
+  text-indent: 0;
   padding: 3px 4px;
   min-width: 1.9em;
   justify-content: center;

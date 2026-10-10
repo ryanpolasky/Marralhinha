@@ -2,7 +2,7 @@ const LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '6': 'g', '7': 
 
 // Matched anywhere inside the name, since nothing normal contains them
 const COMPACT = [
-  'nigger', 'nigga', 'niglet', 'nignog', 'niggo', 'nibba', 'nikka', 'kneegrow', 'wigger',
+  'nigg', 'nigger', 'nigga', 'niglet', 'nignog', 'niggo', 'nibba', 'nikka', 'kneegrow', 'wigger',
   'faggot', 'phag', 'kike', 'chink', 'gook', 'wop', 'gypo',
   'wetback', 'beaner', 'darky', 'darkie', 'tranny', 'shemale', 'retard',
   'porchmonkey', 'towelhead', 'raghead', 'zipperhead', 'golliwog', 'pajeet',

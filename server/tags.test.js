@@ -66,6 +66,16 @@ test('a tag loadout puts the main tag then shorthands first, and only accepts he
   assert.deepEqual(accounts.profile(id).tagLoadout, { main: null, shorthands: [] });
 });
 
+test('devs can put any tag in their loadout', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Ryan' });
+  accounts.setTags(id, ['dev']);
+  accounts.setTagLoadout(id, 'halloween', ['supporter']);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['halloween', 'supporter', 'dev']);
+  accounts.setTagLoadout(id, null, []);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['dev']);
+});
+
 test('admin-granted packs unlock the tag and cosmetics without an entitlement', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Gifted' });

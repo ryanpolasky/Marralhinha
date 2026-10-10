@@ -6,6 +6,7 @@ const { nameBlocked } = require('./namefilter');
 
 const BLOCKED = [
   'nigger', 'NIGGER', 'N1gg3r', 'n i g g e r', 'níggèr', 'niiiiggerrr', 'n!gga', 'NiBBa', 'kneeGrow', 'SandNigger', 'Niglet',
+  'niggrpants', 'niggr', 'N1ggz', 'nigg',
   'fag', 'f4g', 'f.a.g.', 'faggot', 'FAGGOT', 'f a g g o t', 'kike', 'chink', 'gook', 'wop', 'wetback', 'beaner',
   'tranny', 'retard', 'shemale', 'porchmonkey', 'towelhead', 'raghead', 'pajeet', 'jigaboo', 'pickaninny',
   'tarbaby', 'redskin', 'chingchong', 'cameljockey', 'golliwog', 'zipperhead', 'injun',
