@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { SLOTS, SLOT_KEYS, ITEMS, TAGS, itemsForSlot, canUse, collectible } from '../game/catalog';
+import React, { useEffect, useRef, useState } from 'react';
+import { SLOTS, SLOT_KEYS, ITEMS, TAGS, TAG_KEYS, itemsForSlot, canUse, collectible } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
-import { ItemCard, PreviewStage, RarityTag, TagBadge } from './Economy';
+import { ItemCard, PreviewStage, RarityTag, TagBadge, visibleTags, shownTags } from './Economy';
 import { warmBoardSkin } from '../game/skinWarm';
 import { Close } from './Icons';
 
 const THUMB_BATCH = 6;
+const TAGS_TAB = 'tags';
+const MAX_SHORTHANDS = 2;
 
-export default function Locker({ account, onClose, onEquip, onShop }) {
+export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop }) {
   const [slot, setSlot] = useState('marble');
   const [selected, setSelected] = useState(account.equipped.marble);
   const [seat, setSeat] = useState(0);
@@ -39,6 +41,19 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const tabsRef = useRef(null);
+  useEffect(() => {
+    const el = tabsRef.current;
+    const onWheel = (e) => {
+      if (el.scrollWidth <= el.clientWidth || !e.deltaY) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const ownedTags = visibleTags(account.tags);
   const owns = (id) => canUse(account, id);
   const pool = collectible(account);
   const collected = pool.filter((i) => owns(i.id)).length;
@@ -59,7 +74,7 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
           </button>
         </div>
 
-        <div className="tabs">
+        <div className="tabs" ref={tabsRef}>
           {SLOT_KEYS.map((key) => (
             <button key={key} className={`tab${slot === key ? ' active' : ''}`} onClick={() => setSlot(key)}>
               {SLOTS[key].label}
@@ -68,8 +83,17 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
               </span>
             </button>
           ))}
+          <button className={`tab${slot === TAGS_TAB ? ' active' : ''}`} onClick={() => setSlot(TAGS_TAB)}>
+            Tags
+            <span className="tab-count">
+              {(account.tags || []).filter((t) => TAGS[t]).length}/{TAG_KEYS.length}
+            </span>
+          </button>
         </div>
 
+        {slot === TAGS_TAB ? (
+          <TagsPane account={account} ownedTags={ownedTags} onTagLoadout={onTagLoadout} />
+        ) : (
         <div className="locker-body">
           <div className="locker-preview">
             {item && (
@@ -109,6 +133,59 @@ export default function Locker({ account, onClose, onEquip, onShop }) {
             ))}
           </div>
         </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TagsPane({ account, ownedTags, onTagLoadout }) {
+  const [selected, setSelected] = useState(ownedTags[0] || TAG_KEYS[0]);
+  const held = (tag) => (account.tags || []).includes(tag);
+  const hidden = (tag) => held(tag) && !ownedTags.includes(tag);
+  const featured = ownedTags[0];
+  const shown = shownTags(account.tags);
+  const { main, shorthands } = account.tagLoadout || { main: null, shorthands: [] };
+  const roleOf = (tag) => (featured === tag ? 'Main' : shorthands.includes(tag) ? 'Shorthand' : tag === 'lucky' && shown.includes(tag) ? 'Always shown' : shown.includes(tag) ? 'Showing' : held(tag) ? 'Owned' : 'Locked');
+  const full = shorthands.length >= MAX_SHORTHANDS;
+  const info = TAGS[selected];
+  return (
+    <div className="locker-body">
+      <div className="locker-preview">
+        <div className="tag-preview">
+          <TagBadge tag={selected} />
+          <TagBadge tag={selected} small icon />
+        </div>
+        <div className="locker-item-info">
+          <h3>{info.label}</h3>
+          <p className="muted">{info.source}</p>
+          {hidden(selected) ? (
+            <div className="exclusive-note">Hidden while you carry the Dev tag.</div>
+          ) : (
+            held(selected) && (
+              <>
+                <button className="btn primary block" disabled={main === selected} onClick={() => onTagLoadout(selected, shorthands.filter((t) => t !== selected))}>
+                  {main === selected ? 'Main tag' : 'Make main tag'}
+                </button>
+                {featured !== selected && (
+                  <button className="btn secondary block" disabled={full && !shorthands.includes(selected)} onClick={() => onTagLoadout(main, shorthands.includes(selected) ? shorthands.filter((t) => t !== selected) : [...shorthands, selected])}>
+                    {shorthands.includes(selected) ? 'Remove shorthand' : full ? `Shorthands full (${MAX_SHORTHANDS}/${MAX_SHORTHANDS})` : 'Add as shorthand'}
+                  </button>
+                )}
+                {selected === 'lucky' && <p className="muted">Always shown while you hold it.</p>}
+              </>
+            )
+          )}
+        </div>
+      </div>
+      <div className="item-grid">
+        {[...TAG_KEYS].reverse().map((tag) => (
+          <button key={tag} className={`item-card tag-card${held(tag) ? '' : ' locked'}${selected === tag ? ' selected' : ''}${featured === tag ? ' equipped' : ''}`} style={{ '--rarity': TAGS[tag].color }} onClick={() => setSelected(tag)}>
+            <TagBadge tag={tag} />
+            <span className="item-name">{TAGS[tag].label}</span>
+            <span className="muted tag-card-state">{roleOf(tag)}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

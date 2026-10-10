@@ -10,18 +10,19 @@
     "exclusive": { "label": "Exclusive", "color": "#ff4fd8", "dupe": 0 }
   },
   "tags": {
-    "dev": { "label": "Dev", "color": "#ff4a5a", "admin": true, "blurb": "Built this thing." },
-    "beta": { "label": "Beta", "color": "#5fb8ff", "admin": false, "blurb": "Played before it was cool." },
-    "supporter": { "label": "Supporter", "color": "#a7f3de", "admin": false, "auto": true, "blurb": "Helped keep the table lit.", "unlock": "The Supporter Pack is a one-time $5.99 purchase through Discord. Thank you for keeping this little game alive." },
-    "halloween": { "label": "Haunted", "color": "#ff9a3c", "admin": false, "auto": true, "blurb": "Sat in on the séance.", "unlock": "The Halloween Pack is a one-time $3.99 purchase through Discord, sold only in October. Once it's yours, it's yours for good." },
+    "dev": { "label": "Dev", "color": "#ff4a5a", "admin": true, "blurb": "Built this thing.", "source": "Reserved for Ryan, the dev." },
+    "beta": { "label": "Beta", "color": "#5fb8ff", "admin": false, "blurb": "Played before it was cool.", "source": "Earned by playing during the beta." },
+    "supporter": { "label": "Supporter", "color": "#a7f3de", "admin": false, "auto": true, "blurb": "Helped keep the table lit.", "source": "Earned by purchasing the Supporter Pack.", "unlock": "The Supporter Pack is a one-time $5.99 purchase through Discord. Thank you for keeping this little game alive." },
     "lucky": {
       "label": "Luckiest",
       "color": "#ffd166",
       "admin": false,
       "auto": true,
       "blurb": "Highest luck score across the last 10 completed games.",
+      "source": "Earned by holding the highest luck score across the last 10 completed games.",
       "unlock": "Hold Luckiest for three cumulative days to unlock the Golden Die permanently."
-    }
+    },
+    "halloween": { "label": "Haunted", "color": "#ff9a3c", "admin": false, "auto": true, "blurb": "Sat in on the séance.", "source": "Earned by purchasing the Halloween Pack.", "unlock": "The Halloween Pack is a one-time $3.99 purchase through Discord, sold only in October. Once it's yours, it's yours for good." }
   },
   "slots": {
     "marble": { "label": "Marbles", "default": "marble.classic" },

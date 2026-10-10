@@ -5861,6 +5861,22 @@ img.emote-glyph {
   vertical-align: 1px;
 }
 
+.tag-badge.icon-only {
+  gap: 0;
+  padding: 3px 4px;
+  min-width: 1.9em;
+  justify-content: center;
+  cursor: help;
+}
+
+.tag-badge.small.icon-only {
+  padding: 2px 3px;
+}
+
+.tag-badge.icon-only .tag-code-icon {
+  width: 1.3em;
+}
+
 .tag-badge.tag-dev {
   color: #fff6e8;
   --flow-to: 166.667% 0;
@@ -5869,6 +5885,10 @@ img.emote-glyph {
   box-shadow: 0 0 12px rgba(255, 74, 90, 0.6);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
   animation: plate-flow 3s linear infinite;
+}
+
+.tag-badge.tag-dev:not(.icon-only) {
+  gap: 0.55em;
 }
 
 .tag-code-icon {
@@ -6919,6 +6939,44 @@ select.admin-input optgroup {
   box-shadow: 0 0 8px var(--tag);
 }
 
+.tag-card {
+  min-height: 108px;
+  justify-content: center;
+}
+
+.tag-card .tag-badge {
+  margin-left: 0;
+}
+
+.tag-card.locked .tag-badge {
+  filter: grayscale(1) brightness(0.55);
+  animation: none;
+}
+
+.tag-card-state {
+  font-size: 12px;
+}
+
+.tag-preview {
+  height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.tag-preview .tag-badge {
+  margin-left: 0;
+  font-size: 22px;
+  padding: 6px 14px;
+}
+
+.tag-preview .tag-badge.icon-only {
+  font-size: 22px;
+  padding: 6px 8px;
+}
+
 .tag-toggle-note {
   font-size: 10px;
   font-weight: 700;
@@ -7620,7 +7678,7 @@ select.admin-input optgroup {
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
-  padding: 6px 44px;
+  padding: 6px 58px;
 }
 
 .profile-plate .level-badge {
@@ -7633,6 +7691,12 @@ select.admin-input optgroup {
 .profile-plate .account-info {
   align-items: center;
   text-align: center;
+}
+
+.profile-plate .account-name-row {
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 3px;
 }
 
 .profile-plate .xp-bar {

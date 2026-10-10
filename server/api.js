@@ -210,6 +210,18 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
   );
 
   router.post(
+    '/me/tag-loadout',
+    auth,
+    handle((req) => {
+      const main = req.body?.main ?? null;
+      const shorthands = req.body?.shorthands ?? [];
+      if ((main !== null && !TAG_KEYS.includes(main)) || !Array.isArray(shorthands) || shorthands.some((t) => !TAG_KEYS.includes(t))) throw new ApiError('Unknown tag');
+      accounts.setTagLoadout(req.user.id, main, shorthands);
+      return { profile: changed(req.user.id) };
+    })
+  );
+
+  router.post(
     '/daily',
     auth,
     handle((req) => {

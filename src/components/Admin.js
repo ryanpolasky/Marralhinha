@@ -141,7 +141,7 @@ function UserEditor({ user, me, onChange, notify }) {
       <div className="admin-editor-head">
         <div>
           <div className="admin-user-name">
-            {user.name} <TagBadges tags={user.tags} small />
+            {user.name} <TagBadges tags={user.tags} small full />
             <LinkBadge user={user} />
             {isMe && <span className="badge">you</span>}
           </div>
@@ -617,7 +617,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
                     <span className="admin-row-name">
                       {u.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />}
                       {u.name}
-                      <TagBadges tags={u.tags} small />
+                      <TagBadges tags={u.tags} small full />
                     </span>
                     <span className="admin-row-meta">
                       Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · {ago(u.lastSeen)}

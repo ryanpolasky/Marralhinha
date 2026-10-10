@@ -37,7 +37,7 @@ test('tags are stored, normalized and drive the admin flag', () => {
 test('Supporter is ordered above Luckiest and cannot be granted as a stored tag', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Supporter' });
-  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'halloween', 'lucky']);
+  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky', 'halloween']);
   assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 6);
   accounts.setTags(id, ['supporter', 'lucky', 'beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
@@ -45,6 +45,25 @@ test('Supporter is ordered above Luckiest and cannot be granted as a stored tag'
   assert.throws(() => accounts.equip(id, 'marble', 'marble.supporter'), /Supporter only/);
   assert.throws(() => accounts.grantItem(id, 'marble.supporter'), /Supporter tag/);
   assert.ok(DROPPABLE.every((item) => item.tag !== 'supporter'));
+});
+
+test('a tag loadout puts the main tag then shorthands first, and only accepts held tags', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Many' });
+  accounts.setTags(id, ['beta']);
+  accounts.setPack(id, 'supporter', true);
+  accounts.setPack(id, 'halloween', true);
+  const tags = () => accounts.tags(accounts.getUser(id));
+  assert.deepEqual(tags(), ['beta', 'supporter', 'halloween']);
+  accounts.setTagLoadout(id, 'halloween', ['supporter']);
+  assert.deepEqual(tags(), ['halloween', 'supporter', 'beta']);
+  accounts.setTagLoadout(id, null, ['halloween', 'beta']);
+  assert.deepEqual(tags(), ['supporter', 'halloween', 'beta'], 'unset main falls back to the best non-shorthand');
+  assert.throws(() => accounts.setTagLoadout(id, 'dev', []), /don't have/);
+  assert.throws(() => accounts.setTagLoadout(id, null, ['beta', 'supporter', 'halloween']), /up to 2/);
+  accounts.setTagLoadout(id, null, []);
+  assert.deepEqual(tags(), ['beta', 'supporter', 'halloween']);
+  assert.deepEqual(accounts.profile(id).tagLoadout, { main: null, shorthands: [] });
 });
 
 test('admin-granted packs unlock the tag and cosmetics without an entitlement', () => {

@@ -367,6 +367,18 @@ const App = () => {
     [notify]
   );
 
+  const setTagLoadout = useCallback(
+    async (main, shorthands) => {
+      try {
+        setAccount((await post('/me/tag-loadout', { main, shorthands })).profile);
+        sfx.pop();
+      } catch (err) {
+        notify(err.message);
+      }
+    },
+    [notify]
+  );
+
   const claimDaily = async () => {
     try {
       const res = await post('/daily');
@@ -660,7 +672,7 @@ const App = () => {
       {toast && <Toast key={toast.id} toast={toast} onDone={dismissToast} />}
       {screen}
       {modal === 'shop' && account && <Shop account={account} onClose={() => setModal(null)} onProfile={setAccount} onEquip={equip} notify={notify} />}
-      {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onShop={() => setModal('shop')} />}
+      {modal === 'locker' && account && <Locker account={account} onClose={() => setModal(null)} onEquip={equip} onTagLoadout={setTagLoadout} onShop={() => setModal('shop')} />}
       {modal === 'admin' && account?.admin && (
         <Admin
           account={account}
