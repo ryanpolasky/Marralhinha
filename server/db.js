@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS luckiest_reigns (
 );
 CREATE INDEX IF NOT EXISTS luckiest_reigns_player ON luckiest_reigns(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS luckiest_reigns_open ON luckiest_reigns ((1)) WHERE ended_at IS NULL;
+CREATE TABLE IF NOT EXISTS ip_bans (
+  ip TEXT PRIMARY KEY,
+  name TEXT,
+  reason TEXT,
+  created_at INTEGER NOT NULL
+);
 `;
 
 // Columns added after the first release; applied to existing databases on startup
@@ -114,6 +120,9 @@ const MIGRATIONS = [
   ['users', 'supporter_entitlement_id', 'TEXT'],
   ['users', 'halloween_entitlement_id', 'TEXT'],
   ['users', 'granted_packs', "TEXT NOT NULL DEFAULT '[]'"],
+  ['users', 'banned_at', 'INTEGER'],
+  ['users', 'ban_reason', 'TEXT'],
+  ['users', 'last_ip', 'TEXT'],
   ['match_players', 'roll_count', 'INTEGER'],
   ['match_players', 'six_count', 'INTEGER'],
 ];

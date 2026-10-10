@@ -11,7 +11,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, syncPurchases, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, onBan = () => {}, syncPurchases, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -42,6 +42,9 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     const token = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
     const user = accounts.userForToken(token);
     if (!user) return res.status(401).json({ error: 'Not signed in' });
+    const banned = accounts.banReason(user, req.ip);
+    if (banned) return res.status(403).json({ error: banned, banned: true });
+    accounts.noteIp(user, req.ip);
     req.user = user;
     req.token = token;
     return next();
@@ -71,10 +74,12 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
   router.post(
     '/auth/guest',
     handle((req) => {
+      if (accounts.ipBanned(req.ip)) throw new ApiError('Your network has been banned');
       const hits = (guestHits.get(req.ip) || 0) + 1;
       guestHits.set(req.ip, hits);
       if (hits > GUEST_LIMIT_PER_HOUR) throw new ApiError('Too many new accounts from this network, try again later');
       const user = accounts.createUser({ name: req.body?.name || 'Player' });
+      accounts.noteIp(user, req.ip);
       return { token: accounts.createSession(user.id), profile: profileOf(user.id) };
     })
   );
@@ -114,6 +119,8 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       if (!state || !req.query.code) return back('login_error=cancelled');
       const tokens = await discord.exchangeCode(req.query.code, { redirect: discord.redirectUri() });
       const user = accounts.loginDiscord(await discord.fetchUser(tokens.access_token), state.guestId);
+      if (accounts.banReason(user, req.ip)) return back('login_error=banned');
+      accounts.noteIp(user, req.ip);
       const code = randomKey();
       put(`login:${code}`, accounts.createSession(user.id), 2 * 60 * 1000);
       onProfileChange(user.id);
@@ -156,6 +163,8 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       const token = take(`login:${req.body?.code}`);
       const user = token && accounts.userForToken(token);
       if (!user) throw new ApiError('That login link expired, please try again');
+      const banned = accounts.banReason(user, req.ip);
+      if (banned) throw new ApiError(banned);
       try { await syncPurchases(user.id); } catch (err) { console.error('[purchases]', err); }
       return { token, profile: profileOf(user.id) };
     })
@@ -168,6 +177,9 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       if (!req.body?.code) throw new ApiError('Missing authorization code');
       const tokens = await discord.exchangeCode(req.body.code);
       const user = accounts.loginDiscord(await discord.fetchUser(tokens.access_token));
+      const banned = accounts.banReason(user, req.ip);
+      if (banned) throw new ApiError(banned);
+      accounts.noteIp(user, req.ip);
       try { await syncPurchases(user.id); } catch (err) { console.error('[purchases]', err); }
       return { token: accounts.createSession(user.id), accessToken: tokens.access_token, profile: profileOf(user.id) };
     })
@@ -368,6 +380,47 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       const user = target(req);
       accounts.setPack(user.id, String(req.body?.pack || ''), !!req.body?.granted);
       return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/ban',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      if (user.id === req.user.id) throw new ApiError("You can't ban yourself");
+      accounts.ban(user.id, req.body?.reason, { ip: !!req.body?.ip });
+      onBan({ userId: user.id, ip: req.body?.ip ? user.last_ip : null });
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/unban',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.unban(user.id);
+      return adminResult(user);
+    })
+  );
+
+  router.get(
+    '/admin/bans',
+    auth,
+    admin,
+    handle(() => ({ bans: accounts.bans() }))
+  );
+
+  router.post(
+    '/admin/bans/ip/remove',
+    auth,
+    admin,
+    handle((req) => {
+      accounts.unbanIp(req.body?.ip);
+      return { bans: accounts.bans() };
     })
   );
 

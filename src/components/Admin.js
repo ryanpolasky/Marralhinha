@@ -104,9 +104,15 @@ function UserEditor({ user, me, onChange, notify }) {
   const [amount, setAmount] = useState(500);
   const [item, setItem] = useState(DROPPABLE[0].id);
   const [name, setName] = useState(user.name);
+  const [reason, setReason] = useState('');
+  const [banIp, setBanIp] = useState(!user.discordLinked && !!user.lastIp);
   const isMe = user.id === me.id;
 
   useEffect(() => setName(user.name), [user.id, user.name]);
+  useEffect(() => {
+    setReason('');
+    setBanIp(!user.discordLinked && !!user.lastIp);
+  }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (path, body, okMessage) => {
     setBusy(true);
@@ -212,6 +218,41 @@ function UserEditor({ user, me, onChange, notify }) {
         </div>
         <p className="muted small-text">Dev and Beta cosmetics come with the tag, so hand those out with the toggles above.</p>
       </div>
+
+      {!isMe && !user.tags.some((t) => TAGS[t]?.admin) && (
+        <div className="admin-section">
+          <h4>Ban {user.banned && <span className="badge warn">banned</span>}</h4>
+          {user.banned ? (
+            <>
+              <p className="muted small-text">
+                {user.banReason || 'No reason given'}
+                {user.ipBanned ? ` · IP ${user.lastIp} banned too` : ''}
+              </p>
+              <button className="btn secondary" disabled={busy} onClick={() => act('/unban', {}, `${user.name} unbanned`)}>
+                Unban
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="admin-row-inline">
+                <input className="admin-input grow" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="Reason (shown to them)" aria-label="Ban reason" />
+                <button
+                  className="btn ghost"
+                  disabled={busy}
+                  onClick={() => window.confirm(`Ban ${user.name}${banIp ? ' and their IP' : ''}?`) && act('/ban', { reason, ip: banIp }, `${user.name} banned`)}
+                >
+                  Ban
+                </button>
+              </div>
+              <label className="switch-row compact">
+                <input type="checkbox" checked={banIp} disabled={!user.lastIp} onChange={(e) => setBanIp(e.target.checked)} />
+                <span className="switch" aria-hidden="true" />
+                <span className="switch-text">{user.lastIp ? `Also ban IP ${user.lastIp}` : 'No IP on record yet'}</span>
+              </label>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="admin-section">
         <h4>Rename</h4>
@@ -439,6 +480,54 @@ function ReportList({ notify }) {
   );
 }
 
+function BanList({ notify }) {
+  const [bans, setBans] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api('/admin/bans')
+      .then((res) => !cancelled && setBans(res.bans))
+      .catch((err) => !cancelled && notify(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [notify]);
+
+  const remove = async (ip) => {
+    try {
+      setBans((await post('/admin/bans/ip/remove', { ip })).bans);
+      notify(`${ip} unbanned`, 'good');
+    } catch (err) {
+      notify(err.message);
+    }
+  };
+
+  return (
+    <div className="admin-games">
+      <h4>
+        Banned IPs <span className="muted">{bans ? bans.length : '…'}</span>
+      </h4>
+      {bans && bans.length === 0 && <div className="muted small-text">No IP bans. Banned accounts live under Players, filter Banned.</div>}
+      <div className="admin-games-list">
+        {(bans || []).map((b) => (
+          <div key={b.ip} className="admin-game">
+            <div className="admin-game-head">
+              <code>{b.ip}</code>
+              <span className="muted small-text">
+                {b.name || 'unknown'} · {ago(b.createdAt)}
+                {b.reason ? ` · ${b.reason}` : ''}
+              </span>
+            </div>
+            <button className="btn tiny secondary" onClick={() => remove(b.ip)}>
+              Unban
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin({ account, onClose, notify, currentCode, onSpectate }) {
   const [tab, setTab] = useState('players');
   const [query, setQuery] = useState('');
@@ -490,6 +579,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
             ['players', 'Players'],
             ['reports', 'Reports'],
             ['games', 'Games'],
+            ['bans', 'Bans'],
           ].map(([key, label]) => (
             <button key={key} role="tab" aria-selected={tab === key} className={`board-tab${tab === key ? ' on' : ''}`} onClick={() => setTab(key)}>
               {label}
@@ -498,6 +588,8 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
         </div>
 
         {tab === 'games' && <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />}
+
+        {tab === 'bans' && <BanList notify={notify} />}
 
         {tab === 'reports' && <ReportList notify={notify} />}
 
@@ -508,6 +600,9 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, account id or Discord id…" autoFocus aria-label="Search players" />
               <button type="button" className={`btn tiny ${query === '#tagged' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#tagged' ? '' : '#tagged')}>
                 Tagged
+              </button>
+              <button type="button" className={`btn tiny ${query === '#banned' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#banned' ? '' : '#banned')}>
+                Banned
               </button>
               <button type="button" className={`btn tiny ${guests ? 'secondary' : 'ghost'}`} onClick={() => setGuests((g) => !g)} title="Include guest accounts that never played (every fresh browser makes one)">
                 Guests

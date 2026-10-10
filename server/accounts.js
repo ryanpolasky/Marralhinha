@@ -36,7 +36,7 @@ const PACKS = ['supporter', 'halloween'];
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
 const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.includes(tag));
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
-const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]' AND granted_packs = '[]')";
+const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]' AND granted_packs = '[]' AND banned_at IS NULL)";
 
 // CDN url for a linked account's Discord avatar; Discord picks a default from the id when none is set
 function avatarUrl(user) {
@@ -114,6 +114,13 @@ class Accounts {
       ),
       recent: db.prepare(`SELECT * FROM users WHERE (? OR NOT ${THROWAWAY}) ORDER BY last_seen DESC LIMIT ?`),
       tagged: db.prepare("SELECT * FROM users WHERE tags != '[]' ORDER BY last_seen DESC LIMIT ?"),
+      setIp: db.prepare('UPDATE users SET last_ip = ? WHERE id = ?'),
+      setBan: db.prepare('UPDATE users SET banned_at = ?, ban_reason = ? WHERE id = ?'),
+      banned: db.prepare('SELECT * FROM users WHERE banned_at IS NOT NULL ORDER BY banned_at DESC LIMIT ?'),
+      ipBan: db.prepare('SELECT * FROM ip_bans WHERE ip = ?'),
+      ipBans: db.prepare('SELECT * FROM ip_bans ORDER BY created_at DESC'),
+      addIpBan: db.prepare('INSERT INTO ip_bans (ip, name, reason, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(ip) DO UPDATE SET name = excluded.name, reason = excluded.reason'),
+      removeIpBan: db.prepare('DELETE FROM ip_bans WHERE ip = ?'),
       count: db.prepare(`SELECT COUNT(*) AS n, SUM(${THROWAWAY}) AS throwaway FROM users`),
     };
   }
@@ -268,6 +275,49 @@ class Accounts {
     return this.tags(user).some((tag) => ADMIN_TAGS.includes(tag));
   }
 
+  // Why this user (arriving from `ip`) is shut out, or null. Admins are never IP-banned
+  banReason(user, ip) {
+    if (user?.banned_at) return user.ban_reason || 'You have been banned';
+    if (user && ip && !this.isAdmin(user) && this.q.ipBan.get(ip)) return this.q.ipBan.get(ip).reason || 'Your network has been banned';
+    return null;
+  }
+
+  ipBanned(ip) {
+    return !!ip && !!this.q.ipBan.get(ip);
+  }
+
+  noteIp(user, ip) {
+    if (ip && user.last_ip !== ip) this.q.setIp.run(ip, user.id);
+  }
+
+  ban(userId, reason, { ip = false } = {}) {
+    const user = this.requireUser(userId);
+    if (this.isAdmin(user)) throw new AccountError("Admins can't be banned");
+    const clean = String(reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) || null;
+    transaction(this.db, () => {
+      this.q.setBan.run(Date.now(), clean, userId);
+      if (ip && user.last_ip) this.q.addIpBan.run(user.last_ip, user.name, clean, Date.now());
+    });
+    return this.getUser(userId);
+  }
+
+  unban(userId) {
+    const user = this.requireUser(userId);
+    transaction(this.db, () => {
+      this.q.setBan.run(null, null, userId);
+      if (user.last_ip) this.q.removeIpBan.run(user.last_ip);
+    });
+    return this.getUser(userId);
+  }
+
+  unbanIp(ip) {
+    this.q.removeIpBan.run(String(ip ?? ''));
+  }
+
+  bans() {
+    return this.q.ipBans.all().map((row) => ({ ip: row.ip, name: row.name, reason: row.reason, createdAt: row.created_at }));
+  }
+
   owns(userOrId, itemId) {
     const item = ITEMS.get(itemId);
     if (!item) return false;
@@ -396,6 +446,7 @@ class Accounts {
     const q = String(query ?? '').trim().slice(0, 40);
     const withGuests = guests ? 1 : 0;
     if (q === '#tagged') return this.q.tagged.all(limit);
+    if (q === '#banned') return this.q.banned.all(limit);
     if (!q) return this.q.recent.all(withGuests, limit);
     const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
     return this.q.search.all(q, q, like, withGuests, limit);
@@ -456,6 +507,10 @@ class Accounts {
       stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,
+      lastIp: user.last_ip,
+      banned: !!user.banned_at,
+      banReason: user.ban_reason,
+      ipBanned: this.ipBanned(user.last_ip),
     };
   }
 

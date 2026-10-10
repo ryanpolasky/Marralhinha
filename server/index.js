@@ -127,8 +127,19 @@ setInterval(() => {
   accounts.q.purchaserAccounts.all().forEach(({ id }) => syncPurchases(id).catch((err) => console.error('[purchases]', err)));
 }, 10 * 60 * 1000).unref();
 
+const clientIp = (socket) => {
+  const forwarded = String(socket.handshake.headers['x-forwarded-for'] || '').split(',').pop().trim();
+  return forwarded || socket.handshake.address;
+};
+
+const kick = ({ userId, ip }) => {
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.userId === userId || (ip && socket.data.ip === ip && !accounts.isAdmin(accounts.getUser(socket.data.userId) || {}))) socket.disconnect(true);
+  }
+};
+
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, syncPurchases, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, onBan: kick, syncPurchases, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {
@@ -149,6 +160,10 @@ if (fs.existsSync(BUILD_DIR)) {
 io.use(async (socket, next) => {
   const user = accounts.userForToken(socket.handshake.auth?.token);
   if (!user) return next(new Error('unauthorized'));
+  const ip = clientIp(socket);
+  if (accounts.banReason(user, ip)) return next(new Error('banned'));
+  accounts.noteIp(user, ip);
+  socket.data.ip = ip;
   try {
     await syncPurchases(user.id);
   } catch (err) {

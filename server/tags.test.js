@@ -370,6 +370,25 @@ test('migration preserves previously earned Fortune dice without inventing old g
   db.close();
 });
 
+test('bans: account and ip, admins exempt', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Troll' });
+  const admin = accounts.createUser({ name: 'Boss' });
+  accounts.addTag(admin.id, 'dev');
+  accounts.noteIp(accounts.getUser(id), '1.2.3.4');
+  accounts.noteIp(accounts.getUser(admin.id), '1.2.3.4');
+  assert.equal(accounts.banReason(accounts.getUser(id), '1.2.3.4'), null);
+  accounts.ban(id, 'being rude', { ip: true });
+  assert.equal(accounts.banReason(accounts.getUser(id), '9.9.9.9'), 'being rude');
+  assert.ok(accounts.ipBanned('1.2.3.4'));
+  assert.equal(accounts.banReason(accounts.getUser(admin.id), '1.2.3.4'), null, 'admins ignore ip bans');
+  assert.throws(() => accounts.ban(admin.id, 'x'), /Admins/);
+  assert.equal(accounts.search('#banned').length, 1);
+  accounts.unban(id);
+  assert.equal(accounts.banReason(accounts.getUser(id), '1.2.3.4'), null);
+  assert.equal(accounts.bans().length, 0);
+});
+
 test('admin grants: coins, items, names', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'A' });
