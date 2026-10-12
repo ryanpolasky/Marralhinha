@@ -16,7 +16,7 @@ function logoFontUrl() {
 const SITE = 'https://marralhinha.app';
 const PAGES = {
   '/how-to-play': { file: 'RULES.md', title: 'How to Play Marralhinha', description: 'Learn the rules of Marralhinha, the traditional marble board game from Terceira, Açores: leaving your dish, capturing, the center shortcut, the home stretch, Blitz, 2v2 teams, and pass and play.' },
-  '/terms': { file: 'TERMS.md', title: 'Terms of Service', description: 'The terms of service for Marralhinha Online, the free marble board game from the Azores.' },
+  '/terms': { file: 'TERMS.md', title: 'Terms of Service', description: 'The terms of service for Marralhinha Online, the free marble board game from the Açores.' },
   '/privacy': { file: 'PRIVACY.md', title: 'Privacy Policy', description: 'What Marralhinha Online collects, why, and what you can do about it. No ads and no trackers.' },
 };
 const DOC_LINKS = Object.fromEntries(Object.entries(PAGES).map(([route, page]) => [page.file, route]));
