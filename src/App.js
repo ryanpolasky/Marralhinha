@@ -433,10 +433,11 @@ const App = () => {
   const leave = async () => {
     if (localView) {
       if (localView.game && localView.game.phase !== 'over') {
-        const ok = await ask({ title: 'Leave this game?', message: 'Your game is saved on this device. Pick it back up from the home screen.', confirm: 'Leave game', cancel: 'Keep playing' });
+        const ok = await ask({ title: 'Leave this game?', message: 'Your game stays saved on this device. Pick it back up from the menu.', confirm: 'Leave game', cancel: 'Keep playing' });
         if (!ok) return;
-      } else localRef.current?.action('local:menu');
-      closeLocal();
+      }
+      openLocal(false);
+      setViewOverride(null);
       return;
     }
     // With another device still in the room, leaving here just hands control to that device
@@ -550,7 +551,7 @@ const App = () => {
 
   let screen;
   if (localView && !localView.game) {
-    screen = <LocalLobby room={localView} onAction={onAction} onBack={closeLocal} />;
+    screen = <LocalLobby room={localView} onAction={onAction} onBack={closeLocal} onResume={savedGameExists() ? () => openLocal(true) : undefined} />;
   } else if (authError && !localView) {
     screen = (
       <div className="screen">

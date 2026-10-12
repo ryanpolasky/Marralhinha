@@ -17,7 +17,7 @@ const kindOf = (p) => (!p ? 'empty' : p.isBot ? 'bot' : 'human');
 const SIDES = ['bottom', 'right', 'top', 'left'];
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches && !window.matchMedia('(any-pointer: coarse)').matches;
 
-export default function LocalLobby({ room, onAction, onBack }) {
+export default function LocalLobby({ room, onAction, onBack, onResume }) {
   const [screenRef, panelRef] = useFitPanel(false, room, { reserveBar: true, bottom: 100 });
   const [error, setError] = useState('');
   const seated = room.seats.filter(Boolean).length;
@@ -129,6 +129,11 @@ export default function LocalLobby({ room, onAction, onBack }) {
           <button className={`btn primary big block${seated >= 2 && humans ? ' play-btn' : ''}`} disabled={seated < 2 || !humans} onClick={start}>
             Start game
           </button>
+          {onResume && (
+            <button className="btn ghost block" onClick={onResume}>
+              Resume saved game
+            </button>
+          )}
           <div className="row">
             <button className="btn link" onClick={onBack}>
               Back
