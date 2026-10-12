@@ -90,6 +90,19 @@ const rooms = new RoomManager({
   onTableEnded: (room, host) => io.to(room.code).emit('room:tableEnded', host),
   onTeam: emitToSeats,
   onPing: (room, ping, seats) => (seats ? emitToSeats(room, seats, 'room:ping', ping) : io.to(room.code).emit('room:ping', ping)),
+  onExpired: (room) => rooms.close(room),
+  onClosed: (room) => {
+    io.to(room.code).emit('room:left', { code: room.code, reason: 'The table closed' });
+    [...room.seats, ...room.spectators.values()].forEach((p) =>
+      [...(p?.sockets || [])].forEach((id) => {
+        const socket = io.sockets.sockets.get(id);
+        if (socket) {
+          socket.leave(room.code);
+          socket.data.code = null;
+        }
+      })
+    );
+  },
   onGameOver: (room, { players, botGame }) => {
     try {
       const { rewards, lucky } = transaction(db, () => {

@@ -80,6 +80,7 @@ class Room {
     this.turnDeadline = null;
     this.clockOffSeat = null;
     this.pausedAt = null;
+    this.pauseTimer = null;
     this.hostTimer = null;
     this.banterTimers = new Set();
     this.rematchVotes = new Set();
@@ -827,6 +828,13 @@ class Room {
     // The pause shouldn't eat into a dropped player's reconnect grace
     if (!paused) this.seats.forEach((p) => p?.goneAt != null && (p.goneAt += now - Math.max(p.goneAt, this.pausedAt)));
     this.pausedAt = paused ? now : null;
+    clearTimeout(this.pauseTimer);
+    this.pauseTimer = paused
+      ? setTimeout(() => {
+          this.pauseTimer = null;
+          if (this.paused) this.hooks.onExpired?.(this);
+        }, PAUSE_TTL_MS)
+      : null;
     if (live) rules.addLog(this.game, paused ? 'Game paused' : 'Game resumed');
   }
 
@@ -895,6 +903,7 @@ class Room {
 
   dispose() {
     clearTimeout(this.timer);
+    clearTimeout(this.pauseTimer);
     this.cancelHostHandoff();
     this.banterTimers.forEach(clearTimeout);
   }
@@ -1008,13 +1017,17 @@ class RoomManager {
     return [...this.rooms.values()].filter((room) => room.findViewer(userId));
   }
 
+  close(room) {
+    if (this.rooms.get(room.code) !== room) return;
+    room.dispose();
+    this.rooms.delete(room.code);
+    if (room.instanceId) this.instances.delete(room.instanceId);
+    this.hooks.onClosed?.(room);
+  }
+
   sweep() {
-    for (const [code, room] of this.rooms) {
-      if (room.isAbandoned()) {
-        room.dispose();
-        this.rooms.delete(code);
-        if (room.instanceId) this.instances.delete(room.instanceId);
-      }
+    for (const room of this.rooms.values()) {
+      if (room.isAbandoned()) this.close(room);
     }
   }
 }

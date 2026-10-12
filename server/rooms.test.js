@@ -157,7 +157,8 @@ test('solo human keeps their board even when a bot starts or wins the rematch', 
 });
 
 test('rooms with only bots are swept after the last human leaves', () => {
-  const manager = new RoomManager({ onChange: () => {} });
+  const closed = [];
+  const manager = new RoomManager({ onChange: () => {}, onClosed: (room) => closed.push(room) });
   const room = manager.create();
   room.join({ userId: 'u1', name: 'Ana' });
   room.addBot('u1', 2);
@@ -166,6 +167,7 @@ test('rooms with only bots are swept after the last human leaves', () => {
   assert.strictEqual(room.isAbandoned(), true);
   manager.sweep();
   assert.strictEqual(manager.rooms.size, 0);
+  assert.deepStrictEqual(closed, [room]);
 });
 
 test('quick play rooms with nobody connected are swept after minutes, other rooms keep their grace', () => {
@@ -708,6 +710,30 @@ test('a paused table closes after the pause limit, and leaving the game clears i
   room.game.phase = 'over';
   room.changed();
   assert.strictEqual(room.view().paused, false);
+});
+
+test('a paused room asks to be closed right at the pause limit, and resuming cancels it', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  let expired = 0;
+  const room = new Room('PEXP', { onChange: () => {}, onExpired: () => expired++ });
+  t.after(() => room.dispose());
+  ['u1', 'u2', 'u3'].forEach((u, i) => {
+    room.join({ userId: u, name: `P${i}` });
+    room.attach(u, `s${i}`);
+  });
+  room.pickStarter = () => ({ seat: 0, reason: 'winner' });
+  room.start('u1');
+  ['u1', 'u2', 'u3'].forEach((u) => room.stepAway(u, true));
+  t.mock.timers.tick(20 * 60 * 1000 - 1);
+  assert.strictEqual(expired, 0, 'still open a second before the limit');
+  t.mock.timers.tick(1);
+  assert.strictEqual(expired, 1, 'expires on the dot');
+
+  room.stepAway('u1', false);
+  ['u1', 'u2', 'u3'].forEach((u) => room.stepAway(u, true));
+  room.stepAway('u1', false);
+  t.mock.timers.tick(25 * 60 * 1000);
+  assert.strictEqual(expired, 1, 'resuming before the limit cancels the close');
 });
 
 test('favourite colour: you get it when free, and anyone can swap straight into a bot seat', (t) => {
