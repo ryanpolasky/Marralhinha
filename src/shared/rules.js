@@ -1,4 +1,5 @@
 const BOARDS = require('./boards.json');
+const { START_WHEEL_SPIN_MS } = require('./timing');
 
 const CLASSIC = BOARDS.classic;
 const specOf = (state) => state?.spec || CLASSIC;
@@ -69,7 +70,9 @@ function createGame(seats, { rng = rollDie, teams = false, starter = null, board
     const who = state.names[starter.seat];
     const board = boardSeat !== null && active.includes(boardSeat) ? boardSeat : starter.seat;
     const boardName = board === starter.seat ? 'their' : `${state.names[board]}'s`;
-    addLog(state, starter.reason === 'winner' ? `${who} won last round, so ${who} starts on ${boardName} board` : `The wheel lands on ${who}! ${who} starts and we play on ${boardName} board`, starter.seat);
+    const text = starter.reason === 'winner' ? `${who} won last round, so ${who} starts on ${boardName} board` : `The wheel lands on ${who}! ${who} starts and we play on ${boardName} board`;
+    // The wheel entry is stamped at its landing and held until then, so the feed can't spoil the spin
+    pushLog(state, starter.reason === 'wheel' ? { text, seat: starter.seat, t: state.pick.t + START_WHEEL_SPIN_MS, hold: true } : { text, seat: starter.seat, t: Date.now() });
   } else state.turn = rollOff(state, rng);
   state.boardSeat = boardSeat !== null && active.includes(boardSeat) ? boardSeat : state.turn;
   return state;

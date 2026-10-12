@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { Room, RoomManager, UserError } = require('./rooms');
 const rules = require('../src/shared/rules');
+const timing = require('../src/shared/timing');
 
 function startedRoom() {
   const reactions = [];
@@ -116,6 +117,7 @@ test('first game: a random seated player starts on their board; rematch: a winne
   assert.ok(game.active.includes(game.turn));
   assert.deepStrictEqual({ seat: game.pick.seat, reason: game.pick.reason, board: game.boardSeat }, { seat: game.turn, reason: 'wheel', board: game.turn });
   assert.match(game.log[0].text, /wheel lands on/i);
+  assert.deepStrictEqual({ t: game.log[0].t, hold: game.log[0].hold }, { t: game.pick.t + timing.START_WHEEL_SPIN_MS, hold: true }, 'the wheel entry is held until the spin lands');
 
   // Second player sits across the table, in seat 2
   game.phase = 'over';
@@ -124,6 +126,7 @@ test('first game: a random seated player starts on their board; rematch: a winne
   room.start('u1');
   assert.deepStrictEqual({ turn: room.game.turn, reason: room.game.pick.reason, board: room.game.boardSeat }, { turn: 2, reason: 'winner', board: 2 });
   assert.match(room.game.log[0].text, /won last round/);
+  assert.strictEqual(room.game.log[0].hold, undefined, 'a champion start is announced right away');
 
   // Winner left before the rematch: back to the wheel
   room.game.phase = 'over';

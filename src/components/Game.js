@@ -24,7 +24,7 @@ import { StuntOverlay } from './Stunt';
 
 const BOX_PRICE = BOXES[0].price;
 
-function useAnnouncements(game, mySeat, nameOf, local = false) {
+function useAnnouncements(game, mySeat, nameOf, local = false, masked = false) {
   const [items, setItems] = useState([]);
   const prev = useRef(null);
   const latest = useRef(game);
@@ -72,7 +72,7 @@ function useAnnouncements(game, mySeat, nameOf, local = false) {
       if (mv.to.zone === 'home' && mv.from.zone !== 'home') setTimeout(sfx.home, hopMs + 50);
       else if (mv.kind === 'enter') sfx.pop();
     }
-    if (game.phase === 'roll' && game.turn === mySeat && (p.turn !== mySeat || p.phase === 'over')) {
+    if (!masked && game.phase === 'roll' && game.turn === mySeat && (p.turn !== mySeat || p.phase === 'over')) {
       const rollKey = game.lastRoll?.t;
       const justRolled = roll && roll.t !== p.lastRoll?.t;
       const justMoved = mv && mv.t !== p.lastMove?.t;
@@ -85,7 +85,7 @@ function useAnnouncements(game, mySeat, nameOf, local = false) {
         (game.winners.includes(mySeat) ? sfx.win : sfx.lose)();
       }, 1200);
     }
-  }, [game, mySeat, nameOf, push, local]);
+  }, [game, mySeat, nameOf, push, local, masked]);
 
   return items;
 }
@@ -890,11 +890,13 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   // Results name the players who finished the game, not whoever grabbed a freed seat afterwards
   const over = game.phase === 'over';
   const nameOf = useCallback((s) => ((s === mySeat && !local) ? 'You' : (over ? game.names?.[s] : seats[s]?.name) || SEAT_COLORS[s].name), [mySeat, local, seats, over, game.names]);
-  const announcements = useAnnouncements(game, mySeat, nameOf, local);
+  // While the start wheel spins, nothing may hint at who it picked
+  const masked = startPending && game.pick?.reason === 'wheel';
+  const announcements = useAnnouncements(game, mySeat, nameOf, local, masked);
 
   const held = rollPending || stuck || handoff;
-  const activeSeat = held ? game.lastRoll.seat : game.turn;
-  const covering = coveringTurn(game, seats, mySeat);
+  const activeSeat = held ? game.lastRoll.seat : masked ? null : game.turn;
+  const covering = !masked && coveringTurn(game, seats, mySeat);
   const paused = !!room.paused && !local && game.phase !== 'over';
   const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over' && !paused;
   const meAway = !!seats[mySeat]?.away;
@@ -961,7 +963,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const clockKey = `${game.turn}|${game.phase}|${game.lastRoll?.t}|${game.lastMove?.t}`;
   const deadline = useMemo(() => (room.turnEndsIn != null ? Date.now() + room.turnEndsIn : null), [clockKey, room.turnEndsIn != null]); // eslint-disable-line react-hooks/exhaustive-deps
   const clock = deadline && room.turnSeconds && game.phase !== 'over' && !rollPending ? { key: clockKey, deadline, total: room.turnSeconds * 1000 } : null;
-  const myClock = clock && (game.turn === mySeat || covering) && !meAway;
+  const myClock = clock && !masked && (game.turn === mySeat || covering) && !meAway;
 
   // Ticks for the last 5 seconds of your own turn
   useEffect(() => {
@@ -1017,7 +1019,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         activeSeat={activeSeat}
         mySeat={local ? -1 : mySeat}
         reaction={reactions.find((r) => r.seat === s)}
-        clock={clock && game.turn === s ? clock : null}
+        clock={clock && !masked && game.turn === s ? clock : null}
         viewing={viewing}
         mini={phone && portrait && s !== activeSeat && (local || s !== mySeat) && !viewing}
         onView={local ? undefined : () => onViewSeat?.(s)}
@@ -1025,7 +1027,8 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       />
     );
   };
-  const shared = rollPending ? game.log.filter((entry) => entry.chat || entry.t < game.lastRoll.t) : game.log;
+  const now = Date.now();
+  const shared = game.log.filter((entry) => (!entry.hold || entry.t <= now) && (!rollPending || entry.chat || entry.t < game.lastRoll.t));
   const log = [...(room.chat || []), ...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);
@@ -1043,7 +1046,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     </div>
   );
   const actionPanel = (
-    <div className={`action-panel${myTurn ? ' mine' : ''}`} style={{ '--seat': SEAT_COLORS[activeSeat].main }}>
+    <div className={`action-panel${myTurn ? ' mine' : ''}`} style={activeSeat == null ? undefined : { '--seat': SEAT_COLORS[activeSeat].main }}>
       {badge && (
         <span key={game.lastRoll?.t} className={`roll-badge${badge.die === 6 ? ' six' : ''}`} style={{ '--seat': SEAT_COLORS[badge.seat].main }}>
           {badge.die}
