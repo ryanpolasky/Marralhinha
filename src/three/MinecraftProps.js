@@ -108,9 +108,9 @@ export function campsiteBlocks(layout) {
       (plants[type] ||= []).push({ at: [x, y, z], size: [B * 0.9, B * h, B * 0.9], turn: Math.abs(lx * 7 + lz * 3) % 2 });
     };
     const torch = (lx, lz, gy = 0) => {
-      box('post', lx, gy, lz, 0.16, 1.05, 0.16);
+      box('post', lx, gy, lz, 0.125, 0.56, 0.125);
       const [x, z] = world(lx, lz);
-      torches.push([x, (gy + 1.15) * B, z]);
+      torches.push([x, (gy + 0.62) * B, z]);
     };
     if (kind === 'grove') {
       const oak = (tx, tz, trunk, wide) => {
@@ -160,16 +160,15 @@ export function campsiteBlocks(layout) {
     } else if (kind === 'mine') {
       const rand = seeded(53);
       for (let lx = -2; lx <= 2; lx++) for (let lz = -2; lz <= -1; lz++) {
-        const h = lz === -2 ? 3 : 2;
+        const h = lz === -1 ? 3 : 4 - (Math.abs(lx) === 2 ? 1 : 0);
         for (let gy = 0; gy < h; gy++) {
-          if (lz === -1 && lx === 0 && gy < 2) continue;
+          const frame = lz === -1 && Math.abs(lx) <= 1 && gy <= 2;
+          if (frame && lx === 0 && gy < 2) continue;
           const top = gy === h - 1;
-          block(top ? 'grass' : rand() > 0.82 ? `ore${Math.floor(rand() * 4)}` : rand() > 0.5 ? 'cobble' : 'stone', lx, gy, lz);
+          block(frame ? 'log' : top ? 'grass' : rand() > 0.82 ? `ore${Math.floor(rand() * 4)}` : rand() > 0.5 ? 'cobble' : 'stone', lx, gy, lz);
         }
       }
-      box('opening', 0, 0, -1.5, 0.98, 1.96, 1.4);
-      [-1, 1].forEach((lx) => box('log', lx, 0, -0.38, 0.32, 2.1, 0.32));
-      box('log', 0, 2, -0.38, 2.4, 0.32, 0.32);
+      box('opening', 0, 0, -1.6, 0.98, 1.98, 1.2);
       for (let lz = -1; lz <= 3; lz++) box('rail', 0, 0, lz, 1, 0.06, 1, 0.03);
       [[2, 1, 'ore0'], [-2, 2, 'ore2'], [2, 3, 'ore1'], [-2, 0, 'ore3']].forEach(([lx, lz, type]) => block(type, lx, 0, lz));
       [[-1, 2], [-1, 3], [1, 3]].forEach(([lx, lz]) => box('gravel', lx, 0, lz, 1, 0.5, 1));
@@ -179,27 +178,28 @@ export function campsiteBlocks(layout) {
       torch(1, 0.6);
     } else {
       for (let lx = -2; lx <= 2; lx++) for (let lz = -1; lz <= 2; lz++) {
-        if (lx === 0) box('water', lx, 0, lz, 1, 0.1, 1, 0.33);
+        if (lx === 0) box('water', lx, 0, lz, 1, 0.1, 1, 0.04);
         else {
-          box('farmland', lx, 0, lz, 1, 0.75, 1);
+          box('farmland', lx, 0, lz, 1, 0.14, 1);
           const ripe = Math.abs(lx * 3 + lz) % 4 !== 0;
-          plant(ripe ? 'wheat' : 'sprout', lx, lz, ripe ? 0.95 : 0.6, 0.375);
+          plant(ripe ? 'wheat' : 'sprout', lx, lz, ripe ? 0.95 : 0.6, 0.14 * B);
         }
       }
-      box('dirt', 0, 0, 0.5, 1, 0.3, 4, 0.15);
+      const ring = (lx, lz) => lx >= -3 && lx <= 3 && lz >= -2 && lz <= 3 && (Math.abs(lx) === 3 || lz === -2 || lz === 3);
       const gate = (lx, lz) => lx === -3 && (lz === 0 || lz === 1);
-      const fence = (lx, lz) => !gate(lx, lz) && (lx === -3 || lx === 3 || lz === -2 || lz === 3);
       for (let lx = -3; lx <= 3; lx++) for (let lz = -2; lz <= 3; lz++) {
-        if (!fence(lx, lz)) continue;
-        box('planks', lx, 0, lz, 0.25, 1.4, 0.25);
-        if (fence(lx + 1, lz) && (lz === -2 || lz === 3)) [0.55, 1.05].forEach((gy) => box('planks', lx + 0.5, gy, lz, 1, 0.15, 0.12));
-        if (fence(lx, lz + 1) && (lx === -3 || lx === 3)) [0.55, 1.05].forEach((gy) => box('planks', lx, gy, lz + 0.5, 0.12, 0.15, 1));
+        if (!ring(lx, lz)) continue;
+        if (gate(lx, lz)) [-0.38, 0.38].forEach((o) => box('planks', lx, 0.3, lz + o, 0.12, 0.9, 0.12));
+        else box('planks', lx, 0, lz, 0.25, 1.5, 0.25);
+        const rails = gate(lx, lz) ? [0.4, 1.0] : [0.375, 0.75].map((f) => f * 1.5);
+        if (ring(lx + 1, lz)) rails.forEach((gy) => box('planks', lx + 0.5, gy, lz, 1, 0.19, 0.12));
+        if (ring(lx, lz + 1)) rails.forEach((gy) => box('planks', lx, gy, lz + 0.5, 0.12, 0.19, 1));
       }
       [[-4, 0, 'poppy'], [4, -3, 'dandelion'], [-4, 3, 'tuft']].forEach(([lx, lz, type]) => plant(type, lx, lz));
-      torch(3, 3, 1.4);
+      torch(3, 3, 1.5);
       [[0.4, 4.6], [-1.6, 4.9]].forEach(([lx, lz], i) => chickens.push({ at: world(lx, lz), phase: i * 2.1 }));
       const [bx, bz] = world(0.5, 0.5);
-      bees.push({ at: [bx, 0.95, bz], rx: 0.8, rz: 0.55, phase: 0 }, { at: [bx, 1.1, bz], rx: 0.55, rz: 0.8, phase: 2.6 });
+      bees.push({ at: [bx, 0.7, bz], rx: 0.8, rz: 0.55, phase: 0 }, { at: [bx, 0.85, bz], rx: 0.55, rz: 0.8, phase: 2.6 });
     }
   });
 
@@ -378,11 +378,19 @@ function Bee({ at: [x, y, z], rx, rz, phase }) {
 }
 
 const CLOUD = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, transparent: true, opacity: 0.82 });
+const CLOUD_SHADOW = new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.MultiplyBlending, premultipliedAlpha: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, toneMapped: false });
+const SHADE = new THREE.Color('#c4cfbf');
+const SUNLIT = new THREE.Color('#ffffff');
+const GROUND_QUAD = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+// Matches the key light in Stage.js, so painted shadows land where real ones would
+const SUN = new THREE.Vector3(7, 18, 9);
 
-// Flat slabs way out past the table, drifting one way and wrapping; their shadows slide over the grass
+// Cloud shadows are painted, not cast: the shadow map only covers the table and clipped them at its edge
 function Clouds({ clouds }) {
   const ref = useRef();
+  const shade = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const tint = useMemo(() => new THREE.Color(), []);
   const count = clouds.reduce((n, c) => n + c.cells.length, 0);
   const still = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)'), []);
   useFrame(({ clock }) => {
@@ -390,16 +398,31 @@ function Clouds({ clouds }) {
     let i = 0;
     clouds.forEach((cloud) => {
       const z = ((cloud.z + t * cloud.speed + 26) % 52) - 26;
+      const dx = (-SUN.x / SUN.y) * cloud.y;
+      const dz = (-SUN.z / SUN.y) * cloud.y;
+      tint.lerpColors(SUNLIT, SHADE, Math.min(1, (26 - Math.abs(z)) / 6));
       cloud.cells.forEach(([cx, cz]) => {
+        shade.current.setColorAt(i, tint);
         dummy.position.set(cloud.x + cx * 1.4, cloud.y, z + cz * 1.4);
         dummy.scale.set(1.4, 0.3, 1.4);
         dummy.updateMatrix();
-        ref.current.setMatrixAt(i++, dummy.matrix);
+        ref.current.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(cloud.x + cx * 1.4 + dx, 0.02, z + cz * 1.4 + dz);
+        dummy.scale.set(1.4, 1, 1.4);
+        dummy.updateMatrix();
+        shade.current.setMatrixAt(i++, dummy.matrix);
       });
     });
     ref.current.instanceMatrix.needsUpdate = true;
+    shade.current.instanceMatrix.needsUpdate = true;
+    shade.current.instanceColor.needsUpdate = true;
   });
-  return <instancedMesh ref={ref} args={[CUBE, CLOUD, count]} castShadow frustumCulled={false} dispose={null} />;
+  return (
+    <>
+      <instancedMesh ref={ref} args={[CUBE, CLOUD, count]} frustumCulled={false} dispose={null} />
+      <instancedMesh ref={shade} args={[GROUND_QUAD, CLOUD_SHADOW, count]} frustumCulled={false} renderOrder={-1} dispose={null} />
+    </>
+  );
 }
 
 function Torch({ at, phase }) {
@@ -414,12 +437,12 @@ function Torch({ at, phase }) {
   });
   return (
     <group position={at}>
-      <mesh ref={flame} position-y={0.03}>
-        <boxGeometry args={[0.1, 0.12, 0.1]} />
+      <mesh ref={flame} position-y={0.02}>
+        <boxGeometry args={[0.07, 0.08, 0.07]} />
         <meshBasicMaterial color="#ffe7a6" toneMapped={false} />
       </mesh>
-      <mesh position-y={-0.04}>
-        <boxGeometry args={[0.11, 0.05, 0.11]} />
+      <mesh position-y={-0.03}>
+        <boxGeometry args={[0.075, 0.035, 0.075]} />
         <meshBasicMaterial color="#ff9a2e" toneMapped={false} />
       </mesh>
       <mesh ref={glow} position-y={0.03 - at[1]} rotation-x={-Math.PI / 2}>

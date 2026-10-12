@@ -358,16 +358,16 @@ export function workbenchFace(ctx, size, value) {
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
     const x = (2 + col * 10) * p;
     const y = (2 + row * 10) * p;
-    ctx.fillStyle = '#3b2610';
+    ctx.fillStyle = '#9a7443';
     ctx.fillRect(x, y, p * 8, p * 8);
-    ctx.fillStyle = '#c9a066';
+    ctx.fillStyle = '#b48c54';
     ctx.fillRect(x + p, y + p, p * 7, p * 7);
-    ctx.fillStyle = '#6b4a26';
+    ctx.fillStyle = '#a7804b';
     ctx.fillRect(x + p, y + p, p * 6, p * 6);
   }
 }
 
-const GEM = ['.2211.', '221110', '211100', '.1100.', '..10..'];
+const GEM = ['.000000.', '02211110', '02111110', '01111110', '01111110', '01111110', '01111110', '.000000.'];
 
 // Pip spots already sit on a 3x3 grid, so each pip becomes a gem in its crafting slot
 export function workbenchPips(ctx, pips, size, color) {
@@ -376,8 +376,8 @@ export function workbenchPips(ctx, pips, size, color) {
   pips.forEach(([px, py]) => {
     const col = Math.round((px - 0.27) / 0.23);
     const row = Math.round((py - 0.27) / 0.23);
-    const x0 = (3 + col * 10) * p;
-    const y0 = (4 + row * 10) * p;
+    const x0 = (2 + col * 10) * p;
+    const y0 = (2 + row * 10) * p;
     GEM.forEach((line, y) => [...line].forEach((ch, x) => {
       if (ch === '.') return;
       ctx.fillStyle = tones[+ch];

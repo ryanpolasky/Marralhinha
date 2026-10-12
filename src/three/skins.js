@@ -1230,7 +1230,7 @@ const DICE = {
   supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
   arcade: { bg: 'arcade', pip: '#ffe94d', one: '#ff4fd8', roughness: 0.4, clearcoat: 0.3 },
   halloween: { bg: 'halloween', pip: '#ffcf80', one: '#ffe2a8', roughness: 0.16, metalness: 0.12, clearcoat: 1, extra: { iridescence: 0.2, envMapIntensity: 1.3 } },
-  minecraft: { bg: 'minecraft', pip: '#4fe3e0', one: '#3ee07a', roughness: 0.85 },
+  minecraft: { bg: 'minecraft', pip: '#2fd8e8', one: '#22d36a', roughness: 0.85 },
   defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
@@ -1238,7 +1238,7 @@ const DICE = {
 const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
 const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
 
-const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.55), main: color, light: mix(color, '#ffffff', 0.7) });
+const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
 // Segments a-g, as [x, y, w, h] in a 1x2 cell
 const SEG_RECTS = { a: [0.15, 0, 0.7, 0.14], b: [0.86, 0.1, 0.14, 0.8], c: [0.86, 1.1, 0.14, 0.8], d: [0.15, 1.86, 0.7, 0.14], e: [0, 1.1, 0.14, 0.8], f: [0, 0.1, 0.14, 0.8], g: [0.15, 0.93, 0.7, 0.14] };

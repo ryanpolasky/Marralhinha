@@ -7864,7 +7864,7 @@ select.admin-input optgroup {
 /* ---------- Turn clock ---------- */
 
 .avatar-level {
-  z-index: 1;
+  z-index: 3;
 }
 
 .turn-clock {
