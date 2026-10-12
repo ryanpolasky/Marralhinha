@@ -17,7 +17,9 @@ function ChatInput({ onSend, teams = false }) {
       message = shortcut[2].trim();
     }
     if (!message) return;
-    if (await onSend(message, target)) setText((current) => (current.trim() === text.trim() ? '' : current));
+    setText('');
+    const sent = await onSend(message, target).catch(() => false);
+    if (!sent) setText((current) => (current.trim() ? current : text));
   };
   return (
     <form className={`chat-form${active === 'team' ? ' team' : ''}`} onSubmit={submit}>

@@ -2,6 +2,7 @@ import { SEAT_COLORS } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 import { videoFor } from './Spectacle';
+import { ORES as MC_ORES } from './minecraft';
 
 const col = (s) => SEAT_COLORS[s];
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -23,6 +24,47 @@ const timeline = (bus) => {
 
 // One (emit, info) => {} per skin key; info = { at, by, victim, sfx, later, seq, track }
 const KILL_FX = {
+  // The victim breaks like a block: chunks bounce, flat debris rains, then XP orbs hop out and get pulled up into a level-up
+  minecraft: (emit, { at, by, victim, sfx, later, seq }) => {
+    const ore = MC_ORES[victim % 4];
+    const rubble = ['#6f706c', '#878984', '#9a9b97', ore.main, ore.dark, ore.light];
+    emit('spr', { position: at, tile: TILE.glow, c: ['#ffffff'], size: 0.5, size2: 2, life: 0.18 });
+    emit('shard', { shape: 'box', position: off(at, 0, -0.1), colors: rubble, n: 22, speed: 2.6, up: 3.8, size: 0.15, life: 2, bounce: 0.38, spin: 7 });
+    emit('spr', { position: at, n: 40, px: true, tile: TILE.square, c: rubble, rot: 0, speed: 2.2, up: 2.8, size: 0.2, size2: 0.13, life: 1, grav: 1.4, land: true, fade: 0.3 });
+    emit('spr', { position: off(at, 0, -0.15), n: 12, px: true, tile: TILE.smoke, c: ['#c9cbbd', '#ecebdf', '#a9ab9f'], speed: 1.1, up: 0.5, size: 0.5, size2: 1.2, life: 0.7, a: 0.7, drag: 2.2 });
+    emit('ring', { position: ground(at), color: '#eef7d2', size: 1.9, life: 0.35 });
+    emit('shake', { amount: 0.2 });
+    sfx('crunch');
+    const top = off(at, 0, 1.55);
+    const ORBS = 7;
+    for (let i = 0; i < ORBS; i++) {
+      const angle = (i / ORBS) * Math.PI * 2 + 0.4;
+      const reach = 0.65 + (i % 3) * 0.18;
+      const rest = [at[0] + Math.cos(angle) * reach, 0.18, at[2] + Math.sin(angle) * reach];
+      seq(44, 26, (k) => {
+        let p;
+        if (k < 0.34) {
+          const u = k / 0.34;
+          const hop = u < 0.78 ? Math.sin((u / 0.78) * Math.PI) * 0.85 : Math.sin(((u - 0.78) / 0.22) * Math.PI) * 0.12;
+          p = [at[0] + (rest[0] - at[0]) * u, at[1] + (rest[1] - at[1]) * u + hop, at[2] + (rest[2] - at[2]) * u];
+        } else if (k < 0.55) p = [rest[0], rest[1] + Math.abs(Math.sin(k * 40 + i)) * 0.06, rest[2]];
+        else {
+          const u = ((k - 0.55) / 0.45) ** 2;
+          p = [rest[0] + (top[0] - rest[0]) * u, rest[1] + (top[1] - rest[1]) * u + Math.sin(u * Math.PI) * 0.35, rest[2] + (top[2] - rest[2]) * u];
+        }
+        const pulse = 0.85 + 0.15 * Math.sin(k * 30 + i);
+        emit('spr', { position: p, tile: TILE.glow, c: [i % 2 ? '#d8ff4a' : '#86ff3a'], size: 0.5 * pulse, life: 0.07, jitter: 0, fadeIn: 0.01, a: 0.85 });
+        emit('spr', { position: p, px: true, tile: TILE.square, c: [k % 0.2 < 0.1 ? '#f2ffb0' : '#c8f53c'], rot: 0, size: 0.17, life: 0.06, jitter: 0, fadeIn: 0.01 });
+        if (k === 1) sfx('xp', i);
+      }, 260 + i * 70);
+    }
+    later(260 + (ORBS - 1) * 70 + 43 * 26 + 40, () => {
+      emit('spr', { position: top, tile: TILE.flare, c: ['#f4ffb8'], size: 0.4, size2: 2.6, life: 0.32, rot: 0 });
+      emit('spr', { position: top, n: 28, px: true, tile: TILE.square, c: ['#c8ff5a', '#86ff3a', '#fff7a0', col(by).light], sphere: true, rot: 0, speed: 2.6, size: 0.16, size2: 0.06, life: 0.9, drag: 1.6, grav: 0.4 });
+      emit('ring', { position: ground(at), color: '#b6ff5a', size: 2.6, life: 0.5 });
+      sfx('levelUp');
+    });
+  },
   // Glass marble shatters into solid shards
   pop: (emit, { at, by, victim }) => {
     emit('spr', { position: at, tile: TILE.glow, c: ['#ffffff'], size: 0.4, size2: 2.4, life: 0.22 });

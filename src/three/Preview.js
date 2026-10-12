@@ -48,9 +48,9 @@ function DicePreview({ itemId }) {
 
 function BoardPreview({ itemId }) {
   return (
-    <group scale={hasBoardProps(itemId) ? 0.15 : 0.19} rotation-x={0.75}>
+    <group scale={itemId === 'board.minecraft' ? 0.115 : hasBoardProps(itemId) ? 0.15 : 0.19} rotation-x={0.75}>
       <Spinner speed={0.3} tilt={0}>
-        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} />
+        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={itemId} preview />
       </Spinner>
     </group>
   );
@@ -96,7 +96,7 @@ function FxPreview({ itemId, seat, replay }) {
       fired.current = true;
       target.current.visible = false;
       sfx.capture('mine');
-      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim }, { bus, sfx: (name) => sfx[name]?.() });
+      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim }, { bus, sfx: (name, ...args) => sfx[name]?.(...args) });
     }
   });
   return (

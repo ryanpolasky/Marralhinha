@@ -16,6 +16,15 @@ let tick = 0;
 
 // Called every ~0.34 units of hop travel with info = { by, prev, n }, so keep each call cheap
 const TRAILS = {
+  // XP orbs that bob up and wink out, plus grass and dirt crumbs kicked up on every other hop
+  minecraft: (emit, p, { n }) => {
+    const at = [p[0], p[1] + 0.08, p[2]];
+    const orb = { position: at, up: 0.5, uj: 0, drag: 0.9, life: 1.4, jitter: 0, fade: 1.6 };
+    emit('spr', { ...orb, tile: TILE.glow, c: [n % 2 ? '#d8ff4a' : '#86ff3a'], size: 1.05, size2: 0.4, flick: 9, a: 0.95 });
+    emit('spr', { ...orb, px: true, tile: TILE.square, c: ['#3f6a12'], rot: 0, size: 0.36, size2: 0.17 });
+    emit('spr', { ...orb, px: true, tile: TILE.square, c: [n % 2 ? '#f2ffb0' : '#c8f53c'], rot: 0, size: 0.27, size2: 0.12 });
+    if (n % 2 === 0) emit('spr', { position: down(p, 0.2), n: 4, px: true, tile: TILE.square, c: ['#5d8736', '#709c42', '#896044', '#66472f'], rot: 0, speed: 0.9, up: 1.5, size: 0.12, size2: 0.08, life: 0.55, grav: 1.3, land: true });
+  },
   // kicked-up dust
   dust: (emit, p) => {
     emit('spr', { position: down(p), n: 2, tile: TILE.smoke, c: ['#cbb79b', '#a4957f'], add: false, speed: 0.35, up: 0.4, size: 0.26, size2: 0.7, life: 0.55, a: 0.35, drag: 1.6 });

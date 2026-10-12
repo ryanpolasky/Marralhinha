@@ -208,7 +208,7 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
         seg.begun = true;
         if (seg.impact) {
           sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
-          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim }, { sfx: (name) => sfx[name]?.() });
+          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim }, { sfx: (name, ...args) => sfx[name]?.(...args) });
         }
       }
       if (t >= 1) {

@@ -7,6 +7,7 @@ import { boardSkin, animateBoardSkin } from './skins';
 import { itemsForSlot, skinKey } from '../game/catalog';
 import DefuseProps from './DefuseProps';
 import PicnicProps from './PicnicProps';
+import MinecraftProps from './MinecraftProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -216,7 +217,8 @@ const TABLE_R = 1200;
 function Table({ texture }) {
   const map = useMemo(() => {
     const t = texture.clone();
-    t.repeat.set(TABLE_R / 6, TABLE_R / 6);
+    const repeat = TABLE_R * 2 / (texture.userData.tileSize || 12);
+    t.repeat.set(repeat, repeat);
     t.needsUpdate = true;
     return t;
   }, [texture]);
@@ -230,7 +232,7 @@ function Table({ texture }) {
 }
 
 // Boards that dress the table around them, not just the board itself
-const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps };
+const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps, minecraft: MinecraftProps };
 export const hasBoardProps = (id) => !!BOARD_PROPS[skinKey(id)];
 
 const SWAP_MS = 150;
@@ -318,7 +320,7 @@ function useSkinTransition(skin, animate, prepare) {
   return [shown, wave];
 }
 
-export default function Board({ active, names, turn, showNames, skin, table = true, layout = CLASSIC_LAYOUT }) {
+export default function Board({ active, names, turn, showNames, skin, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
@@ -417,7 +419,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
     <group>
       {table && <Table texture={materials.felt} />}
       {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
-      {Props && <Props layout={layout} y={TABLE_Y} />}
+      {Props && <Props layout={layout} y={TABLE_Y} preview={preview} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
       <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.core || materials.cup} receiveShadow>

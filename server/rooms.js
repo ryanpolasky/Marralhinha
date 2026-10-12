@@ -73,7 +73,7 @@ class Room {
     this.lastWinners = [];
     // Team chat never enters the shared game log; each team's history only goes to that team's devices
     this.teamLogs = [[], []];
-    // Chat while no game is running (lobby, between rounds) lives here instead of game.log
+    // Chat lives outside game.log so a new round can't wipe the history
     this.chatLog = [];
     this.timer = null;
     this.timerKey = null;
@@ -738,13 +738,8 @@ class Room {
       return;
     }
     const entry = { chat: true, seat, from: player.id, spectator: seat === null, name: player.name, text: clean, t: now };
-    // Live rounds log chat into the game; lobby and results banter collect in the room log
-    if (this.game && this.game.phase !== 'over') {
-      rules.pushLog(this.game, entry);
-    } else {
-      this.chatLog.push(entry);
-      if (this.chatLog.length > CHAT_LOG_LIMIT) this.chatLog.splice(0, this.chatLog.length - CHAT_LOG_LIMIT);
-    }
+    this.chatLog.push(entry);
+    if (this.chatLog.length > CHAT_LOG_LIMIT) this.chatLog.splice(0, this.chatLog.length - CHAT_LOG_LIMIT);
     if (seat !== null && this.game) this.hooks.onReaction?.(this, { seat, text: clean, t: now });
     this.changed();
   }

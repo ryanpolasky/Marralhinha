@@ -41,7 +41,7 @@ export function StuntOverlay({ stunts = [], names = [], onCut }) {
           on();
         };
         const end = () => {
-          if (state !== 1) return;
+          if (state === 2) return;
           state = 2;
           off();
         };

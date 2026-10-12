@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SEAT_COLORS, rotate, layoutFor } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { makeCanvas, seeded, finish, makeWoodCanvas, makeFeltTexture, makeSwirlCanvas, finishMarble } from './textures';
+import { blockCanvas, oreBlockCanvases, firstNightCanvas, stumpCanvas, grassFieldCanvas, workbenchFace, workbenchPips } from './minecraft';
 
 const cache = new Map();
 const cached = (key, build) => {
@@ -48,30 +49,39 @@ function veins(ctx, rand, { count, color, width, alpha, w, h, steps = 40 }) {
   ctx.globalAlpha = 1;
 }
 
-function stars(ctx, rand, { count, w, h, color = '#ffffff' }) {
+function stars(ctx, rand, { count, w, h, color = '#ffffff', wrapX = false, wrapY = false, y0 = 0, y1 = h }) {
+  const dxs = wrapX ? [-w, 0, w] : [0];
+  const dys = wrapY ? [-h, 0, h] : [0];
   for (let i = 0; i < count; i++) {
     ctx.globalAlpha = 0.3 + rand() * 0.7;
     ctx.fillStyle = color;
     const r = rand() < 0.08 ? 1.8 : 0.5 + rand() * 0.9;
-    ctx.beginPath();
-    ctx.arc(rand() * w, rand() * h, r, 0, TAU);
-    ctx.fill();
+    const x = rand() * w;
+    const y = y0 + rand() * (y1 - y0);
+    dxs.forEach((dx) => dys.forEach((dy) => {
+      ctx.beginPath();
+      ctx.arc(x + dx, y + dy, r, 0, TAU);
+      ctx.fill();
+    }));
   }
   ctx.globalAlpha = 1;
 }
 
-function nebula(ctx, rand, { colors, count, w, h, alpha = 0.35 }) {
+function nebula(ctx, rand, { colors, count, w, h, alpha = 0.35, wrapX = false }) {
   ctx.globalCompositeOperation = 'lighter';
+  const dxs = wrapX ? [-w, 0, w] : [0];
   for (let i = 0; i < count; i++) {
     const x = rand() * w;
     const y = rand() * h;
     const r = 30 + rand() * 90;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, colors[i % colors.length]);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    dxs.forEach((dx) => {
+      const g = ctx.createRadialGradient(x + dx, y, 0, x + dx, y, r);
+      g.addColorStop(0, colors[i % colors.length]);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = g;
+      ctx.fillRect(x + dx - r, y - r, r * 2, r * 2);
+    });
   }
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -81,6 +91,16 @@ const crisp = (tex) => {
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
   tex.anisotropy = 1;
+  return tex;
+};
+
+// Hard texels up close, but mipmapped so a 16px block seen from the table camera averages instead of shimmering
+const pixelMips = (tex) => {
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
   return tex;
 };
 
@@ -107,18 +127,30 @@ function pixelRows(ctx, rows, x0, y0, color) {
   rows.forEach((row, y) => [...row].forEach((bit, x) => bit === '1' && ctx.fillRect(x0 + x, y0 + y, 1, 1)));
 }
 
+const INVADER = ['00100100', '00011000', '00111100', '01011010', '11111111', '10100101'];
+const CROWN = ['1001001', '1101011', '1111111', '1111111', '0111110'];
+const ARCADE_ICONS = [[HEART, STAR], [INVADER, COIN], [CROWN, HEART], [STAR, INVADER]];
+// All integer-cycle and clamped-smooth: no vertical jumps anywhere, so the stripe never visibly "cuts"
+const ARCADE_WAVES = [
+  (p) => Math.sin(p * TAU * 2),
+  (p) => Math.max(-1, Math.min(1, Math.sin(p * TAU * 2 + Math.PI / 4) * 2.2)),
+  (p) => 1 - 4 * Math.abs(((p * 3) % 1) - 0.5),
+  (p) => (Math.sin(p * TAU * 2) + 0.5 * Math.sin(p * TAU * 6 + 0.9)) / 1.5,
+];
+
 function arcadeMarbleCanvases(c, seat) {
   const [base, bctx] = makeCanvas(64, 32);
   const [glow, gctx] = makeCanvas(64, 32);
   const rand = seeded(88 + seat);
+  const [bgA, bgB] = [mix(c.dark, '#000000', 0.78), mix(c.dark, '#000000', 0.6)];
   for (let y = 0; y < 32; y += 4) for (let x = 0; x < 64; x += 4) {
-    bctx.fillStyle = (x + y) % 8 ? '#150a30' : '#1d1042';
+    bctx.fillStyle = (x + y) % 8 ? bgA : bgB;
     bctx.fillRect(x, y, 4, 4);
   }
   gctx.fillStyle = '#000';
   gctx.fillRect(0, 0, 64, 32);
   for (let x = 0; x < 64; x++) {
-    const y = 14 + Math.round(Math.sin((x / 64) * TAU * 2) * 5);
+    const y = 14 + Math.round(ARCADE_WAVES[seat % 4](x / 64) * 5);
     [[-1, c.light], [0, c.main], [1, c.main], [2, c.dark]].forEach(([dy, color]) => {
       bctx.fillStyle = color;
       bctx.fillRect(x, y + dy, 1, 1);
@@ -129,10 +161,10 @@ function arcadeMarbleCanvases(c, seat) {
     gctx.fillRect(x, y, 1, 1);
   }
   [4, 36].forEach((x, i) => {
-    [[bctx, '#150a30'], [gctx, '#000']].forEach(([ctx, bg]) => {
+    [[bctx, bgA], [gctx, '#000']].forEach(([ctx, bg]) => {
       ctx.fillStyle = bg;
       ctx.fillRect(x - 1, 9 + i * 2, 10, 10);
-      pixelRows(ctx, i ? STAR : HEART, x + 1, 10 + i * 2, i ? '#ffe94d' : '#ffffff');
+      pixelRows(ctx, ARCADE_ICONS[seat % 4][i], x + 1, 10 + i * 2, i ? '#ffe94d' : '#ffffff');
     });
   });
   for (let i = 0; i < 40; i++) {
@@ -166,7 +198,51 @@ const GEM_PHASES = [
   { deep: '#00221a', mid: '#008a4c', bright: '#1fe582', glint: '#a6ffd2' },
 ];
 
+// Every seat gets its own sky: magenta nova, violet deep field, twin amber suns, emerald rift band
+const GALAXY_PHASES = [
+  { bg: '#160409', accent: '#ff4f9a', deep: '#70102f', star: '#ffd9e8', motif: 'nova' },
+  { bg: '#050a1e', accent: '#6a3cff', deep: '#1a2380', star: '#d0e2ff' },
+  { bg: '#150d02', accent: '#ff8a1f', deep: '#7c3f00', star: '#ffefc4', motif: 'binary' },
+  { bg: '#02130c', accent: '#1fd491', deep: '#0a5c3d', star: '#c9ffe4', motif: 'band' },
+];
+
 const MARBLES = {
+  // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
+  minecraft: (c, seat) => {
+    const [base, glow] = oreBlockCanvases(seat);
+    const pixelMap = (canvas) => {
+      const map = pixelMips(finishMarble(canvas));
+      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+      return map;
+    };
+    const uniforms = { uOreGlow: { value: 0.35 } };
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    return {
+      map: pixelMap(base), emissiveMap: pixelMap(glow), emissive: '#ffffff', emissiveIntensity: 1,
+      roughness: 0.82, clearcoat: 0.25, clearcoatRoughness: 0.5,
+      onBeforeCompile: (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vOrePos;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOrePos = position;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vOrePos;\nuniform float uOreGlow;')
+          .replace('#include <map_fragment>', `
+            vec3 oreN = normalize(vOrePos);
+            vec3 oreA = abs(oreN);
+            vec2 oreUv = oreA.x >= oreA.y && oreA.x >= oreA.z ? vec2(oreN.z * sign(oreN.x), oreN.y) / oreA.x
+              : oreA.y >= oreA.z ? vec2(oreN.x, oreN.z * sign(oreN.y)) / oreA.y
+              : vec2(-oreN.x * sign(oreN.z), oreN.y) / oreA.z;
+            oreUv = clamp(oreUv * 0.5 + 0.5, 0.001, 0.999);
+            float oreEdge = max(abs(oreUv.x - 0.5), abs(oreUv.y - 0.5));
+            diffuseColor *= texture2D(map, oreUv);
+            diffuseColor.rgb *= 0.8 - smoothstep(0.43, 0.5, oreEdge) * 0.3;`)
+          .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = texture2D(emissiveMap, oreUv).rgb * uOreGlow;');
+      },
+      customProgramCacheKey: () => 'marble-minecraft-ore-block',
+      animate: (m, t) => { uniforms.uOreGlow.value = 0.35 + 0.2 * Math.max(0, Math.sin((still?.matches ? 0 : t) * 1.4 + seat * 1.7)) ** 3; },
+    };
+  },
   arcade: (c, seat) => {
     const [base, glow] = arcadeMarbleCanvases(c, seat);
     const map = crisp(finishMarble(base));
@@ -306,10 +382,33 @@ const MARBLES = {
   galaxy: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     const rand = seeded(90 + seat);
-    ctx.fillStyle = '#070617';
+    const phase = GALAXY_PHASES[seat];
+    ctx.fillStyle = phase.bg;
     ctx.fillRect(0, 0, 512, 256);
-    nebula(ctx, rand, { colors: [c.main, c.light, '#6a3cff'], count: 26, w: 512, h: 256 });
-    stars(ctx, rand, { count: 420, w: 512, h: 256 });
+    nebula(ctx, rand, { colors: [c.main, c.light, phase.accent, phase.deep], count: 26, w: 512, h: 256, wrapX: true });
+    ctx.globalCompositeOperation = 'lighter';
+    const core = (x, y, r, color) => [-512, 0, 512].forEach((dx) => {
+      const g = ctx.createRadialGradient(x + dx, y, 0, x + dx, y, r);
+      g.addColorStop(0, color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x + dx - r, y - r, r * 2, r * 2);
+    });
+    if (phase.motif === 'nova') { core(150, 108, 110, phase.accent); core(150, 108, 44, '#ffffff'); }
+    else if (phase.motif === 'binary') { core(150, 88, 76, phase.accent); core(150, 88, 26, '#fff3d8'); core(362, 168, 60, c.light); core(362, 168, 20, '#ffffff'); }
+    else if (phase.motif === 'band') {
+      const band = ctx.createLinearGradient(0, 74, 0, 182);
+      band.addColorStop(0, 'rgba(0,0,0,0)');
+      band.addColorStop(0.5, phase.accent);
+      band.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = band;
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.globalAlpha = 1;
+      stars(ctx, rand, { count: 260, w: 512, h: 256, color: phase.star, y0: 96, y1: 160, wrapX: true });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    stars(ctx, rand, { count: 420, w: 512, h: 256, color: phase.star, wrapX: true });
     const tex = finishMarble(canvas);
     return { map: tex, emissiveMap: tex, emissive: '#ffffff', emissiveIntensity: 0.55, roughness: 0.08, clearcoat: 1 };
   },
@@ -389,7 +488,7 @@ const MARBLES = {
       fern(40 + rand() * 432, 30 + rand() * 196, rand() * TAU, 20 + rand() * 22, 3);
     }
     veins(ctx, rand, { count: 6, color: '#e8f8ff', width: 1, alpha: 0.45, w: 512, h: 256, steps: 16 });
-    stars(ctx, rand, { count: 120, w: 512, h: 256, color: '#f2fbff' });
+    stars(ctx, rand, { count: 120, w: 512, h: 256, color: '#f2fbff', wrapX: true });
     return { map: finishMarble(canvas), roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.04, iridescence: 0.2, envMapIntensity: 1.2 };
   },
   gold: (c, seat) => {
@@ -540,25 +639,52 @@ const MARBLES = {
     }
     return { map: finishMarble(canvas), roughness: 0.18, clearcoat: 0.9, sheen: 0.6, sheenColor: new THREE.Color('#ffd27a') };
   },
-  bubble: (c) => ({
-    color: mix(c.light, '#ffffff', 0.55),
-    transparent: true,
-    opacity: 0.58,
-    roughness: 0,
-    clearcoat: 1,
-    iridescence: 1,
-    iridescenceIOR: 1.35,
-    iridescenceThicknessRange: [120, 720],
-    envMapIntensity: 2,
-    specularIntensity: 1,
-    depthWrite: true,
-  }),
+  bubble: (c, seat) => {
+    const uniforms = { uTime: { value: 0 }, uSeed: { value: seat * 5.17 + 1.3 }, uTint: { value: new THREE.Color(c.main) }, uGlow: { value: new THREE.Color(c.light) } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBubPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBubPos = normalize(position);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uSeed;\nuniform vec3 uTint;\nuniform vec3 uGlow;\nvarying vec3 vBubPos;\n${SKIN_NOISE_GLSL}`)
+        .replace('#include <emissivemap_fragment>', `{
+          vec3 n = normalize(normal);
+          float ndv = clamp(dot(n, normalize(vViewPosition)), 0.0, 1.0);
+          float rim = pow(1.0 - ndv, 2.0);
+          float swirl = skFbm3(vBubPos * 1.4 + uSeed + vec3(0.0, uTime * 0.12, uTime * 0.05));
+          float th = skFbm3(vBubPos * 2.2 + swirl * 2.4 + uSeed) - vBubPos.y * 0.18 + (1.0 - ndv) * 0.55;
+          vec3 film = 0.5 + 0.5 * cos(6.2832 * (th * 2.4 + vec3(0.0, 0.33, 0.67)));
+          film = mix(film, film * uTint * 1.8, 0.4);
+          diffuseColor.rgb = mix(uTint, film, 0.5);
+          diffuseColor.a = mix(opacity, 1.0, rim * 0.85);
+          totalEmissiveRadiance = film * (0.12 + rim * 0.75) + uGlow * 0.06;
+        }`);
+    };
+    return {
+      transparent: true,
+      opacity: 0.74,
+      roughness: 0.04,
+      clearcoat: 1,
+      clearcoatRoughness: 0.02,
+      iridescence: 0.6,
+      iridescenceIOR: 1.33,
+      iridescenceThicknessRange: [120, 720],
+      envMapIntensity: 2,
+      specularIntensity: 1,
+      depthWrite: true,
+      onBeforeCompile,
+      customProgramCacheKey: () => 'marble-bubble-film',
+      animate: (m, t) => (uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 0.9),
+    };
+  },
   aurora: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     const rand = seeded(210 + seat);
     ctx.fillStyle = '#060b1c';
     ctx.fillRect(0, 0, 512, 256);
-    stars(ctx, rand, { count: 160, w: 512, h: 256 });
+    stars(ctx, rand, { count: 160, w: 512, h: 256, wrapX: true });
     ctx.globalCompositeOperation = 'lighter';
     const colors = ['#2fd2a0', c.main, '#6a3cff', '#2fe6ff', c.light];
     for (let i = 0; i < 12; i++) {
@@ -849,9 +975,10 @@ const MARBLES = {
     const [glow, gctx] = makeCanvas(512, 256);
     const rand = seeded(313 + seat);
     const water = ctx.createLinearGradient(0, 0, 0, 256);
-    water.addColorStop(0, '#082d3c');
-    water.addColorStop(0.5, mix(c.main, '#44b6ad', 0.55));
-    water.addColorStop(1, '#082d3c');
+    const deep = seat === 1 ? '#082d3c' : mix(c.dark, '#02141c', 0.5);
+    water.addColorStop(0, deep);
+    water.addColorStop(0.5, mix(c.main, '#44b6ad', seat === 1 ? 0.55 : 0.12));
+    water.addColorStop(1, deep);
     ctx.fillStyle = water;
     ctx.fillRect(0, 0, 512, 256);
     gctx.fillStyle = '#000';
@@ -889,7 +1016,9 @@ const MARBLES = {
           float ribbon = pow(0.5 + 0.5 * sin(uv.y * 25.0 + ripple * 1.5 - uTide * 2.4), 12.0);
           float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.7);
           float sparkle = pow(max(sin(tideU * 5.0 + uv.y * 31.0 - uTide * 4.0), 0.0), 30.0) * ribbon;
-          totalEmissiveRadiance = currents * (0.5 + ribbon * 1.3) + uTideColor * (ribbon * 0.3 + rim * 0.5 + sparkle * 0.25);
+          vec2 cp = vec2(tideU * 2.0, uv.y * 12.0) + vec2(uTide * 0.5, -uTide * 0.35);
+          float caustic = pow(1.0 - abs(sin(cp.x + sin(cp.y * 1.3 + uTide * 0.8)) * sin(cp.y - cos(cp.x * 0.9 - uTide * 0.6))), 10.0);
+          totalEmissiveRadiance = currents * (0.5 + ribbon * 1.3) + uTideColor * (ribbon * 0.3 + rim * 0.5 + sparkle * 0.25) + vec3(0.55, 1.0, 0.9) * caustic * 0.35;
         }`);
     };
     return { map, emissiveMap, emissive: c.light, emissiveIntensity: 0.48, roughness: 0.09, clearcoat: 1, clearcoatRoughness: 0.04, iridescence: 0.36,
@@ -1101,12 +1230,15 @@ const DICE = {
   supporter: { bg: 'supporter', pip: '#125058', one: '#125058', roughness: 0.14, metalness: 0.36, clearcoat: 1, extra: { iridescence: 0.26, envMapIntensity: 1.4 } },
   arcade: { bg: 'arcade', pip: '#ffe94d', one: '#ff4fd8', roughness: 0.4, clearcoat: 0.3 },
   halloween: { bg: 'halloween', pip: '#ffcf80', one: '#ffe2a8', roughness: 0.16, metalness: 0.12, clearcoat: 1, extra: { iridescence: 0.2, envMapIntensity: 1.3 } },
+  minecraft: { bg: 'minecraft', pip: '#4fe3e0', one: '#3ee07a', roughness: 0.85 },
   defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
+
+const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.55), main: color, light: mix(color, '#ffffff', 0.7) });
 
 // Segments a-g, as [x, y, w, h] in a 1x2 cell
 const SEG_RECTS = { a: [0.15, 0, 0.7, 0.14], b: [0.86, 0.1, 0.14, 0.8], c: [0.86, 1.1, 0.14, 0.8], d: [0.15, 1.86, 0.7, 0.14], e: [0, 1.1, 0.14, 0.8], f: [0, 0.1, 0.14, 0.8], g: [0.15, 0.93, 0.7, 0.14] };
@@ -1220,6 +1352,8 @@ function dieBackground(ctx, style, size, value) {
       ctx.closePath();
       ctx.fill();
     }
+  } else if (style === 'minecraft') {
+    workbenchFace(ctx, size, value);
   } else if (style === 'arcade') {
     const px = size / 32;
     for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
@@ -1414,11 +1548,12 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
       if (key === 'arcade') crisp(map);
+      if (key === 'minecraft') pixelMips(map);
       const params = { map, roughness: spec.roughness, metalness: spec.metalness || 0, clearcoat: spec.clearcoat || 0, ...(spec.extra || {}) };
       if (spec.glow) {
         const [glow, gctx] = makeCanvas(size, size);
@@ -1434,6 +1569,7 @@ export function diceSkin(itemId) {
         mctx.fillRect(0, 0, size, size);
         mctx.fillStyle = '#fff';
         if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
+        else if (key === 'minecraft') gemPips(mctx, value, size, '#fff');
         else PIPS[value].forEach(([x, y]) => {
           mctx.beginPath();
           mctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
@@ -1443,6 +1579,7 @@ export function diceSkin(itemId) {
         params.emissiveMap = new THREE.CanvasTexture(key === 'defuse' ? defuseDieData(size) : mask);
         params.emissive = '#ffffff';
         params.emissiveIntensity = 1;
+        if (key === 'minecraft') pixelMips(params.emissiveMap);
       }
       const material = new THREE.MeshPhysicalMaterial(params);
       if (ANIMATED_DICE.includes(key)) {
@@ -1455,7 +1592,12 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'defuse' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'minecraft' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float gem = texture2D(emissiveMap, uv).r;
+              float glint = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 7.0 - uSkinTime * 2.2 + uFacePhase), 14.0);
+              totalEmissiveRadiance = vec3(0.55, 1.0, 0.95) * gem * (0.12 + glint * 0.9);
+            }` : key === 'defuse' ? `{
               vec3 lcd = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               float cyc = mod(uSkinTime + uFacePhase * 3.0, 6.0);
               float typed = step(lcd.g, cyc / 3.2);
@@ -1849,7 +1991,7 @@ function spaceFeltCanvas() {
     [-S, 0, S].forEach((dx) => [-S, 0, S].forEach((dy) => softBlob(ctx, x + dx, y + dy, r, color, 0.3)));
   }
   ctx.globalCompositeOperation = 'source-over';
-  stars(ctx, rand, { count: 1600, w: S, h: S });
+  stars(ctx, rand, { count: 1600, w: S, h: S, wrapX: true, wrapY: true });
   return canvas;
 }
 
@@ -3747,8 +3889,8 @@ function plantedBomb(ctx, glow, x, y, scale) {
     g.strokeStyle = '#c42a22';
     g.lineWidth = 0.02;
     g.beginPath();
-    g.moveTo(-0.32, 0.1);
-    g.bezierCurveTo(-0.45, 0.2, -0.38, 0.32, -0.25, 0.3);
+    g.moveTo(-0.32, 0.08);
+    g.bezierCurveTo(-0.5, 0.24, -0.2, 0.42, -0.02, 0.19);
     g.stroke();
     g.restore();
   });
@@ -4077,6 +4219,41 @@ const PICNIC_BLANKET_SHADER = `{
 }`;
 
 const SPECIAL_BOARDS = {
+  // An oak deck with a log rim, stump trays with bark sides, and a campfire in the center hole.
+  // Outer walls get bark; hole walls carry the planks down into the divots
+  minecraft: (layout) => {
+    const [stump, dishRepeat] = stumpCanvas(layout.spec.dishR);
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const emberDim = new THREE.Color('#7a2a08');
+    const emberBright = new THREE.Color('#ffb347');
+    const woods = { uBark: { value: pixelMips(finish(blockCanvas('logSide', 811))) }, uPlank: { value: pixelMips(finish(blockCanvas('planks', 702))) } };
+    const cupMap = pixelMips(finish(blockCanvas('planks', 705)));
+    const { halfWidth: W, halfLength: L, dishR } = layout.spec;
+    const walls = (rim) => `{
+      if (vSkinTop < 0.95) {
+        float along = vSkinPos.x + vSkinPos.z;
+        diffuseColor.rgb = ${rim} > -0.33
+          ? texture2D(uBark, vec2(vSkinPos.y * 1.4, along)).rgb
+          : texture2D(uPlank, vec2(along, vSkinPos.y)).rgb * mix(0.62, 0.9, clamp(1.0 + vSkinPos.y / 0.2, 0.0, 1.0));
+      }
+    }`;
+    return {
+      canvas: firstNightCanvas(layout), repeat: BOARD_R, pixel: true, roughness: 0.94,
+      dishCanvas: stump, dishRepeat,
+      dish: '#9c7742', feltCanvas: grassFieldCanvas(), cup: '#ffffff', cupMap, core: '#7a2a08',
+      accent: { color: '#85877f', metalness: 0, roughness: 0.95 },
+      shaderCommon: 'uniform sampler2D uBark;\nuniform sampler2D uPlank;',
+      uniforms: woods,
+      dishUniforms: woods,
+      shader: walls(`min(max(abs(vSkinPos.x) - ${W.toFixed(2)}, abs(vSkinPos.z) - ${L.toFixed(2)}), max(abs(vSkinPos.x) - ${L.toFixed(2)}, abs(vSkinPos.z) - ${W.toFixed(2)}))`),
+      dishShader: walls(`(length(vSkinPos.xz) - ${dishR.toFixed(2)})`),
+      animate: (mats, t) => {
+        const time = still?.matches ? 0 : t;
+        const flame = 0.5 + 0.5 * Math.sin(time * 6.1) * Math.sin(time * 2.7) + 0.15 * Math.sin(time * 13.0);
+        mats.core.color.lerpColors(emberDim, emberBright, Math.min(1, Math.max(0, flame)));
+      },
+    };
+  },
   defuse: (layout) => {
     const [dishCanvases, dishGlowCanvases, dishRepeat] = defuseDishes(layout);
     return {
@@ -4214,7 +4391,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
@@ -4285,10 +4462,32 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       dish,
       dishes: dishes || [dish, dish, dish, dish],
       surfaces: [board, ...(dishes || [dish])],
-      cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}) }),
+      cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
     };
+    // Cups take the planks straight down in board space, so the deck runs on into each divot and darkens with depth
+    if (spec.cupMap) {
+      mats.cup.customProgramCacheKey = () => 'cup-planar-planks';
+      mats.cup.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vCupPos;')
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+            vec4 cupPos = vec4(transformed, 1.0);
+            #ifdef USE_INSTANCING
+              cupPos = instanceMatrix * cupPos;
+            #endif
+            vCupPos = vec3(cupPos.x, transformed.y, cupPos.z);`);
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vCupPos;')
+          .replace('#include <map_fragment>', `diffuseColor *= texture2D(map, vCupPos.xz);
+            diffuseColor.rgb *= mix(0.22, 0.62, clamp(1.0 + vCupPos.y / 0.29, 0.0, 1.0));`);
+      };
+    }
+    if (resolved === 'minecraft') {
+      [board.map, dish.map, mats.felt].forEach(pixelMips);
+      mats.felt.userData.tileSize = 4;
+    }
     if (spec.blanket) {
       const blanket = new THREE.MeshStandardMaterial({ map: finish(spec.blanket.canvas, 1 / 6), roughness: 0.94 });
       patchSkinShader(blanket, {

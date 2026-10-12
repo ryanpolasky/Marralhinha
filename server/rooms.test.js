@@ -15,11 +15,11 @@ function startedRoom() {
   return { room, reactions };
 }
 
-test('chat messages land in the game log and pop a bubble for the sender', (t) => {
+test('chat messages land in the room feed and pop a bubble for the sender', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());
   room.chat('u1', '  boa   sorte!  ');
-  const entry = room.game.log.at(-1);
+  const entry = room.view().chat.at(-1);
   assert.deepStrictEqual({ chat: entry.chat, name: entry.name, text: entry.text, seat: entry.seat }, { chat: true, name: 'Ana', text: 'boa sorte!', seat: 0 });
   assert.strictEqual(reactions.at(-1).text, 'boa sorte!');
 });
@@ -44,11 +44,11 @@ test('one account on two devices shares a seat; leaving on one device keeps it f
 test('chat is cleaned, capped and ignores blank messages', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
-  const before = room.game.log.length;
+  const before = room.view().chat.length;
   room.chat('u1', ' \n\t ');
-  assert.strictEqual(room.game.log.length, before);
+  assert.strictEqual(room.view().chat.length, before);
   room.chat('u2', `hi\u202Ethere ${'x'.repeat(300)}`);
-  const entry = room.game.log.at(-1);
+  const entry = room.view().chat.at(-1);
   assert.ok(entry.text.startsWith('hi there'));
   assert.strictEqual(entry.text.length, 280);
 });
@@ -580,12 +580,12 @@ function teamRoom(t, { botPartner = false } = {}) {
   return { room, sent };
 }
 
-test('team chat only reaches the two partners and never the shared game log', (t) => {
+test('team chat only reaches the two partners and never the shared feed', (t) => {
   const { room, sent } = teamRoom(t);
   const partnerOfAna = room.seats[2].userId;
-  const before = room.game.log.length;
+  const before = room.view().chat.length;
   room.chat('u0', 'go for their blue one', 'team');
-  assert.strictEqual(room.game.log.length, before, 'team chat stays out of the broadcast log');
+  assert.strictEqual(room.view().chat.length, before, 'team chat stays out of the shared feed');
   const teamChat = sent.find((m) => m.event === 'room:teamChat');
   assert.deepStrictEqual(teamChat.to, [0, 2]);
   assert.strictEqual(teamChat.payload.text, 'go for their blue one');
@@ -810,7 +810,7 @@ test('chat is rate limited, open to spectators, and works from the lobby on', (t
   room.attach('viewer', 's9');
   const bubbles = reactions.length;
   room.chat('viewer', 'go ana!');
-  const entry = room.game.log.at(-1);
+  const entry = room.view().chat.at(-1);
   assert.deepStrictEqual({ seat: entry.seat, from: entry.from, spectator: entry.spectator, text: entry.text }, { seat: null, from: viewer.id, spectator: true, text: 'go ana!' });
   assert.strictEqual(reactions.length, bubbles, 'spectators have no nameplate, so no bubble');
 });
@@ -831,13 +831,16 @@ test('chat works before the game starts and keeps working across rounds', (t) =>
 
   lobby.start('u1');
   lobby.chat('u2', 'gl hf');
-  assert.strictEqual(lobby.game.log.at(-1).text, 'gl hf', 'mid-game lines join the game log');
-  assert.strictEqual(lobby.view().chat.at(-1).text, 'already chatting', 'lobby lines stay in the room log');
+  assert.strictEqual(lobby.view().chat.at(-1).text, 'gl hf', 'mid-game lines join the room log too');
+  assert.ok(lobby.game.log.every((e) => !e.chat), 'the game log stays game-only');
 
   lobby.game.phase = 'over';
   lobby.chat('u3', 'gg wp');
   assert.strictEqual(lobby.view().chat.at(-1).text, 'gg wp', 'results banter lands in the room log');
-  assert.strictEqual(lobby.game.log.at(-1).text, 'gl hf', 'the finished game log is untouched');
+
+  lobby.rematch('u1');
+  lobby.start('u1');
+  assert.deepStrictEqual(lobby.view().chat.map((e) => e.text), ['already chatting', 'gl hf', 'gg wp'], 'a new round keeps the whole chat history');
 });
 
 test('beta and dev tags get a hair trigger on reactions; everyone else waits', (t) => {

@@ -1,6 +1,11 @@
+import * as THREE from 'three';
 import { planMove } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin } from './skins';
 import { layoutFor } from '../game/geometry';
+import { ITEMS } from '../game/catalog';
+import { campsiteBlocks } from './MinecraftProps';
+import { KILL_FX } from './killfx';
+import { TRAILS } from './trails';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -114,6 +119,128 @@ test('Halloween skins build for every slot and keep their motion behind reduced-
     if (originalMatchMedia) window.matchMedia = originalMatchMedia;
     else delete window.matchMedia;
   }
+});
+
+test('Minecraft materials are distinct, pixel filtered, and motion safe on both board sizes', () => {
+  const gradient = { addColorStop: () => {} };
+  const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+  const originalMatchMedia = window.matchMedia;
+  const motion = { matches: false };
+  window.matchMedia = () => motion;
+  try {
+    const ores = [0, 1, 2, 3].map((seat) => marbleSkin('marble.minecraft', seat));
+    expect(new Set(ores.map((ore) => ore.material)).size).toBe(4);
+    expect(new Set(ores.map((ore) => ore.material.map)).size).toBe(4);
+    expect(ores[0].material.map.image.width).toBe(16);
+    const pixelMipped = (tex) => tex.magFilter === THREE.NearestFilter && tex.minFilter === THREE.NearestMipmapLinearFilter && tex.generateMipmaps;
+    expect(pixelMipped(ores[0].material.map)).toBe(true);
+    const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <emissivemap_fragment>' };
+    ores[0].material.onBeforeCompile(shader);
+    expect(shader.vertexShader).toContain('vOrePos = position');
+    expect(shader.fragmentShader).toContain('texture2D(map, oreUv)');
+    expect(shader.fragmentShader).toContain('texture2D(emissiveMap, oreUv)');
+    ores[0].animate(1.1);
+    expect(shader.uniforms.uOreGlow.value).toBeGreaterThan(0.35);
+    motion.matches = true;
+    ores[0].animate(1.1);
+    expect(shader.uniforms.uOreGlow.value).toBe(0.35);
+    motion.matches = false;
+
+    const dice = diceSkin('dice.minecraft');
+    expect(dice).toHaveLength(6);
+    expect(pixelMipped(dice[0].map)).toBe(true);
+    expect(pixelMipped(dice[0].emissiveMap)).toBe(true);
+    expect(dice[0].customProgramCacheKey()).toBe('dice-minecraft-animated');
+    motion.matches = true;
+    animateDiceSkin(dice);
+    expect(dice[0].userData.skinTime.value).toBe(0);
+
+    const classic = boardSkin('board.minecraft', layoutFor('classic'));
+    const blitz = boardSkin('board.minecraft', layoutFor('blitz'));
+    expect(classic.board).not.toBe(blitz.board);
+    expect([classic.board.map, classic.dish.map, classic.felt].every(pixelMipped)).toBe(true);
+    expect(classic.felt.userData.tileSize).toBe(4);
+    expect(classic.core).toBeTruthy();
+    const dishShader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    classic.dish.onBeforeCompile(dishShader);
+    expect(dishShader.fragmentShader).toContain('length(vSkinPos.xz) - 2.20');
+    expect(dishShader.uniforms.uPlank.value).toBeTruthy();
+    const boardShader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+    classic.board.onBeforeCompile(boardShader);
+    expect(boardShader.fragmentShader).toContain('abs(vSkinPos.z) - 8.75');
+    expect(boardShader.fragmentShader).toContain('texture2D(uBark');
+    expect(boardShader.fragmentShader).toContain('texture2D(uPlank');
+    expect(pixelMipped(classic.cup.map)).toBe(true);
+    const cupShader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>' };
+    classic.cup.onBeforeCompile(cupShader);
+    expect(cupShader.vertexShader).toContain('instanceMatrix * cupPos');
+    expect(cupShader.fragmentShader).toContain('texture2D(map, vCupPos.xz)');
+    expect(() => animateBoardSkin(blitz, 3)).not.toThrow();
+  } finally {
+    getContext.mockRestore();
+    if (originalMatchMedia) window.matchMedia = originalMatchMedia;
+    else delete window.matchMedia;
+  }
+});
+
+test('the Minecraft set registers all six mythic slots without paid entitlements', () => {
+  const set = Object.values(ITEMS).filter((item) => item.id.endsWith('.minecraft'));
+  expect(set.map((item) => item.slot).sort()).toEqual(['board', 'dice', 'fx', 'marble', 'nameplate', 'trail']);
+  expect(set.every((item) => item.rarity === 'mythic' && !item.tag)).toBe(true);
+});
+
+test.each(['classic', 'blitz'])('Minecraft scenery keeps every block off the %s board, trays, and die spots', (variant) => {
+  const layout = layoutFor(variant);
+  const { blocks, plants, torches, sheep, chickens, bees, clouds } = campsiteBlocks(layout);
+  expect(torches).toHaveLength(6);
+  expect(sheep).toHaveLength(1);
+  expect(chickens).toHaveLength(2);
+  expect(bees).toHaveLength(2);
+  expect(clouds.every((c) => Math.abs(c.x) > 15 && c.cells.length >= 4)).toBe(true);
+  expect(blocks.leaves.length).toBeGreaterThan(40);
+  expect(blocks.roof.length).toBeGreaterThan(20);
+  expect(['ore0', 'ore1', 'ore2', 'ore3'].every((ore) => blocks[ore]?.length)).toBe(true);
+  expect(plants.tuft.length).toBeGreaterThan(40);
+  const sheepReach = sheep.map(({ at: [x, z], rx, rz }) => ({ at: [x, 0, z], size: [rx * 2 + 0.7, 1, rz * 2 + 0.7] }));
+  const chickenReach = chickens.map(({ at: [x, z] }) => ({ at: [x, 0, z], size: [0.5, 1, 0.5] }));
+  const beeReach = bees.map(({ at: [x, , z], rx, rz }) => ({ at: [x, 0, z], size: [rx * 2 + 0.3, 1, rz * 2 + 0.3] }));
+  [...Object.values(blocks).flat(), ...Object.values(plants).flat(), ...sheepReach, ...chickenReach, ...beeReach].forEach(({ at: [x, , z], size: [w, , d] }) => {
+    const hw = layout.spec.halfWidth + 0.2;
+    const hl = layout.spec.halfLength + 0.2;
+    expect(Math.abs(x) - w / 2 > hw || Math.abs(z) - d / 2 > hl).toBe(true);
+    expect(Math.abs(x) - w / 2 > hl || Math.abs(z) - d / 2 > hw).toBe(true);
+    layout.BASE_TRAY.forEach(([r, c]) => {
+      const gap = Math.hypot(Math.max(0, Math.abs(c - x) - w / 2), Math.max(0, Math.abs(r - z) - d / 2));
+      expect(gap).toBeGreaterThan(layout.spec.dishR + 0.2);
+    });
+    layout.DIE_SPOT.forEach(([r, c]) => {
+      const gap = Math.hypot(Math.max(0, Math.abs(c - x) - w / 2), Math.max(0, Math.abs(r - z) - d / 2));
+      expect(gap).toBeGreaterThan(0.85);
+    });
+  });
+});
+
+test('Minecraft capture and trail emit pixel fragments and XP without falling back to other skins', () => {
+  const emit = jest.fn();
+  const sfx = jest.fn();
+  const seq = (n, gap, fn) => Array.from({ length: n }, (_, i) => fn(i / (n - 1), i));
+  KILL_FX.minecraft(emit, { at: [1, 0.4, 2], by: 0, victim: 1, sfx, later: (ms, fn) => fn(), seq });
+  const types = emit.mock.calls.map(([type]) => type);
+  expect(types).toContain('shard');
+  expect(emit.mock.calls.find(([type]) => type === 'shard')[1]).toMatchObject({ shape: 'box', colors: expect.arrayContaining(['#2350c8']) });
+  const orbPath = emit.mock.calls.filter(([, d]) => d.px && d.life === 0.06);
+  expect(orbPath).toHaveLength(7 * 44);
+  expect(Math.max(...orbPath.map(([, d]) => d.position[1]))).toBeCloseTo(1.95, 1);
+  expect(sfx.mock.calls.map(([name]) => name)).toEqual(['crunch', ...Array(7).fill('xp'), 'levelUp']);
+  expect(sfx.mock.calls.filter(([name]) => name === 'xp').map(([, step]) => step)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  emit.mockClear();
+  TRAILS.minecraft(emit, [1, 0.4, 2], { n: 0 });
+  expect(emit).toHaveBeenCalledTimes(4);
+  expect(emit.mock.calls[1][1]).toMatchObject({ px: true, jitter: 0, uj: 0 });
+  emit.mockClear();
+  TRAILS.minecraft(emit, [1, 0.4, 2], { n: 1 });
+  expect(emit).toHaveBeenCalledTimes(3);
 });
 
 test('a marble hopping past another taps on top of it instead of passing through', () => {

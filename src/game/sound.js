@@ -415,6 +415,12 @@ export const sfx = {
     tone({ freq: 120, to: 38, type: 'sine', dur: 0.6, vol: 0.4 });
     noise({ dur: 0.5, vol: 0.3, freq: 300, to: 1400, q: 0.6 });
   },
+  crunch: () => {
+    [0, 0.035, 0.07].forEach((d, i) => noise({ dur: 0.07, vol: 0.26 - i * 0.05, freq: jitter(900 + i * 500, 0.2), q: 1.2, delay: d }));
+    tone({ freq: 160, to: 70, type: 'triangle', dur: 0.14, vol: 0.18 });
+  },
+  xp: (step = 0) => tone({ freq: jitter(1400 + step * 110, 0.06), to: jitter(1900 + step * 120, 0.05), type: 'sine', dur: 0.09, vol: 0.07, attack: 0.004 }),
+  levelUp: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: i === 4 ? 0.5 : 0.16, vol: 0.1, delay: i * 0.075 })),
   twinkle: () => [1568, 2093, 2637, 3136].forEach((f, i) => tone({ freq: jitter(f, 0.04), type: 'sine', dur: 0.16, vol: 0.09, delay: i * 0.07 })),
   ping: (type = 'look', team = false) => {
     const vol = team ? 0.08 : 0.11;

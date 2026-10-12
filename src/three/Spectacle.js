@@ -210,8 +210,9 @@ void main() {
   p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) + 0.5;
   bool outside = p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0;
   ${pixel ? 'p = (floor(clamp(p, 0.0, 0.999) * 8.0) + 0.5) / 8.0;' : ''}
-  float col = mod(vT, 4.0);
-  float row = floor(vT / 4.0);
+  float tile = floor(vT + 0.5);
+  float row = floor((tile + 0.5) / 4.0);
+  float col = tile - row * 4.0;
   vec2 uv = vec2((col + p.x) / 4.0, 1.0 - (row + p.y) / 4.0);
   vec4 t = ${pixel ? 'texture2DLodEXT(uMap, uv, 0.0)' : 'texture2D(uMap, uv)'};
   float a = t.a * vA;
