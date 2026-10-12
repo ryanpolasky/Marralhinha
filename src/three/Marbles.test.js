@@ -161,7 +161,7 @@ test('Minecraft materials are distinct, pixel filtered, and motion safe on both 
     expect(classic.board).not.toBe(blitz.board);
     expect([classic.board.map, classic.dish.map, classic.felt].every(pixelMipped)).toBe(true);
     expect(classic.felt.userData.tileSize).toBe(4);
-    expect(classic.core).toBeTruthy();
+    expect(classic.core).toBeUndefined();
     const dishShader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
     classic.dish.onBeforeCompile(dishShader);
     expect(dishShader.fragmentShader).toContain('length(vSkinPos.xz) - 2.20');

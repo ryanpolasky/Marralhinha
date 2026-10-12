@@ -4219,13 +4219,10 @@ const PICNIC_BLANKET_SHADER = `{
 }`;
 
 const SPECIAL_BOARDS = {
-  // An oak deck with a log rim, stump trays with bark sides, and a campfire in the center hole.
+  // An oak deck with a log rim, stump trays with bark sides, and a crafting table in the middle.
   // Outer walls get bark; hole walls carry the planks down into the divots
   minecraft: (layout) => {
     const [stump, dishRepeat] = stumpCanvas(layout.spec.dishR);
-    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const emberDim = new THREE.Color('#7a2a08');
-    const emberBright = new THREE.Color('#ffb347');
     const woods = { uBark: { value: pixelMips(finish(blockCanvas('logSide', 811))) }, uPlank: { value: pixelMips(finish(blockCanvas('planks', 702))) } };
     const cupMap = pixelMips(finish(blockCanvas('planks', 705)));
     const { halfWidth: W, halfLength: L, dishR } = layout.spec;
@@ -4240,18 +4237,13 @@ const SPECIAL_BOARDS = {
     return {
       canvas: firstNightCanvas(layout), repeat: BOARD_R, pixel: true, roughness: 0.94,
       dishCanvas: stump, dishRepeat,
-      dish: '#9c7742', feltCanvas: grassFieldCanvas(), cup: '#ffffff', cupMap, core: '#7a2a08',
+      dish: '#9c7742', feltCanvas: grassFieldCanvas(), cup: '#ffffff', cupMap,
       accent: { color: '#85877f', metalness: 0, roughness: 0.95 },
       shaderCommon: 'uniform sampler2D uBark;\nuniform sampler2D uPlank;',
       uniforms: woods,
       dishUniforms: woods,
       shader: walls(`min(max(abs(vSkinPos.x) - ${W.toFixed(2)}, abs(vSkinPos.z) - ${L.toFixed(2)}), max(abs(vSkinPos.x) - ${L.toFixed(2)}, abs(vSkinPos.z) - ${W.toFixed(2)}))`),
       dishShader: walls(`(length(vSkinPos.xz) - ${dishR.toFixed(2)})`),
-      animate: (mats, t) => {
-        const time = still?.matches ? 0 : t;
-        const flame = 0.5 + 0.5 * Math.sin(time * 6.1) * Math.sin(time * 2.7) + 0.15 * Math.sin(time * 13.0);
-        mats.core.color.lerpColors(emberDim, emberBright, Math.min(1, Math.max(0, flame)));
-      },
     };
   },
   defuse: (layout) => {

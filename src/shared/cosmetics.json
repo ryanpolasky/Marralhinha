@@ -82,7 +82,7 @@
     { "id": "board.neon", "slot": "board", "name": "Neon Night", "rarity": "legendary", "desc": "The board after dark." },
     { "id": "board.aurora", "slot": "board", "name": "Midnight Aurora", "rarity": "legendary", "desc": "The sky came down to play." },
     { "id": "board.arcade", "slot": "board", "name": "Attract Mode", "rarity": "mythic", "desc": "Neon confetti on a dark arcade carpet, dithered down to a handful of colors." },
-    { "id": "board.minecraft", "slot": "board", "name": "First Night", "rarity": "mythic", "desc": "An oak deck framed in logs, a campfire in the middle, and enough torches to make it home. Don't dig straight down." },
+    { "id": "board.minecraft", "slot": "board", "name": "First Night", "rarity": "mythic", "desc": "An oak deck framed in logs, a crafting table in the middle, and enough torches to make it home. Don't dig straight down." },
     { "id": "board.defuse", "slot": "board", "name": "Bombsite", "rarity": "mythic", "desc": "Sun-baked sandstone with A on one side and B on the other. Something is planted on A, and it won't stop beeping." },
     { "id": "board.halloween", "slot": "board", "name": "Velvet Table", "rarity": "exclusive", "tag": "halloween", "desc": "The spirits gather round the table. So do you. Candles gutter, and something circles the ring." },
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },

@@ -142,14 +142,6 @@ const TEXTURES = {
     cobble(ctx, rand, BLOCK_PALETTES.cobble, '#626460');
     for (let i = 0; i < 40; i++) px(ctx, Math.floor(rand() * 16), Math.floor(rand() * 16), pick(rand, ['#6f8a4a', '#6b8546']));
   },
-  stonebrick: (ctx, rand) => {
-    noise(ctx, rand, BLOCK_PALETTES.stone);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const row = Math.floor(y / 8);
-      if (y % 8 === 7 || (x + row * 8) % 16 === 15) px(ctx, x, y, '#66685f');
-      else if (y % 8 === 0 || (x + row * 8) % 16 === 0) px(ctx, x, y, '#8e908a');
-    }
-  },
   sand: (ctx, rand) => noise(ctx, rand, BLOCK_PALETTES.sand),
   gravel: (ctx, rand) => noise(ctx, rand, BLOCK_PALETTES.gravel),
   wool: (ctx, rand) => noise(ctx, rand, BLOCK_PALETTES.wool),
@@ -282,29 +274,30 @@ export function blockCanvas(kind, seed = 731) {
 // A few grass variants, so neither the board nor the table tiles into a visible pattern
 const grassVariants = () => Array.from({ length: 6 }, (_, i) => blockCanvas('grass', 731 + i * 37));
 
-// An oak deck, block for block: oak planks with the track laid in darker spruce, and a stone brick hearth in the middle
+const SLOT = ['#9c7643', '#a07a46', '#a47e49', '#9f7945'];
+
+// A 3x3 block crafting table top: dark frame, nine bevelled slots, the center hole landing in the middle one
+function craftingTable(ctx, rand, x0, y0) {
+  rect(ctx, x0, y0, 48, 48, '#4e3418');
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+    const x = x0 + 2 + col * 15;
+    const y = y0 + 2 + row * 15;
+    noise(ctx, rand, SLOT, x, y, 14, 14);
+    rect(ctx, x, y, 14, 1, '#6e5029');
+    rect(ctx, x, y, 1, 14, '#6e5029');
+    rect(ctx, x + 1, y + 13, 13, 1, '#c29c62');
+    rect(ctx, x + 13, y + 1, 1, 13, '#c29c62');
+  }
+}
+
+// An oak deck, block for block: oak planks with the track laid in darker spruce, and a crafting table in the middle
 export function firstNightCanvas(layout) {
   const [canvas, ctx] = makeCanvas(320, 320);
   const rand = seeded(1201);
   ctx.imageSmoothingEnabled = false;
   for (let y = 0; y < 320; y += 16) for (let x = 0; x < 320; x += 16) ctx.drawImage(blockCanvas('planks', 700 + Math.floor(rand() * 5)), x, y);
   layout.RING.forEach(([r, c], i) => ctx.drawImage(blockCanvas('spruce', 400 + (i % 5)), 160 + c * 16 - 8, 160 - r * 16 - 8));
-  for (let gy = -1; gy <= 1; gy++) for (let gx = -1; gx <= 1; gx++) ctx.drawImage(blockCanvas('stonebrick', 500 + gy * 3 + gx), 152 + gx * 16, 152 + gy * 16);
-  const bark = blockCanvas('logSide');
-  const [log, lctx] = makeCanvas(40, 6);
-  lctx.imageSmoothingEnabled = false;
-  lctx.drawImage(bark, 0, 0, 16, 6, 0, 0, 40, 6);
-  lctx.fillStyle = '#a98650';
-  lctx.fillRect(0, 1, 2, 4);
-  lctx.fillRect(38, 1, 2, 4);
-  ctx.drawImage(log, 140, 146);
-  ctx.drawImage(log, 140, 168);
-  ctx.save();
-  ctx.translate(160, 160);
-  ctx.rotate(Math.PI / 2);
-  ctx.drawImage(log, -20, -14);
-  ctx.drawImage(log, -20, 8);
-  ctx.restore();
+  craftingTable(ctx, rand, 136, 136);
   return canvas;
 }
 
