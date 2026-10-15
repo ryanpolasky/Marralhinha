@@ -70,7 +70,7 @@ const logo = [...'Marralhinha!'].map((ch, i) => `<span style="--c:${LOGO_COLORS[
 const jsonLd = (route, title, description) => ({
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'WebPage', '@id': `${SITE}${route}#page`, url: `${SITE}${route}`, name: title, description, inLanguage: 'en', isPartOf: { '@id': `${SITE}/#website` }, about: { '@id': `${SITE}/#game` }, author: { '@id': `${SITE}/#author` } },
+    { '@type': 'WebPage', '@id': `${SITE}${route}#page`, url: `${SITE}${route}`, name: title, description, inLanguage: 'en', isPartOf: { '@id': `${SITE}/#website` }, about: { '@id': `${SITE}/#game` }, author: { '@id': 'https://ryanpolasky.com/#person' } },
     { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Marralhinha Online', item: `${SITE}/` }, { '@type': 'ListItem', position: 2, name: title, item: `${SITE}${route}` }] },
   ],
 });
