@@ -1,4 +1,13 @@
-import { layoutFor, positionIn, entryIdx, tipIdx } from './geometry';
+import { layoutFor, positionIn, entryIdx, tipIdx, SEAT_COLORS } from './geometry';
+import {
+  COLOR_PALETTE,
+  MIN_LOBBY_DIST,
+  hexToOklch,
+  tripletFromHex,
+  paletteAvailability,
+  resolveLobbyColors,
+  lobbyPairwiseMatrix,
+} from './colors';
 
 test('the shared blitz layout builds the same connected 40-cell board as the rules', () => {
   const blitz = layoutFor('blitz');
@@ -44,4 +53,36 @@ test('classic remains the unchanged default layout', () => {
   expect(classic.BASE[0]).toHaveLength(5);
   expect(classic.HOME[0]).toHaveLength(5);
   expect(classic.INNER_CORNERS).toEqual([8, 24, 40, 56]);
+});
+
+test('custom hex synthesis clamps extreme dark and white values into readable board triplets', () => {
+  const pitchBlack = tripletFromHex('#000000');
+  const pureWhite = tripletFromHex('#ffffff');
+  expect(hexToOklch(pitchBlack.main).L).toBeGreaterThanOrEqual(0.44);
+  expect(hexToOklch(pureWhite.main).L).toBeLessThanOrEqual(0.8);
+  expect(hexToOklch(pitchBlack.light).L).toBeGreaterThan(hexToOklch(pitchBlack.main).L);
+  expect(hexToOklch(pitchBlack.dark).L).toBeLessThan(hexToOklch(pitchBlack.main).L);
+});
+
+test('lobby color resolution separates four colliding red requests above the perceptual threshold', () => {
+  const requests = ['red', '#d92b38', 'coral', '#c82032'];
+  for (const strategy of ['nudge', 'palette', 'classic']) {
+    const { colors, report } = resolveLobbyColors(requests, { strategy, minDist: MIN_LOBBY_DIST });
+    expect(report[0].status).toBe('kept');
+    expect(report.slice(1).every((r) => r.status !== 'kept')).toBe(true);
+    const { minPair } = lobbyPairwiseMatrix(colors);
+    expect(minPair.dist).toBeGreaterThanOrEqual(MIN_LOBBY_DIST);
+  }
+});
+
+test('palette availability marks claimed and perceptually close swatches for the active seat', () => {
+  const list = paletteAvailability(1, SEAT_COLORS, MIN_LOBBY_DIST);
+  const redEntry = list.find((x) => x.swatch.id === 'red');
+  const coralEntry = list.find((x) => x.swatch.id === 'coral');
+  const violetEntry = list.find((x) => x.swatch.id === 'violet');
+  expect(redEntry.takenBy).toBe(0);
+  expect(redEntry.available).toBe(false);
+  expect(coralEntry.available).toBe(false);
+  expect(violetEntry.available).toBe(true);
+  expect(COLOR_PALETTE.length).toBeGreaterThanOrEqual(16);
 });

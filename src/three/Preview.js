@@ -23,8 +23,8 @@ function Spinner({ children, speed = 0.6, tilt = 0.35 }) {
   return <group ref={ref}>{children}</group>;
 }
 
-function MarblePreview({ itemId, seat }) {
-  const skin = marbleSkin(itemId, seat);
+function MarblePreview({ itemId, seat, color }) {
+  const skin = marbleSkin(itemId, seat, color);
   useFrame(({ clock }) => skin.animate?.(clock.elapsedTime));
   return (
     <Spinner>
@@ -216,14 +216,14 @@ function CompileGate({ children, onReady }) {
   );
 }
 
-export default function ItemPreview({ itemId, seat = 0, replay = 0, onReady }) {
+export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
   return (
     <Canvas key={stage ? 'stage' : 'item'} dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
-      <CompileGate key={`${itemId}-${seat}`} onReady={onReady}>
-        {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} />}
+      <CompileGate key={`${itemId}-${seat}-${color?.main || ''}`} onReady={onReady}>
+        {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} color={color} />}
         {slot === 'dice' && <DicePreview itemId={itemId} />}
         {slot === 'board' && <BoardPreview itemId={itemId} />}
         {slot === 'fx' && <FxPreview itemId={itemId} seat={seat} replay={replay} />}

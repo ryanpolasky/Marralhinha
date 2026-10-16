@@ -905,3 +905,26 @@ test('emotes only fire from the pack a player has equipped', (t) => {
   room.seats[2].cosmetics = { emotes: 'emotes.hype' };
   assert.throws(() => room.react('u2', 'salt'), UserError, 'hype pack cannot borrow from the salt pack');
 });
+
+test('seat colours and table palettes can be set in lobby or mid-game with unrestricted hexes and reset', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  assert.strictEqual(room.view().colors, undefined);
+  assert.throws(() => room.setColor('stranger', { seat: 0, color: 'violet' }), /not in this room/);
+  assert.throws(() => room.setColor('u1', { seat: 9, color: 'violet' }), /Pick a seat/);
+  assert.throws(() => room.setColor('u1', { seat: 0, color: 'not-a-color' }), /Unknown colour/);
+
+  room.setColor('u1', { seat: 0, color: 'violet' });
+  assert.strictEqual(room.view().colors[0].main, '#8b4dff');
+  assert.strictEqual(room.view().seats[0].color.name, 'Violet');
+  assert.strictEqual(room.view().game.colors[0].main, '#8b4dff');
+
+  room.setColor('u1', { seat: 1, color: '#050507' });
+  assert.strictEqual(room.view().colors[1].main, '#050507');
+
+  room.setColor('u1', { palette: 'neon' });
+  assert.deepStrictEqual(room.view().colors.map((c) => c.id), ['magenta', 'cyan', 'lime', 'orange']);
+
+  room.setColor('u1', { palette: null });
+  assert.strictEqual(room.view().colors, undefined);
+});

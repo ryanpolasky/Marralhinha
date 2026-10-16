@@ -418,8 +418,9 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
   const layout = layoutFor(board.variant);
+  const seatColors = colors || board.colors;
   const pointer = useRef(null);
   usePingKeys(pointer, canPing, onPing, layout);
   const openPingMenu = (at) => {
@@ -464,11 +465,12 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, bo
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />
       <Turntable viewSeat={viewSeat}>
-        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} layout={layout} />
+        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} colors={seatColors} layout={layout} />
         <KillFxLayer layout={layout} />
         <Marbles
           board={board}
           skins={cosmetics.map((c) => c?.marble)}
+          colors={seatColors}
           killFx={cosmetics.map((c) => c?.fx)}
           trails={cosmetics.map((c) => c?.trail)}
           moves={moves}

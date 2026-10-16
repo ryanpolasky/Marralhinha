@@ -122,10 +122,10 @@ export function PreviewLoader({ out = false }) {
   );
 }
 
-export function ItemThumb({ itemId, seat = 0 }) {
+export function ItemThumb({ itemId, seat = 0, color: colorProp = null }) {
   const item = ITEMS[itemId];
   const key = skinKey(itemId);
-  const color = SEAT_COLORS[seat];
+  const color = colorProp || SEAT_COLORS[seat];
   return (
     <span className={`thumb thumb-${item.slot} skin-${key}`} style={{ '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark }}>
       {item.slot === 'nameplate' && <Nameplate plate={itemId}>Aa</Nameplate>}
@@ -141,14 +141,15 @@ export function ItemThumb({ itemId, seat = 0 }) {
   );
 }
 
-export function PreviewStage({ itemId, seat = 0, playerName, replay = 0 }) {
+export function PreviewStage({ itemId, seat = 0, color = null, playerName, replay = 0 }) {
   const item = ITEMS[itemId];
   if (!item) return null;
   if (item.slot === 'nameplate') {
+    const c = color || SEAT_COLORS[seat];
     return (
       <div className="preview-stage plate-preview">
         <Nameplate plate={itemId} className="big">
-          <span className="avatar" style={{ '--seat': SEAT_COLORS[seat].main, '--seat-light': SEAT_COLORS[seat].light }}>
+          <span className="avatar" style={{ '--seat': c.main, '--seat-light': c.light }}>
             {(playerName || '?').slice(0, 1).toUpperCase()}
           </span>
           <span>{playerName || 'Player'}</span>
@@ -167,10 +168,10 @@ export function PreviewStage({ itemId, seat = 0, playerName, replay = 0 }) {
       </div>
     );
   }
-  return <ModelStage itemId={itemId} seat={seat} replay={replay} />;
+  return <ModelStage itemId={itemId} seat={seat} color={color} replay={replay} />;
 }
 
-function ModelStage({ itemId, seat, replay }) {
+function ModelStage({ itemId, seat, color, replay }) {
   const [ready, setReady] = useState(false);
   const [loaderOn, setLoaderOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -198,7 +199,7 @@ function ModelStage({ itemId, seat, replay }) {
     <div className="preview-stage">
       <div className={`preview-fade${revealed ? ' in' : ''}`}>
         <Suspense fallback={null}>
-          <ItemPreview itemId={itemId} seat={seat} replay={replay} onReady={() => setReady(true)} />
+          <ItemPreview itemId={itemId} seat={seat} color={color} replay={replay} onReady={() => setReady(true)} />
         </Suspense>
       </div>
       {loaderOn && <PreviewLoader out={revealed} />}

@@ -4,6 +4,7 @@ const { chooseMove } = require('../src/shared/bot');
 const { animationMs, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
 const { REACTION_KEYS } = require('../src/shared/reactions');
 const { STUNT_KINDS, rockyPath, stuntSeconds } = require('../src/shared/stunts');
+const { SEAT_COLORS, TABLE_PALETTE_BY_ID, resolveColorSpec } = require('../src/shared/colors');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -61,6 +62,7 @@ class Room {
     this.instanceId = instanceId;
     this.quickPlay = quickPlay;
     this.seats = [null, null, null, null];
+    this.seatColors = [null, null, null, null];
     this.spectators = new Map();
     this.swapOffers = [];
     this.hostId = null;
@@ -421,6 +423,32 @@ class Room {
     if (Object.keys(troll).length) target.troll = troll;
     else delete target.troll;
     if (this.game) rules.addLog(this.game, entry ? `Dev gave ${target.name} the ${entry.name}` : `${target.name} is back to their own look`, null);
+    this.changed();
+  }
+
+  // Dev-only now, host table palettes later: recolor one seat (swatch id or #hex) or all four via a table palette
+  setColor(userId, { seat, color, palette } = {}) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (palette !== undefined) {
+      if (palette === null || palette === 'classic') {
+        this.seatColors = [null, null, null, null];
+        if (this.game) rules.addLog(this.game, 'The table is back to classic colours', null);
+        this.changed();
+        return;
+      }
+      const entry = TABLE_PALETTE_BY_ID[palette];
+      if (!entry) throw new UserError('Unknown table palette');
+      this.seatColors = entry.colors.map((c) => resolveColorSpec(c));
+      if (this.game) rules.addLog(this.game, `The table is now painted in ${entry.name}`, null);
+      this.changed();
+      return;
+    }
+    if (!Number.isInteger(seat) || seat < 0 || seat > 3) throw new UserError('Pick a seat');
+    const resolved = resolveColorSpec(color);
+    if (color !== null && color !== undefined && color !== 'classic' && !resolved) throw new UserError('Unknown colour');
+    this.seatColors[seat] = resolved;
+    const who = this.seats[seat]?.name || SEAT_COLORS[seat].name;
+    if (this.game) rules.addLog(this.game, resolved ? `Dev painted ${who} ${resolved.name}` : `${who} is back to ${SEAT_COLORS[seat].name}`, null);
     this.changed();
   }
 
@@ -910,6 +938,17 @@ class Room {
 
   view() {
     const now = Date.now();
+    const hasColors = this.seatColors.some(Boolean);
+    const colors = hasColors ? this.seatColors.map((c, s) => c || SEAT_COLORS[s]) : undefined;
+    const gameView =
+      this.game && (this.game.hits || this.game.stunts || colors)
+        ? {
+            ...this.game,
+            ...(colors ? { colors } : {}),
+            ...(this.game.hits ? { hits: (this.game.hits || []).map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })) } : {}),
+            ...(this.game.stunts ? { stunts: (this.game.stunts || []).map(({ t, cutAt, ...s }) => ({ ...s, age: now - t, cut: !!cutAt, cutAge: cutAt ? now - cutAt : null })) } : {}),
+          }
+        : this.game;
     return {
       code: this.code,
       hostId: this.hostId,
@@ -917,7 +956,8 @@ class Room {
       teams: this.teams,
       variant: this.game?.variant || this.variant,
       turnSeconds: this.turnSeconds,
-      seats: this.seats.map((p) => p && {
+      ...(colors ? { colors } : {}),
+      seats: this.seats.map((p, s) => p && {
         id: p.id,
         name: p.name,
         avatar: p.avatar ?? null,
@@ -931,6 +971,7 @@ class Room {
         coveredBy: p.coveredBy ?? null,
         devices: p.sockets?.size || 0,
         cosmetics: p.troll ? { ...p.cosmetics, ...p.troll } : p.cosmetics,
+        ...(this.seatColors[s] ? { color: this.seatColors[s] } : {}),
         level: p.level,
         tags: p.tags || [],
       }),
@@ -943,14 +984,7 @@ class Room {
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       chat: this.chatLog,
       // Hit and stunt ages are relative too, so every client plays the bit on the same beat
-      game:
-        this.game?.hits || this.game?.stunts
-          ? {
-              ...this.game,
-              hits: (this.game.hits || []).map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })),
-              stunts: (this.game.stunts || []).map(({ t, cutAt, ...s }) => ({ ...s, age: now - t, cut: !!cutAt, cutAge: cutAt ? now - cutAt : null })),
-            }
-          : this.game,
+      game: gameView,
     };
   }
 

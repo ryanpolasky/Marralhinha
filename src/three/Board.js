@@ -157,14 +157,12 @@ function NameTag({ name, color, position }) {
 }
 
 const mixHex = (a, b, t) => `#${[1, 3, 5].map((i) => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('')}`;
-const DIMMED = SEAT_COLORS.map((c) => mixHex(c.main, '#4a3a2c', 0.74));
-const seatColor = (seat, active) => (active ? SEAT_COLORS[seat].main : DIMMED[seat]);
+const seatColor = (c, active) => (active ? c.main : mixHex(c.main, '#4a3a2c', 0.74));
 
-function Dish({ seat, geometry, material, active, isTurn, name, layout }) {
+function Dish({ seat, color = SEAT_COLORS[seat], geometry, material, active, isTurn, name, layout }) {
   const rimRef = useRef();
   const [r, c] = layout.BASE_TRAY[seat];
   const dishR = layout.spec.dishR;
-  const color = SEAT_COLORS[seat];
   useFrame(({ clock }) => {
     const mat = rimRef.current.material;
     mat.emissiveIntensity = isTurn ? 0.6 + Math.sin(clock.elapsedTime * 4) * 0.4 : active ? 0.12 : 0;
@@ -175,7 +173,7 @@ function Dish({ seat, geometry, material, active, isTurn, name, layout }) {
         <mesh geometry={geometry} material={material} castShadow receiveShadow />
         <mesh ref={rimRef} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
           <ringGeometry args={[dishR - 0.2, dishR - 0.04, 64]} />
-          <meshStandardMaterial color={seatColor(seat, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
+          <meshStandardMaterial color={seatColor(color, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
         </mesh>
       </group>
       {active && name && <NameTag name={name} color={color.main} position={[c, 1.45, r]} />}
@@ -183,7 +181,7 @@ function Dish({ seat, geometry, material, active, isTurn, name, layout }) {
   );
 }
 
-function TurnGem({ turn, layout }) {
+function TurnGem({ turn, colors = SEAT_COLORS, layout }) {
   const ref = useRef();
   const mat = useRef();
   const color = useMemo(() => new THREE.Color(), []);
@@ -201,7 +199,7 @@ function TurnGem({ turn, layout }) {
     g.position.z += (r - g.position.z) * k;
     g.position.y = 2.5 + Math.sin(clock.elapsedTime * 2.5) * 0.2;
     g.rotation.y += dt * 1.6;
-    mat.current.color.lerp(color.set(SEAT_COLORS[turn].main), k);
+    mat.current.color.lerp(color.set((colors[turn] || SEAT_COLORS[turn]).main), k);
     mat.current.emissive.copy(mat.current.color);
   });
   return (
@@ -320,7 +318,7 @@ function useSkinTransition(skin, animate, prepare) {
   return [shown, wave];
 }
 
-export default function Board({ active, names, turn, showNames, skin, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
+export default function Board({ active, names, turn, showNames, skin, colors = SEAT_COLORS, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
@@ -428,15 +426,16 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
 
       {SEATS.map((s) => {
         const seated = active.includes(s);
+        const col = colors?.[s] || SEAT_COLORS[s];
         return (
           <group key={s}>
             <Divots points={seatHoles[s]} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
-            <Divots points={seatHoles[s]} geometry={DIVOT_LIPPED_GEO} color={seatColor(s, seated)} />
+            <Divots points={seatHoles[s]} geometry={DIVOT_LIPPED_GEO} color={seatColor(col, seated)} />
             <mesh geometry={stripGeometry} rotation-y={(s * Math.PI) / 2} position-y={0.003}>
-              <meshStandardMaterial color={seatColor(s, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
+              <meshStandardMaterial color={seatColor(col, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
             </mesh>
-            <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.09} color={seatColor(s, seated)} />
-            <Dish seat={s} geometry={dishGeometries[s]} material={materials.dishes[s]} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
+            <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.09} color={seatColor(col, seated)} />
+            <Dish seat={s} color={col} geometry={dishGeometries[s]} material={materials.dishes[s]} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
           </group>
         );
       })}
@@ -456,7 +455,7 @@ export default function Board({ active, names, turn, showNames, skin, table = tr
         );
       })}
       <Ring at={CENTER} inner={CENTER_R + 0.03} outer={CENTER_R + 0.16} material={materials.brass} />
-      <TurnGem turn={turn ?? null} layout={layout} />
+      <TurnGem turn={turn ?? null} colors={colors} layout={layout} />
       {table && <SwapWave wave={wave} />}
     </group>
   );

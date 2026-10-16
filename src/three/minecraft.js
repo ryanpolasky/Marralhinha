@@ -76,8 +76,8 @@ const ORE_SHAPES = [
 const ORE_SPOTS = [[2, 2], [9, 1], [12, 6], [5, 7], [1, 11], [8, 11], [12, 13]];
 
 // One 16px ore block; the glow canvas lights only the ore pixels
-export function oreBlockCanvases(seat) {
-  const ore = ORES[seat % ORES.length];
+export function oreBlockCanvases(seat, customOre = null) {
+  const ore = customOre ? { name: 'custom', dark: customOre.dark, main: customOre.main, light: customOre.light } : ORES[seat % ORES.length];
   const [base, ctx] = makeCanvas(16, 16);
   const [glow, light] = makeCanvas(16, 16);
   const rand = seeded(311 + seat * 47);

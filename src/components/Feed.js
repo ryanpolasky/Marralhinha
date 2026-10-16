@@ -50,7 +50,7 @@ function ChatInput({ onSend, teams = false }) {
   );
 }
 
-export default function Feed({ entries, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
+export default function Feed({ entries, colors = SEAT_COLORS, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
   const shown = open || docked ? entries : entries.slice(0, 4);
   const empty = !open && !entries.length;
   return (
@@ -76,7 +76,7 @@ export default function Feed({ entries, open, onToggle, showLogs, onToggleLogs, 
           <div
             key={`${entry.t}-${i}`}
             className={`feed-entry${entry.chat ? ' chat' : ''}${entry.team ? ' team' : ''}`}
-            style={{ '--seat': entry.seat === null ? '#8aa' : SEAT_COLORS[entry.seat].main }}
+            style={{ '--seat': entry.seat === null ? '#8aa' : (colors[entry.seat] || SEAT_COLORS[entry.seat]).main }}
           >
             {entry.chat && (
               <b className="chat-name">

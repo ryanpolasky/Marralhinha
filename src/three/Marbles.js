@@ -151,7 +151,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -320,7 +320,7 @@ function Marble({ seat, target, plan, planKey, material, movable, selected, hove
       </group>
       {movable && (
         <mesh ref={halo} geometry={HALO_GEO} position={[target.x, 0.02, target.z]} rotation-x={-Math.PI / 2}>
-          <meshBasicMaterial color={selected ? '#ffe066' : SEAT_COLORS[seat].light} transparent toneMapped={false} depthWrite={false} />
+          <meshBasicMaterial color={selected ? '#ffe066' : color.light} transparent toneMapped={false} depthWrite={false} />
         </mesh>
       )}
     </>
@@ -339,10 +339,9 @@ function GhostLabel({ text, color }) {
 
 const moveLabel = (move) => (move.kind === 'enterCenter' ? 'Shortcut' : move.capture ? 'Capture!' : move.kind === 'exitCenter' ? 'Out of center' : `Move ${move.path.length}`);
 
-function Ghost({ move, strong, label, onMove, layout }) {
+function Ghost({ move, color = SEAT_COLORS[move.seat], strong, label, onMove, layout }) {
   const ref = useRef();
   const ring = useRef();
-  const color = SEAT_COLORS[move.seat];
   const target = worldOf(move.seat, move.to, move.marble, layout);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -380,20 +379,21 @@ function Ghost({ move, strong, label, onMove, layout }) {
   );
 }
 
-function PathDots({ move, layout }) {
+function PathDots({ move, color = SEAT_COLORS[move.seat], layout }) {
   if (!move.path || move.path.length < 2) return null;
   return move.path.slice(0, -1).map((cell, i) => {
     const p = worldOf(move.seat, cell, move.marble, layout);
     return (
       <mesh key={i} geometry={PATH_DOT_GEO} position={[p.x, 0.06, p.z]}>
-        <meshBasicMaterial color={SEAT_COLORS[move.seat].light} toneMapped={false} />
+        <meshBasicMaterial color={color.light} toneMapped={false} />
       </mesh>
     );
   });
 }
 
-export default function Marbles({ board, skins = [], killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
-  const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s));
+export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
+  const palette = colors || board.colors || SEAT_COLORS;
+  const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, palette[s]));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = board.lastMove?.t;
@@ -437,6 +437,7 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
             <Marble
               key={key}
               seat={seat}
+              color={palette[seat] || SEAT_COLORS[seat]}
               target={worldOf(seat, pos, marble, layout)}
               plan={plans[key]}
               planKey={planKey}
@@ -465,12 +466,13 @@ export default function Marbles({ board, skins = [], killFx = [], trails = [], m
         <group key={`g-${mv.id}`}>
           <Ghost
             move={mv}
+            color={palette[mv.seat] || SEAT_COLORS[mv.seat]}
             strong={!!selected && (!keyMove || keyMove === mv.id)}
             label={keyMove === mv.id ? `${moveLabel(mv)} · Enter` : focusMoves.length > 1 ? moveLabel(mv) : null}
             onMove={onMove}
             layout={layout}
           />
-          <PathDots move={mv} layout={layout} />
+          <PathDots move={mv} color={palette[mv.seat] || SEAT_COLORS[mv.seat]} layout={layout} />
         </group>
       ))}
     </group>

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
+import { COLOR_PALETTE } from '../game/colors';
+import { TablePaletteBar } from './Lobby';
 import { coverFor, coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
@@ -167,8 +169,9 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
     };
   }, [wheel, pick.t, elapsedAtMount]);
 
-  const stops = contenders.map((s, i) => `${SEAT_COLORS[s].main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
-  const color = SEAT_COLORS[pick.seat];
+  const palette = game.colors || SEAT_COLORS;
+  const stops = contenders.map((s, i) => `${(palette[s] || SEAT_COLORS[s]).main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
+  const color = palette[pick.seat] || SEAT_COLORS[pick.seat];
   const starter = nameOf(pick.seat);
   const boardSeat = game.boardSeat ?? pick.seat;
   const board = seats[boardSeat]?.cosmetics?.board;
@@ -284,7 +287,7 @@ function TurnClock({ deadline, total }) {
 }
 
 export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats, mini = false }) {
-  const color = SEAT_COLORS[seat];
+  const color = player?.color || game?.colors?.[seat] || SEAT_COLORS[seat];
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
@@ -353,12 +356,13 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
 
 // Dev-only: swap the whole table's board, or force anyone's marble, dice and kill effect skins mid-game
 const TROLL_SLOTS = { marble: 'marbles', dice: 'dice', fx: 'kill effect', trail: 'move trail' };
-export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1, onShoot, onUnshoot, onStunt, onBitStart, startOpen = false }) {
+export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, game, mySeat = -1, onShoot, onUnshoot, onStunt, onBitStart, startOpen = false }) {
   const [open, setOpen] = useState(startOpen);
   const [tab, setTab] = useState('board');
   const [edit, setEdit] = useState(null);
   const [bit, setBit] = useState(null);
   const [picks, setPicks] = useState(null);
+  const seatColor = (s) => colors?.[s] || game?.colors?.[s] || seats?.[s]?.color || SEAT_COLORS[s];
   const reopen = (nextBit) => {
     setTab('bits');
     setBit(nextBit);
@@ -389,10 +393,10 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
-  const items = edit ? itemsForSlot(edit.slot) : [];
+  const items = edit && edit.slot !== 'color' ? itemsForSlot(edit.slot) : [];
   const victim = edit && seats[edit.seat];
-  const slotLabel = TROLL_SLOTS[edit?.slot];
-  const worn = victim ? cosmeticsOf(victim)[edit.slot] : null;
+  const slotLabel = edit?.slot === 'color' ? 'colour' : TROLL_SLOTS[edit?.slot];
+  const worn = victim && edit?.slot !== 'color' ? cosmeticsOf(victim)[edit.slot] : null;
   const pickTab = (key) => {
     setTab(key);
     setEdit(null);
@@ -495,9 +499,50 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
                     />
                   </>
                 )}
-                {tab === 'dress' && edit && (
+                {tab === 'dress' && edit && edit.slot === 'color' && (
                   <>
-                    <div className="board-picker-head" style={{ '--seat': SEAT_COLORS[edit.seat].main }}>
+                    <div className="board-picker-head" style={{ '--seat': seatColor(edit.seat).main }}>
+                      <span className="picker-victim">
+                        {victim?.name}'s colour
+                      </span>
+                      <span className="troll-actions">
+                        <button className="btn tiny ghost" onClick={() => setEdit(null)}>
+                          Back
+                        </button>
+                        <button className="btn tiny ghost" onClick={() => onColor?.({ seat: edit.seat, color: null })}>
+                          Default ({SEAT_COLORS[edit.seat].name})
+                        </button>
+                      </span>
+                    </div>
+                    <div className="board-picker-grid">
+                      {COLOR_PALETTE.map((sw) => {
+                        const cur = seatColor(edit.seat);
+                        const on = cur.main.toLowerCase() === sw.main.toLowerCase();
+                        return (
+                          <button
+                            key={sw.id}
+                            role="menuitemradio"
+                            aria-checked={on}
+                            className={`board-option${on ? ' on' : ''}`}
+                            onClick={() => onColor?.({ seat: edit.seat, color: sw.id })}
+                            title={sw.name}
+                          >
+                            <span className="marble-dot" style={{ '--seat': sw.main, '--seat-light': sw.light }} />
+                            <span>{sw.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <label className="dev-hex-picker">
+                      <span className="marble-dot mini" style={{ '--seat': seatColor(edit.seat).main, '--seat-light': seatColor(edit.seat).light }} />
+                      <span>Custom hex: <b>{seatColor(edit.seat).main.toUpperCase()}</b></span>
+                      <input type="color" value={seatColor(edit.seat).main} onChange={(e) => onColor?.({ seat: edit.seat, color: e.target.value })} aria-label="Custom colour hex" />
+                    </label>
+                  </>
+                )}
+                {tab === 'dress' && edit && edit.slot !== 'color' && (
+                  <>
+                    <div className="board-picker-head" style={{ '--seat': seatColor(edit.seat).main }}>
                       <span className="picker-victim">
                         {victim?.name}'s {slotLabel}
                       </span>
@@ -513,7 +558,7 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
                     <div className="board-picker-grid">
                       {items.map((b) => (
                         <button key={b.id} role="menuitemradio" aria-checked={worn === b.id} className={`board-option${worn === b.id ? ' on' : ''}`} onClick={() => onSkin(edit.seat, edit.slot, b.id)} title={b.desc}>
-                          <ItemThumb itemId={b.id} seat={edit.seat} />
+                          <ItemThumb itemId={b.id} seat={edit.seat} color={seatColor(edit.seat)} />
                           <span>{b.name}</span>
                         </button>
                       ))}
@@ -522,14 +567,29 @@ export function BoardPicker({ current, seats, onPick, onSkin, game, mySeat = -1,
                 )}
                 {tab === 'dress' && !edit && (
                   <div className="troll-list">
+                    {onColor && (
+                      <TablePaletteBar
+                        colors={[0, 1, 2, 3].map(seatColor)}
+                        onSelect={(palette) => onColor({ palette })}
+                      />
+                    )}
                     {seats.map((p, s) =>
                       p ? (
-                        <div className="troll-row" key={s} style={{ '--seat': SEAT_COLORS[s].main }}>
+                        <div className="troll-row" key={s} style={{ '--seat': seatColor(s).main }}>
                           <span className="troll-name">{p.name}</span>
                           <div className="troll-slots">
+                            {onColor && (
+                              <button className="troll-slot" aria-label={`${p.name}'s colour`} title={`${p.name}'s colour`} onClick={() => setEdit({ seat: s, slot: 'color' })}>
+                                <span className="marble-dot" style={{ '--seat': seatColor(s).main, '--seat-light': seatColor(s).light }} />
+                                <span className="troll-slot-info">
+                                  <b>Colour</b>
+                                  <span>{seatColor(s).name}</span>
+                                </span>
+                              </button>
+                            )}
                             {Object.keys(TROLL_SLOTS).map((slot) => (
                               <button key={slot} className="troll-slot" aria-label={`${p.name}'s ${TROLL_SLOTS[slot]}`} title={`${p.name}'s ${TROLL_SLOTS[slot]}`} onClick={() => setEdit({ seat: s, slot })}>
-                                <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} />
+                                <ItemThumb itemId={cosmeticsOf(p)[slot]} seat={s} color={seatColor(s)} />
                                 <span className="troll-slot-info">
                                   <b>{TROLL_SLOTS[slot][0].toUpperCase() + TROLL_SLOTS[slot].slice(1)}</b>
                                   <span>{ITEMS[cosmeticsOf(p)[slot]]?.name || 'None'}</span>
@@ -655,12 +715,13 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
         const mine = awards.filter((a) => a.seat === s);
         const marbles = game.marbles[s] || [];
         const home = homeCount(marbles);
+        const col = game.colors?.[s] || p?.color || SEAT_COLORS[s];
         return (
           <button
             key={s}
             type="button"
             className={`win-player${human ? '' : ' quiet'}${won(s) ? ' won' : ''}`}
-            style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light, '--seat-dark': SEAT_COLORS[s].dark }}
+            style={{ '--seat': col.main, '--seat-light': col.light, '--seat-dark': col.dark }}
             disabled={!human}
             onClick={() => human && onPlayerStats(p)}
             title={human ? `See ${p.name}'s stats` : undefined}
@@ -668,7 +729,7 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
             <span className="marble-dot" />
             <span className="win-player-main">
               <span className="win-player-head">
-                <span className="win-player-name">{s === mySeat ? 'You' : p?.name || SEAT_COLORS[s].name}</span>
+                <span className="win-player-name">{s === mySeat ? 'You' : p?.name || col.name}</span>
                 <TagBadges tags={p?.tags} small />
                 {p?.isBot && <span className="badge">bot</span>}
               </span>
@@ -720,9 +781,10 @@ export function WinCard({ cardRef, activity = false, wide = false, local = false
     <div ref={cardRef} className={`panel win-card${iWon ? ' won' : ''}${activity || wide ? ' activity-win-card' : ''}${wide && !activity ? ' wide-win-card' : ''}${reward ? '' : ' no-payout'}`}>
       <div className="win-intro">
         <div className="win-marbles">
-          {game.winners.map((s) => (
-            <span key={s} className="marble-dot big" style={{ '--seat': SEAT_COLORS[s].main, '--seat-light': SEAT_COLORS[s].light }} />
-          ))}
+          {game.winners.map((s) => {
+            const col = game.colors?.[s] || seats?.[s]?.color || SEAT_COLORS[s];
+            return <span key={s} className="marble-dot big" style={{ '--seat': col.main, '--seat-light': col.light }} />;
+          })}
         </div>
         <div className="win-headline">
           <div className="win-kicker">{iWon ? 'Victory!' : 'Game over'}</div>
@@ -1045,10 +1107,11 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       ))}
     </div>
   );
+  const seatColors = game.colors || SEAT_COLORS;
   const actionPanel = (
-    <div className={`action-panel${myTurn ? ' mine' : ''}`} style={activeSeat == null ? undefined : { '--seat': SEAT_COLORS[activeSeat].main }}>
+    <div className={`action-panel${myTurn ? ' mine' : ''}`} style={activeSeat == null ? undefined : { '--seat': (seatColors[activeSeat] || SEAT_COLORS[activeSeat]).main }}>
       {badge && (
-        <span key={game.lastRoll?.t} className={`roll-badge${badge.die === 6 ? ' six' : ''}`} style={{ '--seat': SEAT_COLORS[badge.seat].main }}>
+        <span key={game.lastRoll?.t} className={`roll-badge${badge.die === 6 ? ' six' : ''}`} style={{ '--seat': (seatColors[badge.seat] || SEAT_COLORS[badge.seat]).main }}>
           {badge.die}
         </span>
       )}
@@ -1096,8 +1159,10 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     <BoardPicker
       current={game.boardOverride || seats[game.boardSeat ?? -1]?.cosmetics?.board || null}
       seats={seats}
+      colors={seatColors}
       onPick={(item) => onAction('game:setBoard', { item })}
       onSkin={(seat, slot, item) => onAction('game:setSkin', { seat, slot, item })}
+      onColor={(payload) => onAction('game:setColor', payload)}
       game={game}
       mySeat={mySeat}
       onShoot={(shot) => onAction('game:shoot', shot)}
@@ -1121,6 +1186,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const feed = (docked) => (
     <Feed
       entries={entries}
+      colors={seatColors}
       open={feedOpen}
       onToggle={() => {
         setFeedOpen((o) => !o);

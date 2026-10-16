@@ -492,7 +492,7 @@ const App = () => {
       const active = [0, 1, 2, 3].filter((s) => view.seats[s]);
       const spec = BOARDS[view.variant] || BOARDS.classic;
       const marbles = [0, 1, 2, 3].map((s) => (view.seats[s] ? Array.from({ length: spec.marbles }, () => base) : []));
-      return { mode: 'lobby', board: { variant: spec.id, active, marbles, lastMove: null, lastRoll: null, turn: null }, names, viewSeat, cosmetics };
+      return { mode: 'lobby', board: { variant: spec.id, active, marbles, colors: view.colors, lastMove: null, lastRoll: null, turn: null }, colors: view.colors, names, viewSeat, cosmetics };
     }
     const g = view.game;
     const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat)) && g.phase !== 'over' && !view.paused;
@@ -500,6 +500,7 @@ const App = () => {
     return {
       mode: 'game',
       board: held ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
+      colors: g.colors || view.colors,
       names,
       viewSeat: heldView.current,
       lockCamera: locked,

@@ -209,7 +209,7 @@ const GALAXY_PHASES = [
 const MARBLES = {
   // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
   minecraft: (c, seat) => {
-    const [base, glow] = oreBlockCanvases(seat);
+    const [base, glow] = oreBlockCanvases(seat, c !== SEAT_COLORS[seat] ? c : null);
     const pixelMap = (canvas) => {
       const map = pixelMips(finishMarble(canvas));
       map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
@@ -279,7 +279,9 @@ const MARBLES = {
   },
   // Defuse set: Doppler-style anodized gem, one phase per seat, painted in object space so it rolls with the marble
   defuse: (c, seat) => {
-    const gem = GEM_PHASES[seat];
+    const gem = c === SEAT_COLORS[seat]
+      ? GEM_PHASES[seat]
+      : { deep: mix(c.dark, '#000000', 0.68), mid: mix(c.main, c.dark, 0.3), bright: c.main, glint: c.light };
     const color = (hex) => ({ value: new THREE.Color(hex) });
     const uniforms = { uTime: { value: 0 }, uSeed: { value: seat * 7.31 + 2.0 }, uDeep: color(gem.deep), uMid: color(gem.mid), uBright: color(gem.bright), uGlint: color(gem.glint) };
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -382,7 +384,9 @@ const MARBLES = {
   galaxy: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     const rand = seeded(90 + seat);
-    const phase = GALAXY_PHASES[seat];
+    const phase = c === SEAT_COLORS[seat]
+      ? GALAXY_PHASES[seat]
+      : { bg: mix(c.dark, '#03030a', 0.8), accent: c.main, deep: c.dark, star: mix(c.light, '#ffffff', 0.55), motif: GALAXY_PHASES[seat % 4].motif };
     ctx.fillStyle = phase.bg;
     ctx.fillRect(0, 0, 512, 256);
     nebula(ctx, rand, { colors: [c.main, c.light, phase.accent, phase.deep], count: 26, w: 512, h: 256, wrapX: true });
@@ -1189,10 +1193,12 @@ const MARBLES = {
   },
 };
 
-export function marbleSkin(itemId, seat) {
+export function marbleSkin(itemId, seat, color = null) {
   const key = MARBLES[skinKey(itemId)] ? skinKey(itemId) : 'classic';
-  return cached(`marble:${key}:${seat}`, () => {
-    const { animate, ...params } = MARBLES[key](SEAT_COLORS[seat], seat);
+  const c = color || SEAT_COLORS[seat] || SEAT_COLORS[0];
+  const colorTag = c === SEAT_COLORS[seat] ? seat : `${seat}:${c.main}`;
+  return cached(`marble:${key}:${colorTag}`, () => {
+    const { animate, ...params } = MARBLES[key](c, seat);
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     return { material, animate: animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null };
   });
