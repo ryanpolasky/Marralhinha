@@ -3007,6 +3007,85 @@ function moonFeltCanvas() {
   return canvas;
 }
 
+// The board edge drawn as a cross-section of the sea: scallops under a moonlit waterline, sinking to black.
+// Canvas top is the board's top edge; 1024px wraps 8 world units around the wall
+function moonwakeSideCanvas() {
+  const S = 1024;
+  const H = 84;
+  const [canvas, ctx] = makeCanvas(S, H);
+  const rand = seeded(913);
+  const wrapX = (fn) => [-S, 0, S].forEach((dx) => {
+    ctx.save();
+    ctx.translate(dx, 0);
+    fn();
+    ctx.restore();
+  });
+  const sea = ctx.createLinearGradient(0, 0, 0, H);
+  sea.addColorStop(0, '#0e3d4e');
+  sea.addColorStop(0.3, '#082636');
+  sea.addColorStop(0.7, '#04141f');
+  sea.addColorStop(1, '#010609');
+  ctx.fillStyle = sea;
+  ctx.fillRect(0, 0, S, H);
+
+  const line = ctx.createLinearGradient(0, 0, 0, 18);
+  line.addColorStop(0, 'rgba(175,246,232,0.55)');
+  line.addColorStop(1, 'rgba(175,246,232,0)');
+  ctx.fillStyle = line;
+  ctx.fillRect(0, 0, S, 18);
+  ctx.fillStyle = 'rgba(205,250,240,0.45)';
+  ctx.fillRect(0, 0, S, 1.5);
+
+  const R = 19;
+  ctx.lineWidth = 1.3;
+  for (let row = 0; row < 4; row++) {
+    const cy = 4 + row * 9;
+    const off = row % 2 ? R : 0;
+    [1, 0.68, 0.36].forEach((s, i) => {
+      ctx.strokeStyle = `rgba(190,236,229,${0.32 - row * 0.06 - i * 0.05})`;
+      for (let cx = -R + off; cx < S + R; cx += R * 2) {
+        wrapX(() => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, R * s, 0.06 * Math.PI, 0.94 * Math.PI);
+          ctx.stroke();
+        });
+      }
+    });
+  }
+
+  for (let i = 0; i < 12; i++) {
+    const x = rand() * S;
+    const w = 5 + rand() * 15;
+    const len = 34 + rand() * 46;
+    const lean = (rand() - 0.5) * 36;
+    const beam = ctx.createLinearGradient(x, 2, x + lean, len);
+    beam.addColorStop(0, 'rgba(140,225,215,0.08)');
+    beam.addColorStop(1, 'rgba(140,225,215,0)');
+    ctx.fillStyle = beam;
+    wrapX(() => {
+      ctx.beginPath();
+      ctx.moveTo(x, 1);
+      ctx.lineTo(x + w, 1);
+      ctx.lineTo(x + w + lean, len);
+      ctx.lineTo(x + lean, len);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  for (let i = 0; i < 9; i++) {
+    wavyLine(ctx, { y0: H * 0.52 + rand() * H * 0.42, amp: 2 + rand() * 4, k: 2 + Math.floor(rand() * 4), phase: rand() * TAU, width: 0.7 + rand() * 0.8, color: '#7fd0cc', alpha: 0.05 + rand() * 0.05, w: S });
+  }
+
+  for (let i = 0; i < 220; i++) {
+    const x = rand() * S;
+    const y = rand() * H;
+    ctx.fillStyle = `rgba(160,240,225,${(0.1 + rand() * 0.3) * (0.35 + 0.65 * (1 - y / H))})`;
+    ctx.fillRect(x, y, rand() > 0.85 ? 2 : 1, rand() > 0.85 ? 2 : 1);
+  }
+  return canvas;
+}
+
 // A lighthouse beam sweeps from the center, lighting the tide lines, glints and hole collars as it passes
 const MOONWAKE_SHADER = `{
   vec2 uvB = vEmissiveMapUv;
@@ -3041,10 +3120,13 @@ const MOONWAKE_SHADER = `{
   float ripple = exp(-pow((dat.a - (1.0 - age)) / 0.1, 2.0)) * (1.0 - age) * step(0.2, dd.r);
   vec3 halo = vec3(0.3, 0.95, 0.82) * collar * (0.07 + 0.05 * sin(t * 1.2 + dd.g * 40.0)) + vec3(0.8, 1.0, 0.96) * collar * lit * 1.1 + vec3(0.5, 1.0, 0.9) * ripple * 0.4;
   vec3 em = water * (1.0 - 0.65 * inlay) + silver * inlay * (0.2 + 0.4 * sheen + lit * 1.5 + moon * 0.5) + halo;
-  totalEmissiveRadiance = em * top;
+  // Walls get their own painted strip: smeared top art would land here otherwise
+  vec3 side = texture2D(uSide, vec2((vSkinPos.x + vSkinPos.z) / 8.0, 1.0 + vSkinPos.y / 0.66)).rgb;
+  diffuseColor.rgb = mix(side, diffuseColor.rgb, top);
+  totalEmissiveRadiance = em * top + side * (1.0 - top) * (0.3 + 0.12 * sin(t * 0.7 + (vSkinPos.x + vSkinPos.z) * 1.6));
 }`;
 
-const moonDishShader = (R) => `{
+const moonDishShader = (R, dishR) => `{
   vec2 uvB = vEmissiveMapUv;
   vec2 q = (uvB - 0.5) / ${R.toFixed(5)};
   float t = uSkinTime;
@@ -3054,7 +3136,9 @@ const moonDishShader = (R) => `{
   float rip = pow(0.5 + 0.5 * sin(r * 11.0 - t * 1.5), 8.0) * (1.0 - smoothstep(0.3, 2.3, r));
   float gl = skStars(q + vec2(t * 0.05, 0.0), 2.6, 0.5, t * 2.0, 0.0).g * 2.0;
   vec3 em = etched * (0.5 + 0.4 * sin(t * 0.7 + r * 2.5)) + vec3(0.3, 0.8, 0.82) * rip * 0.2 + vec3(0.85, 1.0, 0.96) * gl * (0.3 + 0.7 * rip);
-  totalEmissiveRadiance = em * top;
+  vec3 side = texture2D(uSide, vec2(atan(vSkinPos.z, vSkinPos.x) * ${dishR.toFixed(4)} / 8.0, 1.0 + vSkinPos.y / 0.66)).rgb;
+  diffuseColor.rgb = mix(side, diffuseColor.rgb, top);
+  totalEmissiveRadiance = em * top + side * (1.0 - top) * 0.3;
 }`;
 
 function bambooCanvas() {
@@ -4359,14 +4443,17 @@ const SPECIAL_BOARDS = {
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const coreDim = new THREE.Color('#0c3b46');
     const coreBright = new THREE.Color('#bff3e6');
+    const side = { value: finish(moonwakeSideCanvas()) };
     return {
       canvas: base, glowCanvas: data, glowData: true, repeat: BOARD_R, roughness: 0.5, params: { specularIntensity: 0.22 },
       dishCanvas: dishBase, dishGlowCanvas: dishGlow, dishRepeat,
       dish: '#174b56', feltCanvas: moonFeltCanvas(), cup: '#061b26', core: '#0c3b46',
       accent: { color: '#6fa89f', metalness: 0.4, roughness: 0.5, emissive: '#5fa89b', emissiveIntensity: 0.12 },
-      shaderCommon: SKIN_NOISE_GLSL,
+      shaderCommon: `${SKIN_NOISE_GLSL}\nuniform sampler2D uSide;`,
+      uniforms: { uSide: side },
+      dishUniforms: { uSide: side },
       shader: MOONWAKE_SHADER,
-      dishShader: moonDishShader(dishRepeat),
+      dishShader: moonDishShader(dishRepeat, layout.spec.dishR),
       animate: (mats, t) => {
         const time = still?.matches ? 0 : t;
         mats.core.color.lerpColors(coreDim, coreBright, 0.5 + 0.5 * Math.sin(time * 0.6));
