@@ -1179,29 +1179,40 @@ const MARBLES = {
   },
 };
 
-const HUE_SHIFT_GLSL = `
-uniform float uHueShift;
-vec3 hueShift(vec3 c, float a) {
+const hueGlsl = (name) => `
+uniform float ${name};
+vec3 ${name}Spin(vec3 c, float a) {
   const vec3 k = vec3(0.57735);
   return max(c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a)), 0.0);
 }
 void main() {`;
 
-// Rainbow seats spin the final lit color's hue on the GPU (so emissive shaders follow too), in step with the flat colors
-function withHueShift(material, baseHue) {
-  const uniform = { value: 0 };
+// Spins the final lit color's hue on the GPU, so emissive shaders follow too
+function hueSpin(material, uniform, name, tag) {
   const prevCompile = material.onBeforeCompile;
   const baseKey = material.customProgramCacheKey();
   material.onBeforeCompile = (shader, renderer) => {
     prevCompile.call(material, shader, renderer);
-    shader.uniforms.uHueShift = uniform;
+    shader.uniforms[name] = uniform;
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', HUE_SHIFT_GLSL)
-      .replace('#include <opaque_fragment>', 'outgoingLight = hueShift(outgoingLight, uHueShift);\n#include <opaque_fragment>');
+      .replace('void main() {', hueGlsl(name))
+      .replace('#include <opaque_fragment>', `outgoingLight = ${name}Spin(outgoingLight, ${name});\n#include <opaque_fragment>`);
   };
-  material.customProgramCacheKey = () => `${baseKey}:hue`;
+  material.customProgramCacheKey = () => `${baseKey}:${tag}`;
+}
+
+// Rainbow seats spin in step with the flat colors
+function withHueShift(material, baseHue) {
+  const uniform = { value: 0 };
+  hueSpin(material, uniform, 'uHueShift', 'hue');
   return () => (uniform.value = ((rainbowHue() - baseHue) * Math.PI) / 180);
 }
+
+// The dev die and board are drawn in Dev red; they spin to whatever color the dev is actually playing
+const _hsl = {};
+const _tint = new THREE.Color();
+const DEV_HUE = _tint.set('#ff4a5a').getHSL(_hsl).h;
+export const devTintAngle = (color) => (color?.main ? (_tint.set(color.main).getHSL(_hsl).h - DEV_HUE) * TAU : 0);
 
 export function marbleSkin(itemId, seat, color = null) {
   const key = MARBLES[skinKey(itemId)] ? skinKey(itemId) : 'classic';
@@ -1562,6 +1573,7 @@ export function diceSkin(itemId) {
   return cached(`dice:${key}`, () => {
     const spec = DICE[key];
     const time = { value: 0 };
+    const tint = { value: 0 };
     return DIE_FACE_ORDER.map((value) => {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
@@ -1709,14 +1721,20 @@ export function diceSkin(itemId) {
             }`);
         };
       }
+      if (key === 'dev') {
+        hueSpin(material, tint, 'uDevTint', 'tint');
+        material.userData.devTint = tint;
+      }
       return material;
     });
   });
 }
 
-export function animateDiceSkin(materials) {
+export function animateDiceSkin(materials, color = null) {
   const time = materials[0]?.userData.skinTime;
   if (time) time.value = materials[0].userData.reducedMotion?.matches ? 0 : performance.now() / 1000;
+  const tint = materials[0]?.userData.devTint;
+  if (tint) tint.value = devTintAngle(color);
 }
 
 const WOODS = {
@@ -4598,14 +4616,20 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
     }
     if (spec.core) mats.core = new THREE.MeshBasicMaterial({ color: spec.core });
     if (spec.animate) mats.animate = spec.animate;
+    if (resolved === 'dev') {
+      mats.devTint = { value: 0 };
+      [...new Set([...mats.surfaces, mats.cup, mats.brass])].forEach((m) => hueSpin(m, mats.devTint, 'uDevTint', 'tint'));
+    }
     return mats;
   });
 }
 
-export function animateBoardSkin(materials, t) {
+// tint is the owner's seat color for skins that follow it; null keeps the skin's own colors
+export function animateBoardSkin(materials, t, tint = null) {
   materials.surfaces.forEach((m) => {
     const time = m.userData.skinTime;
     if (time) time.value = m.userData.reducedMotion?.matches ? 0 : t;
   });
   materials.animate?.(materials, t);
+  if (materials.devTint) materials.devTint.value = devTintAngle(tint);
 }

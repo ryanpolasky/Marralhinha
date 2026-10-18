@@ -319,8 +319,9 @@ function useSkinTransition(skin, animate, prepare) {
   return [shown, wave];
 }
 
-export default function Board({ active, names, turn, showNames, skin, colors: seatPalette = SEAT_COLORS, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
+export default function Board({ active, names, turn, showNames, skin, colors: seatPalette = SEAT_COLORS, ownerSeat = -1, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
   const colors = useRainbow(seatPalette);
+  const tint = ownerSeat >= 0 ? colors[ownerSeat] || null : null;
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
@@ -400,7 +401,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
 
   const [shownSkin, wave] = useSkinTransition(skin, table, prepareSkin);
   const materials = useMemo(() => (shownSkin === null ? null : boardSkin(shownSkin, layout)), [shownSkin, layout]);
-  useFrame(({ clock }) => materials && animateBoardSkin(materials, clock.elapsedTime));
+  useFrame(({ clock }) => materials && animateBoardSkin(materials, clock.elapsedTime, tint));
   const { board: boardGeometry, dishes: dishGeometries, strip: stripGeometry, blanket: blanketGeometry } = layoutGeometries(layout);
   const seatHoles = useMemo(
     () => SEATS.map((s) => [[...layout.RING[entryIdx(s, layout)]], ...layout.HOME[s], ...layout.BASE[s]]),

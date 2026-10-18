@@ -153,7 +153,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, down, pickable, onPick, stunt, star, knock, seed, layout }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -185,7 +185,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const dropTrail = (drop = 0.08) => {
       if (!a.trailAt) a.trailAt = a.pos.clone();
       else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
-        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
+        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, color, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
         a.trailAt.copy(a.pos);
       }
     };
@@ -217,7 +217,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         seg.begun = true;
         if (seg.impact) {
           sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
-          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim }, { sfx: (name, ...args) => sfx[name]?.(...args) });
+          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim, color: palette?.[seg.impact.by], victimColor: palette?.[seg.impact.victim] }, { sfx: (name, ...args) => sfx[name]?.(...args) });
         }
       }
       if (t >= 1) {
@@ -274,7 +274,8 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       body.current.quaternion.premultiply(spin.setFromAxisAngle(axis, dist / MARBLE_R));
     }
     if (aura) {
-      const goal = down ? 0.1 : a.segs.length || a.returning ? 1 : selected ? 0.85 : hovered ? 0.7 : movable ? 0.5 : 0.3;
+      const travelling = !down && (a.segs.length > 0 || a.returning);
+      const goal = down ? 0.1 : travelling ? 1 : selected ? 0.85 : hovered ? 0.7 : movable ? 0.5 : 0.3;
       energy.current += (goal - energy.current) * (1 - Math.exp(-dt * 4));
     }
     if (halo.current) {
@@ -471,6 +472,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               mySeat={mySeat}
               killFx={killFx}
               trail={trails[seat]}
+              palette={palette}
               down={downOf(seat, marble)}
               pickable={!!picking && seat !== picking.notSeat && !picking.skip?.includes(`${seat}:${marble}`)}
               onPick={() => fx.emit('picked', { seat, marble })}

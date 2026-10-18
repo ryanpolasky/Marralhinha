@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { planMove } from './Marbles';
-import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin } from './skins';
+import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
-import { KILL_FX } from './killfx';
+import { KILL_FX, DEV_RED } from './killfx';
 import { TRAILS } from './trails';
 import { diskFrame, holeEnvelope } from './Gravity';
 
@@ -267,21 +267,42 @@ test('a singularity grows in, holds and collapses, and its disk stays nearly edg
   expect(e1.length()).toBeCloseTo(1);
 });
 
-test('Accretion trail and Supernova kill drive the gravity layers', () => {
+test('Accretion trail ripples without spawning holes, and the Supernova kill ends on a single vwomp', () => {
   const emit = jest.fn();
   const types = () => emit.mock.calls.map(([type]) => type);
   TRAILS.dev(emit, [1, 0.4, 2], { by: 0, n: 0 });
-  expect(types()).toEqual(expect.arrayContaining(['warp', 'hole']));
+  expect(types()).toContain('warp');
+  expect(types()).not.toContain('hole');
   emit.mockClear();
   TRAILS.dev(emit, [1, 0.4, 2], { by: 0, n: 1 });
-  expect(types()).not.toContain('hole');
+  expect(types()).not.toContain('warp');
   emit.mockClear();
   const sfx = jest.fn();
   const seq = (n, gap, fn) => Array.from({ length: n }, (_, i) => fn(n > 1 ? i / (n - 1) : 1, i));
   KILL_FX.dev(emit, { at: [1, 0.4, 2], by: 0, victim: 1, sfx, later: (ms, fn) => fn(), seq });
-  expect(emit.mock.calls.filter(([type]) => type === 'hole')).toHaveLength(2);
+  expect(emit.mock.calls.filter(([type]) => type === 'hole')).toHaveLength(1);
   expect(Math.max(...emit.mock.calls.filter(([type]) => type === 'warp').map(([, d]) => d.size))).toBeGreaterThan(10);
-  expect(sfx.mock.calls.map(([name]) => name)).toEqual(['singularity', 'supernova']);
+  expect(types()).not.toEqual(expect.arrayContaining(['bolt']));
+  expect(types()).not.toContain('dome');
+  expect(sfx.mock.calls.map(([name]) => name)).toEqual(['singularity', 'vwomp']);
+});
+
+test('Dev kit effects take the live seat color and fall back to red with no player', () => {
+  const purple = { main: '#8b4dff', light: '#c7a8ff', dark: '#3d1a80' };
+  const emit = jest.fn();
+  const seq = (n, gap, fn) => Array.from({ length: n }, (_, i) => fn(n > 1 ? i / (n - 1) : 1, i));
+  const holeColor = () => emit.mock.calls.find(([type]) => type === 'hole')[1].color;
+  KILL_FX.dev(emit, { at: [0, 0.4, 0], by: 2, victim: 1, color: purple, sfx: () => {}, later: () => {}, seq });
+  expect(holeColor()).toBe(purple);
+  emit.mockClear();
+  KILL_FX.dev(emit, { at: [0, 0.4, 0], by: 2, victim: 1, sfx: () => {}, later: () => {}, seq });
+  expect(holeColor()).toBe(DEV_RED);
+  emit.mockClear();
+  TRAILS.dev(emit, [0, 0.4, 0], { by: 2, n: 0, color: purple });
+  expect(emit.mock.calls.find(([type]) => type === 'warp')[1].color).toBe(purple.light);
+  expect(devTintAngle(null)).toBe(0);
+  expect(Math.abs(devTintAngle(DEV_RED))).toBeLessThan(0.2);
+  expect(Math.abs(devTintAngle(purple))).toBeGreaterThan(1);
 });
 
 test('a marble hopping past another taps on top of it instead of passing through', () => {
