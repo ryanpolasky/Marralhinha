@@ -9716,8 +9716,14 @@ textarea.report-text {
 .thumb-fx.skin-minecraft { --fx: #a5ec55; --fx2: #e1ff94; --fx-bg: #242b1e; }
 
 .thumb-fx.skin-minecraft::before {
+  inset: auto;
+  left: 50%;
+  top: 50%;
   width: 9px;
   height: 9px;
+  transform: translate(-50%, -50%);
+  -webkit-mask: none;
+  mask: none;
   border-radius: 0;
   background: #989d8a;
   box-shadow: -15px -12px 0 -1px #757c69, 13px -15px 0 -2px #d1d4bb, 17px 10px 0 -1px #80886e, -12px 15px 0 -2px #a3cb60;
