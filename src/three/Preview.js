@@ -10,8 +10,9 @@ import { makeFxBus } from './fx';
 import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
 import { MARBLE_GEO } from './Marbles';
+import { SingularityAura } from './Gravity';
 import { ITEMS } from '../game/catalog';
-import { layoutFor } from '../game/geometry';
+import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
 
 function Spinner({ children, speed = 0.6, tilt = 0.35 }) {
@@ -23,9 +24,12 @@ function Spinner({ children, speed = 0.6, tilt = 0.35 }) {
   return <group ref={ref}>{children}</group>;
 }
 
+const PREVIEW_ENERGY = { current: 0.75 };
+
 function MarblePreview({ itemId, seat, color }) {
   const skin = marbleSkin(itemId, seat, color);
   useFrame(({ clock }) => skin.animate?.(clock.elapsedTime));
+  if (skin.aura === 'singularity') return <SingularityAura size={0.62} color={color || SEAT_COLORS[seat]} energy={PREVIEW_ENERGY} seed={seat} />;
   return (
     <Spinner>
       <mesh material={skin.material}>

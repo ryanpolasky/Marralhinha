@@ -5,6 +5,7 @@ import { SEAT_COLORS, positionIn, layoutFor } from '../game/geometry';
 import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
+import { SHADOW_ONLY, SingularityAura } from './Gravity';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
@@ -152,7 +153,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, down, pickable, onPick, stunt, star, knock, seed, layout }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -160,7 +161,9 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   const pickHover = useRef(false);
   const shade = useRef();
   const rig = useRef({});
+  const energy = useRef(0.3);
   const rocky = star && stunt?.kind === 'rocky';
+  const aura = skinAura === 'singularity' && !rocky;
   if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
@@ -270,6 +273,10 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       axis.set(dz, 0, -dx).normalize();
       body.current.quaternion.premultiply(spin.setFromAxisAngle(axis, dist / MARBLE_R));
     }
+    if (aura) {
+      const goal = down ? 0.1 : a.segs.length || a.returning ? 1 : selected ? 0.85 : hovered ? 0.7 : movable ? 0.5 : 0.3;
+      energy.current += (goal - energy.current) * (1 - Math.exp(-dt * 4));
+    }
     if (halo.current) {
       const pulse = Math.sin(now * 5) * 0.5 + 0.5;
       halo.current.scale.setScalar(1 + pulse * 0.25);
@@ -316,7 +323,8 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   return (
     <>
       <group ref={group}>
-        <mesh ref={body} geometry={MARBLE_GEO} material={material} castShadow />
+        <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow />
+        {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} />}
         {rocky && <Limbs rig={rig} />}
         {down && (
           <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
@@ -454,6 +462,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               plan={plans[key]}
               planKey={planKey}
               material={materials[seat].material}
+              aura={materials[seat].aura}
               movable={movable}
               selected={!!selected && selected.seat === seat && selected.marble === marble}
               hovered={!!hovered && hovered.seat === seat && hovered.marble === marble}

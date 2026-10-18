@@ -6,6 +6,7 @@ import { ITEMS } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
 import { KILL_FX } from './killfx';
 import { TRAILS } from './trails';
+import { diskFrame, holeEnvelope } from './Gravity';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -241,6 +242,46 @@ test('Minecraft capture and trail emit pixel fragments and XP without falling ba
   emit.mockClear();
   TRAILS.minecraft(emit, [1, 0.4, 2], { n: 1 });
   expect(emit).toHaveBeenCalledTimes(3);
+});
+
+test('Singularity marble swaps its sphere for the lensing aura', () => {
+  expect(marbleSkin('marble.dev', 2).aura).toBe('singularity');
+});
+
+test('a singularity grows in, holds and collapses, and its disk stays nearly edge-on to the camera', () => {
+  expect(holeEnvelope(-0.1, 1, 0.3, 0.2)).toBe(0);
+  expect(holeEnvelope(0.5, 1, 0.3, 0.2)).toBe(1);
+  expect(holeEnvelope(0.9, 1, 0.3, 0.2)).toBeLessThan(1);
+  expect(holeEnvelope(1, 1, 0.3, 0.2)).toBe(0);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 34, 34);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const [n, e1, e2] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  diskFrame(camera, 0, n, e1, e2);
+  const view = new THREE.Vector3();
+  camera.getWorldDirection(view);
+  expect(Math.abs(n.dot(view))).toBeLessThan(0.45);
+  expect(n.dot(e1)).toBeCloseTo(0);
+  expect(n.dot(e2)).toBeCloseTo(0);
+  expect(e1.length()).toBeCloseTo(1);
+});
+
+test('Accretion trail and Supernova kill drive the gravity layers', () => {
+  const emit = jest.fn();
+  const types = () => emit.mock.calls.map(([type]) => type);
+  TRAILS.dev(emit, [1, 0.4, 2], { by: 0, n: 0 });
+  expect(types()).toEqual(expect.arrayContaining(['warp', 'hole']));
+  emit.mockClear();
+  TRAILS.dev(emit, [1, 0.4, 2], { by: 0, n: 1 });
+  expect(types()).not.toContain('hole');
+  emit.mockClear();
+  const sfx = jest.fn();
+  const seq = (n, gap, fn) => Array.from({ length: n }, (_, i) => fn(n > 1 ? i / (n - 1) : 1, i));
+  KILL_FX.dev(emit, { at: [1, 0.4, 2], by: 0, victim: 1, sfx, later: (ms, fn) => fn(), seq });
+  expect(emit.mock.calls.filter(([type]) => type === 'hole')).toHaveLength(2);
+  expect(Math.max(...emit.mock.calls.filter(([type]) => type === 'warp').map(([, d]) => d.size))).toBeGreaterThan(10);
+  expect(sfx.mock.calls.map(([name]) => name)).toEqual(['singularity', 'supernova']);
 });
 
 test('a marble hopping past another taps on top of it instead of passing through', () => {

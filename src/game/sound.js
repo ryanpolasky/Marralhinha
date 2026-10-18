@@ -76,7 +76,7 @@ function ring({ freq, vol, hold, fade, delay = 0, type = 'sine', out = null }) {
 }
 
 let noiseBuffer = null;
-function noise({ dur = 0.05, vol = 0.2, freq = 2000, to = null, q = 1.2, delay = 0 }) {
+function noise({ dur = 0.05, vol = 0.2, freq = 2000, to = null, q = 1.2, delay = 0, attack = 0 }) {
   const ac = audio();
   if (!ac) return;
   if (!noiseBuffer) {
@@ -93,7 +93,8 @@ function noise({ dur = 0.05, vol = 0.2, freq = 2000, to = null, q = 1.2, delay =
   filter.frequency.setValueAtTime(freq, t0);
   if (to) filter.frequency.exponentialRampToValueAtTime(to, t0 + dur);
   const gain = ac.createGain();
-  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.setValueAtTime(attack ? 0.0001 : vol, t0);
+  if (attack) gain.gain.exponentialRampToValueAtTime(vol, t0 + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   src.connect(filter).connect(gain).connect(master);
   src.start(t0, Math.random() * 0.5);
@@ -551,6 +552,24 @@ export const sfx = {
   boom: () => {
     tone({ freq: 120, to: 38, type: 'sine', dur: 0.6, vol: 0.4 });
     noise({ dur: 0.5, vol: 0.3, freq: 300, to: 1400, q: 0.6 });
+  },
+  warp: (vol = 1) => {
+    tone({ freq: 170, to: 55, type: 'sine', dur: 0.24, vol: 0.08 * vol });
+    noise({ dur: 0.2, vol: 0.03 * vol, freq: 1800, to: 300, q: 2 });
+  },
+  // Everything nearby gets dragged in: a sub swell, a rising suction hiss and a thin whine climbing over it
+  singularity: () => {
+    tone({ freq: 36, to: 92, type: 'sine', dur: 1.25, vol: 0.4, attack: 1.05 });
+    tone({ freq: 55, to: 140, type: 'triangle', dur: 1.2, vol: 0.12, attack: 1 });
+    noise({ dur: 1.2, vol: 0.16, freq: 220, to: 4200, q: 1.6, attack: 1 });
+    tone({ freq: 700, to: 2600, type: 'sine', dur: 1.15, vol: 0.035, attack: 0.95 });
+  },
+  supernova: () => {
+    tone({ freq: 95, to: 26, type: 'sine', dur: 1.6, vol: 0.55 });
+    tone({ freq: 190, to: 48, type: 'triangle', dur: 0.9, vol: 0.18 });
+    noise({ dur: 1.3, vol: 0.38, freq: 480, to: 110, q: 0.5 });
+    noise({ dur: 0.55, vol: 0.18, freq: 6500, to: 1400, q: 0.8 });
+    [2093, 2637, 3136, 3951, 4699].forEach((f, i) => tone({ freq: jitter(f, 0.03), type: 'sine', dur: 0.5, vol: 0.05, delay: 0.25 + i * 0.09 }));
   },
   crunch: () => {
     [0, 0.035, 0.07].forEach((d, i) => noise({ dur: 0.07, vol: 0.26 - i * 0.05, freq: jitter(900 + i * 500, 0.2), q: 1.2, delay: d }));

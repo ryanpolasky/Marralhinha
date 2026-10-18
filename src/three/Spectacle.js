@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { fx } from './fx';
 import { ARCADE_GLSL } from './skins';
 import { clipToBoard } from './boardClip';
+import { Holes, Warps } from './Gravity';
 
 const T = 64;
 const FLOOR = 0.08;
@@ -1200,6 +1201,8 @@ export default function Spectacle({ bus = fx, clip = null }) {
   return (
     <group ref={root}>
       <Decals bus={bus} clip={clip} />
+      <Warps bus={bus} />
+      <Holes bus={bus} />
       <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />
       <Bolts bus={bus} />
