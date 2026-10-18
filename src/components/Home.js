@@ -74,16 +74,19 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
   return (
     <div className="screen">
       <div className="panel home">
-        <div className="logo-wrap">
-          <div className="logo-marbles" aria-hidden="true">
-            {SEAT_COLORS.map((c, i) => (
-              <span key={i} className="marble-dot" style={{ '--seat': c.main, '--seat-light': c.light, '--i': i }} />
-            ))}
+        <div className="home-brand">
+          <div className="logo-wrap">
+            <div className="logo-marbles" aria-hidden="true">
+              {SEAT_COLORS.map((c, i) => (
+                <span key={i} className="marble-dot" style={{ '--seat': c.main, '--seat-light': c.light, '--i': i }} />
+              ))}
+            </div>
+            <Logo />
           </div>
-          <Logo />
+          <Pronunciation />
+          <p className="tagline">The marble game from Terceira, Açores</p>
         </div>
-        <Pronunciation />
-        <p className="tagline">The marble game from Terceira, Açores</p>
+        <div className="home-main">
         {invited && <div className="invite-banner">You've been invited to a game! Pick a name, then hop in.</div>}
 
         <label className="field">
@@ -164,6 +167,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
         )}
 
         {!nameOk && <p className="hint">Pick a name (or roll one) to start playing</p>}
+        </div>
         <div className="home-footer">
           <RulesButton className="btn link" />
           <InstallButton />

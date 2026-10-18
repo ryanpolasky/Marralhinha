@@ -23,14 +23,12 @@ function useBarHeight(ref) {
   }, [ref]);
 }
 
-const PHONE = '(max-width: 620px)';
-
 function useFold(ref, signature, max) {
   const [hidden, setHidden] = useState(0);
   const [tick, setTick] = useState(0);
   useLayoutEffect(() => {
     const bar = ref.current;
-    if (!bar || hidden >= max || !window.matchMedia?.(PHONE).matches) return;
+    if (!bar || hidden >= max) return;
     const kids = [...bar.children].filter((k) => k.offsetParent);
     const first = kids[0]?.getBoundingClientRect();
     const wrapped = first && kids.some((k) => k.getBoundingClientRect().top > first.bottom - 1);
