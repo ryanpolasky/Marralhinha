@@ -60,7 +60,7 @@
     { "id": "marble.defuse", "slot": "marble", "name": "Gem Phase", "rarity": "mythic", "desc": "Anodized candy coat over chrome. Ruby, Sapphire, Citrine or Emerald, depending on where you sit." },
     { "id": "marble.halloween", "slot": "marble", "name": "Crystal Ball", "rarity": "exclusive", "tag": "halloween", "desc": "It sees you losing. Look away." },
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
-    { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "Obsidian, cracked open. Something inside is awake." },
+    { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },

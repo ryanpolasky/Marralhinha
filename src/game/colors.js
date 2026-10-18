@@ -4,6 +4,7 @@ import shared from '../shared/colors';
 export const CLASSIC_IDS = ['red', 'blue', 'yellow', 'green'];
 export const COLOR_PALETTE = shared.COLOR_PALETTE;
 export const COLOR_BY_ID = shared.COLOR_BY_ID;
+export const RAINBOW = shared.RAINBOW;
 export const TABLE_PALETTES = shared.TABLE_PALETTES;
 export const TABLE_PALETTE_BY_ID = shared.TABLE_PALETTE_BY_ID;
 export const hexToRgb = shared.hexToRgb;

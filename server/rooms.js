@@ -3,7 +3,7 @@ const rules = require('../src/shared/rules');
 const { chooseMove } = require('../src/shared/bot');
 const { animationMs, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
 const { REACTION_KEYS } = require('../src/shared/reactions');
-const { STUNT_KINDS, rockyPath, stuntSeconds } = require('../src/shared/stunts');
+const { STUNT_KINDS, rockyPath, rollStuntDice, nudgeStuntDice, stuntSeconds, stuntHoldMs } = require('../src/shared/stunts');
 const { SEAT_COLORS, TABLE_PALETTE_BY_ID, resolveColorSpec } = require('../src/shared/colors');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
@@ -280,6 +280,11 @@ class Room {
       return;
     }
     const { seat, player } = this.require(userId);
+    const diceStunt = this.liveDiceStunt();
+    if (diceStunt && (diceStunt.seat === seat || diceStunt.byUserId === userId)) {
+      diceStunt.cutAt = Date.now();
+      this.restoreDiceSnapshot();
+    }
     this.rematchVotes.delete(player.id);
     this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id && offer.toId !== player.id);
     // Hand the host off before the seat becomes a stand-in
@@ -491,25 +496,98 @@ class Room {
     this.changed();
   }
 
+  liveDiceStunt() {
+    return (this.game?.stunts || []).find((s) => s.kind === 'dice' && !s.cutAt) || null;
+  }
+
+  queueStuntDie(stunt, preferredId = null) {
+    const { game } = this;
+    game.turn = stunt.seat;
+    game.phase = 'move';
+    const unburned = stunt.dice.filter((d) => !d.burnedAt);
+    const ordered = preferredId != null ? [...unburned.filter((d) => d.id === preferredId), ...unburned.filter((d) => d.id !== preferredId)] : unburned;
+    for (const d of ordered) {
+      game.die = d.die;
+      const moves = rules.computeLegalMoves(game);
+      if (moves.length) {
+        stunt.activeDieId = d.id;
+        game.legalMoves = moves;
+        return d;
+      }
+    }
+    const fallback = ordered[0] || null;
+    stunt.activeDieId = null;
+    game.die = fallback ? fallback.die : game.die;
+    game.legalMoves = [];
+    return null;
+  }
+
+  restoreDiceSnapshot() {
+    const snap = this.diceSnapshot;
+    if (!snap || !this.game) return;
+    this.diceSnapshot = null;
+    const { clockOffSeat, ...gameSnap } = snap;
+    Object.assign(this.game, gameSnap);
+    this.clockOffSeat = clockOffSeat;
+  }
+
   // Dev-only (checked by the caller): one marble pulls a one-person bit (flashbang, Rocky run). Theatre too, nothing moves for real
   stunt(userId, { kind, seat, marble }) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
     const game = this.game;
     if (!game || game.phase === 'over') throw new UserError('Start a game first');
     if (!STUNT_KINDS.includes(kind)) throw new UserError('Unknown bit');
-    if (!game.active.includes(seat) || !Number.isInteger(marble) || marble < 0 || marble >= game.marbles[seat].length) throw new UserError('Pick a marble');
     const now = Date.now();
     const still = (a, b) => a.zone === b.zone && a.idx === b.idx && a.slot === b.slot;
-    if ((game.hits || []).some((h) => !h.undoneAt && h.victim === seat && h.victimMarble === marble && still(h.victimAt, game.marbles[seat][marble]))) throw new UserError('That marble is in no state for that');
     // Rocky celebrates until cut, unless the game has since moved its marble for real
-    const running = (s) => !s.cutAt && now - s.t < stuntSeconds(s) * 1000 && (s.kind !== 'rocky' || still(s.at, game.marbles[s.seat][s.marble]));
+    const running = (s) => !s.cutAt && now - s.t < stuntSeconds(s) * 1000 && (s.kind === 'flash' || s.kind === 'dice' || still(s.at, game.marbles[s.seat][s.marble]));
     if ((game.stunts || []).some(running)) throw new UserError('Cut the last bit first');
+    if (kind === 'dice') {
+      const roller = game.active.includes(seat) ? seat : (this.findByUser(userId)?.seat ?? game.turn);
+      this.diceSnapshot = {
+        marbles: game.marbles.map((row) => row.map((p) => ({ ...p }))),
+        turn: game.turn,
+        phase: game.phase,
+        die: game.die,
+        lastRoll: game.lastRoll ? { ...game.lastRoll } : null,
+        lastMove: game.lastMove ? { ...game.lastMove, from: { ...game.lastMove.from }, to: { ...game.lastMove.to }, path: game.lastMove.path?.map((c) => ({ ...c })), capture: game.lastMove.capture ? { ...game.lastMove.capture } : null } : null,
+        legalMoves: game.legalMoves.map((m) => ({ ...m, from: { ...m.from }, to: { ...m.to }, path: m.path?.map((c) => ({ ...c })), capture: m.capture ? { ...m.capture } : null })),
+        winners: game.winners ? [...game.winners] : null,
+        log: game.log.map((e) => ({ ...e })),
+        stats: game.stats.map((s) => ({ ...s })),
+        played: game.played ? game.played.map((p) => ({ ...p })) : undefined,
+        clockOffSeat: this.clockOffSeat,
+      };
+      const dice = rollStuntDice(roller, game.marbles, game.variant, secureDie);
+      const stunt = { id: newId(), kind: 'dice', seat: roller, byUserId: userId, dice, activeDieId: null, t: now };
+      const first = this.queueStuntDie(stunt);
+      game.lastRoll = { seat: roller, die: first ? first.die : dice[0].die, noMoves: !first, t: now };
+      game.stunts = [stunt];
+      const who = this.seats[roller]?.name || 'Someone';
+      rules.addLog(game, `${who} dumped ${dice.length} dice on the table`, roller);
+      this.clockOffSeat = roller;
+      this.changed();
+      return;
+    }
+    if (!game.active.includes(seat) || !Number.isInteger(marble) || marble < 0 || marble >= game.marbles[seat].length) throw new UserError('Pick a marble');
+    if ((game.hits || []).some((h) => !h.undoneAt && h.victim === seat && h.victimMarble === marble && still(h.victimAt, game.marbles[seat][marble]))) throw new UserError('That marble is in no state for that');
     const stunt = { id: newId(), kind, seat, marble, at: { ...game.marbles[seat][marble] }, t: now };
     if (kind === 'rocky') stunt.path = rockyPath(seat, marble, game.marbles, game.variant);
     game.stunts = [stunt];
     const who = this.seats[seat]?.name || 'Someone';
-    rules.addLog(game, kind === 'flash' ? `${who} threw a flashbang` : `${who} went the distance`, null);
+    rules.addLog(game, kind === 'flash' ? `${who} threw a flashbang` : kind === 'ufo' ? `${who} was abducted by aliens` : `${who} went the distance`, null);
     this.clockOffSeat = game.turn;
+    this.changed();
+  }
+
+  pickStuntDie(userId, dieId) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    const stunt = this.liveDiceStunt();
+    if (!stunt) throw new UserError('No dice bit is running');
+    if (userId !== stunt.byUserId) this.requireTurn(userId);
+    const die = stunt.dice.find((d) => d.id === dieId && !d.burnedAt);
+    if (!die) throw new UserError('That die is already gone');
+    this.queueStuntDie(stunt, die.id);
     this.changed();
   }
 
@@ -518,6 +596,10 @@ class Room {
     const stunt = this.game?.stunts?.find((s) => s.id === id && !s.cutAt);
     if (!stunt) throw new UserError('Nothing to cut');
     stunt.cutAt = Date.now();
+    if (stunt.kind === 'dice') {
+      this.restoreDiceSnapshot();
+      rules.addLog(this.game, `${this.seats[stunt.seat]?.name || 'Someone'} swept the extra dice off the table`, null);
+    }
     this.changed();
   }
 
@@ -579,6 +661,7 @@ class Room {
     this.swapOffers = [];
     this.teamLogs = [[], []];
     this.rematchVotes.clear();
+    this.diceSnapshot = null;
     this.game = rules.createGame(this.seats, { rng: secureDie, teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
     // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
@@ -637,6 +720,7 @@ class Room {
   doRematch() {
     this.lastWinners = this.game.winners?.map((s) => this.seats[s]?.id).filter(Boolean) || [];
     this.game = null;
+    this.diceSnapshot = null;
     // Activity seats held by closed clients free up for the next round instead of staying locked
     const gone = (p) => p.standIn || (this.instanceId && !p.isBot && !p.connected);
     this.seats = this.seats.map((p) => (p && gone(p) ? null : p));
@@ -688,6 +772,26 @@ class Room {
   }
 
   move(userId, moveId) {
+    const diceStunt = this.liveDiceStunt();
+    if (diceStunt) {
+      if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+      if (userId !== diceStunt.byUserId) this.requireTurn(userId);
+      if (this.game.phase !== 'move') throw new UserError('Roll the dice first');
+      const mv = this.game.legalMoves.find((m) => m.id === moveId);
+      if (!mv) throw new UserError("That move isn't allowed");
+      rules.move(this.game, moveId);
+      if (this.game.phase === 'over') {
+        this.game.winners = null;
+        this.game.phase = 'move';
+      }
+      const activeDie = diceStunt.dice.find((d) => d.id === diceStunt.activeDieId && !d.burnedAt) || diceStunt.dice.find((d) => !d.burnedAt && d.die === this.game.die);
+      if (activeDie) activeDie.burnedAt = Date.now();
+      const extraCells = (mv.path || []).map((cell) => ({ seat: mv.seat, cell, marble: mv.marble }));
+      nudgeStuntDice(diceStunt, this.game.marbles, this.game.variant, extraCells);
+      this.queueStuntDie(diceStunt);
+      this.changed();
+      return;
+    }
     const kind = this.requireTurn(userId);
     if (this.game.phase !== 'move') throw new UserError('Roll the dice first');
     if (!this.game.legalMoves.some((m) => m.id === moveId)) throw new UserError("That move isn't allowed");
@@ -873,13 +977,14 @@ class Room {
     const player = game && game.phase !== 'over' ? this.seats[game.turn] : null;
     const cover = player ? this.coverFor(game.turn) : null;
     if (this.clockOffSeat !== game?.turn) this.clockOffSeat = null;
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused].join('|');
+    const bit = game?.stunts?.[0];
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused, bit?.id, bit?.cutAt].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
     this.timerKey = key;
     this.turnDeadline = null;
-    if (!player || this.paused) return;
+    if (!player || this.paused || this.liveDiceStunt()) return;
     const human = !player.isBot;
     // Waiting on a person: the player themselves, or their partner covering while they're away
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
@@ -893,7 +998,7 @@ class Room {
         : !player.connected
           ? Math.max(BOT_DELAY_MS, (player.goneAt ?? now) + AWAY_GRACE_MS - now)
           : IDLE_DELAY_MS;
-    const delay = base + animationMs(game, now);
+    const delay = base + animationMs(game, now) + (waiting ? 0 : stuntHoldMs(game.stunts, now));
     if (waiting) this.turnDeadline = Date.now() + delay;
     this.timer = setTimeout(() => {
       this.timer = null;
@@ -946,7 +1051,25 @@ class Room {
             ...this.game,
             ...(colors ? { colors } : {}),
             ...(this.game.hits ? { hits: (this.game.hits || []).map(({ t, undoneAt, ...h }) => ({ ...h, age: now - t, undone: !!undoneAt, undoneAge: undoneAt ? now - undoneAt : null })) } : {}),
-            ...(this.game.stunts ? { stunts: (this.game.stunts || []).map(({ t, cutAt, ...s }) => ({ ...s, age: now - t, cut: !!cutAt, cutAge: cutAt ? now - cutAt : null })) } : {}),
+            ...(this.game.stunts
+              ? {
+                  stunts: (this.game.stunts || []).map(({ t, cutAt, byUserId, dice, ...s }) => ({
+                    ...s,
+                    age: now - t,
+                    cut: !!cutAt,
+                    cutAge: cutAt ? now - cutAt : null,
+                    ...(dice
+                      ? {
+                          dice: dice.map(({ burnedAt, ...d }) => ({
+                            ...d,
+                            burned: !!burnedAt,
+                            burnedAge: burnedAt ? now - burnedAt : null,
+                          })),
+                        }
+                      : {}),
+                  })),
+                }
+              : {}),
           }
         : this.game;
     return {

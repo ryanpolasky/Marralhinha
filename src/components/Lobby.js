@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import useFitPanel from './useFitPanel';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
 import { COLOR_PALETTE, COLOR_BY_ID, TABLE_PALETTES } from '../game/colors';
+import { useRainbow } from '../game/rainbow';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
 import RulesButton from './Rules';
@@ -73,14 +74,14 @@ function TurnTimer({ seconds, isHost, onChange }) {
   );
 }
 
-export function SeatColorDrawer({ seat, colors, onPick }) {
+export function SeatColorDrawer({ seat, colors, onPick, admin = false }) {
   const current = colors?.[seat] || SEAT_COLORS[seat];
-  const isCustom = current.main !== SEAT_COLORS[seat].main;
+  const isCustom = current.rainbow || current.main !== SEAT_COLORS[seat].main;
   return (
     <div className="seat-color-drawer" onClick={(e) => e.stopPropagation()}>
       <div className="seat-color-swatches" role="radiogroup" aria-label="Pick seat colour">
         {COLOR_PALETTE.map((swatch) => {
-          const selected = current.main.toLowerCase() === swatch.main.toLowerCase();
+          const selected = !current.rainbow && current.main.toLowerCase() === swatch.main.toLowerCase();
           return (
             <button
               key={swatch.id}
@@ -97,6 +98,19 @@ export function SeatColorDrawer({ seat, colors, onPick }) {
             />
           );
         })}
+        {admin && (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!!current.rainbow}
+            className={`seat-swatch rainbow${current.rainbow ? ' on' : ''}`}
+            title="Rainbow"
+            onClick={() => {
+              sfx.click();
+              onPick('rainbow');
+            }}
+          />
+        )}
         <label className={`seat-custom-pill${current.custom ? ' on' : ''}`} title="Pick any custom hex colour">
           <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />
           <span>{current.custom ? current.name : '+ Hex'}</span>
@@ -158,6 +172,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
   const [screenRef, panelRef] = useFitPanel(room.activity, room, { reserveBar: true, bottom: 100 });
   const events = useSeatEvents(room, playerId);
+  const liveColors = useRainbow(SEATS.map((s) => room.colors?.[s] || room.seats[s]?.color || SEAT_COLORS[s]));
   const act = async (fn) => {
     if (busy) return;
     setBusy(true);
@@ -245,7 +260,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
         <div className="seats">
           {SEATS.map((s) => {
             const p = room.seats[s];
-            const color = room.colors?.[s] || p?.color || SEAT_COLORS[s];
+            const color = liveColors[s];
             const mine = p && p.id === playerId;
             const viewable = p && !p.isBot && p.userId && !mine && onPlayerStats;
             const canPaint = !!(isAdmin || room.canPaint);
@@ -346,6 +361,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
                   <SeatColorDrawer
                     seat={s}
                     colors={room.colors || SEAT_COLORS}
+                    admin={isAdmin}
                     onPick={(nextColor) => onAction('game:setColor', { seat: s, color: nextColor })}
                   />
                 )}

@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const { Room, RoomManager, UserError } = require('./rooms');
 const rules = require('../src/shared/rules');
 const timing = require('../src/shared/timing');
+const { UFO } = require('../src/shared/stunts');
 
 function startedRoom() {
   const reactions = [];
@@ -823,6 +824,97 @@ test('dev stunts are theatre: one at a time, a Rocky run ends in its home row, a
   assert.strictEqual(room.view().game.stunts[0].cut, true);
   room.stunt('u1', { kind: 'flash', seat: a, marble: 1 });
   assert.deepStrictEqual(room.game.stunts.map((s) => s.kind), ['flash']);
+  room.cutStunt('u1', room.game.stunts[0].id);
+  room.stunt('u1', { kind: 'ufo', seat: a, marble: 0 });
+  assert.deepStrictEqual(room.game.stunts.map((s) => s.kind), ['ufo']);
+});
+
+test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts everything when cut', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.game.turn = 2;
+  room.game.phase = 'roll';
+  room.game.marbles[2][0] = { zone: 'track', idx: rules.entryIdx(2) + 4 };
+  const snapshotBefore = JSON.stringify({
+    marbles: room.game.marbles,
+    turn: room.game.turn,
+    phase: room.game.phase,
+    die: room.game.die,
+    stats: room.game.stats,
+  });
+
+  room.stunt('u1', { kind: 'dice' });
+  const [stunt] = room.view().game.stunts;
+  assert.strictEqual(stunt.kind, 'dice');
+  assert.strictEqual(stunt.seat, 0);
+  assert.strictEqual(stunt.dice.length, 50);
+  assert.strictEqual(room.game.turn, 0);
+  assert.strictEqual(room.game.phase, 'move');
+  assert.ok(room.game.legalMoves.length > 0);
+  assert.strictEqual(room.view().turnEndsIn, null, 'turn clock stays off during dice storm');
+
+  const firstMove = room.game.legalMoves[0];
+  room.move('u1', firstMove.id);
+  const afterFirst = room.view().game.stunts[0];
+  assert.strictEqual(afterFirst.dice.filter((d) => d.burned).length, 1);
+  assert.strictEqual(room.game.turn, 0, 'turn stays with the roller across dice');
+  assert.strictEqual(room.game.phase, 'move');
+  assert.ok(room.game.legalMoves.length > 0);
+
+  const nonSix = afterFirst.dice.find((d) => !d.burned && d.die > 1 && d.die < 6);
+  if (nonSix) {
+    room.pickStuntDie('u1', nonSix.id);
+    assert.strictEqual(room.game.die, nonSix.die);
+    assert.strictEqual(room.game.stunts[0].activeDieId, nonSix.id);
+  }
+
+  const secondMove = room.game.legalMoves[0];
+  room.move('u1', secondMove.id);
+  assert.strictEqual(room.view().game.stunts[0].dice.filter((d) => d.burned).length, 2);
+  assert.notStrictEqual(JSON.stringify(room.game.marbles[0]), JSON.stringify(JSON.parse(snapshotBefore).marbles[0]));
+
+  room.cutStunt('u1', stunt.id);
+  assert.strictEqual(room.view().game.stunts[0].cut, true);
+  assert.strictEqual(
+    JSON.stringify({
+      marbles: room.game.marbles,
+      turn: room.game.turn,
+      phase: room.game.phase,
+      die: room.game.die,
+      stats: room.game.stats,
+    }),
+    snapshotBefore,
+    'cutting the bit restores the original game state'
+  );
+});
+
+test('a bot waits out a close encounter instead of moving the marble that is up in the saucer', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const room = new Room('ABDC', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.attach('u1', 's1');
+  room.addBot('u1', 1);
+  room.pickStarter = () => ({ seat: 1, reason: 'winner' });
+  room.start('u1');
+  const rolls = () => room.game.stats[1].rolls;
+  room.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
+  t.mock.timers.tick(UFO.end * 1000 - 100);
+  assert.strictEqual(rolls(), 0, 'the bot holds while the bit plays');
+  t.mock.timers.tick(8000);
+  assert.ok(rolls() > 0, 'and gets on with it once the bit is over');
+
+  const quick = new Room('CUTT', { onChange: () => {} });
+  t.after(() => quick.dispose());
+  quick.join({ userId: 'u1', name: 'Ana' });
+  quick.attach('u1', 's1');
+  quick.addBot('u1', 1);
+  quick.pickStarter = () => ({ seat: 1, reason: 'winner' });
+  quick.start('u1');
+  quick.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
+  quick.cutStunt('u1', quick.game.stunts[0].id);
+  t.mock.timers.tick(8000);
+  assert.ok(quick.game.stats[1].rolls > 0, 'cutting the bit frees the bot straight away');
 });
 
 test('chat is rate limited, open to spectators, and works from the lobby on', (t) => {
@@ -926,5 +1018,16 @@ test('seat colours and table palettes can be set in lobby or mid-game with unres
   assert.deepStrictEqual(room.view().colors.map((c) => c.id), ['magenta', 'cyan', 'lime', 'orange']);
 
   room.setColor('u1', { palette: null });
+  assert.strictEqual(room.view().colors, undefined);
+});
+
+test('a seat can be set to rainbow and reset', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.setColor('u1', { seat: 2, color: 'rainbow' });
+  assert.strictEqual(room.view().colors[2].rainbow, true);
+  assert.strictEqual(room.view().seats[2].color.name, 'Rainbow');
+  assert.strictEqual(room.view().colors[0].rainbow, undefined);
+  room.setColor('u1', { seat: 2, color: null });
   assert.strictEqual(room.view().colors, undefined);
 });

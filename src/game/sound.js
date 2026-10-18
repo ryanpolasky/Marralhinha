@@ -357,6 +357,135 @@ export function setRain(on) {
   }
 }
 
+// A syllable: one oscillator through a couple of bandpass formants, which is what makes it read as a voice
+function formant({ freq, to, type = 'triangle', dur = 0.1, vol = 1, delay = 0, formants, out = null }) {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(40, to), t0 + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol * 0.22, t0 + 0.012);
+  gain.gain.setValueAtTime(vol * 0.22, t0 + dur * 0.6);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  formants.forEach(([f, q]) => {
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = f;
+    bp.Q.value = q;
+    osc.connect(bp).connect(gain);
+  });
+  gain.connect(out || master);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+}
+
+const THEREMIN = [[440, 1.3], [659, 1.1], [622, 0.7], [494, 1.2], [698, 1.5], [659, 0.5], [440, 1.9], [415, 1.0]];
+
+// The saucer's bed: a theremin wailing a slow phrase with real vibrato over a throbbing low drone; resolves to stop()
+export function ufoBed({ vol = 1 } = {}) {
+  const ac = audio();
+  if (!ac) return () => {};
+  const { bus, stop } = fader(ac, vol);
+  const lead = ac.createOscillator();
+  lead.type = 'sine';
+  const vib = ac.createOscillator();
+  vib.frequency.value = 5.6;
+  const vibDepth = ac.createGain();
+  vibDepth.gain.value = 9;
+  vib.connect(vibDepth).connect(lead.frequency);
+  const leadGain = ac.createGain();
+  leadGain.gain.setValueAtTime(0.0001, ac.currentTime);
+  leadGain.gain.exponentialRampToValueAtTime(0.06, ac.currentTime + 1.2);
+  lead.connect(leadGain).connect(bus);
+  const phrase = [0, 1, 2, 3].flatMap(() => THEREMIN);
+  lead.frequency.setValueAtTime(THEREMIN[0][0], ac.currentTime + 0.05);
+  phrase.reduce((at, [f, d]) => {
+    lead.frequency.linearRampToValueAtTime(f, at + d);
+    return at + d;
+  }, ac.currentTime + 0.05);
+  const drone = ac.createOscillator();
+  drone.type = 'sawtooth';
+  drone.frequency.value = 55;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 230;
+  lp.Q.value = 7;
+  const throb = ac.createOscillator();
+  throb.frequency.value = 0.9;
+  const throbDepth = ac.createGain();
+  throbDepth.gain.value = 95;
+  throb.connect(throbDepth).connect(lp.frequency);
+  const droneGain = ac.createGain();
+  droneGain.gain.value = 0.16;
+  drone.connect(lp).connect(droneGain).connect(bus);
+  const nodes = [lead, vib, drone, throb];
+  nodes.forEach((o) => o.start());
+  return (fade = 0.8) => {
+    stop(fade);
+    nodes.forEach((o) => o.stop(ac.currentTime + fade + 0.1));
+  };
+}
+
+// Inside the ship: a soft hum and a console that beeps to itself
+export function labBed({ seconds = 8 } = {}) {
+  const ac = audio();
+  if (!ac) return () => {};
+  const { bus, stop } = fader(ac, 1);
+  const hum = [110, 165.5].map((f, i) => {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = f;
+    const g = ac.createGain();
+    g.gain.value = i ? 0.035 : 0.06;
+    o.connect(g).connect(bus);
+    o.start();
+    return o;
+  });
+  let at = 0.4;
+  while (at < seconds) {
+    const f = [1046, 1318, 1568, 2093][Math.floor(Math.random() * 4)];
+    tone({ freq: f, type: 'sine', dur: 0.07, vol: 0.035, delay: at, out: bus });
+    if (Math.random() < 0.35) tone({ freq: f * 1.5, type: 'sine', dur: 0.07, vol: 0.03, delay: at + 0.11, out: bus });
+    at += 0.5 + Math.random() * 1.1;
+  }
+  return (fade = 0.3) => {
+    stop(fade);
+    hum.forEach((o) => o.stop(ac.currentTime + fade + 0.1));
+  };
+}
+
+// The tractor beam: a low pulse and a shimmer that keeps climbing while the marble rises
+export function beamHum({ seconds = 3 } = {}) {
+  const ac = audio();
+  if (!ac) return () => {};
+  const { bus, stop } = fader(ac, 1);
+  const low = ac.createOscillator();
+  low.type = 'triangle';
+  low.frequency.setValueAtTime(70, ac.currentTime);
+  low.frequency.linearRampToValueAtTime(118, ac.currentTime + seconds);
+  const pulse = ac.createOscillator();
+  pulse.frequency.value = 7;
+  const pulseDepth = ac.createGain();
+  pulseDepth.gain.value = 0.05;
+  const lowGain = ac.createGain();
+  lowGain.gain.value = 0.12;
+  pulse.connect(pulseDepth).connect(lowGain.gain);
+  low.connect(lowGain).connect(bus);
+  for (let i = 0; i * 0.17 < seconds; i++) {
+    const f = 420 + ((i * 7) % 12) * 60 + i * 18;
+    tone({ freq: f, to: f * 1.2, type: 'sine', dur: 0.2, vol: 0.045, delay: i * 0.17, attack: 0.02, out: bus });
+  }
+  [low, pulse].forEach((o) => o.start());
+  return (fade = 0.25) => {
+    stop(fade);
+    [low, pulse].forEach((o) => o.stop(ac.currentTime + fade + 0.1));
+  };
+}
+
 export const sfx = {
   hop: () => {
     tone({ freq: jitter(2100, 0.2), type: 'triangle', dur: 0.05, vol: 0.07 });
@@ -379,6 +508,14 @@ export const sfx = {
       noise({ dur: 0.05, vol: 0.28 * (1 - i / 10), freq: jitter(1600, 0.5), q: 2, delay: d });
       tone({ freq: jitter(700, 0.4), type: 'triangle', dur: 0.04, vol: 0.06, delay: d });
     });
+  },
+  diceStorm: () => {
+    for (let i = 0; i < 28; i++) {
+      const d = i * 0.042 + Math.random() * 0.03;
+      const decay = 1 - i / 34;
+      noise({ dur: 0.055, vol: 0.24 * decay, freq: jitter(1700, 0.55), q: 1.8, delay: d });
+      tone({ freq: jitter(760, 0.5), type: 'triangle', dur: 0.045, vol: 0.055 * decay, delay: d });
+    }
   },
   // kind: 'mine' (you captured), 'victim' (you got captured) or 'other' (someone else's fight)
   capture: (kind = 'other') => {
@@ -495,6 +632,130 @@ export const sfx = {
   cheer: () => {
     for (let i = 0; i < 14; i++) noise({ dur: 1.6, vol: 0.07, freq: jitter(1100, 0.6), q: 0.6, delay: i * 0.22 });
     [0.3, 1.1, 2].forEach((d) => tone({ freq: 2200, to: 2900, dur: 0.35, vol: 0.03, delay: d }));
+  },
+  // Close encounter: the saucer swooping in on a wobbling glide, its hatch, and the gulp as the marble goes in
+  ufoArrive: () => {
+    [0, 3, 7].forEach((d, i) => tone({ freq: 1500 + d * 6, to: 520 + d * 5, type: 'sine', dur: 1.9, vol: i ? 0.025 : 0.06, attack: 0.3 }));
+    noise({ dur: 1.6, vol: 0.08, freq: 400, to: 1800, q: 0.8 });
+  },
+  servo: () => {
+    for (let i = 0; i < 6; i++) tone({ freq: 150 + (i % 2) * 22, type: 'square', dur: 0.06, vol: 0.03, delay: i * 0.06 });
+    noise({ dur: 0.35, vol: 0.05, freq: 2600, q: 2 });
+  },
+  slurp: () => {
+    tone({ freq: 220, to: 1600, type: 'sine', dur: 0.3, vol: 0.17 });
+    noise({ dur: 0.22, vol: 0.14, freq: 700, to: 4400, q: 1.8 });
+    tone({ freq: 980, to: 380, type: 'triangle', dur: 0.14, vol: 0.12, delay: 0.28 });
+  },
+  hatch: () => {
+    noise({ dur: 0.05, vol: 0.3, freq: 2400, q: 3 });
+    tone({ freq: 1300, to: 620, type: 'triangle', dur: 0.09, vol: 0.1 });
+    tone({ freq: 150, to: 70, type: 'sine', dur: 0.25, vol: 0.2, delay: 0.03 });
+  },
+  cutThunk: () => {
+    tone({ freq: 95, to: 48, type: 'sine', dur: 0.16, vol: 0.3 });
+    noise({ dur: 0.03, vol: 0.14, freq: 1500, q: 1 });
+  },
+  // A Grey talking: formant-filtered chatter, Zorp chirpy and quick, Klarg low and gurgly; caps shout
+  alienVoice: (who, text = '') => {
+    const letters = text.replace(/[^a-z]/gi, '').length;
+    const shout = letters > 0 && text.replace(/[^A-Z]/g, '').length / letters > 0.5;
+    const syllables = Math.max(2, Math.round(letters / 2.7));
+    const base = (who ? 215 : 540) * (shout ? 1.3 : 1);
+    const step = (who ? 0.17 : 0.11) * (shout ? 0.75 : 1);
+    const formants = who ? [[520, 5], [1100, 6]] : [[900, 4], [1900, 6]];
+    for (let i = 0; i < syllables; i++) {
+      const rise = text.trim().endsWith('?') && i >= syllables - 2 ? 1.25 : 1;
+      const f = jitter(base * rise + ((i * 53) % 90), 0.16);
+      const dur = step * (0.55 + Math.random() * 0.4);
+      formant({ freq: f, to: f * (0.85 + Math.random() * 0.35), type: who ? 'sawtooth' : 'triangle', dur, vol: (who ? 0.9 : 1.1) * (shout ? 1.5 : 1), delay: i * step, formants });
+    }
+  },
+  alienLaugh: () => {
+    for (let i = 0; i < 8; i++) {
+      formant({ freq: 640 - i * 14, to: 500, type: 'triangle', dur: 0.1, vol: 1.0, delay: i * 0.15, formants: [[900, 4], [1900, 6]] });
+      formant({ freq: 300 - i * 6, to: 230, type: 'sawtooth', dur: 0.12, vol: 0.8, delay: 0.07 + i * 0.17, formants: [[520, 5], [1100, 6]] });
+    }
+    noise({ dur: 0.35, vol: 0.07, freq: 1200, to: 2800, q: 1.5, delay: 1.3 });
+  },
+  alienScream: () => {
+    tone({ freq: 900, to: 1900, type: 'sawtooth', dur: 0.22, vol: 0.06 });
+    tone({ freq: 1900, to: 700, type: 'sawtooth', dur: 0.4, vol: 0.06, delay: 0.22 });
+    tone({ freq: 380, to: 820, type: 'sawtooth', dur: 0.25, vol: 0.06, delay: 0.05 });
+    tone({ freq: 820, to: 300, type: 'sawtooth', dur: 0.45, vol: 0.06, delay: 0.3 });
+  },
+  gasp: () => {
+    noise({ dur: 0.25, vol: 0.12, freq: 900, to: 2600, q: 1.2 });
+    tone({ freq: 500, to: 760, type: 'triangle', dur: 0.2, vol: 0.05, delay: 0.03 });
+  },
+  sting: () => {
+    [0, 0.42].forEach((d, i) => {
+      tone({ freq: i ? 98 : 110, type: 'sawtooth', dur: 0.55, vol: 0.07, delay: d, attack: 0.02 });
+      tone({ freq: i ? 49 : 55, type: 'sine', dur: 0.6, vol: 0.18, delay: d, attack: 0.02 });
+    });
+  },
+  whip: () => {
+    noise({ dur: 0.28, vol: 0.26, freq: 350, to: 5600, q: 1.1 });
+    [392, 494, 587, 784, 988].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.14, vol: 0.07, delay: i * 0.035 }));
+  },
+  dream: () => {
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      tone({ freq, to: freq * 1.01, type: 'sine', dur: 0.9, vol: 0.05, delay: i * 0.14, attack: 0.08 });
+    });
+  },
+  clockTick: () => {
+    noise({ dur: 0.016, vol: 0.16, freq: 1900, q: 3 });
+    tone({ freq: 880, type: 'triangle', dur: 0.025, vol: 0.06 });
+  },
+  toasterDing: () => {
+    noise({ dur: 0.06, vol: 0.2, freq: 2800, q: 2 });
+    tone({ freq: 2093, type: 'sine', dur: 0.8, vol: 0.2, attack: 0.002 });
+    tone({ freq: 3136, type: 'sine', dur: 0.5, vol: 0.09, delay: 0.01, attack: 0.002 });
+    tone({ freq: 180, to: 520, type: 'triangle', dur: 0.16, vol: 0.14, delay: 0.04 });
+  },
+  pew: () => {
+    tone({ freq: 2100, to: 260, type: 'square', dur: 0.14, vol: 0.07 });
+    tone({ freq: 1400, to: 180, type: 'sawtooth', dur: 0.12, vol: 0.04, delay: 0.01 });
+    noise({ dur: 0.03, vol: 0.1, freq: 5000, q: 2 });
+  },
+  sizzle: () => noise({ dur: 0.7, vol: 0.1, freq: 3200, to: 1400, q: 1.5 }),
+  thud: () => {
+    tone({ freq: 120, to: 42, type: 'sine', dur: 0.32, vol: 0.32 });
+    noise({ dur: 0.08, vol: 0.18, freq: 260, q: 0.8 });
+    noise({ dur: 0.2, vol: 0.06, freq: 900, to: 300, q: 1, delay: 0.05 });
+  },
+  boing: (n = 0) => {
+    tone({ freq: 150, to: 380 + n * 70, type: 'sine', dur: 0.22, vol: 0.16 });
+    tone({ freq: 300, to: 760 + n * 140, type: 'triangle', dur: 0.14, vol: 0.05 });
+    noise({ dur: 0.03, vol: 0.08, freq: 3800, q: 2 });
+  },
+  squeak: () => {
+    tone({ freq: 1800, to: 2700, type: 'sine', dur: 0.12, vol: 0.12, attack: 0.01 });
+    tone({ freq: 2700, to: 1500, type: 'sine', dur: 0.18, vol: 0.1, delay: 0.12 });
+  },
+  bigButton: () => {
+    noise({ dur: 0.05, vol: 0.3, freq: 420, q: 2 });
+    tone({ freq: 230, to: 120, type: 'triangle', dur: 0.12, vol: 0.18 });
+  },
+  klaxon: () => {
+    [0, 0.26].forEach((d) => tone({ freq: 520, to: 470, type: 'square', dur: 0.18, vol: 0.05, delay: d }));
+    tone({ freq: 820, to: 190, type: 'sawtooth', dur: 0.4, vol: 0.04, delay: 0.55 });
+  },
+  trapdoor: () => {
+    noise({ dur: 0.4, vol: 0.14, freq: 900, to: 300, q: 1.2 });
+    tone({ freq: 1250, to: 190, type: 'sine', dur: 0.75, vol: 0.11, delay: 0.15 });
+  },
+  ptoo: () => {
+    noise({ dur: 0.07, vol: 0.28, freq: 1200, to: 500, q: 0.9 });
+    tone({ freq: 640, to: 230, type: 'sine', dur: 0.26, vol: 0.14, delay: 0.02 });
+  },
+  ufoZoom: () => {
+    tone({ freq: 500, to: 2300, type: 'sine', dur: 0.45, vol: 0.1, attack: 0.03 });
+    tone({ freq: 2300, to: 160, type: 'sine', dur: 0.8, vol: 0.1, delay: 0.45 });
+    noise({ dur: 1.1, vol: 0.14, freq: 700, to: 5200, q: 1.3 });
+  },
+  typewriter: (n = 12) => {
+    for (let i = 0; i < n; i++) noise({ dur: 0.018, vol: 0.12, freq: jitter(3600, 0.2), q: 4, delay: i * 0.065 });
   },
   tick: (urgent = false) => {
     tone({ freq: urgent ? 1400 : 1000, type: 'square', dur: 0.035, vol: urgent ? 0.07 : 0.045 });

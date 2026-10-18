@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { layoutFor } from '../game/geometry';
 import { ROLL_REVEAL_MS } from '../game/moves';
+import { boardSurfaceY, burnClock, cutClock, stuntClock, stuntLive } from '../game/stunts';
 import { sfx } from '../game/sound';
 import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
@@ -205,36 +206,239 @@ function DieBody({ seat, skin, spawnT, lastRoll, active, canRoll, onRoll, onGone
   );
 }
 
-export default function Dice({ lastRoll, turn, idleSeat = 0, canRoll, onRoll, skins = [], layout = layoutFor('classic') }) {
+const _mat = new THREE.Matrix4();
+const _scale = new THREE.Vector3();
+const _spinQ = new THREE.Quaternion();
+const _twistQ = new THREE.Quaternion();
+
+function DiceStorm({ stunt, skin, assets, layout, onPickDie }) {
+  const materials = diceSkin(skin);
+  const meshRef = useRef();
+  const glowRef = useRef();
+  const labelRef = useRef();
+  const itemsRef = useRef(null);
+  const soundPlayed = useRef(false);
+  const lastLabelDie = useRef(null);
+  const dice = stunt.dice || [];
+  const count = dice.length;
+
+  if (!itemsRef.current || itemsRef.current.id !== stunt.id) {
+    soundPlayed.current = false;
+    itemsRef.current = {
+      id: stunt.id,
+      items: dice.map((d, i) => ({
+        pos: new THREE.Vector3(d.fromX ?? d.x, REST_Y, d.fromZ ?? d.z),
+        quat: faceUp(d.die, d.yaw || 0),
+        finalQuat: faceUp(d.die, d.yaw || 0),
+        axis: new THREE.Vector3(Math.sin(i * 1.7 + 0.3), Math.cos(i * 2.3 + 0.5), Math.sin(i * 3.1 + 1.1)).normalize(),
+        spin: Math.PI * (5 + (i % 4) * 0.65),
+        targetX: d.x,
+        targetZ: d.z,
+        nudge: null,
+        landed: false,
+        burnedSeen: !!d.burned && (d.burnedAge || 0) > 400,
+      })),
+    };
+  }
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh || !count) return;
+    const now = state.clock.elapsedTime;
+    const st = stuntClock(stunt);
+    const cut = cutClock(stunt);
+    const cutScale = cut === null ? 1 : Math.max(0, 1 - cut / 0.42);
+    animateDiceSkin(materials);
+
+    if (!soundPlayed.current) {
+      soundPlayed.current = true;
+      if (st < 0.45 && !stunt.cut) {
+        sfx.diceStorm?.();
+        setTimeout(() => fx.emit('shake', { amount: 0.28 }), 280);
+      }
+    }
+
+    const { items } = itemsRef.current;
+    let activeItem = null;
+    let activeDie = null;
+    let activeSurfY = TABLE_Y;
+
+    for (let i = 0; i < count; i++) {
+      const d = dice[i];
+      const item = items[i];
+      const bc = burnClock(stunt.id, d);
+      if (bc !== null && !item.burnedSeen) {
+        item.burnedSeen = true;
+        if (bc < 0.35) {
+          fx.emit('burst', {
+            position: [item.pos.x, item.pos.y + 0.3, item.pos.z],
+            colors: ['#ffd166', '#fff3b0', '#ffffff', '#ff8a3d'],
+            count: 18,
+            speed: 2.8,
+            up: 3.5,
+            size: 0.08,
+          });
+        }
+      }
+      const burnScale = bc === null ? 1 : Math.max(0, 1 - bc / 0.26);
+      const s = Math.min(cutScale, burnScale);
+      if (s <= 0.001) {
+        _mat.makeScale(0, 0, 0);
+        mesh.setMatrixAt(i, _mat);
+        continue;
+      }
+
+      if (item.landed && (d.x !== item.targetX || d.z !== item.targetZ)) {
+        item.nudge = { fromX: item.pos.x, fromZ: item.pos.z, toX: d.x, toZ: d.z, start: now };
+        item.targetX = d.x;
+        item.targetZ = d.z;
+      }
+
+      const rt = (st - (d.delay || 0)) / ROLL_TIME;
+      if (rt < 0) {
+        _mat.makeScale(0, 0, 0);
+        mesh.setMatrixAt(i, _mat);
+        continue;
+      }
+      if (rt < 1) {
+        const e = 1 - (1 - rt) ** 3;
+        const x = (d.fromX ?? d.x) + (d.x - (d.fromX ?? d.x)) * e;
+        const z = (d.fromZ ?? d.z) + (d.z - (d.fromZ ?? d.z)) * e;
+        const surfY = boardSurfaceY(x, z, layout.spec, TABLE_Y);
+        item.pos.set(x, surfY + SIZE / 2 + bounce(rt, d.height || 2.6), z);
+        item.quat.copy(item.finalQuat).multiply(_spinQ.setFromAxisAngle(item.axis, item.spin * (1 - e) ** 2));
+      } else {
+        if (!item.landed) {
+          item.landed = true;
+          if (d.die === 6 && st - (d.delay || 0) < ROLL_TIME + 0.25) {
+            const sy = boardSurfaceY(d.x, d.z, layout.spec, TABLE_Y);
+            fx.emit('burst', { position: [d.x, sy + SIZE + 0.2, d.z], colors: ['#ffd166', '#fff3b0', '#ffffff', '#ff8a3d'], count: 10, speed: 2.4, up: 4, size: 0.08 });
+          }
+        }
+        if (item.nudge) {
+          const nt = Math.min(1, (now - item.nudge.start) / 0.28);
+          const ne = 1 - (1 - nt) ** 2;
+          const x = item.nudge.fromX + (item.nudge.toX - item.nudge.fromX) * ne;
+          const z = item.nudge.fromZ + (item.nudge.toZ - item.nudge.fromZ) * ne;
+          const surfY = boardSurfaceY(x, z, layout.spec, TABLE_Y);
+          item.pos.set(x, surfY + SIZE / 2 + Math.sin(Math.PI * nt) * 0.55, z);
+          if (nt >= 1) item.nudge = null;
+        } else {
+          const surfY = boardSurfaceY(d.x, d.z, layout.spec, TABLE_Y);
+          item.pos.set(d.x, surfY + SIZE / 2, d.z);
+        }
+        item.quat.copy(item.finalQuat);
+      }
+
+      const isActive = !stunt.cut && bc === null && item.landed && d.id === stunt.activeDieId;
+      if (isActive) {
+        activeItem = item;
+        activeDie = d;
+        activeSurfY = boardSurfaceY(item.pos.x, item.pos.z, layout.spec, TABLE_Y);
+        item.pos.y += 0.32 + Math.sin(now * 4) * 0.1;
+        item.quat.premultiply(_twistQ.setFromAxisAngle(UP, Math.sin(now * 2.2) * 0.25));
+      }
+      if (s < 1) {
+        const shrink = 1 - s;
+        item.pos.y -= shrink * (SIZE / 2);
+        item.quat.premultiply(_twistQ.setFromAxisAngle(UP, shrink * 2.4));
+      }
+      _mat.compose(item.pos, item.quat, _scale.setScalar(s));
+      mesh.setMatrixAt(i, _mat);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+
+    const showActive = !!activeItem && !!activeDie;
+    glowRef.current.visible = showActive;
+    labelRef.current.visible = showActive;
+    if (showActive) {
+      glowRef.current.position.set(activeItem.pos.x, activeSurfY + 0.02, activeItem.pos.z);
+      glowRef.current.material.opacity = 0.45 + Math.sin(now * 5) * 0.3;
+      if (lastLabelDie.current !== activeDie.die) {
+        lastLabelDie.current = activeDie.die;
+        labelRef.current.material.map = assets.numbers[activeDie.die - 1];
+        labelRef.current.material.needsUpdate = true;
+      }
+      labelRef.current.scale.setScalar(1.25);
+      labelRef.current.position.set(activeItem.pos.x, activeSurfY + SIZE / 2 + 1.35 + Math.sin(now * 4) * 0.08, activeItem.pos.z);
+      labelRef.current.material.opacity = 0.95;
+    }
+  });
+
+  const interactive = onPickDie
+    ? {
+        onClick: (e) => {
+          if (stunt.cut || e.instanceId === undefined) return;
+          const d = dice[e.instanceId];
+          if (!d || d.burned) return;
+          e.stopPropagation();
+          document.body.style.cursor = '';
+          onPickDie(d.id);
+        },
+        onPointerOver: (e) => {
+          if (stunt.cut || e.instanceId === undefined) return;
+          const d = dice[e.instanceId];
+          if (!d || d.burned) return;
+          e.stopPropagation();
+          document.body.style.cursor = 'pointer';
+        },
+        onPointerOut: () => {
+          document.body.style.cursor = '';
+        },
+      }
+    : {};
+
+  return (
+    <group>
+      <instancedMesh key={`${stunt.id}:${count}`} ref={meshRef} args={[assets.geometry, materials, count]} frustumCulled={false} castShadow receiveShadow {...interactive} />
+      <mesh ref={glowRef} rotation-x={-Math.PI / 2} visible={false}>
+        <ringGeometry args={[0.72, 0.92, 48]} />
+        <meshBasicMaterial color="#ffd166" transparent toneMapped={false} depthWrite={false} />
+      </mesh>
+      <sprite ref={labelRef} visible={false} renderOrder={20}>
+        <spriteMaterial map={assets.numbers[0]} transparent depthTest={false} depthWrite={false} toneMapped={false} />
+      </sprite>
+    </group>
+  );
+}
+
+export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], layout = layoutFor('classic') }) {
   const assets = useDieAssets();
+  const diceStunt = (stunts || []).find((s) => s.kind === 'dice' && (stuntLive(s) || (s.cut && cutClock(s) < 0.5))) || null;
+  const stormLive = !!diceStunt && !diceStunt.cut;
   const idle = turn === null || turn === undefined;
-  const activeSeat = idle ? idleSeat : lastRoll?.seat === turn || canRoll ? turn : null;
+  const activeSeat = stormLive ? null : idle ? idleSeat : lastRoll?.seat === turn || canRoll ? turn : null;
   const [dice, setDice] = useState(() => (activeSeat === null ? [] : [{ seat: activeSeat, spawnT: null }]));
   const seenRoll = useRef(lastRoll?.t);
 
   useLayoutEffect(() => {
-    const fresh = lastRoll && lastRoll.t !== seenRoll.current ? lastRoll : null;
-    if (fresh) seenRoll.current = fresh.t;
+    const fresh = !stormLive && lastRoll && lastRoll.t !== seenRoll.current ? lastRoll : null;
+    if (lastRoll) seenRoll.current = lastRoll.t;
     const need = fresh ? fresh.seat : activeSeat;
     if (need === null || need === undefined) return;
     setDice((list) => (list.some((d) => d.seat === need) ? list : [...list, { seat: need, spawnT: fresh ? fresh.t : null }]));
-  }, [lastRoll, activeSeat]);
+  }, [lastRoll, activeSeat, stormLive]);
 
   const onGone = (seat) => setDice((list) => list.filter((d) => d.seat !== seat || d.seat === activeSeat));
 
-  return dice.map((d) => (
-    <DieBody
-      key={`${d.seat}:${layout.spec.id}`}
-      seat={d.seat}
-      skin={skins[d.seat]}
-      spawnT={d.spawnT}
-      lastRoll={lastRoll}
-      active={d.seat === activeSeat}
-      canRoll={canRoll && d.seat === activeSeat}
-      onRoll={onRoll}
-      onGone={onGone}
-      assets={assets}
-      layout={layout}
-    />
-  ));
+  return (
+    <>
+      {diceStunt && <DiceStorm key={diceStunt.id} stunt={diceStunt} skin={skins[diceStunt.seat]} assets={assets} layout={layout} onPickDie={onPickDie} />}
+      {dice.map((d) => (
+        <DieBody
+          key={`${d.seat}:${layout.spec.id}`}
+          seat={d.seat}
+          skin={skins[d.seat]}
+          spawnT={d.spawnT}
+          lastRoll={stormLive ? null : lastRoll}
+          active={d.seat === activeSeat}
+          canRoll={!stormLive && canRoll && d.seat === activeSeat}
+          onRoll={onRoll}
+          onGone={onGone}
+          assets={assets}
+          layout={layout}
+        />
+      ))}
+    </>
+  );
 }

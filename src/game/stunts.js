@@ -3,12 +3,13 @@ import shared from '../shared/stunts';
 import { positionIn } from './geometry';
 import { clamp01, hitClock, samePos, sinceClock } from './hits';
 
-export const { FLASH, ROCKY_JUMPS, rockyTiming, stuntSeconds } = shared;
+export const { DICE_STORM_COUNT, FLASH, UFO, ROCKY_JUMPS, rockyTiming, boardCrossSDF, dishSDF, boardSurfaceY, stuntSeconds } = shared;
 export const stuntClock = hitClock;
 export const stuntLive = (s, now) => !!s && !s.cut && stuntClock(s, now) < stuntSeconds(s);
 export const liveStunt = (stunts) => (stunts || []).find((s) => stuntLive(s)) || null;
+export const burnClock = (stuntId, die, now) => (die.burned ? sinceClock(`${stuntId}:burn:${die.id}`, die.burnedAge, now) : null);
 // The game moving the marble for real ends its part in the bit
-export const starOf = (stunt, board) => !!stunt && samePos(stunt.at, board.marbles[stunt.seat]?.[stunt.marble]);
+export const starOf = (stunt, board) => !!stunt && stunt.kind !== 'dice' && samePos(stunt.at, board.marbles[stunt.seat]?.[stunt.marble]);
 
 const REST_Y = 0.07;
 // Marble center when it's up on its legs (hip drop plus leg length)
@@ -182,4 +183,63 @@ export function flashSway(t, star, seed) {
   const hop = star ? Math.sin(Math.PI * clamp01((t - (FLASH.toss - 0.15)) / 0.4)) * 0.45 : 0;
   const daze = t > FLASH.bang ? 0.07 * Math.max(0, 1 - (t - FLASH.bang) / 4) : 0;
   return { y: hop, x: Math.sin(t * 7 + seed) * daze, z: Math.cos(t * 5.3 + seed * 1.7) * daze };
+}
+
+export function ufoSpot(stunt, layout) {
+  const [r, c] = positionIn(stunt.seat, stunt.at, stunt.marble, layout);
+  return [c, r];
+}
+
+// Saucer hovers with its hatch this high over the marble
+export const UFO_HOVER_Y = 3.4;
+const HATCH_Y = UFO_HOVER_Y - 0.45;
+
+export const ufoPhase = (t) => (t < UFO.toLab ? 'board' : t < UFO.kitchen ? 'lab' : t < UFO.lab2 ? 'kitchen' : t < UFO.board2 ? 'lab' : 'board');
+
+// who 0 is Zorp (the small one with the tablet), who 1 is Klarg (the tall one with the probe); low = said from the floor
+export const UFO_SCRIPT = [
+  { who: 0, at: UFO.specimen, until: UFO.ball - 0.15, text: "Specimen 4,071. Earth's apex predator." },
+  { who: 1, at: UFO.ball, until: UFO.menace - 0.15, text: "...It's a ball." },
+  { who: 0, at: UFO.menace, until: UFO.toaster - 0.15, text: 'A PERFECT ball. Look at the menace.' },
+  { who: 1, at: UFO.toaster, until: UFO.whipOut - 0.05, text: 'Remember the toaster?' },
+  { who: 1, at: UFO.leader, until: UFO.tick - 0.1, text: 'Take us to your leader.' },
+  { who: 0, at: UFO.thinking, until: UFO.ding - 0.05, text: "...It's thinking." },
+  { who: 0, at: UFO.armed, until: UFO.abort - 0.1, text: "IT'S ARMED!" },
+  { who: 1, at: UFO.abort, until: UFO.whipBack - 0.05, text: 'ABORT! ABORT!', low: true },
+  { who: 1, at: UFO.classic, until: UFO.cried - 0.15, text: 'Hahaha. Classic.' },
+  { who: 0, at: UFO.cried, until: UFO.cord - 0.15, text: 'You cried for a week.' },
+  { who: 1, at: UFO.cord, until: UFO.pokeIt - 0.15, text: 'It had a CORD, Zorp.' },
+  { who: 0, at: UFO.pokeIt, until: UFO.poke1 + 0.25, text: 'Anyway. Poke it.' },
+  { who: 1, at: UFO.nothing, until: UFO.tossIt - 0.15, text: 'Nothing. Zero threat.' },
+  { who: 0, at: UFO.tossIt, until: UFO.button + 0.15, text: 'Toss it.' },
+];
+export const ufoTalking = (who, t) => UFO_SCRIPT.some((l) => l.who === who && t >= l.at && t < l.until);
+
+// The star rattles under the beam, spirals up into the hatch, is gone, then gets spat back out and lands dazed.
+// Everyone else shivers while the saucer hangs over the table and flinches when the star hits the board
+export function ufoSway(t, star, seed) {
+  if (!star) {
+    const dread = t > UFO.lock - 0.4 && t < UFO.aboard ? 0.025 * clamp01((t - UFO.lock + 0.4) / 0.6) : 0;
+    const flinch = t > UFO.land + seed * 0.02 ? Math.sin(Math.PI * clamp01((t - UFO.land - seed * 0.02) / 0.3)) * 0.16 : 0;
+    return { x: Math.sin(t * 19 + seed) * dread, y: flinch, z: Math.cos(t * 16 + seed * 1.3) * dread, visible: true, spin: false };
+  }
+  if (t < UFO.lift) {
+    const buzz = t >= UFO.beam ? 0.045 * clamp01((t - UFO.beam) / (UFO.lift - UFO.beam)) : 0;
+    return { x: Math.sin(t * 30 + seed) * buzz, y: Math.abs(Math.sin(t * 24)) * buzz * 1.5, z: Math.cos(t * 26 + seed) * buzz, visible: true, spin: false };
+  }
+  if (t < UFO.aboard) {
+    const u = clamp01((t - UFO.lift) / (UFO.aboard - UFO.lift));
+    const ease = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const spiral = Math.sin(Math.PI * u) * 0.22;
+    return { x: Math.cos(t * 7 + seed) * spiral, y: ease * HATCH_Y, z: Math.sin(t * 7 + seed) * spiral, visible: true, spin: true };
+  }
+  if (t < UFO.eject) return { x: 0, y: HATCH_Y, z: 0, visible: false, spin: false };
+  if (t < UFO.land) {
+    const u = clamp01((t - UFO.eject) / (UFO.land - UFO.eject));
+    return { x: 0, y: HATCH_Y * (1 - u * u), z: 0, visible: true, spin: true };
+  }
+  const since = t - UFO.land;
+  const bounce = since < 0.32 ? Math.sin(Math.PI * (since / 0.32)) * 0.42 : since < 0.52 ? Math.sin(Math.PI * ((since - 0.32) / 0.2)) * 0.12 : 0;
+  const daze = 0.05 * Math.max(0, 1 - since / 1.8);
+  return { x: Math.sin(t * 11 + seed) * daze, y: bounce, z: Math.cos(t * 9 + seed) * daze, visible: true, spin: false };
 }

@@ -335,6 +335,9 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can pull a bit');
     current().stunt(userId, { kind, seat, marble });
   });
+  handle('game:pickStuntDie', ({ dieId } = {}) => {
+    current().pickStuntDie(userId, dieId);
+  });
   handle('game:cutStunt', ({ id } = {}) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can cut a bit');
     current().cutStunt(userId, id);

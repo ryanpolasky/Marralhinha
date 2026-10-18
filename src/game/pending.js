@@ -9,6 +9,10 @@ export function useRollPending(lastRoll, holdStuck = false) {
   const stuck = holdStuck && !!lastRoll?.noMoves;
   useEffect(() => {
     if (!t || t === seen.current) return undefined;
+    if (seen.current && t < seen.current) {
+      seen.current = t;
+      return undefined;
+    }
     seen.current = t;
     setPending({ t, phase: 'rolling' });
     const timers = [setTimeout(() => setPending((p) => (p?.t === t ? (stuck ? { t, phase: 'stuck' } : null) : p)), ROLL_REVEAL_MS)];
@@ -16,7 +20,7 @@ export function useRollPending(lastRoll, holdStuck = false) {
     return () => timers.forEach(clearTimeout);
   }, [t]); // eslint-disable-line react-hooks/exhaustive-deps
   // A brand new roll counts as rolling on its very first render, before the effect has caught up
-  const phase = t && t !== seen.current ? 'rolling' : pending && pending.t === t ? pending.phase : null;
+  const phase = t && t !== seen.current && (!seen.current || t > seen.current) ? 'rolling' : pending && pending.t === t ? pending.phase : null;
   return [phase === 'rolling', phase === 'stuck'];
 }
 
@@ -29,6 +33,10 @@ export function useHandoff(game, seats, enabled = false) {
   const handsOver = enabled && !!mv && game.phase === 'roll' && game.turn !== game.lastRoll?.seat && !!seats?.[game.turn] && !seats[game.turn].isBot;
   useEffect(() => {
     if (!t || t === seen.current) return undefined;
+    if (seen.current && t < seen.current) {
+      seen.current = t;
+      return undefined;
+    }
     seen.current = t;
     if (!handsOver) return undefined;
     setHeld({ t, roll: game.lastRoll?.t });

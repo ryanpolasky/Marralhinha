@@ -240,3 +240,29 @@ test('only a present, connected partner covers an away seat in 2v2', () => {
     assert.strictEqual(rules.coverFor(game, [table[0], null, p, null], 0), null);
   }
 });
+
+test('tracks center evictions, center stay streak, heartbreaks, six streaks, blocked rolls and steps', () => {
+  const state = setup();
+  state.marbles[1][0] = { zone: 'center' };
+  state.marbles[0][0] = track(8);
+  rollWith(state, 6);
+  rules.move(state, state.legalMoves.find((m) => m.kind === 'step').id);
+  assert.equal(state.stats[1].longestCenter, 1);
+
+  state.marbles[0][1] = track(8);
+  rollWith(state, 6);
+  assert.equal(state.stats[0].bestStreak, 2);
+  assert.equal(state.stats[1].longestCenter, 2);
+  rules.move(state, state.legalMoves.find((m) => m.kind === 'enterCenter').id);
+  assert.equal(state.stats[0].evictions, 1);
+  assert.equal(state.stats[1].centerCur, 0);
+
+  const nearHome = rules.idxOf(1, rules.LAST_TRACK - 2);
+  state.marbles[1][1] = track(nearHome);
+  state.marbles[0][2] = track((nearHome - 3 + rules.TRACK_LEN) % rules.TRACK_LEN);
+  rollWith(state, 3);
+  assert.equal(state.stats[0].sixStreak, 0);
+  rules.move(state, state.legalMoves.find((m) => m.marble === 2).id);
+  assert.equal(state.stats[0].heartbreaks, 1);
+  assert.equal(state.stats[0].steps, 9);
+});

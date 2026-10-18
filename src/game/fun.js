@@ -21,27 +21,58 @@ export function randomNickname() {
   }
 }
 
-export function computeAwards(game) {
-  if (!game.stats) return [];
-  const seats = game.active;
-  const best = (score, min = 1) => {
-    let top = null;
-    seats.forEach((s) => {
-      const v = score(game.stats[s]);
-      if (v >= min && (top === null || v > top.v)) top = { seat: s, v };
-    });
-    return top;
-  };
-  const awards = [];
-  const add = (title, blurb, top, format = (v) => v) => top && awards.push({ title, blurb, seat: top.seat, value: format(top.v) });
-  add('Marble Hunter', 'most captures', best((s) => s.captures));
-  add('Six Machine', 'most sixes rolled', best((s) => s.sixes));
-  add('Shortcut Fan', 'most center jumps', best((s) => s.shortcuts));
-  add('Hot Hands', 'best average roll', best((s) => (s.rolls >= 4 ? s.pips / s.rolls : 0), 0.1), (v) => v.toFixed(1));
-  add('Punching Bag', 'got captured the most', best((s) => s.captured));
-  for (let i = awards.length - 1; i > 0; i--) {
+const MAX_AWARDS_PER_SEAT = 2;
+
+export const AWARD_POOL = [
+  { title: 'Marble Hunter', blurb: 'most captures', score: (s) => s.captures || 0 },
+  { title: 'Six Machine', blurb: 'most sixes rolled', score: (s) => s.sixes || 0 },
+  { title: 'Shortcut Fan', blurb: 'most center jumps', score: (s) => s.shortcuts || 0 },
+  { title: 'Hot Hands', blurb: 'best average roll', score: (s) => (s.rolls >= 4 ? s.pips / s.rolls : 0), min: 0.1, format: (v) => v.toFixed(1) },
+  { title: 'Punching Bag', blurb: 'got captured the most', score: (s) => s.captured || 0 },
+  { title: 'Eviction Notice', blurb: 'most center captures', score: (s) => s.evictions || 0 },
+  { title: 'Squatter', blurb: 'longest stay in the center', score: (s) => s.longestCenter || 0, min: 2 },
+  { title: 'Heartbreaker', blurb: 'most captures near home', score: (s) => s.heartbreaks || 0 },
+  { title: 'Hot Streak', blurb: 'most sixes in a row', score: (s) => s.bestStreak || 0, min: 2 },
+  { title: 'Cold Hands', blurb: 'lowest average roll', score: (s) => (s.rolls >= 4 && s.pips / s.rolls < 3.2 ? 6 - s.pips / s.rolls : 0), min: 0.1, format: (v) => (6 - v).toFixed(1) },
+  { title: 'Boxed In', blurb: 'most rolls with no move', score: (s) => s.noMoves || 0, min: 2 },
+  { title: 'Marathoner', blurb: 'most steps moved', score: (s) => s.steps || 0, min: 15 },
+];
+
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [awards[i], awards[j]] = [awards[j], awards[i]];
+    [list[i], list[j]] = [list[j], list[i]];
   }
-  return awards;
+  return list;
+}
+
+export function computeAwards(game) {
+  if (!game?.stats) return [];
+  const seats = game.active;
+  const candidates = [];
+  AWARD_POOL.forEach(({ title, blurb, score, min = 1, format = (v) => v }) => {
+    let best = null;
+    let tops = [];
+    seats.forEach((s) => {
+      const v = score(game.stats[s] || {});
+      if (v < min) return;
+      if (best === null || v > best) {
+        best = v;
+        tops = [s];
+      } else if (v === best) tops.push(s);
+    });
+    if (best !== null) candidates.push({ title, blurb, value: format(best), seats: shuffle(tops) });
+  });
+  shuffle(candidates);
+  const counts = {};
+  const awards = [];
+  candidates.forEach(({ title, blurb, value, seats: tops }) => {
+    const open = tops.filter((s) => (counts[s] || 0) < MAX_AWARDS_PER_SEAT);
+    if (!open.length) return;
+    open.sort((a, b) => (counts[a] || 0) - (counts[b] || 0));
+    const seat = open[0];
+    counts[seat] = (counts[seat] || 0) + 1;
+    awards.push({ title, blurb, seat, value });
+  });
+  return shuffle(awards);
 }

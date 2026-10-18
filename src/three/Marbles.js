@@ -5,12 +5,13 @@ import { SEAT_COLORS, positionIn, layoutFor } from '../game/geometry';
 import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
+import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
-import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive } from '../game/stunts';
+import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive, ufoSway } from '../game/stunts';
 
 export const MARBLE_R = 0.335;
 const REST_Y = 0.07;
@@ -164,7 +165,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
 
   useLayoutEffect(() => {
     const a = anim.current;
-    if (plan && planKey !== a.seen) {
+    if (plan && planKey !== a.seen && (!a.seen || planKey > a.seen)) {
       a.seen = planKey;
       a.segs = plan.map((s) => ({ ...s, start: null }));
     }
@@ -186,8 +187,13 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       }
     };
     const st = stunt && stuntClock(stunt);
+    if (stunt?.kind === 'dice' && stunt.cut && a.pos.distanceToSquared(target) > 0.02) {
+      a.segs.length = 0;
+      a.returning = true;
+    }
     const pose = rocky ? rockyPose(stunt, layout, st) : null;
     const sway = stunt?.kind === 'flash' && !stunt.cut ? flashSway(st, star, seed) : null;
+    const ufo = stunt?.kind === 'ufo' && !stunt.cut ? ufoSway(st, star, seed) : null;
     const knocked = knock && !stunt?.cut ? knockOffset(knock, st) : null;
     poseLimbs(rig.current, pose);
     if (pose) {
@@ -242,9 +248,14 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const prevOffZ = a.off.z;
     a.off.set(down ? down.shift[0] * fly : 0, Math.sin(Math.PI * k) * FLING_HEIGHT, down ? down.shift[1] * fly : 0);
     if (sway) a.off.add(_sway.set(sway.x, sway.y, sway.z));
+    if (ufo) a.off.add(_sway.set(ufo.x, ufo.y, ufo.z));
     if (knocked) a.off.add(_sway.set(knocked.x, knocked.y, knocked.z));
-    group.current.visible = knocked ? knocked.visible : true;
+    group.current.visible = knocked ? knocked.visible : ufo ? ufo.visible : true;
     if (knocked?.tumble) body.current.rotation.x += dt * 14;
+    if (ufo?.spin) {
+      body.current.rotation.y += dt * 7;
+      body.current.rotation.x += dt * 4;
+    }
     if (shade.current) {
       shade.current.material.opacity = 0.72 * clamp01((k - 0.15) / 0.85);
       shade.current.visible = shade.current.material.opacity > 0.01;
@@ -374,7 +385,7 @@ function Ghost({ move, color = SEAT_COLORS[move.seat], strong, label, onMove, la
           <meshBasicMaterial color="#ff4040" transparent opacity={0.7} toneMapped={false} depthWrite={false} />
         </mesh>
       )}
-      {label && <GhostLabel text={label} color={move.capture ? '#ff4040' : color.light} />}
+      {label && <GhostLabel text={label} color={move.capture ? '#ff4040' : color.rainbow ? '#ffffff' : color.light} />}
     </group>
   );
 }
@@ -392,8 +403,9 @@ function PathDots({ move, color = SEAT_COLORS[move.seat], layout }) {
 }
 
 export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
-  const palette = colors || board.colors || SEAT_COLORS;
-  const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, palette[s]));
+  const basePalette = colors || board.colors || SEAT_COLORS;
+  const palette = useRainbow(basePalette);
+  const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, basePalette[s]));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = board.lastMove?.t;
@@ -412,7 +424,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
     return { hit, shift: [rest[0] - to[0], rest[1] - to[1]] };
   };
   // A cut Rocky stays on a moment longer so its limbs can shrink away before it heads home
-  const stunt = (board.stunts || []).find((s) => stuntLive(s) || (s.kind === 'rocky' && s.cut && cutClock(s) < CUT_HOLD)) || null;
+  const stunt = (board.stunts || []).find((s) => stuntLive(s) || ((s.kind === 'rocky' || s.kind === 'dice') && s.cut && cutClock(s) < CUT_HOLD)) || null;
   const starring = starOf(stunt, board);
   const knocks = stunt?.kind === 'rocky' && starring ? rockyKnocks(stunt, layout, board.marbles) : [];
 

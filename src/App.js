@@ -495,7 +495,8 @@ const App = () => {
       return { mode: 'lobby', board: { variant: spec.id, active, marbles, colors: view.colors, lastMove: null, lastRoll: null, turn: null }, colors: view.colors, names, viewSeat, cosmetics };
     }
     const g = view.game;
-    const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat)) && g.phase !== 'over' && !view.paused;
+    const diceBit = (g.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
+    const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat) || (!!account?.admin && !!diceBit)) && g.phase !== 'over' && !view.paused;
     if (!(view.local && held)) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
     return {
       mode: 'game',
@@ -507,8 +508,9 @@ const App = () => {
       cosmetics,
       moves: myTurn && g.phase === 'move' && !held ? g.legalMoves : undefined,
       canRoll: myTurn && g.phase === 'roll' && !held && !startPending,
+      canPickDie: myTurn && !!diceBit && !held,
     };
-  }, [inRoom, view, mySeat, account?.equipped, held, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, view, mySeat, account?.equipped, account?.admin, held, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   // True while the camera is panned/zoomed/orbited away from the default view (pulses the reset button)
@@ -518,6 +520,13 @@ const App = () => {
     (moveId) => {
       sfx.click();
       onAction('game:move', { moveId });
+    },
+    [onAction]
+  );
+  const scenePickDie = useCallback(
+    (dieId) => {
+      sfx.click();
+      onAction('game:pickStuntDie', { dieId });
     },
     [onAction]
   );
@@ -655,6 +664,7 @@ const App = () => {
               boardSkinId={boardSkinId}
               onRoll={sceneRoll}
               onMove={sceneMove}
+              onPickDie={sceneProps.canPickDie ? scenePickDie : undefined}
               resetKey={resetKey}
               pings={game ? pings : NO_PINGS}
               teams={game?.mode === 'teams'}

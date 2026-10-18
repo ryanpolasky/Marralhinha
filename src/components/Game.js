@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
 import { COLOR_PALETTE } from '../game/colors';
+import { useRainbow, useRainbowColor } from '../game/rainbow';
 import { TablePaletteBar } from './Lobby';
 import { coverFor, coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
@@ -58,13 +59,17 @@ function useAnnouncements(game, mySeat, nameOf, local = false, masked = false) {
     const p = prev.current;
     prev.current = game;
     if (!p) return;
+    const diceBit = (game.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
+    if (diceBit && !(p.stunts || []).some((s) => s.id === diceBit.id)) {
+      push(`${diceBit.dice?.length || 50} dice!`, 'Burn them move by move', 'gold', ROLL_REVEAL_MS, sfx.six);
+    }
     const roll = game.lastRoll;
-    if (roll && roll.t !== p.lastRoll?.t && (roll.seat === mySeat || (local && roll.noMoves))) {
+    if (!diceBit && roll && roll.t !== p.lastRoll?.t && (!p.lastRoll?.t || roll.t > p.lastRoll.t) && (roll.seat === mySeat || (local && roll.noMoves))) {
       if (roll.noMoves) push(`No moves`, `${local ? `${nameOf(roll.seat)} rolled a ${roll.die}` : `with a ${roll.die}`}${roll.die === 6 ? ', roll again!' : ''}`, 'muted', ROLL_REVEAL_MS);
       else if (roll.die === 6) push('Six!', 'Move, then roll again', 'gold', ROLL_REVEAL_MS, sfx.six);
     }
     const mv = game.lastMove;
-    if (mv && mv.t !== p.lastMove?.t) {
+    if (mv && mv.t !== p.lastMove?.t && (!p.lastMove?.t || mv.t > p.lastMove.t)) {
       const hopMs = (mv.path?.length || 1) * 190;
       if (mv.capture) {
         const mine = mv.seat === mySeat;
@@ -92,13 +97,28 @@ function useAnnouncements(game, mySeat, nameOf, local = false, masked = false) {
   return items;
 }
 
-function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false, paused = false }) {
+function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false, paused = false, isAdmin = false }) {
   if (startPending) {
     return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'The wheel decides the first roll' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
   }
+  const diceBit = (game.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
   if (rollPending) {
     const roller = game.lastRoll.seat;
-    return { title: roller === mySeat ? 'Rolling…' : `${nameOf(roller)} is rolling…`, sub: 'Fingers crossed…' };
+    const count = diceBit?.dice?.length;
+    return {
+      title: roller === mySeat ? (count ? `Rolling ${count} dice…` : 'Rolling…') : `${nameOf(roller)} is rolling${count ? ` ${count} dice` : ''}…`,
+      sub: 'Fingers crossed…',
+    };
+  }
+  if (diceBit) {
+    const left = (diceBit.dice || []).filter((d) => !d.burned).length;
+    const mine = game.turn === mySeat || (isAdmin && mySeat < 0);
+    if (mine) {
+      return game.legalMoves?.length
+        ? { title: `You rolled a ${game.die} · ${left} ${left === 1 ? 'die' : 'dice'} left`, sub: 'Pick a glowing marble to burn a die, or cut the bit' }
+        : { title: left ? `No moves left (${left} ${left === 1 ? 'die' : 'dice'} on the table)` : 'All dice burned!', sub: 'Cut the bit to put the board back' };
+    }
+    return { title: `${nameOf(game.turn)} has ${left} ${left === 1 ? 'die' : 'dice'} left`, sub: game.legalMoves?.length ? `Burning a ${game.die}…` : 'Out of moves…' };
   }
   if (stuck) {
     const { seat, die } = game.lastRoll;
@@ -287,7 +307,7 @@ function TurnClock({ deadline, total }) {
 }
 
 export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats, mini = false }) {
-  const color = player?.color || game?.colors?.[seat] || SEAT_COLORS[seat];
+  const color = useRainbowColor(player?.color || game?.colors?.[seat] || SEAT_COLORS[seat]);
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
   const sticker = reaction && REACTION_BY_KEY[reaction.key];
@@ -362,7 +382,8 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
   const [edit, setEdit] = useState(null);
   const [bit, setBit] = useState(null);
   const [picks, setPicks] = useState(null);
-  const seatColor = (s) => colors?.[s] || game?.colors?.[s] || seats?.[s]?.color || SEAT_COLORS[s];
+  const liveColors = useRainbow([0, 1, 2, 3].map((s) => colors?.[s] || game?.colors?.[s] || seats?.[s]?.color || SEAT_COLORS[s]));
+  const seatColor = (s) => liveColors[s];
   const reopen = (nextBit) => {
     setTab('bits');
     setBit(nextBit);
@@ -379,6 +400,10 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
   );
   const aimOnBoard = (key = 'hit') => {
     setOpen(false);
+    if (key === 'dice') {
+      onStunt?.({ kind: 'dice' });
+      return;
+    }
     startAim(key);
     onBitStart?.();
   };
@@ -517,7 +542,7 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                     <div className="board-picker-grid">
                       {COLOR_PALETTE.map((sw) => {
                         const cur = seatColor(edit.seat);
-                        const on = cur.main.toLowerCase() === sw.main.toLowerCase();
+                        const on = !cur.rainbow && cur.main.toLowerCase() === sw.main.toLowerCase();
                         return (
                           <button
                             key={sw.id}
@@ -532,6 +557,16 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                           </button>
                         );
                       })}
+                      <button
+                        role="menuitemradio"
+                        aria-checked={!!seatColor(edit.seat).rainbow}
+                        className={`board-option${seatColor(edit.seat).rainbow ? ' on' : ''}`}
+                        onClick={() => onColor?.({ seat: edit.seat, color: 'rainbow' })}
+                        title="Rainbow"
+                      >
+                        <span className="marble-dot rainbow" />
+                        <span>Rainbow</span>
+                      </button>
                     </div>
                     <label className="dev-hex-picker">
                       <span className="marble-dot mini" style={{ '--seat': seatColor(edit.seat).main, '--seat-light': seatColor(edit.seat).light }} />
@@ -960,7 +995,8 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   const activeSeat = held ? game.lastRoll.seat : masked ? null : game.turn;
   const covering = !masked && coveringTurn(game, seats, mySeat);
   const paused = !!room.paused && !local && game.phase !== 'over';
-  const myTurn = (activeSeat === mySeat || (covering && !held)) && game.phase !== 'over' && !paused;
+  const diceBit = (game.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
+  const myTurn = (activeSeat === mySeat || (covering && !held) || (isAdmin && mySeat < 0 && !!diceBit && !held)) && game.phase !== 'over' && !paused;
   const meAway = !!seats[mySeat]?.away;
   const setAway = useCallback((away) => onAction('game:away', { away }), [onAction]);
   const pauseEnd = useMemo(() => (room.pauseEndsIn != null ? Date.now() + room.pauseEndsIn : null), [room.paused]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1056,7 +1092,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     if (isAdmin) warmBoardSkin();
   }, [isAdmin]);
 
-  const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table, paused });
+  const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table, paused, isAdmin });
   const badge = stuck ? game.lastRoll : game.phase === 'move' && !rollPending ? { die: game.die, seat: game.turn } : null;
   // Faces Red during the start wheel; bot turns stay facing the last human since nobody sits there
   const tableSide = !local || !room.table ? null : startPending ? 'bottom' : TABLE_SIDES[seats[activeSeat]?.isBot ? Math.max(mySeat, 0) : activeSeat];

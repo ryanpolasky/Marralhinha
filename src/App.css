@@ -2049,16 +2049,218 @@ body.hit-grim .hud {
   transition-duration: 0.9s;
 }
 
+.ufo-dialogue {
+  --voice: #5ce6ff;
+  position: absolute;
+  bottom: max(calc(9vh + 24px), calc(env(safe-area-inset-bottom) + 16px));
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 48px));
+  transform: translateX(-50%);
+  text-align: center;
+  padding: 12px 20px 16px;
+  border: 3px solid var(--voice);
+  border-radius: 18px;
+  background: #fff6e8;
+  color: #13252a;
+  box-shadow: 0 6px 0 #0008;
+  font: 500 clamp(18px, 2.4vw, 28px) / 1.25 var(--font);
+  overflow-wrap: anywhere;
+  animation: ufo-dialogue-in 0.15s ease-out both;
+}
+
+.ufo-dialogue.speaker-1 {
+  --voice: #7dff9a;
+}
+
+body.stunt-ufo .stunt-overlay .hit-undo {
+  top: max(16px, env(safe-area-inset-top));
+  bottom: auto;
+  z-index: 5;
+}
+
+.ufo-dialogue b {
+  color: #36565c;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@keyframes ufo-dialogue-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-height: 500px) {
+  .ufo-dialogue {
+    bottom: calc(9vh + 12px);
+    padding: 8px 14px;
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ufo-dialogue {
+    animation: none;
+  }
+}
+
 body.stunt-rocky .scene-layer {
   filter: sepia(0.28) saturate(1.35) contrast(1.08) brightness(1.06) hue-rotate(-8deg);
   transition-duration: 1.2s;
 }
 
 body.stunt-rocky .hud,
+body.stunt-ufo .hud,
 body.stunt-flashed .hud {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+
+/* Close encounter: a grade per scene. Night on the table, a cold scanlined lab, a warm washed-out sitcom */
+body.ufo-night .scene-layer {
+  filter: brightness(0.6) saturate(0.72) contrast(1.16);
+  transition-duration: 1.6s;
+}
+
+body.ufo-lab .scene-layer {
+  filter: saturate(1.08) contrast(1.12) brightness(0.98);
+  transition-duration: 0.05s;
+}
+
+body.ufo-sitcom .scene-layer {
+  filter: sepia(0.14) saturate(1.05) contrast(1.03) brightness(0.9);
+  transition-duration: 0.05s;
+}
+
+body.ufo-dream .scene-layer {
+  transition-duration: 0.8s;
+}
+
+body.ufo-dream .ufo-grade {
+  transition-duration: 0.8s;
+}
+
+.ufo-grade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transition: background 1.2s ease, opacity 1.2s ease;
+}
+
+body.ufo-night .ufo-grade {
+  background: radial-gradient(ellipse at 50% 40%, rgba(8, 24, 60, 0.1) 20%, rgba(4, 10, 30, 0.62) 100%);
+}
+
+body.ufo-lab .ufo-grade {
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.16) 3px),
+    radial-gradient(ellipse at center, rgba(90, 255, 200, 0.06) 0%, rgba(0, 20, 20, 0.45) 100%);
+  transition-duration: 0.05s;
+}
+
+body.ufo-sitcom .ufo-grade {
+  background: radial-gradient(ellipse at center, rgba(255, 230, 180, 0) 45%, rgba(60, 30, 0, 0.42) 100%);
+  transition-duration: 0.05s;
+}
+
+body.ufo-sitcom .ufo-grade::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0));
+  animation: ufo-tracking 2.6s linear infinite;
+}
+
+@keyframes ufo-tracking {
+  from {
+    top: -8px;
+  }
+  to {
+    top: 100%;
+  }
+}
+
+.ufo-stamp {
+  position: absolute;
+  top: calc(9vh + 26px);
+  left: max(28px, env(safe-area-inset-left));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 600 clamp(14px, 2.1vw, 23px) / 1.2 ui-monospace, Consolas, 'Courier New', monospace;
+  letter-spacing: 0.14em;
+  color: #8ff7c9;
+  text-shadow: 0 0 12px rgba(80, 255, 180, 0.55), 0 2px 8px #000;
+}
+
+.ufo-stamp span {
+  display: block;
+  width: max-content;
+  white-space: nowrap;
+  animation: ufo-type var(--duration) steps(var(--n)) var(--delay) both;
+}
+
+@keyframes ufo-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+.ufo-chyron {
+  position: absolute;
+  left: max(36px, env(safe-area-inset-left));
+  top: calc(9vh + 26px);
+  z-index: 2;
+  font-family: 'Trebuchet MS', Arial, sans-serif;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000, 0 0 18px rgba(0, 0, 0, 0.8);
+  animation: ufo-chyron-in 0.45s cubic-bezier(0.2, 0.9, 0.2, 1.2) both;
+}
+
+.ufo-chyron b {
+  display: block;
+  font-size: clamp(22px, 3.8vw, 42px);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.ufo-chyron span {
+  display: block;
+  font-size: clamp(14px, 2vw, 20px);
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+@keyframes ufo-chyron-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ufo-stamp span {
+    animation: none;
+  }
 }
 
 body.stunt-flashed .scene-layer {
@@ -6412,17 +6614,16 @@ img.emote-glyph {
 }
 
 .thumb-marble.skin-dev {
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55) 0 5%, transparent 13%),
-    linear-gradient(28deg, transparent 0 44%, var(--seat-light) 45% 47%, transparent 48%), linear-gradient(-40deg, transparent 0 58%, var(--seat-light) 59% 60.5%, transparent 62%),
-    linear-gradient(75deg, transparent 0 28%, var(--seat-light) 29% 30.5%, transparent 32%), linear-gradient(28deg, transparent 0 41%, rgba(255, 74, 90, 0.5) 42% 50%, transparent 51%),
-    linear-gradient(-40deg, transparent 0 55%, rgba(255, 74, 90, 0.5) 56% 63%, transparent 65%), radial-gradient(circle at 50% 50%, #1a0d11, #0a0709 70%);
-  box-shadow: 0 0 16px rgba(255, 74, 90, 0.55), 0 6px 12px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.45) 0 5%, transparent 13%),
+    linear-gradient(0deg, transparent 0 41%, var(--seat-light) 46% 54%, transparent 59%), radial-gradient(circle, #000 0 27%, var(--seat-light) 31%, transparent 42%),
+    radial-gradient(circle, transparent 0 38%, color-mix(in srgb, var(--seat) 60%, transparent) 62%, transparent 80%), radial-gradient(circle at 50% 50%, #0a0709, #020103 85%);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--seat) 70%, transparent), 0 6px 12px rgba(0, 0, 0, 0.45);
   animation: singularity 2.6s ease-in-out infinite;
 }
 
 @keyframes singularity {
   50% {
-    box-shadow: 0 0 26px rgba(255, 74, 90, 0.9), 0 6px 12px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 26px var(--seat-light), 0 6px 12px rgba(0, 0, 0, 0.45);
     filter: brightness(1.25);
   }
 }
@@ -10686,3 +10887,14 @@ body {
   cursor: pointer;
 }
 
+.seat-swatch.rainbow,
+.marble-dot.rainbow {
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85) 0 6%, transparent 22%), conic-gradient(#ff4d4d, #ffb84d, #f2ff4d, #4dff7a, #4dd2ff, #6a4dff, #ff4dd2, #ff4d4d);
+  animation: rainbow-spin 10s linear infinite;
+}
+
+@keyframes rainbow-spin {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}

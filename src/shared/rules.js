@@ -60,7 +60,22 @@ function createGame(seats, { rng = rollDie, teams = false, starter = null, board
     winners: null,
     startedAt: Date.now(),
     log: [],
-    stats: [0, 1, 2, 3].map(() => ({ rolls: 0, pips: 0, sixes: 0, captures: 0, captured: 0, shortcuts: 0 })),
+    stats: [0, 1, 2, 3].map(() => ({
+      rolls: 0,
+      pips: 0,
+      sixes: 0,
+      captures: 0,
+      captured: 0,
+      shortcuts: 0,
+      evictions: 0,
+      centerCur: 0,
+      longestCenter: 0,
+      heartbreaks: 0,
+      sixStreak: 0,
+      bestStreak: 0,
+      noMoves: 0,
+      steps: 0,
+    })),
     pick: null,
     boardSeat: null,
   };
@@ -194,10 +209,26 @@ function roll(state, rng = rollDie) {
   const stats = state.stats[state.turn];
   stats.rolls++;
   stats.pips += die;
-  if (die === 6) stats.sixes++;
+  if (die === 6) {
+    stats.sixes++;
+    stats.sixStreak = (stats.sixStreak || 0) + 1;
+    stats.bestStreak = Math.max(stats.bestStreak || 0, stats.sixStreak);
+  } else {
+    stats.sixStreak = 0;
+  }
+  state.active.forEach((s) => {
+    const st = state.stats[s];
+    if (state.marbles[s].some((p) => p.zone === 'center')) {
+      st.centerCur = (st.centerCur || 0) + 1;
+      st.longestCenter = Math.max(st.longestCenter || 0, st.centerCur);
+    } else {
+      st.centerCur = 0;
+    }
+  });
   state.phase = 'move';
   state.legalMoves = computeLegalMoves(state);
   const noMoves = state.legalMoves.length === 0;
+  if (noMoves) stats.noMoves = (stats.noMoves || 0) + 1;
   state.lastRoll = { seat: state.turn, die, noMoves, t: Date.now() };
   const helping = controlledSeat(state) !== state.turn ? ` (for ${state.names[controlledSeat(state)]})` : '';
   addLog(state, `${state.names[state.turn]} rolled a ${die}${helping}${noMoves ? ', no moves' : ''}`, state.turn);
@@ -210,13 +241,24 @@ function move(state, moveId) {
   const mv = state.legalMoves.find((m) => m.id === moveId);
   if (!mv) throw new Error('Illegal move');
   const { seat, marble, to, capture } = mv;
+  const spec = specOf(state);
   state.marbles[seat][marble] = to;
   if (capture) {
     state.marbles[capture.seat][capture.marble] = { zone: 'base' };
-    state.stats[state.turn].captures++;
+    const turnStats = state.stats[state.turn];
+    turnStats.captures++;
     state.stats[capture.seat].captured++;
+    if (to.zone === 'center') {
+      turnStats.evictions = (turnStats.evictions || 0) + 1;
+      state.stats[capture.seat].centerCur = 0;
+    }
+    if (to.zone === 'track' && progressOf(capture.seat, to.idx, spec) >= spec.lastTrack - spec.arm) {
+      turnStats.heartbreaks = (turnStats.heartbreaks || 0) + 1;
+    }
   }
   if (mv.kind === 'enterCenter') state.stats[state.turn].shortcuts++;
+  if (mv.kind === 'exitCenter') state.stats[seat].centerCur = 0;
+  if (mv.kind === 'step') state.stats[state.turn].steps = (state.stats[state.turn].steps || 0) + mv.path.length;
   state.lastMove = { seat, marble, kind: mv.kind, from: mv.from, to, path: mv.path, capture, t: Date.now() };
 
   const who = state.names[seat];

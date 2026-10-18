@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { SEAT_COLORS, rotate, layoutFor } from '../game/geometry';
 import { skinKey } from '../game/catalog';
+import { hexToOklch } from '../game/colors';
+import { rainbowHue } from '../game/rainbow';
 import { makeCanvas, seeded, finish, makeWoodCanvas, makeFeltTexture, makeSwirlCanvas, finishMarble } from './textures';
 import { blockCanvas, oreBlockCanvases, firstNightCanvas, stumpCanvas, grassFieldCanvas, workbenchFace, workbenchPips } from './minecraft';
 
@@ -829,9 +831,12 @@ const MARBLES = {
             vec3 q = vec3(cos(spin) * p.x - sin(spin) * p.z, p.y, sin(spin) * p.x + cos(spin) * p.z);
             float convect = solFbm(q * 2.4 + vec3(0.0, uTime * 0.025, 0.0));
             vec3 warped = q * 15.0 + (vec3(solFbm(q * 4.0), solFbm(q * 4.0 + 5.2), solFbm(q * 4.0 + 9.7)) - 0.5) * 1.6;
+            float far = smoothstep(0.2, 0.7, length(fwidth(warped)));
             vec2 cells = solCells(warped, uTime * 0.9);
             float gran = (1.0 - smoothstep(0.1, 0.95, cells.x)) * smoothstep(0.0, 0.4, cells.y - cells.x);
-            gran = 0.5 + 0.5 * gran * (0.8 + 0.4 * solNoise(q * 34.0 + uTime * 0.4));
+            float fine = mix(solNoise(q * 34.0 + uTime * 0.4), 0.5, smoothstep(0.3, 0.9, length(fwidth(q * 34.0))));
+            gran = mix(gran, 0.3, far);
+            gran = 0.5 + 0.5 * gran * (0.8 + 0.4 * fine);
             float belt = 1.0 - smoothstep(0.12, 0.3, abs(abs(p.y) - 0.32));
             float region = solFbm(q * 3.2 + 7.3);
             float umbra = smoothstep(0.64, 0.69, region) * belt;
@@ -847,7 +852,7 @@ const MARBLES = {
             vec3 col = mix(uCool, uMid, smoothstep(0.1, 0.6, heat));
             col = mix(col, uHot, smoothstep(0.85, 1.2, heat));
             float rim = pow(1.0 - facing, 3.5);
-            float licks = solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0));
+            float licks = mix(solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0)), 0.5, far);
             diffuseColor.rgb = col * 0.08;
             totalEmissiveRadiance = col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8);
           }`
@@ -870,107 +875,88 @@ const MARBLES = {
       },
     };
   },
-  // Dev set: black obsidian glass cracked open, seat-colored light leaking out of every fissure (reads from any angle)
+  // Dev set: a pocket black hole. The view ray is bent through a Schwarzschild-style well in view space, so the
+  // accretion disk wraps over and under the shadow the way it does in the films, tinted by the seat color
   dev: (c, seat) => {
-    const [canvas, ctx] = makeCanvas(512, 256);
-    const [glow, gctx] = makeCanvas(512, 256);
-    const rand = seeded(250 + seat);
-    ctx.fillStyle = '#0a0709';
-    ctx.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 1400; i++) {
-      ctx.fillStyle = `rgba(255,74,90,${rand() * 0.05})`;
-      ctx.fillRect(rand() * 512, rand() * 256, 1 + rand() * 3, 1 + rand() * 3);
-    }
-    gctx.fillStyle = '#000';
-    gctx.fillRect(0, 0, 512, 256);
-    // Cracks wrap around the seam so the sphere has no bald side
-    const crack = (x, alpha, width, color) => {
-      x.lineCap = 'round';
-      x.lineJoin = 'round';
-      [-512, 0, 512].forEach((dx) => {
-        const r = seeded(250 + seat);
-        for (let i = 0; i < 9; i++) {
-          let px = r() * 512 + dx;
-          let py = 20 + r() * 216;
-          let angle = r() * TAU;
-          x.beginPath();
-          x.moveTo(px, py);
-          for (let s = 0; s < 26; s++) {
-            angle += (r() - 0.5) * 1.1;
-            px += Math.cos(angle) * 12;
-            py += Math.sin(angle) * 7;
-            x.lineTo(px, py);
-          }
-          x.globalAlpha = alpha * (0.6 + r() * 0.4);
-          x.strokeStyle = color;
-          x.lineWidth = width * (0.5 + r());
-          x.stroke();
-        }
-      });
-      x.globalAlpha = 1;
+    const uniforms = {
+      uTime: { value: 0 },
+      uHot: { value: new THREE.Color(mix(c.light, '#fff4d6', 0.55)) },
+      uMid: { value: new THREE.Color(c.main) },
+      uCool: { value: new THREE.Color(c.dark) },
     };
-    crack(ctx, 0.35, 9, '#ff4a5a');
-    crack(ctx, 0.95, 2.6, c.light);
-    crack(gctx, 0.45, 10, '#ff4a5a');
-    crack(gctx, 1, 2.6, mix(c.light, '#ffffff', 0.35));
-    const map = finishMarble(canvas);
-    const emissiveMap = finishMarble(glow);
-    emissiveMap.wrapT = THREE.RepeatWrapping;
-    // Shader patch: light pulses race along the cracks, a slower layer of light drifts underneath
-    // (fake depth), and an event-horizon rim in the seat color wraps the silhouette from every angle
-    const uniforms = { uTime: { value: 0 }, uFlare: { value: 0 }, uRim: { value: new THREE.Color(mix(c.light, '#ff4a5a', 0.35)) } };
     const onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vSingularityPosition;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSingularityPosition = normalize(position);');
+        .replace('#include <common>', '#include <common>\nvarying vec3 vHoleCenter;\nvarying float vHoleRadius;')
+        .replace('#include <project_vertex>', `#include <project_vertex>
+          vHoleCenter = (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+          vHoleRadius = length(mvPosition.xyz - vHoleCenter);`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uFlare;\nuniform vec3 uRim;\nvarying vec3 vSingularityPosition;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uHot;\nuniform vec3 uMid;\nuniform vec3 uCool;\nvarying vec3 vHoleCenter;\nvarying float vHoleRadius;')
         .replace(
           '#include <emissivemap_fragment>',
           `{
-            vec2 uv = vEmissiveMapUv;
-            vec3 cracks = texture2D( emissiveMap, uv ).rgb;
-            float p1 = pow( 0.5 + 0.5 * sin( ( uv.x * 3.0 - uv.y * 1.5 ) * 6.2831 - uTime * 2.4 ), 10.0 );
-            float p2 = pow( 0.5 + 0.5 * sin( ( uv.x * 2.0 + uv.y * 2.5 ) * 6.2831 + uTime * 1.7 ), 12.0 );
-            float pulse = 0.2 + 0.6 * max( p1, p2 );
-            vec3 deep = texture2D( emissiveMap, vec2( uv.x + uTime * 0.08, uv.y + sin( uTime * 0.4 ) * 0.02 ) ).rgb;
-            vec3 p = normalize(vSingularityPosition);
-            float spin = uTime * 0.85;
-            p.xz = mat2(cos(spin), -sin(spin), sin(spin), cos(spin)) * p.xz;
-            p.xy = mat2(0.8, -0.6, 0.6, 0.8) * p.xy;
-            float angle = atan(p.z, p.x);
-            float orbit = abs(p.y + 0.22 * sin(angle * 3.0 - uTime * 1.6));
-            float band = 1.0 - smoothstep(0.035, 0.19, orbit);
-            float core = 1.0 - smoothstep(0.008, 0.035, orbit);
-            float crossOrbit = abs(p.x + 0.3 * sin(p.z * 4.0 + uTime * 1.3));
-            float crossBand = 1.0 - smoothstep(0.025, 0.1, crossOrbit);
-            float stream = 0.55 + 0.45 * sin(angle * 5.0 + uTime * 4.0);
-            float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 3.2);
-            vec3 energy = mix(uRim, vec3(1.0, 0.12, 0.025), 0.3 + 0.2 * sin(angle + uTime));
-            diffuseColor.rgb = mix(vec3(0.008, 0.003, 0.015), energy * 0.12, band);
-            totalEmissiveRadiance = cracks * pulse + deep * 0.12
-              + energy * band * (0.9 + stream * 1.5)
-              + vec3(1.0, 0.72, 0.3) * (core * 0.9 + crossBand * 0.65)
-              + uRim * rim * (0.8 + uFlare * 0.45);
+            const float RIN = 2.7;
+            const float ROUT = 6.0;
+            vec3 onSphere = (-vViewPosition - vHoleCenter) / vHoleRadius;
+            float footprint = length(fwidth(onSphere.xy));
+            float steady = 1.0 - smoothstep(0.05, 0.13, footprint);
+            vec3 dir = normalize(-vViewPosition);
+            float wobble = 0.2 + 0.07 * sin(uTime * 0.45);
+            vec3 n = normalize(vec3(0.22 * sin(uTime * 0.31), 1.0, wobble));
+            vec3 pos = onSphere * 6.25;
+            vec3 col = vec3(0.0);
+            float seen = 1.0;
+            bool escaped = false;
+            for (int i = 0; i < 72; i++) {
+              float r2 = dot(pos, pos);
+              float r = sqrt(r2);
+              if (r < 1.0) break;
+              if (r > 6.4 && dot(pos, dir) > 0.0) { escaped = true; break; }
+              float h = length(cross(pos, dir));
+              float dt = clamp(0.16 * r, 0.06, 0.5);
+              vec3 prev = pos;
+              dir = normalize(dir - 1.5 * h * h * pos / (r2 * r2 * r) * dt);
+              pos += dir * dt;
+              float a = dot(prev, n);
+              float b = dot(pos, n);
+              if (a * b < 0.0) {
+                vec3 hit = mix(prev, pos, a / (a - b));
+                float rr = length(hit);
+                if (rr > RIN && rr < ROUT) {
+                  float heat = pow(RIN / rr, 1.4);
+                  float ang = atan(hit.z, hit.x);
+                  float swirl = 0.72 + 0.28 * steady * sin(ang * 3.0 - uTime * (2.4 / pow(rr, 0.75)) + rr * 1.6);
+                  vec3 orbit = normalize(cross(n, hit));
+                  float beam = clamp(0.62 + 0.55 * dot(orbit, -dir), 0.2, 1.5);
+                  float edge = smoothstep(RIN, RIN + 0.5, rr) * (1.0 - smoothstep(ROUT - 1.3, ROUT, rr));
+                  vec3 ramp = mix(uCool, uMid, smoothstep(0.1, 0.5, heat));
+                  ramp = mix(ramp, uHot, smoothstep(0.55, 1.0, heat));
+                  col += ramp * (0.5 + heat * 2.6) * swirl * beam * edge * seen;
+                  seen *= 0.42;
+                }
+              }
+            }
+            float facing = max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+            float rim = pow(1.0 - facing, 3.0);
+            vec3 sky = uCool * 0.14 * (0.4 + 0.6 * dot(dir, vec3(0.3, 0.8, 0.5)));
+            col = escaped ? col + sky * seen : col;
+            diffuseColor.rgb = vec3(0.004);
+            totalEmissiveRadiance = col * 1.15 + uMid * rim * 0.55;
           }`
         );
     };
     return {
-      map,
-      emissiveMap,
+      color: '#000000',
       emissive: '#ffffff',
       emissiveIntensity: 1,
       roughness: 0.04,
       clearcoat: 1,
       clearcoatRoughness: 0.02,
       onBeforeCompile,
-      customProgramCacheKey: () => 'marble-dev-orbits',
+      customProgramCacheKey: () => 'marble-dev-blackhole',
       animate: (m, t) => {
         uniforms.uTime.value = t + seat * 1.9;
-        // A flare every few seconds, sharp attack and slow decay
-        const phase = (t * 0.45 + seat * 0.3) % 1;
-        uniforms.uFlare.value = phase < 0.08 ? phase / 0.08 : Math.max(0, 1 - (phase - 0.08) / 0.3);
       },
     };
   },
@@ -1193,14 +1179,40 @@ const MARBLES = {
   },
 };
 
+const HUE_SHIFT_GLSL = `
+uniform float uHueShift;
+vec3 hueShift(vec3 c, float a) {
+  const vec3 k = vec3(0.57735);
+  return max(c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a)), 0.0);
+}
+void main() {`;
+
+// Rainbow seats spin the final lit color's hue on the GPU (so emissive shaders follow too), in step with the flat colors
+function withHueShift(material, baseHue) {
+  const uniform = { value: 0 };
+  const prevCompile = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    prevCompile.call(material, shader, renderer);
+    shader.uniforms.uHueShift = uniform;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', HUE_SHIFT_GLSL)
+      .replace('#include <opaque_fragment>', 'outgoingLight = hueShift(outgoingLight, uHueShift);\n#include <opaque_fragment>');
+  };
+  material.customProgramCacheKey = () => `${baseKey}:hue`;
+  return () => (uniform.value = ((rainbowHue() - baseHue) * Math.PI) / 180);
+}
+
 export function marbleSkin(itemId, seat, color = null) {
   const key = MARBLES[skinKey(itemId)] ? skinKey(itemId) : 'classic';
   const c = color || SEAT_COLORS[seat] || SEAT_COLORS[0];
-  const colorTag = c === SEAT_COLORS[seat] ? seat : `${seat}:${c.main}`;
+  const colorTag = c === SEAT_COLORS[seat] ? seat : `${seat}:${c.main}${c.rainbow ? ':rainbow' : ''}`;
   return cached(`marble:${key}:${colorTag}`, () => {
     const { animate, ...params } = MARBLES[key](c, seat);
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
-    return { material, animate: animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null };
+    const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
+    const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
+    return { material, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 

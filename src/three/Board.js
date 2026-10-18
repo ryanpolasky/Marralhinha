@@ -11,6 +11,7 @@ import MinecraftProps from './MinecraftProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
+import { useRainbow } from '../game/rainbow';
 
 export const HOLE_R = 0.37;
 const CENTER_R = HOLE_R;
@@ -176,7 +177,7 @@ function Dish({ seat, color = SEAT_COLORS[seat], geometry, material, active, isT
           <meshStandardMaterial color={seatColor(color, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
         </mesh>
       </group>
-      {active && name && <NameTag name={name} color={color.main} position={[c, 1.45, r]} />}
+      {active && name && <NameTag name={name} color={color.baseMain || color.main} position={[c, 1.45, r]} />}
     </group>
   );
 }
@@ -318,7 +319,8 @@ function useSkinTransition(skin, animate, prepare) {
   return [shown, wave];
 }
 
-export default function Board({ active, names, turn, showNames, skin, colors = SEAT_COLORS, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
+export default function Board({ active, names, turn, showNames, skin, colors: seatPalette = SEAT_COLORS, table = true, preview = false, layout = CLASSIC_LAYOUT }) {
+  const colors = useRainbow(seatPalette);
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);

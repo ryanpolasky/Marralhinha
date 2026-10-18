@@ -72,8 +72,9 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     controls.minPolarAngle = overhead ? 0 : 0.1;
     const target = new THREE.Vector3(0, 0, 0);
     const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
-    tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     home.current = { target, distance, dir: position.clone().sub(target).normalize() };
+    if (orbit.current || follow.current) return;
+    tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
     controls.enabled = game && !locked;
@@ -111,11 +112,18 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     };
     const off = fx.on((type, data) => {
       const h = home.current;
-      if (!['focus', 'orbit', 'follow', 'unfocus'].includes(type) || !h || locked) return;
+      if (!['focus', 'orbit', 'follow', 'unfocus'].includes(type) || !h) return;
+      if (locked && !data.cinematic && !(type === 'unfocus' && held !== null)) return;
       const goHome = () => {
         release();
         restore();
-        go(h.target.clone().addScaledVector(h.dir, h.distance), h.target.clone(), 2);
+        const position = h.target.clone().addScaledVector(h.dir, h.distance);
+        if (data.cut) {
+          tween.current = null;
+          camera.position.copy(position);
+          controls.target.copy(h.target);
+          controls.update();
+        } else go(position, h.target.clone(), 2);
       };
       clearTimeout(back);
       if (type === 'unfocus') return goHome();
@@ -141,7 +149,14 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
         tween.current = null;
         follow.current = null;
         if (data.radius) relax(data.radius * 0.8, data.phi);
-        orbit.current = { target, radius: data.radius ?? (shot ? shot * 1.25 : h.distance * 0.58), phi: data.phi ?? (shot ? Math.PI / 2 - SHOT_ELEVATION : 0.98), speed: 0, max: data.speed ?? ORBIT_SPEED };
+        const radius = data.radius ?? (shot ? shot * 1.25 : h.distance * 0.58);
+        const phi = data.phi ?? (shot ? Math.PI / 2 - SHOT_ELEVATION : 0.98);
+        if (data.cut) {
+          camera.position.copy(target).add(_toCamera.setFromSphericalCoords(radius, phi, data.theta ?? 0));
+          controls.target.copy(target);
+        }
+        // ease: the orbit's centre glides over from the current view instead of snapping, a crane shot rather than a cut
+        orbit.current = { target: data.ease ? controls.target.clone() : target, goal: data.ease ? target : null, radius, phi, speed: 0, max: data.speed ?? ORBIT_SPEED };
         hold();
       }
       // No hold means it lasts until someone says unfocus
@@ -188,6 +203,7 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     if (o && !tween.current) {
       const ease = 1 - Math.exp(-dt * 1.5);
       o.speed = Math.min(o.max, o.speed + dt * o.max * 0.8);
+      if (o.goal) o.target.lerp(o.goal, 1 - Math.exp(-dt * 1.2));
       _orbit.setFromVector3(_toCamera.copy(camera.position).sub(o.target));
       _orbit.radius += (o.radius - _orbit.radius) * ease;
       _orbit.phi += (o.phi - _orbit.phi) * ease;
@@ -198,18 +214,23 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     const l = lens.current;
     // Phones have a slim bottom bar (portrait) or side rails (landscape), so there's nothing big to dodge
     const phone = (size.height <= 500 && size.width > size.height) || (size.width <= 620 && size.width < size.height);
-    const goal = mode === 'game' && !locked && !phone ? size.height * 0.08 : 0;
-    const next = l.shift + (goal - l.shift) * (1 - Math.exp(-dt * 3));
-    if (Math.abs(next - l.shift) > 0.05 || l.w !== size.width || l.h !== size.height) {
+    const goal = mode === 'game' && !locked && !phone && !o && !f ? size.height * 0.08 : 0;
+    const stationary = o?.max === 0;
+    const next = stationary ? goal : l.shift + (goal - l.shift) * (1 - Math.exp(-dt * 3));
+    if ((stationary && next !== l.shift) || Math.abs(next - l.shift) > 0.05 || l.w !== size.width || l.h !== size.height) {
       l.shift = next;
       l.w = size.width;
       l.h = size.height;
       camera.setViewOffset(size.width, size.height, 0, l.shift, size.width, size.height);
     }
     const panLimit = layout.spec.halfLength + 0.25;
-    controls.target.x = THREE.MathUtils.clamp(controls.target.x, -panLimit, panLimit);
-    controls.target.z = THREE.MathUtils.clamp(controls.target.z, -panLimit, panLimit);
+    // A bit's orbit or follow owns the target, which may be nowhere near the table
+    if (!o && !f) {
+      controls.target.x = THREE.MathUtils.clamp(controls.target.x, -panLimit, panLimit);
+      controls.target.z = THREE.MathUtils.clamp(controls.target.z, -panLimit, panLimit);
+    }
     controls.target.y = f ? 0.55 : o ? o.target.y : 0;
+    controls.autoRotate = !o && !f && (mode !== 'game' || spinning);
     controls.update();
 
     // Tell the HUD when you've wandered off the default view (panned, zoomed or orbited away), so it
@@ -418,7 +439,7 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
   const pointer = useRef(null);
@@ -484,11 +505,11 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
           layout={layout}
         />
         <Hits hits={board.hits} board={board} layout={layout} />
-        <Stunts stunts={board.stunts} board={board} layout={layout} />
+        <Stunts stunts={board.stunts} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
-        <Die lastRoll={board.lastRoll} turn={board.turn} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
+        <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} layout={layout} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
     </Canvas>

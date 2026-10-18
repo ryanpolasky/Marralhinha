@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SEAT_COLORS } from '../game/geometry';
+import { useRainbow } from '../game/rainbow';
 
 // 2v2: Tab or the pill switches Team/All, "/t msg" or "/a msg" sends one message without switching
 function ChatInput({ onSend, teams = false }) {
@@ -50,7 +51,8 @@ function ChatInput({ onSend, teams = false }) {
   );
 }
 
-export default function Feed({ entries, colors = SEAT_COLORS, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
+export default function Feed({ entries, colors: seatPalette = SEAT_COLORS, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
+  const colors = useRainbow(seatPalette);
   const shown = open || docked ? entries : entries.slice(0, 4);
   const empty = !open && !entries.length;
   return (

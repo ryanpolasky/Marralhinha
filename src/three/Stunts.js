@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
 import { Bubble } from './Hits';
+import { UfoFx } from './Ufo';
 import { SEAT_COLORS } from '../game/geometry';
 import { clamp01 } from '../game/hits';
 import { sfx } from '../game/sound';
@@ -156,8 +157,16 @@ function RockyFx({ stunt, board, layout }) {
   return <group ref={root} />;
 }
 
-export default function Stunts({ stunts, board, layout }) {
+export default function Stunts({ stunts, board, layout, skins, colors }) {
   return (stunts || [])
-    .filter((s) => stuntClock(s) < stuntSeconds(s) + 2)
-    .map((s) => (s.kind === 'flash' ? <FlashFx key={s.id} stunt={s} layout={layout} /> : <RockyFx key={s.id} stunt={s} board={board} layout={layout} />));
+    .filter((s) => s.kind !== 'dice' && stuntClock(s) < stuntSeconds(s) + 2)
+    .map((s) =>
+      s.kind === 'flash' ? (
+        <FlashFx key={s.id} stunt={s} layout={layout} />
+      ) : s.kind === 'ufo' ? (
+        <UfoFx key={s.id} stunt={s} board={board} layout={layout} skins={skins} colors={colors} />
+      ) : (
+        <RockyFx key={s.id} stunt={s} board={board} layout={layout} />
+      )
+    );
 }

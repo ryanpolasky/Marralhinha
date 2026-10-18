@@ -25,6 +25,8 @@ const COLOR_PALETTE = [
 
 const COLOR_BY_ID = Object.fromEntries(COLOR_PALETTE.map((c) => [c.id, c]));
 
+const RAINBOW = { id: 'rainbow', name: 'Rainbow', main: '#e03a3e', light: '#ff8a8a', dark: '#8c1116', rainbow: true };
+
 const TABLE_PALETTES = [
   { id: 'classic', name: 'Classic', desc: 'Red, Blue, Yellow & Green', colors: [null, null, null, null] },
   { id: 'neon', name: 'Neon', desc: 'Orchid, Sky, Lime & Tangerine', colors: ['magenta', 'cyan', 'lime', 'orange'] },
@@ -136,6 +138,7 @@ function rawTripletFromHex(hex, customName = null) {
 
 function resolveColorSpec(spec) {
   if (spec === null || spec === undefined || spec === '' || spec === 'classic') return null;
+  if (spec === 'rainbow' || spec?.id === 'rainbow') return { ...RAINBOW };
   if (typeof spec === 'string') {
     if (COLOR_BY_ID[spec]) return { ...COLOR_BY_ID[spec] };
     return rawTripletFromHex(spec);
@@ -151,6 +154,7 @@ module.exports = {
   SEAT_COLORS,
   COLOR_PALETTE,
   COLOR_BY_ID,
+  RAINBOW,
   TABLE_PALETTES,
   TABLE_PALETTE_BY_ID,
   normalizeHex,
