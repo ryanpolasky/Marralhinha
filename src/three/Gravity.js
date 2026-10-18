@@ -31,6 +31,7 @@ const lensMesh = (geometry, material, renderOrder = -1) => {
   mesh.frustumCulled = false;
   mesh.renderOrder = renderOrder;
   mesh.onBeforeRender = (renderer) => {
+    if (material.uniforms.uWarp?.value === 0) return;
     const t = grabFrame(renderer);
     if (t) material.uniforms.uFrame.value = t;
   };
@@ -94,6 +95,7 @@ uniform float uLens;
 uniform float uDisk;
 uniform float uGlow;
 uniform float uFade;
+uniform float uWarp;
 uniform vec3 uNormal;
 uniform vec3 uE1;
 uniform vec3 uE2;
@@ -143,7 +145,11 @@ void main() {
   float seen = 1.0;
   float minR = 1e4;
   bool fell = false;
+  // Without lensing, rays that pass wide of the disk can't hit anything, so skip the march
+  bool wide = uWarp < 0.001 && bImp > ROUT + 0.4;
+  if (wide) minR = bImp;
   for (int i = 0; i < 120; i++) {
+    if (wide) break;
     float r2 = dot(pos, pos);
     float r = sqrt(r2);
     minR = min(minR, r);
@@ -182,14 +188,14 @@ void main() {
   vec3 bg = vec3(0.0);
   float bgA = 0.0;
   float moved = 0.0;
-  if (!fell) {
+  if (!fell && uWarp > 0.001) {
     vec3 nv = normalize(cameraPosition - vCenter);
     vec3 plane = vCenter - nv * uLens;
     vec3 exitW = vCenter + pos * uUnit;
     float den = dot(dir, nv);
     vec3 bent = exitW + dir * (den < -0.05 ? dot(plane - exitW, nv) / den : uLens);
     vec3 straight = cameraPosition + rd * (dot(plane - cameraPosition, nv) / dot(rd, nv));
-    vec3 delta = (bent - straight) * (1.0 - smoothstep(0.45, 0.95, rim));
+    vec3 delta = (bent - straight) * (1.0 - smoothstep(0.45, 0.95, rim)) * uWarp;
     vec4 g = grab(straight + delta);
     bg = vec3(grab(straight + delta * 1.035).r, g.g, grab(straight + delta * 0.965).b);
     bgA = g.a;
@@ -263,40 +269,8 @@ void main() {
   gl_FragColor = vec4((bg * rep + lit) * uOpacity, alpha * uOpacity);
 }`;
 
-const JET_VERT = `
-varying vec2 vUv;
-varying vec3 vN;
-varying vec3 vV;
-void main() {
-  vUv = uv;
-  vN = normalize(normalMatrix * normal);
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vV = -mv.xyz;
-  gl_Position = projectionMatrix * mv;
-}`;
-
-const JET_FRAG = `
-uniform float uTime;
-uniform float uPower;
-uniform vec3 uColor;
-uniform vec3 uCore;
-varying vec2 vUv;
-varying vec3 vN;
-varying vec3 vV;
-void main() {
-  float y = vUv.y;
-  float core = pow(abs(dot(normalize(vN), normalize(vV))), 3.0);
-  float knots = pow(0.5 + 0.5 * sin(y * 22.0 - uTime * 26.0 + sin(vUv.x * 12.566) * 0.8), 4.0);
-  float flick = 0.85 + 0.15 * sin(uTime * 41.0 + y * 7.0);
-  float along = smoothstep(0.0, 0.08, y) * pow(1.0 - y, 1.3);
-  vec3 c = mix(uColor, uCore, core * 0.8) * (0.5 + 1.6 * knots) * flick;
-  gl_FragColor = vec4(c, along * (0.15 + core) * uPower);
-  #include <colorspace_fragment>
-}`;
-
 export const CARD_GEO = new THREE.PlaneGeometry(2, 2);
 const WARP_GEO = new THREE.PlaneGeometry(2, 2);
-const JET_GEO = new THREE.CylinderGeometry(1, 0.12, 1, 20, 1, true).translate(0, 0.5, 0);
 
 const HOT = new THREE.Color('#fff4d6');
 export const BCRIT = 2.598;
@@ -319,6 +293,7 @@ export const holeMaterial = () => {
     uDisk: { value: 1 },
     uGlow: { value: 1 },
     uFade: { value: 1 },
+    uWarp: { value: 1 },
     uNormal: { value: new THREE.Vector3(0, 1, 0) },
     uE1: { value: new THREE.Vector3(1, 0, 0) },
     uE2: { value: new THREE.Vector3(0, 0, 1) },
@@ -348,18 +323,6 @@ const warpMaterial = () =>
     transparent: true,
     premultipliedAlpha: true,
     depthWrite: false,
-  });
-
-const jetMaterial = () =>
-  new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPower: { value: 0 }, uColor: { value: new THREE.Color() }, uCore: { value: new THREE.Color('#ffffff') } },
-    vertexShader: JET_VERT,
-    fragmentShader: JET_FRAG,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    toneMapped: false,
   });
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -499,39 +462,45 @@ export function Warps({ bus = fx }) {
   return <primitive object={group} />;
 }
 
-const _q = new THREE.Quaternion();
-const _n = new THREE.Vector3();
+const GLASS_GEO = new THREE.SphereGeometry(1, 48, 32);
+const MARBLE_BOUND = 6.8;
 
-// energy is a ref the marble eases between idle (~0.3) and moving (1)
+// Clear glass that only shows itself at the rim and in reflections
+const glassMaterial = () => {
+  const m = new THREE.MeshPhysicalMaterial({ color: '#ffffff', metalness: 0, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.8, transparent: true, depthWrite: false });
+  m.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      '#include <opaque_fragment>\ngl_FragColor.a = mix(0.02, 0.6, pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 3.0));'
+    );
+  };
+  m.customProgramCacheKey = () => 'singularity-glass';
+  return m;
+};
+
+// A black hole in a glass marble; energy eases between idle (~0.3) and moving (1)
 export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0 }) {
   const { camera } = useThree();
-  const { material, jets, jetMat, root, jetRoot } = useMemo(() => {
+  const { material, glass, root, shell } = useMemo(() => {
     const material = holeMaterial();
-    const card = lensMesh(CARD_GEO, material, -1);
-    const jetMat = jetMaterial();
-    const jets = [1, -1].map((side) => {
-      const m = new THREE.Mesh(JET_GEO, jetMat);
-      m.frustumCulled = false;
-      if (side < 0) m.rotation.x = Math.PI;
-      return m;
-    });
-    const jetRoot = new THREE.Group();
-    jets.forEach((j) => jetRoot.add(j));
+    material.uniforms.uWarp.value = 0;
+    material.uniforms.uBound.value = MARBLE_BOUND;
+    const glass = glassMaterial();
+    const shell = new THREE.Mesh(GLASS_GEO, glass);
+    shell.renderOrder = 1;
     const root = new THREE.Group();
-    root.add(card, jetRoot);
-    return { material, jets, jetMat, root, jetRoot };
+    root.add(lensMesh(CARD_GEO, material, 0), shell);
+    return { material, glass, root, shell };
   }, []);
   useEffect(
     () => () => {
       material.dispose();
-      jetMat.dispose();
+      glass.dispose();
     },
-    [material, jetMat]
+    [material, glass]
   );
-  useEffect(() => {
-    paintHole(material.uniforms, color);
-    jetMat.uniforms.uColor.value.set(color.light);
-  }, [material, jetMat, color]);
+  useEffect(() => shell.scale.setScalar(size), [shell, size]);
+  useEffect(() => paintHole(material.uniforms, color), [material, color]);
   const clock = useRef(seed * 3.7);
 
   useFrame((_, dt) => {
@@ -539,23 +508,11 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     clock.current += Math.min(dt, 0.05) * (0.7 + 0.9 * e);
     const u = material.uniforms;
     u.uTime.value = clock.current;
-    u.uUnit.value = (size * 0.8) / BCRIT;
-    u.uFront.value = size * 2.2;
-    u.uLens.value = size * 2.2;
+    u.uUnit.value = (size * 0.95) / MARBLE_BOUND / 1.15;
+    u.uFront.value = size * 0.3;
     u.uDisk.value = 1.1 + 0.9 * e;
     u.uGlow.value = 0.6 + 0.7 * e;
     diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value);
-    root.parent?.getWorldQuaternion(_q).invert();
-    _n.copy(u.uNormal.value).applyQuaternion(_q);
-    jetRoot.quaternion.setFromUnitVectors(WORLD_UP, _n);
-    const length = size * (1.6 + 3.6 * e);
-    const width = size * (0.2 + 0.12 * e);
-    jets.forEach((j, i) => {
-      j.position.y = (i ? -1 : 1) * size * 0.75;
-      j.scale.set(width, length, width);
-    });
-    jetMat.uniforms.uTime.value = clock.current;
-    jetMat.uniforms.uPower.value = 0.25 + 0.75 * e;
   });
 
   return <primitive object={root} />;

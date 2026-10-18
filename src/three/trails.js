@@ -1,7 +1,7 @@
 import { SEAT_COLORS } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { fx } from './fx';
-import { TILE } from './killfx';
+import { TILE, DEV_RED } from './killfx';
 import { sfx } from '../game/sound';
 
 const col = (s) => SEAT_COLORS[s];
@@ -133,17 +133,12 @@ const TRAILS = {
     if (prev) emit('bolt', { from: prev, to: p, color: '#5fb8ff', radius: 0.01, life: 0.5, jag: 0, branches: 0 });
   },
 
-  // accretion: spacetime ripples off the floor, and every cell or so a pocket singularity drinks in the light behind you
-  dev: (emit, p, { by, n }) => {
-    const c = col(by);
+  // accretion: spacetime ripples off the floor while light streaks spiral in behind you
+  dev: (emit, p, { color, n }) => {
+    const c = color || DEV_RED;
     if (n % 2 === 0) emit('warp', { position: [p[0], 0.03, p[2]], size: 1.6, life: 0.95, amp: 0.1, width: 0.15, chroma: 0.7, glow: 0.55, color: c.light });
     emit('spr', { position: p, n: 2, tile: TILE.streak, c: [c.light, '#ffffff'], radius: 0.45, inward: true, speed: 1.3, size: 0.32, size2: 0.04, life: 0.35, swirl: 6 });
     emit('spr', { position: p, tile: TILE.flare, c: ['#ffffff', c.light], size: 0.26, size2: 0, life: 0.3 });
-    if (n % 3) return;
-    const at = [p[0], p[1] + 0.05, p[2]];
-    emit('hole', { position: at, size: 0.17, life: 0.9, grow: 0.12, shrink: 0.32, disk: 1.2, spin: 2.4, color: c });
-    emit('spr', { position: at, n: 8, tile: TILE.glow, c: [c.light, '#ffffff', c.main, '#ffd166'], radius: 0.8, inward: true, speed: 1.7, size: 0.22, size2: 0.03, life: 0.45, swirl: 7 });
-    sfx.warp(0.6);
   },
 
   // spent casings kicked out to the side, plus a faint tracer back along the hop

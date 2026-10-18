@@ -5,6 +5,8 @@ import { videoFor } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
 
 const col = (s) => SEAT_COLORS[s];
+// Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
+export const DEV_RED = SEAT_COLORS[0];
 const rand = (a, b) => a + Math.random() * (b - a);
 const off = (at, dx = 0, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
 const ground = (at, dx = 0, dz = 0) => [at[0] + dx, 0.1, at[2] + dz];
@@ -361,20 +363,20 @@ const KILL_FX = {
     emit('shake', { amount: 0.15 });
   },
 
-  // A black hole tears open and spaghettifies the victim, collapses to a point, then the whole table goes supernova and a pulsar sweeps the wreckage
-  dev: (emit, { at, by, victim, sfx, later, seq }) => {
+  // A black hole looms over the victim and drinks it down, then slams shut with one deep VWOMP and leaves nothing
+  dev: (emit, { at, victim, color, victimColor, sfx, later, seq }) => {
     const core = off(at, 0, 0.3);
     const base = ground(at);
-    const c = col(by);
-    const prey = [col(victim).main, col(victim).light, '#ffffff'];
-    const hues = ['#ffffff', c.light, c.main, '#ffd166'];
-    emit('hole', { position: core, size: 0.62, life: 1.28, grow: 0.5, shrink: 0.14, disk: 1.5, spin: 2.2, color: c });
-    emit('warp', { position: base, size: 4.2, life: 1.3, amp: 0.04, width: 0.2, well: 0.65, glow: 0.4, color: c.main });
-    emit('decal', { position: base, kind: 'vortex', color: c.main, size: 4.8, life: 1.3, spin: 7, grow: 0.15, add: true });
+    const c = color || DEV_RED;
+    const v = victimColor || col(victim);
+    const prey = [v.main, v.light, '#ffffff'];
+    emit('hole', { position: core, size: 0.75, life: 1.56, grow: 0.6, shrink: 0.1, disk: 1.4, spin: 1.8, color: c });
+    emit('warp', { position: base, size: 4.4, life: 1.55, amp: 0.04, width: 0.2, well: 0.7, glow: 0.3, color: c.main });
+    emit('decal', { position: base, kind: 'vortex', color: c.main, size: 4.8, life: 1.5, spin: 7, grow: 0.15, add: true });
     for (let s = 0; s < 5; s++) {
       const a0 = (s / 5) * Math.PI * 2;
       const lift = 0.3 + (s % 3) * 0.35;
-      seq(28, 34, (k) => {
+      seq(30, 40, (k) => {
         const r = 3.4 * (1 - k) ** 1.4 + 0.08;
         const a = a0 + k * k * 7;
         const p = [core[0] + Math.cos(a) * r, core[1] + lift * (1 - k) * Math.sin(k * 9 + s), core[2] + Math.sin(a) * r];
@@ -382,37 +384,14 @@ const KILL_FX = {
         emit('spr', { position: p, tile: TILE.streak, c: [c.light, '#ffffff'], size: 0.5, size2: 0.1, life: 0.18, rot: -a, jitter: 0 });
       }, 60 + s * 70);
     }
-    seq(14, 70, () => emit('spr', { position: core, n: 6, tile: TILE.glow, c: prey.concat(c.light), radius: 3.8, inward: true, speed: 5.8, size: 0.3, size2: 0.04, life: 0.65, swirl: 6 }));
-    seq(10, 110, (k) => emit('shake', { amount: 0.04 + k * 0.2 }));
+    seq(18, 70, () => emit('spr', { position: core, n: 6, tile: TILE.glow, c: prey.concat(c.light), radius: 3.8, inward: true, speed: 5.8, size: 0.3, size2: 0.04, life: 0.65, swirl: 6 }));
+    seq(12, 110, (k) => emit('shake', { amount: 0.04 + k * 0.22 }));
     sfx('singularity');
-
-    later(1240, () => emit('spr', { position: core, tile: TILE.flare, c: ['#ffffff'], size: 1.8, size2: 0.1, life: 0.12, rot: 0 }));
-    later(1300, () => {
-      emit('dome', { position: core, color: '#ffffff', size: 5.5, life: 0.4 });
-      emit('dome', { position: core, color: c.light, size: 4.2, life: 0.7, delay: 0.05 });
-      emit('warp', { position: base, size: 16, life: 1.6, amp: 0.38, width: 0.06, chroma: 1, glow: 1.3, color: c.light });
-      emit('warp', { position: base, size: 10, life: 1.25, amp: 0.22, width: 0.09, chroma: 0.7, glow: 0.8, color: '#ffffff', delay: 0.18 });
-      emit('beam', { position: base, color: '#ffffff', size: 0.3, height: 12, life: 0.5 });
-      emit('beam', { position: base, color: c.main, size: 0.9, height: 8, life: 0.75 });
-      emit('spr', { position: core, tile: TILE.flare, c: ['#ffffff'], size: 1, size2: 12, life: 0.6, rot: 0 });
-      emit('spr', { position: core, tile: TILE.flare, c: [c.light], size: 0.8, size2: 8, life: 0.55, rot: Math.PI / 4 });
-      emit('spr', { position: core, n: 140, tile: TILE.star, c: hues, sphere: true, speed: 10, size: 0.42, size2: 0.05, life: 1.3, drag: 2, rotv: 3, flick: 16 });
-      emit('spr', { position: core, n: 40, tile: TILE.glow, c: hues, sphere: true, speed: 6, size: 0.5, size2: 0, life: 1.1, drag: 1.5, grav: 0.3 });
-      emit('spr', { position: core, n: 26, tile: TILE.smoke, c: [c.main, '#b36bff', '#5fb8ff', c.light], sphere: true, speed: 2.4, up: 0.3, size: 0.8, size2: 3.2, life: 2.2, a: 0.16, drag: 1.4 });
-      emit('ring', { position: base, color: '#ffffff', size: 6, life: 0.8 });
-      emit('ring', { position: base, color: c.main, size: 4.2, life: 0.65, delay: 0.08 });
-      emit('shake', { amount: 0.9 });
-      sfx('supernova');
+    later(1500, () => {
+      emit('warp', { position: base, size: 15, life: 1.4, amp: 0.34, width: 0.07, chroma: 0.6, glow: 0.2, color: c.main });
+      emit('shake', { amount: 0.75 });
+      sfx('vwomp');
     });
-    later(1450, () => emit('hole', { position: core, size: 0.15, life: 1.5, grow: 0.25, shrink: 0.45, disk: 0.7, spin: 4, color: c }));
-    later(1450, () =>
-      seq(30, 50, (k, i) => {
-        const a = i * 0.42;
-        const reach = 3.6 * (1 - k * 0.5);
-        [0, Math.PI].forEach((flip) => emit('bolt', { from: core, to: [core[0] + Math.cos(a + flip) * reach, core[1] + 0.6 * Math.sin(a * 0.5), core[2] + Math.sin(a + flip) * reach], color: i % 2 ? c.light : '#ffffff', radius: 0.025, life: 0.07, jag: 0, branches: 0 }));
-        emit('spr', { position: core, tile: TILE.glow, c: ['#ffffff'], size: 0.5 + 0.25 * Math.sin(i * 1.7), life: 0.06, jitter: 0 });
-      })
-    );
   },
 
 };
