@@ -598,7 +598,6 @@ const App = () => {
             enter(await request('room:quickPlay', { prefer: favorite() }));
           })
         }
-        onReport={() => setModal('report')}
         onLocal={() => openLocal(false)}
         onResume={savedGameExists() ? () => openLocal(true) : undefined}
         onJoin={(code) =>
