@@ -214,8 +214,10 @@ io.on('connection', (socket) => {
     socket.data.code = null;
     const room = rooms.rooms.get(code);
     if (!room || !room.findViewer(userId)) return;
-    if (permanently) room.leaveDevice(userId, socket.id);
-    else room.detach(userId, socket.id);
+    if (permanently) {
+      room.leaveDevice(userId, socket.id);
+      if (room.quickPlay && !room.hasHumans()) rooms.close(room);
+    } else room.detach(userId, socket.id);
   };
 
   // One room per account. Refuse to silently forfeit a live game elsewhere; anything else (lobbies,
@@ -282,6 +284,7 @@ io.on('connection', (socket) => {
     const room = seated.find((r) => r.inLiveGame(userId)) || seated[0];
     return { code: room?.code || null };
   });
+  handle('room:exists', (payload) => ({ exists: rooms.rooms.has(String(payload.code ?? '').trim().toUpperCase()) }));
   handle('room:leave', () => leaveCurrent(true));
   handle('lobby:seat', ({ seat }) => current().setSeat(userId, seat));
   handle('lobby:spectate', () => current().unseat(userId));

@@ -61,7 +61,8 @@ function useAnnouncements(game, mySeat, nameOf, local = false, masked = false) {
     if (!p) return;
     const diceBit = (game.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
     if (diceBit && !(p.stunts || []).some((s) => s.id === diceBit.id)) {
-      push(`${diceBit.dice?.length || 50} dice!`, 'Burn them move by move', 'gold', ROLL_REVEAL_MS, sfx.six);
+      if (diceBit.seat === mySeat) push(`${diceBit.dice?.length || 50} dice!`, 'Burn them move by move', 'gold', ROLL_REVEAL_MS, sfx.six);
+      else push(`${nameOf(diceBit.seat)} rolled a ${diceTotal(diceBit)}!`, 'Totally normal roll', 'gold', ROLL_REVEAL_MS, sfx.six);
     }
     const roll = game.lastRoll;
     if (!diceBit && roll && roll.t !== p.lastRoll?.t && (!p.lastRoll?.t || roll.t > p.lastRoll.t) && (roll.seat === mySeat || (local && roll.noMoves))) {
@@ -97,6 +98,8 @@ function useAnnouncements(game, mySeat, nameOf, local = false, masked = false) {
   return items;
 }
 
+const diceTotal = (bit) => (bit.dice || []).reduce((sum, d) => sum + d.die, 0);
+
 function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local = false, stuck = false, handoff = false, table = false, paused = false, isAdmin = false }) {
   if (startPending) {
     return game.pick.reason === 'wheel' ? { title: 'Who starts?', sub: 'The wheel decides the first roll' } : { title: `${nameOf(game.pick.seat)} start${game.pick.seat === mySeat ? '' : 's'}`, sub: "Winner's privilege: first roll and their board" };
@@ -106,7 +109,7 @@ function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, loc
     const roller = game.lastRoll.seat;
     const count = diceBit?.dice?.length;
     return {
-      title: roller === mySeat ? (count ? `Rolling ${count} dice…` : 'Rolling…') : `${nameOf(roller)} is rolling${count ? ` ${count} dice` : ''}…`,
+      title: roller === mySeat ? (count ? `Rolling ${count} dice…` : 'Rolling…') : `${nameOf(roller)} is rolling…`,
       sub: 'Fingers crossed…',
     };
   }
@@ -118,7 +121,7 @@ function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, loc
         ? { title: `You rolled a ${game.die} · ${left} ${left === 1 ? 'die' : 'dice'} left`, sub: 'Pick a glowing marble to burn a die, or cut the bit' }
         : { title: left ? `No moves left (${left} ${left === 1 ? 'die' : 'dice'} on the table)` : 'All dice burned!', sub: 'Cut the bit to put the board back' };
     }
-    return { title: `${nameOf(game.turn)} has ${left} ${left === 1 ? 'die' : 'dice'} left`, sub: game.legalMoves?.length ? `Burning a ${game.die}…` : 'Out of moves…' };
+    return { title: `${nameOf(diceBit.seat)} rolled a ${diceTotal(diceBit)}!`, sub: game.legalMoves?.length ? `Burning a ${game.die}…` : 'Out of moves…' };
   }
   if (stuck) {
     const { seat, die } = game.lastRoll;
@@ -1396,7 +1399,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   }
 
   return (
-    <div ref={hudRef} className="hud">
+    <div ref={hudRef} className={`hud${local ? ' local-hud' : ''}`}>
       <div className="hud-top">
         {brandChip}
         {playersBar}

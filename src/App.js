@@ -108,6 +108,7 @@ const App = () => {
   const localRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [, setInviteGone] = useState(0);
   const [toast, setToast] = useState(null);
   const [reactions, setReactions] = useState([]);
   const [pings, setPings] = useState([]);
@@ -157,6 +158,9 @@ const App = () => {
             if (/not found/i.test(err.message) && code === saved) throw new Error(`Room ${code} has closed (the game server may have restarted). Start a new one!`);
             throw err;
           }
+        } else if (invite && !(await request('room:exists', { code: invite })).exists) {
+          setUrl(null);
+          setInviteGone((n) => n + 1);
         }
       } catch (err) {
         if (!IS_ACTIVITY) saveSession(null);

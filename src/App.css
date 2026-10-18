@@ -10904,3 +10904,49 @@ body {
     filter: hue-rotate(360deg);
   }
 }
+
+/* Pass & play and round the table on tablets: a slimmer action bar leaves the board room */
+@media (max-width: 1200px), (max-height: 820px) {
+  .local-hud .action-panel {
+    gap: 12px;
+    padding: 6px 6px 6px 16px;
+    border-radius: 20px;
+  }
+
+  .local-hud .action-title {
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .local-hud .action-sub {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .local-hud .roll-badge {
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
+    border-radius: 12px;
+  }
+
+  .local-hud .roll-btn {
+    width: auto;
+    height: 52px;
+    padding: 0 18px;
+    flex-direction: row;
+    gap: 8px;
+    border-radius: 16px;
+    font-size: 16px;
+    box-shadow: 0 4px 0 #a8480f, 0 8px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .local-hud .roll-btn:disabled {
+    box-shadow: 0 3px 0 #333, 0 6px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .local-hud .roll-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+}
