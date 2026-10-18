@@ -791,11 +791,18 @@ function KitchenSet({ stunt, board, clock }) {
         <mesh material={DARK} position-z={0.02}>
           <torusGeometry args={[0.285, 0.02, 8, 28]} />
         </mesh>
-        <mesh geometry={BOX} material={DARK} position={[0, 0.07, 0.03]} scale={[0.02, 0.15, 0.005]} rotation-z={-0.1} />
-        <mesh geometry={BOX} material={DARK} position={[-0.06, 0.06, 0.03]} scale={[0.02, 0.22, 0.005]} rotation-z={1.1} />
-        <group ref={seconds} position-z={0.035}>
-          <mesh geometry={BOX} material={NEON_RED} position-y={0.11} scale={[0.008, 0.24, 0.004]} />
+        <group position-z={0.03} rotation-z={-0.1}>
+          <mesh geometry={BOX} material={DARK} position-y={0.075} scale={[0.02, 0.15, 0.005]} />
         </group>
+        <group position-z={0.03} rotation-z={-1.1}>
+          <mesh geometry={BOX} material={DARK} position-y={0.11} scale={[0.02, 0.22, 0.005]} />
+        </group>
+        <group ref={seconds} position-z={0.035}>
+          <mesh geometry={BOX} material={NEON_RED} position-y={0.1} scale={[0.008, 0.2, 0.004]} />
+        </group>
+        <mesh material={DARK} position-z={0.04}>
+          <circleGeometry args={[0.02, 12]} />
+        </mesh>
       </group>
 
       <mesh name="ufo-kitchen-table" geometry={BOX} material={WOOD} position-y={0.78} scale={[1.7, 0.08, 1.05]} castShadow />
