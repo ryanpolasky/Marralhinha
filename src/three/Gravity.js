@@ -462,45 +462,20 @@ export function Warps({ bus = fx }) {
   return <primitive object={group} />;
 }
 
-const GLASS_GEO = new THREE.SphereGeometry(1, 48, 32);
-const MARBLE_BOUND = 6.8;
+const MARBLE_WARP = 0.6;
 
-// Clear glass that only shows itself at the rim and in reflections
-const glassMaterial = () => {
-  const m = new THREE.MeshPhysicalMaterial({ color: '#ffffff', metalness: 0, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.8, transparent: true, depthWrite: false });
-  m.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      '#include <opaque_fragment>\ngl_FragColor.a = mix(0.02, 0.6, pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 3.0));'
-    );
-  };
-  m.customProgramCacheKey = () => 'singularity-glass';
-  return m;
-};
-
-// A black hole in a glass marble; energy eases between idle (~0.3) and moving (1)
+// energy eases between idle (~0.3) and moving (1)
 export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0 }) {
   const { camera } = useThree();
-  const { material, glass, root, shell } = useMemo(() => {
+  const { material, card } = useMemo(() => {
     const material = holeMaterial();
-    material.uniforms.uWarp.value = 0;
-    material.uniforms.uBound.value = MARBLE_BOUND;
-    const glass = glassMaterial();
-    const shell = new THREE.Mesh(GLASS_GEO, glass);
-    shell.renderOrder = 1;
-    const root = new THREE.Group();
-    root.add(lensMesh(CARD_GEO, material, 0), shell);
-    return { material, glass, root, shell };
+    material.uniforms.uWarp.value = MARBLE_WARP;
+    return { material, card: lensMesh(CARD_GEO, material, -1) };
   }, []);
-  useEffect(
-    () => () => {
-      material.dispose();
-      glass.dispose();
-    },
-    [material, glass]
-  );
-  useEffect(() => shell.scale.setScalar(size), [shell, size]);
-  useEffect(() => paintHole(material.uniforms, color), [material, color]);
+  useEffect(() => () => material.dispose(), [material]);
+  useEffect(() => {
+    paintHole(material.uniforms, color);
+  }, [material, color]);
   const clock = useRef(seed * 3.7);
 
   useFrame((_, dt) => {
@@ -508,14 +483,15 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     clock.current += Math.min(dt, 0.05) * (0.7 + 0.9 * e);
     const u = material.uniforms;
     u.uTime.value = clock.current;
-    u.uUnit.value = (size * 0.95) / MARBLE_BOUND / 1.15;
-    u.uFront.value = size * 0.3;
+    u.uUnit.value = (size * 0.8) / BCRIT;
+    u.uFront.value = size * 2.2;
+    u.uLens.value = size * 1.8;
     u.uDisk.value = 1.1 + 0.9 * e;
     u.uGlow.value = 0.6 + 0.7 * e;
     diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value);
   });
 
-  return <primitive object={root} />;
+  return <primitive object={card} />;
 }
 
 export const SHADOW_ONLY = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });

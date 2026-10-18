@@ -29,7 +29,7 @@ const PREVIEW_ENERGY = { current: 0.75 };
 function MarblePreview({ itemId, seat, color }) {
   const skin = marbleSkin(itemId, seat, color);
   useFrame(({ clock }) => skin.animate?.(clock.elapsedTime));
-  if (skin.aura === 'singularity') return <SingularityAura size={1.35} color={color || SEAT_COLORS[seat]} energy={PREVIEW_ENERGY} seed={seat} />;
+  if (skin.aura === 'singularity') return <SingularityAura size={0.62} color={color || SEAT_COLORS[seat]} energy={PREVIEW_ENERGY} seed={seat} />;
   return (
     <Spinner>
       <mesh material={skin.material}>
