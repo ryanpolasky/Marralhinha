@@ -1824,6 +1824,10 @@ body.hit-grim .hud {
   gap: 10px;
 }
 
+.bit-list.duo {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .bit-card {
   display: flex;
   flex-direction: column;

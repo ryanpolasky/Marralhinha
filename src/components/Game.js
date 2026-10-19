@@ -402,12 +402,11 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
     () => reopen(null)
   );
   const aimOnBoard = (key = 'hit') => {
-    setOpen(false);
-    if (key === 'dice') {
-      onStunt?.({ kind: 'dice' });
-      return;
+    if (key === 'dice') setBit('dice');
+    else {
+      setOpen(false);
+      startAim(key);
     }
-    startAim(key);
     onBitStart?.();
   };
   const boards = itemsForSlot('board');
@@ -525,6 +524,32 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                       }}
                       onUnshoot={onUnshoot}
                     />
+                  </>
+                )}
+                {tab === 'bits' && bit === 'dice' && game && (
+                  <>
+                    <div className="board-picker-head">
+                      <span>Who eats the storm?</span>
+                      <button className="btn tiny ghost" onClick={() => setBit(null)}>
+                        Back
+                      </button>
+                    </div>
+                    <div className="bit-list duo">
+                      {game.active.map((s) => (
+                        <button
+                          key={s}
+                          className="bit-card"
+                          onClick={() => {
+                            onStunt?.({ kind: 'dice', seat: s });
+                            setOpen(false);
+                            setBit(null);
+                          }}
+                        >
+                          <b style={{ color: seatColor(s).main }}>{seats[s]?.name || `Seat ${s + 1}`}</b>
+                          <span>{game.armedDice?.seat === s ? 'Armed — click to disarm' : 'Storm hits on their next roll'}</span>
+                        </button>
+                      ))}
+                    </div>
                   </>
                 )}
                 {tab === 'dress' && edit && edit.slot === 'color' && (

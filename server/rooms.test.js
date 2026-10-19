@@ -843,12 +843,12 @@ test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts
     stats: room.game.stats,
   });
 
-  room.stunt('u1', { kind: 'dice' });
+  room.stunt('u1', { kind: 'dice', seat: 2 });
   const [stunt] = room.view().game.stunts;
   assert.strictEqual(stunt.kind, 'dice');
-  assert.strictEqual(stunt.seat, 0);
+  assert.strictEqual(stunt.seat, 2);
   assert.strictEqual(stunt.dice.length, 50);
-  assert.strictEqual(room.game.turn, 0);
+  assert.strictEqual(room.game.turn, 2);
   assert.strictEqual(room.game.phase, 'move');
   assert.ok(room.game.legalMoves.length > 0);
   assert.strictEqual(room.view().turnEndsIn, null, 'turn clock stays off during dice storm');
@@ -857,7 +857,7 @@ test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts
   room.move('u1', firstMove.id);
   const afterFirst = room.view().game.stunts[0];
   assert.strictEqual(afterFirst.dice.filter((d) => d.burned).length, 1);
-  assert.strictEqual(room.game.turn, 0, 'turn stays with the roller across dice');
+  assert.strictEqual(room.game.turn, 2, 'turn stays with the roller across dice');
   assert.strictEqual(room.game.phase, 'move');
   assert.ok(room.game.legalMoves.length > 0);
 
@@ -871,7 +871,7 @@ test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts
   const secondMove = room.game.legalMoves[0];
   room.move('u1', secondMove.id);
   assert.strictEqual(room.view().game.stunts[0].dice.filter((d) => d.burned).length, 2);
-  assert.notStrictEqual(JSON.stringify(room.game.marbles[0]), JSON.stringify(JSON.parse(snapshotBefore).marbles[0]));
+  assert.notStrictEqual(JSON.stringify(room.game.marbles[2]), JSON.stringify(JSON.parse(snapshotBefore).marbles[2]));
 
   room.cutStunt('u1', stunt.id);
   assert.strictEqual(room.view().game.stunts[0].cut, true);
@@ -886,6 +886,37 @@ test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts
     snapshotBefore,
     'cutting the bit restores the original game state'
   );
+});
+
+test('a spectator arms the dice storm on a seat; it goes off on their next roll', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.game.turn = 1;
+  room.game.phase = 'roll';
+  room.join({ userId: 'u3', name: 'Cid' });
+  room.attach('u3', 's3');
+
+  room.stunt('u3', { kind: 'dice', seat: 0 });
+  assert.strictEqual(room.game.armedDice.seat, 0);
+  assert.ok(!room.game.stunts, 'arming drops no dice yet');
+
+  room.stunt('u3', { kind: 'dice', seat: 0 });
+  assert.ok(!room.game.armedDice, 'picking the same seat disarms it');
+
+  room.stunt('u3', { kind: 'dice', seat: 0 });
+  room.game.turn = 0;
+  room.game.phase = 'roll';
+  room.changed();
+  assert.strictEqual(room.game.stunts[0].kind, 'dice');
+  assert.strictEqual(room.game.stunts[0].seat, 0);
+  assert.ok(!room.game.armedDice, 'the arm clears once it fires');
+  room.cutStunt('u3', room.game.stunts[0].id);
+
+  room.game.turn = 1;
+  room.game.phase = 'roll';
+  room.stunt('u3', { kind: 'dice' });
+  assert.strictEqual(room.game.stunts[0].seat, 1, 'untargeted lands on whosoever turn it is and goes off right away');
+  room.cutStunt('u3', room.game.stunts[0].id);
 });
 
 test('a bot waits out a close encounter instead of moving the marble that is up in the saucer', (t) => {
