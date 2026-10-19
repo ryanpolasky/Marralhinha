@@ -4,6 +4,7 @@ import { SEAT_COLORS } from '../game/geometry';
 import { COLOR_PALETTE } from '../game/colors';
 import { useRainbow, useRainbowColor } from '../game/rainbow';
 import { TablePaletteBar } from './Lobby';
+import HexInput from './HexInput';
 import { coverFor, coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
 import { duckMusic } from '../game/music';
@@ -599,7 +600,7 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                     <label className="dev-hex-picker">
                       <span className="marble-dot mini" style={{ '--seat': seatColor(edit.seat).main, '--seat-light': seatColor(edit.seat).light }} />
                       <span>Custom hex: <b>{seatColor(edit.seat).main.toUpperCase()}</b></span>
-                      <input type="color" value={seatColor(edit.seat).main} onChange={(e) => onColor?.({ seat: edit.seat, color: e.target.value })} aria-label="Custom colour hex" />
+                      <HexInput value={seatColor(edit.seat).main} onCommit={(color) => onColor?.({ seat: edit.seat, color })} aria-label="Custom colour hex" />
                     </label>
                   </>
                 )}
