@@ -142,6 +142,12 @@ const TRAILS = {
     emit('spr', { position: p, n: 2, tile: TILE.drop, c: ['#a7f3de', '#e0fff5', '#44b6ad'], speed: 0.4, up: 0.9, size: 0.2, size2: 0.12, life: 0.8, grav: 0.8, land: true, a: 0.9 });
   },
 
+  lucky: (emit, p, { n }) => {
+    emit('spr', { position: p, n: 3, tile: TILE.star, c: ['#fff3b8', '#ffd166', '#ffffff'], speed: 0.35, up: 0.5, size: 0.2, size2: 0, life: 0.9, grav: 0.3, flick: 26, a: 0.95 });
+    emit('spr', { position: p, tile: TILE.glow, c: ['#f0b93a'], size: 0.38, size2: 0.05, life: 0.6, a: 0.6 });
+    if (n % 4 === 0) emit('spr', { position: p, tile: TILE.flare, c: ['#7dffb4'], size: 0.45, size2: 0, life: 0.5, a: 0.85 });
+  },
+
   // wisps and the occasional bat
   halloween: (emit, p, { n }) => {
     emit('spr', { position: p, tile: TILE.ghost, c: ['#d9ffe9', '#e2d4ff'], add: false, rot: 0, size: 0.45, size2: 0.55, life: 1.3, up: 0.45, uj: 0, a: 0.7, drag: 0.7, fade: 1.6, fadeIn: 0.35, jitter: 0 });

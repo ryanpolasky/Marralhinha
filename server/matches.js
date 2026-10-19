@@ -24,6 +24,7 @@ class Matches {
       leadersCaptures: db.prepare("SELECT * FROM users WHERE captures > 0 ORDER BY captures DESC, games DESC LIMIT ?"),
       leadersRate: db.prepare("SELECT * FROM users WHERE games >= ? ORDER BY (wins * 1.0 / games) DESC, wins DESC LIMIT ?"),
       leadersLevel: db.prepare("SELECT * FROM users ORDER BY xp DESC LIMIT ?"),
+      leadersLucky: db.prepare("SELECT u.*, COUNT(*) AS lucky_months, MAX(lm.month) AS lucky_last FROM luckiest_months lm JOIN users u ON u.id = lm.player_id GROUP BY u.id ORDER BY lucky_months DESC, MIN(lm.month) ASC LIMIT ?"),
       leadersHome: db.prepare("SELECT * FROM users WHERE marbles_home > 0 ORDER BY marbles_home DESC, games DESC LIMIT ?"),
     };
   }
@@ -103,6 +104,7 @@ class Matches {
       sixes: u.sixes || 0,
       home: u.marbles_home || 0,
       xp: u.xp,
+      ...(u.lucky_months ? { luckyMonths: u.lucky_months, luckyLast: u.lucky_last } : {}),
     });
     return {
       wins: this.q.leadersWins.all(BOARD_MIN_GAMES, BOARD_SIZE).map(mini),
@@ -111,6 +113,7 @@ class Matches {
       captures: this.q.leadersCaptures.all(BOARD_SIZE).map(mini),
       home: this.q.leadersHome.all(BOARD_SIZE).map(mini),
       level: this.q.leadersLevel.all(BOARD_SIZE).map(mini),
+      lucky: this.q.leadersLucky.all(BOARD_SIZE).map(mini),
     };
   }
 }

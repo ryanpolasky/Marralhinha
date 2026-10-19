@@ -8100,6 +8100,8 @@ select.admin-input optgroup {
 .profile-lucky-section h4 { margin: 0 0 7px; font-size: 12px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
 .profile-lucky-gold-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 12px; color: var(--ink-dim); }
 .profile-lucky-track.gold { height: 7px; }
+.profile-lucky-leader { font-size: 13px; color: var(--ink-dim); }
+.profile-lucky-leader b { color: var(--gold); }
 .profile-lucky-gold-head + .profile-lucky-track { margin-top: 7px; }
 
 .profile-section {
@@ -8486,7 +8488,8 @@ select.admin-input optgroup {
 /* ---------- Leaderboards ---------- */
 
 .board-modal {
-  width: min(560px, 96vw);
+  width: min(640px, 96vw);
+  max-width: 96vw;
 }
 
 .modal-head h2 svg {
@@ -11064,4 +11067,74 @@ body {
   --fx: #e8c35c;
   --fx2: #fff3c0;
   --fx-bg: #2a1408;
+}
+
+.plate-lucky {
+  --plate-ink: #fff6d6;
+  --flow-to: 190px 0, 0 0, 166.667% 0;
+  border: 2px solid transparent !important;
+  background-image: linear-gradient(105deg, transparent 25%, rgba(255, 236, 170, 0.2) 48%, transparent 72%), linear-gradient(125deg, #04301a, #0e6b3b 55%, #053a20), linear-gradient(90deg, #a8741c, #fff3b8, #f0b93a, #a8741c) !important;
+  background-clip: padding-box, padding-box, border-box !important;
+  background-origin: padding-box, padding-box, border-box !important;
+  background-size: 190px 100%, 100% 100%, 250% 100% !important;
+  box-shadow: inset 0 0 14px rgba(255, 209, 102, 0.16), 0 0 16px rgba(255, 196, 70, 0.4);
+  animation: plate-flow 4s linear infinite;
+}
+.plate-lucky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 12% 28%, #fff3b8 0 0.8px, transparent 1.6px), radial-gradient(circle at 88% 70%, #fff3b8 0 0.8px, transparent 1.6px),
+    radial-gradient(circle at 58% 16%, #fff 0 0.7px, transparent 1.4px), radial-gradient(circle at 34% 84%, #ffd166 0 0.7px, transparent 1.4px);
+  animation: glitter 2s steps(2) infinite;
+  pointer-events: none;
+}
+.plate-lucky .account-name,
+.plate-lucky .chip-name-text,
+.plate-lucky .seat-name-text,
+.plate-lucky.big > span:not(.avatar) { text-shadow: 0 0 7px rgba(255, 196, 70, 0.55), 0 1px 3px #021a0e; }
+.plate-lucky .badge { background: rgba(255, 255, 255, 0.16); }
+
+.thumb-marble.skin-lucky {
+  background: radial-gradient(circle at 30% 26%, #fffbe6 0 5%, transparent 18%),
+    radial-gradient(circle at 64% 38%, #f0b93a 0 9%, transparent 10%), radial-gradient(circle at 36% 66%, #ffd166 0 7%, transparent 8%), radial-gradient(circle at 70% 72%, #c48a1c 0 6%, transparent 7%),
+    radial-gradient(circle at 54% 56%, var(--seat-light), color-mix(in srgb, var(--seat) 70%, #0e7a43) 45%, #04301a 85%);
+  box-shadow: inset -7px -9px 14px rgba(2, 26, 14, 0.6), inset 4px 4px 11px rgba(255, 243, 184, 0.4), 0 0 16px rgba(255, 209, 102, 0.6);
+  animation: lucky-shine 2.2s ease-in-out infinite;
+}
+.thumb-board.skin-lucky {
+  background: radial-gradient(circle at 22% 28%, #fff 0 1px, transparent 2px), radial-gradient(circle at 72% 64%, #fff 0 1px, transparent 2px), radial-gradient(circle at 60% 22%, #fff3b8 0 1px, transparent 2px),
+    repeating-conic-gradient(from 45deg at 50% 50%, rgba(240, 185, 58, 0.55) 0 4deg, transparent 4deg 45deg),
+    radial-gradient(circle at 50% 50%, #f0b93a 0 8%, #13854d 10%, #0a5a33 55%, #04301a);
+  filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.55));
+  animation: lucky-shine 2.6s ease-in-out infinite;
+}
+.thumb-fx.skin-lucky {
+  --fx: #ffd166;
+  --fx2: #7dffb4;
+  --fx-bg: #04301a;
+}
+.thumb-trail.skin-lucky {
+  --t1: #f0b93a;
+  --t2: #fff3b8;
+  --t-bg: #04301a;
+}
+.item-card.locked .thumb-marble.skin-lucky,
+.item-card.locked .thumb-board.skin-lucky { animation: none; }
+
+.lucky-claim { width: min(880px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; border: 1px solid rgba(255, 209, 102, 0.45); box-shadow: 0 0 40px rgba(255, 196, 70, 0.22), 0 20px 60px rgba(0, 0, 0, 0.5); }
+.lucky-claim-head { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.lucky-claim-head h2 { margin: 0; color: var(--gold); font-size: clamp(22px, 4vw, 30px); }
+.lucky-claim-head p { margin: 0; max-width: 560px; line-height: 1.45; }
+.lucky-claim-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; align-items: start; margin: 16px 0; }
+.lucky-claim-stage { display: grid; gap: 4px; text-align: center; }
+.lucky-claim-stage h3 { margin: 6px 0 0; }
+.lucky-claim-stage p { margin: 0; }
+.lucky-claim-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lucky-claim-grid .item-card { min-width: 0; }
+.lucky-claim-actions { gap: 10px; }
+@media (max-width: 680px) {
+  .lucky-claim-body { grid-template-columns: 1fr; }
+  .lucky-claim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

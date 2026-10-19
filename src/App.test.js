@@ -40,33 +40,29 @@ jest.mock('./net/auth', () => ({
 jest.mock('./three/Scene', () => () => null);
 jest.mock('./game/music', () => ({ startMusic: () => {} }));
 
-test('holding Luckiest alone does not unlock the Golden Die', () => {
-  const account = { tags: ['lucky'], inventory: [], lucky: { goldenDieUnlocked: false } };
+test('holding Luckiest alone does not unlock the Luckiest set', () => {
+  const account = { tags: ['lucky'], inventory: [], lucky: { setOwned: [] } };
   expect(canUse(account, 'dice.lucky')).toBe(false);
+  expect(canUse(account, 'marble.lucky')).toBe(false);
   expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(false);
-  account.lucky.goldenDieUnlocked = true;
+  account.lucky.setOwned = ['dice.lucky'];
   expect(canUse(account, 'dice.lucky')).toBe(true);
   expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(true);
 });
 
-test('Luckiest starts collapsed with a ten-game bar and reveals readable stats on demand', () => {
-  const lucky = { games: 1, requiredGames: 10, holder: false, eligible: false, rolls: 12, sixes: 2, rate: 1 / 6, expectedRate: 1 / 6, score: null, totalSeconds: 0, longestSeconds: 0, reignCount: 0, goldenDieUnlocked: false, goldenDieRequiredSeconds: 259200, goldenDieRemainingSeconds: 259200 };
+test('Luckiest starts collapsed and shows the month race on demand', () => {
+  const lucky = { month: '2026-10', monthName: 'October 2026', endsAt: Date.now() + 3 * 86400000, holder: false, best: { rate: 0.2, rolls: 60, sixes: 12 }, leader: { id: 'x', name: 'Rui', rate: 0.25, rolls: 40, sixes: 10 }, monthsWon: 1, setOwned: ['dice.lucky'], set: ['marble.lucky', 'board.lucky', 'dice.lucky', 'plate.lucky', 'fx.lucky', 'trail.lucky'], minRolls: 30, expectedRate: 1 / 6 };
   const { container, rerender } = render(<LuckiestPanel lucky={lucky} />);
   const panel = container.querySelector('details.profile-lucky');
   expect(panel).not.toHaveAttribute('open');
-  expect(screen.getByText('1 / 10 games')).toBeInTheDocument();
-  expect(screen.getByRole('progressbar', { name: 'Games toward Luckiest eligibility' })).toHaveAttribute('aria-valuenow', '1');
-  expect(panel.querySelector('.profile-lucky-details')).toBeInTheDocument();
+  expect(screen.getByText('Best this month 20.0%')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', { name: "Your best six rate against this month's leader" })).toHaveAttribute('aria-valuenow', '80');
   fireEvent.click(panel.querySelector('summary'));
   expect(panel).toHaveAttribute('open');
-  expect(screen.getByText('9 more games to qualify')).toBeInTheDocument();
-  expect(screen.getByRole('progressbar', { name: 'Golden Die reign time' })).toHaveAttribute('aria-valuemax', '259200');
-  expect(screen.getByRole('progressbar', { name: 'Golden Die reign time' })).toHaveAttribute('aria-valuenow', '0');
-  fireEvent.click(panel.querySelector('summary'));
-  rerender(<LuckiestPanel lucky={{ ...lucky, games: 10, eligible: false }} />);
-  expect(screen.getByText('Play a game to requalify')).toBeInTheDocument();
-  rerender(<LuckiestPanel lucky={{ ...lucky, games: 10, eligible: true, score: 1.42 }} />);
-  expect(screen.getByText('10 / 10 games')).toBeInTheDocument();
+  expect(screen.getByText('5.0% behind Rui')).toBeInTheDocument();
+  expect(screen.getByText('1 / 6 collected')).toBeInTheDocument();
+  rerender(<LuckiestPanel lucky={{ ...lucky, best: null, leader: null }} />);
+  expect(screen.getByText('Not in the race yet')).toBeInTheDocument();
 });
 
 test('locker lists ordinary rarities before Luckiest, Supporter, Haunted, Beta, Ants and Dev', () => {
