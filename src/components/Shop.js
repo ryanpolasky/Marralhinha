@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
@@ -37,19 +37,107 @@ const PACKS = {
 
 const PACK_SLOTS = ['marble', 'board', 'dice', 'plate', 'fx', 'trail'];
 
-function PackItems({ kind }) {
+function usePeek() {
+  const [peek, setPeek] = useState(null);
+  const touch = useRef(false);
+  const close = useCallback(() => setPeek(null), []);
+  const open = (id, el, via, offer) => setPeek({ id, via, offer, el, rect: el.getBoundingClientRect() });
+
+  useEffect(() => {
+    if (peek?.via !== 'tap') return undefined;
+    const away = (e) => !e.target.closest?.('.featured-peek') && !peek.el.contains(e.target) && close();
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      close();
+    };
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', away, true);
+      document.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [peek, close]);
+
+  const bind = (id) => ({
+    onPointerEnter: (e) => {
+      touch.current = e.pointerType !== 'mouse';
+      if (!touch.current) open(id, e.currentTarget, 'hover');
+    },
+    onPointerLeave: (e) => e.pointerType === 'mouse' && setPeek((p) => (p?.via === 'hover' ? null : p)),
+    onFocus: (e) => e.currentTarget.matches(':focus-visible') && open(id, e.currentTarget, 'focus'),
+    onBlur: () => setPeek((p) => (p?.via === 'focus' ? null : p)),
+  });
+
+  const tapped = (id, el, offer) => {
+    if (!touch.current) return false;
+    if (peek?.id === id && peek.via === 'tap') close();
+    else open(id, el, 'tap', offer);
+    return true;
+  };
+
+  return { peek, bind, tapped, close };
+}
+
+function PeekPop({ peek, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const { rect } = peek;
+    const gap = 8;
+    const h = el.offsetHeight;
+    const w = el.offsetWidth;
+    const above = rect.top - h - gap >= gap || rect.top > window.innerHeight - rect.bottom;
+    const top = above ? rect.top - h - gap : rect.bottom + gap;
+    el.style.top = `${Math.max(gap, Math.min(window.innerHeight - h - gap, top))}px`;
+    el.style.left = `${Math.max(gap, Math.min(window.innerWidth - w - gap, rect.left + rect.width / 2 - w / 2))}px`;
+  });
+  const tap = peek.via === 'tap';
+  return createPortal(
+    <div ref={ref} className={`featured-peek${tap ? ' tap' : ''}`} aria-hidden={tap ? undefined : true}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+function PackItems({ kind, peek }) {
   return (
     <div className="pack-items">
       {PACK_SLOTS.map((slot) => {
         const item = ITEMS[`${slot}.${kind}`];
         return (
-          <span key={item.id} className="pack-item">
+          <button key={item.id} type="button" className="pack-item" aria-label={`Preview ${item.name}`} {...peek.bind(item.id)} onClick={(e) => peek.tapped(item.id, e.currentTarget)}>
             <ItemThumb itemId={item.id} />
             {item.name}
             <small>{catalog.slots[item.slot].label.replace(/s$/, '')}</small>
-          </span>
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+function PeekInfo({ itemId, offer, owned, buying, onBuy }) {
+  const item = ITEMS[itemId];
+  return (
+    <div className="peek-info">
+      <div className="peek-title">
+        <b>{item.name}</b>
+        <RarityTag item={item} />
+      </div>
+      {item.desc && <p>{item.desc}</p>}
+      {offer && (owned ? (
+        <span className="item-price owned">Owned</span>
+      ) : (
+        <button type="button" className="btn primary block" disabled={!!buying} onClick={onBuy}>
+          Buy <Coin size={16} /> {offer.price.toLocaleString()}
+        </button>
+      ))}
     </div>
   );
 }
@@ -119,12 +207,8 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [buying, setBuying] = useState(null);
   const [syncing, setSyncing] = useState(null);
   const [slide, setSlide] = useState(0);
-  const [peek, setPeek] = useState(null);
-  const showPeek = (id, el) => {
-    const r = el.getBoundingClientRect();
-    const below = r.top < 250;
-    setPeek({ id, x: Math.min(Math.max(r.left + r.width / 2, 130), window.innerWidth - 130), y: below ? r.bottom + 8 : r.top - 8, below });
-  };
+  const peeker = usePeek();
+  const { peek } = peeker;
   const swipeStart = useRef(null);
   const refreshIn = useCountdown(shop?.refreshAt);
   const slides = 2;
@@ -296,10 +380,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
               <ItemCard
                 key={offer.id}
                 itemId={offer.id}
-                onPointerEnter={(e) => showPeek(offer.id, e.currentTarget)}
-                onPointerLeave={() => setPeek(null)}
-                onFocus={(e) => showPeek(offer.id, e.currentTarget)}
-                onBlur={() => setPeek(null)}
+                {...peeker.bind(offer.id)}
                 owned
                 footer={
                   owned ? (
@@ -312,16 +393,16 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                 }
                 label={owned ? `${ITEMS[offer.id].name}, owned` : `Buy ${ITEMS[offer.id].name} for ${offer.price.toLocaleString()} ${CURRENCY}`}
                 disabled={owned || !!buying}
-                onClick={() => !owned && !buying && buy(offer)}
+                onClick={(e) => !peeker.tapped(offer.id, e.currentTarget, offer) && !owned && !buying && buy(offer)}
               />
             );
           })}
         </div>
-        {peek && createPortal(
-          <div className="featured-peek" style={{ left: peek.x, top: peek.y, transform: `translate(-50%, ${peek.below ? '0' : '-100%'})` }} aria-hidden="true">
+        {peek && (
+          <PeekPop peek={peek}>
             <PreviewStage itemId={peek.id} playerName={account.name} />
-          </div>,
-          document.body
+            {peek.via === 'tap' && <PeekInfo itemId={peek.id} offer={peek.offer} owned={peek.offer && canUse(account, peek.id)} buying={buying} onBuy={() => { peeker.close(); buy(peek.offer); }} />}
+          </PeekPop>
         )}
         <p className="muted small-text center">Featured items and chests use {CURRENCY} earned by playing. No pay-to-win.</p>
 
@@ -337,7 +418,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                   <div className="supporter-shop-body">
                     <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
                     <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, Riptide kill effect, Wake trail, and more to come! Only the look changes; never the gameplay.</p>
-                    <PackItems kind="supporter" />
+                    <PackItems kind="supporter" peek={peeker} />
                     <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
                     <div className="supporter-actions">
                       {hasSupporter ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
@@ -365,7 +446,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                   <div className="halloween-shop-body">
                     <div className="halloween-shop-head"><span className="halloween-eyebrow">Pull up a chair</span><h3>Halloween Pack</h3><span className="halloween-price">$3.99 USD · one time</span></div>
                     <p>The spirits gather round the table, and so do you. A permanent Haunted badge and six candlelit cosmetics, kill effect included. Only the look changes; never the gameplay.</p>
-                    <PackItems kind="halloween" />
+                    <PackItems kind="halloween" peek={peeker} />
                     <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
                     <div className="halloween-actions">
                       {hasHalloween ? <span className="halloween-owned">Your Haunted set is waiting in the locker. Welcome to the séance.</span> : (

@@ -661,6 +661,7 @@ button.pronounce:hover {
 .modal {
   max-width: 560px;
   max-height: 88vh;
+  max-height: min(88vh, calc(100dvh - 40px));
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--glass-strong);
@@ -5925,6 +5926,14 @@ img.emote-glyph {
     height: 180px;
   }
 
+  .emote-preview {
+    gap: 12px 24px;
+  }
+
+  .emote-sample {
+    font-size: 40px;
+  }
+
   .item-grid {
     max-height: none;
   }
@@ -7327,6 +7336,7 @@ select.admin-input optgroup {
 
   .modal {
     max-height: 90vh;
+    max-height: min(90vh, calc(100dvh - 40px));
   }
 
   .shop-modal,
@@ -7439,11 +7449,12 @@ select.admin-input optgroup {
   }
 
   .modal-backdrop {
-    padding: 10px;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   }
 
   .modal {
     max-height: 94vh;
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)));
     border-radius: 22px;
   }
 
@@ -9475,7 +9486,7 @@ textarea.report-text {
 .halloween-shop-body .halloween-note { max-width: 720px; margin-top: 14px; color: #e6d6f7; }
 
 .pack-items { display: flex; justify-content: safe center; gap: 10px 22px; margin: -4px 0 -10px; padding: 20px 18px 24px; overflow-x: auto; }
-.pack-item { flex-shrink: 0; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; min-width: 96px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; }
+.pack-item { flex-shrink: 0; padding: 0; border: 0; background: none; font-family: inherit; line-height: inherit; cursor: default; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; min-width: 96px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; }
 .pack-item small { color: #c9a8ea; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
 .supporter-shop .pack-item { color: #d6fff3; }
 .supporter-shop .pack-item small { color: #9fd9cb; }
@@ -10688,6 +10699,12 @@ body {
 }
 
 .featured-peek { position: fixed; z-index: 80; width: 240px; padding: 8px; border-radius: 16px; background: var(--glass-strong); border: 1px solid var(--glass-line); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); pointer-events: none; }
+.featured-peek.tap { width: 260px; pointer-events: auto; }
+.peek-info { display: grid; gap: 8px; padding: 6px 6px 4px; }
+.peek-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; font-size: 17px; }
+.peek-title .rarity-tag { white-space: nowrap; }
+.peek-info p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-dim); }
+.peek-info .item-price { justify-self: center; }
 
 .seat.has-drawer {
   flex-wrap: wrap;
