@@ -403,10 +403,6 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
   );
   const aimOnBoard = (key = 'hit') => {
     setOpen(false);
-    if (key === 'dice') {
-      onStunt?.({ kind: 'dice' });
-      return;
-    }
     startAim(key);
     onBitStart?.();
   };

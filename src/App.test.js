@@ -202,7 +202,8 @@ test('signs in as a guest and renders the home screen with the account bar', asy
   expect(screen.getByRole('button', { name: /shop/i })).toBeInTheDocument();
   expect(screen.getByText('Tester')).toBeInTheDocument();
   expect(document.querySelector('.account-actions .report-btn')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Report & ideas' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Report & ideas' }));
   expect(screen.getByRole('dialog', { name: /report/i })).toBeInTheDocument();
   expect(await screen.findByText('Example report')).toBeInTheDocument();
 });

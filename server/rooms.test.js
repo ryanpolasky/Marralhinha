@@ -888,6 +888,21 @@ test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts
   );
 });
 
+test('a spectator can aim the dice storm at a seat; untargeted it falls on whosever turn it is', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.game.turn = 1;
+  room.join({ userId: 'u3', name: 'Cid' });
+  room.attach('u3', 's3');
+  room.stunt('u3', { kind: 'dice', seat: 0 });
+  assert.strictEqual(room.game.stunts[0].seat, 0);
+  assert.strictEqual(room.game.turn, 0);
+  room.cutStunt('u3', room.game.stunts[0].id);
+  room.stunt('u3', { kind: 'dice' });
+  assert.strictEqual(room.game.stunts[0].seat, 1, 'no seat lands on the current turn');
+  room.cutStunt('u3', room.game.stunts[0].id);
+});
+
 test('a bot waits out a close encounter instead of moving the marble that is up in the saucer', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   const room = new Room('ABDC', { onChange: () => {} });
