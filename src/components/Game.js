@@ -534,7 +534,7 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                         Back
                       </button>
                     </div>
-                    <div className="bit-list">
+                    <div className="bit-list duo">
                       {game.active.map((s) => (
                         <button
                           key={s}
