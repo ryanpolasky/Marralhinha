@@ -12,6 +12,7 @@ import { Credit } from './About';
 import { ask } from './Dialog';
 import Marquee from './Marquee';
 import Feed from './Feed';
+import HexInput from './HexInput';
 import BOARDS from '../shared/boards.json';
 
 // Short-lived "Rui joined" / "Ana left" notices, with a sound, when other people come and go
@@ -114,7 +115,7 @@ export function SeatColorDrawer({ seat, colors, onPick, admin = false }) {
         <label className={`seat-custom-pill${current.custom ? ' on' : ''}`} title="Pick any custom hex colour">
           <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />
           <span>{current.custom ? current.name : '+ Hex'}</span>
-          <input type="color" value={current.main} onChange={(e) => onPick(e.target.value)} aria-label="Custom colour hex" />
+          <HexInput value={current.main} onCommit={onPick} aria-label="Custom colour hex" />
         </label>
         {isCustom && (
           <button
