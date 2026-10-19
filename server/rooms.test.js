@@ -171,6 +171,27 @@ test('rooms with only bots are swept after the last human leaves', () => {
   assert.deepStrictEqual(closed, [room]);
 });
 
+test('a results screen with one tab still connected closes after sitting idle', () => {
+  const manager = new RoomManager({ onChange: () => {} });
+  const room = manager.create();
+  ['u1', 'u2'].forEach((u, i) => {
+    room.join({ userId: u, name: `P${i}` });
+    room.attach(u, `s${i}`);
+  });
+  room.start('u1');
+  room.game.phase = 'over';
+  room.game.winners = [0];
+  room.changed();
+  room.detach('u2', 's1');
+  const now = Date.now();
+  assert.strictEqual(room.isAbandoned(now + 9 * 60 * 1000), false);
+  assert.strictEqual(room.isAbandoned(now + 11 * 60 * 1000), true);
+  room.lastActive = now + 9 * 60 * 1000;
+  assert.strictEqual(room.isAbandoned(now + 11 * 60 * 1000), false, 'activity on the results screen resets the clock');
+  room.game.phase = 'roll';
+  assert.strictEqual(room.isAbandoned(now + 60 * 60 * 1000), false, 'a live game with someone connected stays open');
+});
+
 test('quick play rooms with nobody connected are swept after minutes, other rooms keep their grace', () => {
   const manager = new RoomManager({ onChange: () => {} });
   const make = (options) => {
