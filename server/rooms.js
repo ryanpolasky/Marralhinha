@@ -22,6 +22,8 @@ const STUNT_WARM_MAX_MS = 15000;
 const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 15 * 60 * 1000;
 const QUICK_PLAY_TTL_MS = 4 * 60 * 1000;
+// A results screen nobody touches closes even if a tab is still connected
+const RESULTS_TTL_MS = 10 * 60 * 1000;
 // A table where everyone stepped away closes after this long instead of idling forever
 const PAUSE_TTL_MS = 20 * 60 * 1000;
 const REACTION_COOLDOWN_MS = 1200;
@@ -1085,6 +1087,7 @@ class Room {
   isAbandoned(now = Date.now()) {
     if (!this.hasHumans()) return true;
     if (this.paused && now - this.pausedAt > PAUSE_TTL_MS) return true;
+    if (this.game?.phase === 'over' && now - this.lastActive > RESULTS_TTL_MS) return true;
     if (this.anyoneConnected()) return false;
     // Everyone's gone: the room dies ROOM_TTL_MS after the last human left, even if bots keep moving marbles
     return now - (this.emptyAt ?? this.lastActive) > (this.quickPlay ? QUICK_PLAY_TTL_MS : ROOM_TTL_MS);
