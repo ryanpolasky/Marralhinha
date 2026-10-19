@@ -462,6 +462,40 @@ test('search finds by id, discord id and name; merging keeps tags from both acco
   assert.deepEqual(accounts.tags(merged), ['dev', 'beta']);
 });
 
+test('admin merge folds a guest into another account, sessions and shared matches included', () => {
+  const { db, accounts } = setup();
+  const old = accounts.createUser({ name: 'Lost' });
+  const fresh = accounts.createUser({ name: 'NewPhone' });
+  const freshToken = accounts.createSession(fresh.id);
+  accounts.grantItem(old.id, DROPPABLE[0].id);
+  accounts.grantItem(fresh.id, DROPPABLE[0].id);
+  accounts.grantItem(fresh.id, DROPPABLE[1].id);
+  accounts.setTags(fresh.id, ['beta']);
+  db.exec("INSERT INTO matches (id, code, mode, players, bots, turns, seats, winners, started_at, ended_at) VALUES (1, 'AAAA', 'solo', 2, 0, 10, '[]', '[]', 0, 0), (2, 'BBBB', 'solo', 2, 0, 10, '[]', '[]', 0, 0)");
+  db.prepare('INSERT INTO match_players (match_id, user_id, seat, won) VALUES (?, ?, ?, ?)').run(1, old.id, 0, 1);
+  db.prepare('INSERT INTO match_players (match_id, user_id, seat, won) VALUES (?, ?, ?, ?)').run(1, fresh.id, 1, 0);
+  db.prepare('INSERT INTO match_players (match_id, user_id, seat, won) VALUES (?, ?, ?, ?)').run(2, fresh.id, 0, 1);
+
+  const kept = accounts.mergeAccounts(fresh.id, old.id);
+  assert.equal(kept.id, old.id);
+  assert.equal(kept.name, 'Lost');
+  assert.equal(accounts.getUser(fresh.id), null);
+  assert.equal(kept.coins, old.coins + fresh.coins);
+  assert.equal(accounts.userForToken(freshToken).id, old.id, 'the new browser is now signed into the old account');
+  assert.deepEqual(accounts.inventory(old.id).sort(), [DROPPABLE[0].id, DROPPABLE[1].id].sort());
+  assert.deepEqual(accounts.tags(kept), ['beta']);
+  assert.deepEqual(db.prepare('SELECT match_id FROM match_players WHERE user_id = ? ORDER BY match_id').all(old.id).map((r) => r.match_id), [1, 2]);
+
+  const linked = accounts.loginDiscord({ id: '4242', username: 'disc' });
+  const guest = accounts.createUser({ name: 'Other' });
+  assert.throws(() => accounts.mergeAccounts(linked.id, guest.id), /Discord accounts/);
+  assert.throws(() => accounts.mergeAccounts(guest.id, guest.id), /two different/);
+  accounts.ban(guest.id, 'nope');
+  assert.throws(() => accounts.mergeAccounts(guest.id, linked.id), /Unban/);
+  accounts.unban(guest.id);
+  assert.equal(accounts.mergeAccounts(guest.id, linked.id).discord_id, '4242');
+});
+
 test('DEV_DISCORD_IDS bootstraps the dev tag on discord login', () => {
   const { accounts } = setup();
   const previous = process.env.DEV_DISCORD_IDS;

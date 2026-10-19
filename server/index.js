@@ -151,8 +151,16 @@ const kick = ({ userId, ip }) => {
   }
 };
 
+const moveSockets = ({ fromId }) => {
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.userId !== fromId) continue;
+    socket.emit('account:merged');
+    socket.disconnect(true);
+  }
+};
+
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, onBan: kick, syncPurchases, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, onBan: kick, onMerge: moveSockets, syncPurchases, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {

@@ -212,6 +212,16 @@ const App = () => {
     const onTeamChat = (entry) => setTeamLog((log) => ({ ...log, entries: [...log.entries, entry].slice(-60) }));
     const onTeamLog = ({ code, entries }) => setTeamLog({ code, entries });
     const onLuckyChange = (message) => notify(message, 'good');
+    const onMerged = () => {
+      socket.once('disconnect', () => socket.connect());
+      api('/me')
+        .then(({ profile }) => {
+          setAccount(profile);
+          setName(profile.name);
+          notify(`Account recovered. Welcome back, ${profile.name}!`, 'good');
+        })
+        .catch(() => {});
+    };
     const onHost = ({ id, name }) => {
       const mine = id === sessionRef.current?.playerId;
       notify(mine ? "You're the host now. Start when ready." : `${name} is the host now`, 'good');
@@ -243,6 +253,7 @@ const App = () => {
       'room:rematch': onRematchVote,
       'room:tableEnded': onTableEnded,
       'account:update': setAccount,
+      'account:merged': onMerged,
       'luckiest:change': onLuckyChange,
     };
     Object.entries(listeners).forEach(([event, fn]) => socket.on(event, fn));

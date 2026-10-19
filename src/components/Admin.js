@@ -4,6 +4,7 @@ import { CURRENCY, BOXES, DROPPABLE, ITEMS, SLOTS, SLOT_KEYS, TAGS, TAG_KEYS, ra
 import { sfx } from '../game/sound';
 import { Coin, Coins, TagBadges } from './Economy';
 import { Close, Search, DiscordMark, Bug } from './Icons';
+import { ask } from './Dialog';
 import { giftLabel, KIND_LABEL, PACK_LABEL, StatusPill } from './Reports';
 import { SEAT_COLORS } from '../game/geometry';
 import BOARDS from '../shared/boards.json';
@@ -99,7 +100,132 @@ function ActiveGames({ currentCode, onSpectate, notify }) {
   );
 }
 
-function UserEditor({ user, me, onChange, notify }) {
+const AccountMark = ({ user }) => (user.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />);
+
+// Recovery for guests who lost their browser: fold one account into another, the folded one's sessions follow
+function MergeAccounts({ user, me, onMerged, notify }) {
+  const [query, setQuery] = useState('');
+  const [found, setFound] = useState([]);
+  const [other, setOther] = useState(null);
+  const [keepOther, setKeepOther] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setQuery('');
+    setOther(null);
+  }, [user.id]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || other) {
+      setFound([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api(`/admin/users?q=${encodeURIComponent(q)}&guests=1`)
+        .then((res) => !cancelled && setFound(res.users.filter((u) => u.id !== user.id).slice(0, 5)))
+        .catch((err) => !cancelled && notify(err.message));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, other, user.id, notify]);
+
+  const foldable = (u) => !u.discordLinked && u.id !== me.id;
+  const pick = (u) => {
+    setOther(u);
+    setKeepOther(foldable(user) && (!foldable(u) || u.createdAt < user.createdAt));
+  };
+
+  const kept = keepOther ? other : user;
+  const gone = keepOther ? user : other;
+  const possible = other && (foldable(user) || foldable(other));
+
+  const merge = async () => {
+    const ok = await ask({
+      title: `Merge ${gone.name} into ${kept.name}?`,
+      message: `${gone.name} gets deleted. Their ${CURRENCY}, items, tags, stats and match history move to ${kept.name}, and any browser signed in as ${gone.name} switches over.`,
+      confirm: 'Merge',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await post(`/admin/users/${encodeURIComponent(gone.id)}/merge`, { into: kept.id });
+      sfx.pop();
+      notify(`${gone.name} merged into ${kept.name}`, 'good');
+      setOther(null);
+      setQuery('');
+      onMerged(res.user, res.merged);
+    } catch (err) {
+      notify(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-section">
+      <h4>Merge accounts</h4>
+      {other ? (
+        <>
+          <div className="merge-pair">
+            {[user, other].map((u) => {
+              const keep = u === kept;
+              return (
+                <button key={u.id} className={`admin-row${keep ? ' active' : ''}`} disabled={busy || !foldable(u === user ? other : user)} onClick={() => setKeepOther(u === other)}>
+                  <span className={`badge${keep ? '' : ' warn'}`}>{keep ? 'keep' : 'fold in'}</span>
+                  <span className="admin-row-name">
+                    <AccountMark user={u} />
+                    {u.name}
+                  </span>
+                  <span className="admin-row-meta">
+                    Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · {u.stats.games} games
+                  </span>
+                  <span className="admin-row-meta">made {ago(u.createdAt)} · seen {ago(u.lastSeen)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="muted small-text">{possible ? `${gone.name} folds into ${kept.name} and gets deleted. Tap a side to keep it instead.` : "Discord accounts and your own can't be folded in, so there's nothing to merge here."}</p>
+          <div className="admin-row-inline">
+            <button className="btn secondary" disabled={busy || !possible} onClick={merge}>
+              Merge
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={() => setOther(null)}>
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <input className="admin-input grow" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find the other account by name or id…" aria-label="Find account to merge" />
+          {found.length > 0 && (
+            <div className="merge-results">
+              {found.map((u) => (
+                <button key={u.id} className="admin-row" onClick={() => pick(u)}>
+                  <span className="admin-row-name">
+                    <AccountMark user={u} />
+                    {u.name}
+                    <TagBadges tags={u.tags} small full />
+                  </span>
+                  <span className="admin-row-meta">
+                    Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · made {ago(u.createdAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="muted small-text">Lost guest? Find the account they're on now and keep the old one. Their new browser gets signed into it.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function UserEditor({ user, me, onChange, onMerged, notify }) {
   const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState(500);
   const [item, setItem] = useState(DROPPABLE[0].id);
@@ -218,6 +344,8 @@ function UserEditor({ user, me, onChange, notify }) {
         </div>
         <p className="muted small-text">Dev and Beta cosmetics come with the tag, so hand those out with the toggles above.</p>
       </div>
+
+      <MergeAccounts user={user} me={me} onMerged={onMerged} notify={notify} />
 
       {!isMe && !user.tags.some((t) => TAGS[t]?.admin) && (
         <div className="admin-section">
@@ -563,6 +691,10 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
     setSelected(user);
     setResult((r) => r && { ...r, users: r.users.map((u) => (u.id === user.id ? user : u)) });
   };
+  const onMerged = (kept, goneId) => {
+    setSelected(kept);
+    setResult((r) => r && { ...r, users: r.users.filter((u) => u.id !== goneId).map((u) => (u.id === kept.id ? kept : u)) });
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -615,7 +747,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
                 {users.map((u) => (
                   <button key={u.id} className={`admin-row${current?.id === u.id ? ' active' : ''}`} onClick={() => setSelected(u)}>
                     <span className="admin-row-name">
-                      {u.discordLinked ? <DiscordMark size={14} className="admin-row-discord" /> : <span className="admin-row-guest" aria-label="Guest" title="Guest account" />}
+                      <AccountMark user={u} />
                       {u.name}
                       <TagBadges tags={u.tags} small full />
                     </span>
@@ -631,7 +763,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
                     <button className="btn tiny ghost admin-back" onClick={() => setSelected(null)}>
                       ← Players
                     </button>
-                    <UserEditor user={current} me={account} onChange={onChange} notify={notify} />
+                    <UserEditor user={current} me={account} onChange={onChange} onMerged={onMerged} notify={notify} />
                   </>
                 ) : (
                   <div className="admin-editor muted center admin-empty">Pick a player to manage their tags, {CURRENCY} and items.</div>

@@ -7093,6 +7093,21 @@ img.emote-glyph {
   margin: 0;
 }
 
+.merge-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.merge-pair .admin-row:disabled {
+  cursor: default;
+}
+
+.merge-results {
+  display: grid;
+  gap: 6px;
+}
+
 .admin-row-inline {
   display: flex;
   align-items: center;
