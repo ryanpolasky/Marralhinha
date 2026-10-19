@@ -13,6 +13,7 @@ import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
 import { quality as defaultQuality, antialiasFor } from './quality';
+import FrameCap from './FrameCap';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 
 const BG = '#0b1f24';
@@ -439,7 +440,7 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, boardSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, boardSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false }) {
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
   const pointer = useRef(null);
@@ -477,11 +478,13 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
     <Canvas
       ref={canvasRef}
       shadows={SHADOWS}
+      frameloop="never"
       dpr={[1, quality.dpr]}
       camera={{ fov: 38, near: 0.5, far: 400, position: [0, 34, 34] }}
       gl={{ antialias: antialiasFor(quality), powerPreference: 'high-performance' }}
       onPointerMissed={() => setSelected(null)}
     >
+      <FrameCap paused={paused} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />

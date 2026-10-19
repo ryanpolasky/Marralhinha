@@ -9071,7 +9071,9 @@ textarea.report-text {
 .flat-glass .start-card,
 .flat-glass .lobby-event,
 .flat-glass .skin-viewer,
-.flat-glass .carousel-arrow {
+.flat-glass .carousel-arrow,
+.flat-glass .sheet,
+.flat-glass .featured-peek {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }

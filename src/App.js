@@ -677,6 +677,7 @@ const App = () => {
             <Scene
               {...sceneProps}
               preview={preview}
+              paused={!!modal && sceneProps.mode !== 'game'}
               mySeat={inRoom ? mySeat : -1}
               boardSkinId={boardSkinId}
               boardSeat={inRoom ? boardSeat : -1}
