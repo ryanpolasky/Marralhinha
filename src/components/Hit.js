@@ -11,7 +11,7 @@ export const BITS = [
   { key: 'flash', name: 'Flashbang', desc: 'One marble lobs a flashbang. Everyone gets whited out with their ears ringing, and the whole table is left dazed.', prompt: 'Click the marble with the flashbang' },
   { key: 'rocky', name: 'Gonna Fly Now', desc: 'One marble goes the distance: a training montage lap of the board with a chase cam, then the steps celebration at home.', prompt: 'Click the marble going the distance' },
   { key: 'ufo', name: 'Close encounter', desc: 'A saucer beams a marble aboard, two aliens study it, cut away to a toaster incident, laugh it off, poke it with a stick and dump it back.', prompt: 'Click the marble getting abducted' },
-  { key: 'dice', name: 'Dice storm', desc: 'Dumps 50 dice all over the board and table, then lets you burn through them move by move until you cut the bit.', prompt: 'Click the marble getting the storm' },
+  { key: 'dice', name: 'Dice storm', desc: 'Arms a storm on someone: their next roll dumps 50 dice all over the board and table, then they burn through them move by move until you cut the bit.' },
 ];
 
 // The HUD half of the dev hit: music cut, the grim grade, letterbox, muzzle flash, captions and the rewind on undo

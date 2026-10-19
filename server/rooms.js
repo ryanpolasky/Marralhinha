@@ -543,29 +543,10 @@ class Room {
     const running = (s) => !s.cutAt && now - s.t < stuntSeconds(s) * 1000 && (s.kind === 'flash' || s.kind === 'dice' || still(s.at, game.marbles[s.seat][s.marble]));
     if ((game.stunts || []).some(running)) throw new UserError('Cut the last bit first');
     if (kind === 'dice') {
-      const roller = game.active.includes(seat) ? seat : (this.findByUser(userId)?.seat ?? game.turn);
-      this.diceSnapshot = {
-        marbles: game.marbles.map((row) => row.map((p) => ({ ...p }))),
-        turn: game.turn,
-        phase: game.phase,
-        die: game.die,
-        lastRoll: game.lastRoll ? { ...game.lastRoll } : null,
-        lastMove: game.lastMove ? { ...game.lastMove, from: { ...game.lastMove.from }, to: { ...game.lastMove.to }, path: game.lastMove.path?.map((c) => ({ ...c })), capture: game.lastMove.capture ? { ...game.lastMove.capture } : null } : null,
-        legalMoves: game.legalMoves.map((m) => ({ ...m, from: { ...m.from }, to: { ...m.to }, path: m.path?.map((c) => ({ ...c })), capture: m.capture ? { ...m.capture } : null })),
-        winners: game.winners ? [...game.winners] : null,
-        log: game.log.map((e) => ({ ...e })),
-        stats: game.stats.map((s) => ({ ...s })),
-        played: game.played ? game.played.map((p) => ({ ...p })) : undefined,
-        clockOffSeat: this.clockOffSeat,
-      };
-      const dice = rollStuntDice(roller, game.marbles, game.variant, secureDie);
-      const stunt = { id: newId(), kind: 'dice', seat: roller, byUserId: userId, dice, activeDieId: null, t: now };
-      const first = this.queueStuntDie(stunt);
-      game.lastRoll = { seat: roller, die: first ? first.die : dice[0].die, noMoves: !first, t: now };
-      game.stunts = [stunt];
-      const who = this.seats[roller]?.name || 'Someone';
-      rules.addLog(game, `${who} dumped ${dice.length} dice on the table`, roller);
-      this.clockOffSeat = roller;
+      // The storm is armed, not instant: it dumps on the victim's next roll
+      const target = game.active.includes(seat) ? seat : (this.findByUser(userId)?.seat ?? game.turn);
+      if (game.armedDice?.seat === target) game.armedDice = null;
+      else game.armedDice = { seat: target, byUserId: userId };
       this.changed();
       return;
     }
@@ -589,6 +570,37 @@ class Room {
     if (!die) throw new UserError('That die is already gone');
     this.queueStuntDie(stunt, die.id);
     this.changed();
+  }
+
+  // The armed storm goes off as the victim's next roll, hijacking their turn
+  maybeFireDiceStorm() {
+    const { game } = this;
+    const armed = game?.armedDice;
+    if (!armed || game.phase !== 'roll' || game.turn !== armed.seat || this.liveDiceStunt()) return;
+    game.armedDice = null;
+    const roller = armed.seat;
+    const now = Date.now();
+    this.diceSnapshot = {
+      marbles: game.marbles.map((row) => row.map((p) => ({ ...p }))),
+      turn: game.turn,
+      phase: game.phase,
+      die: game.die,
+      lastRoll: game.lastRoll ? { ...game.lastRoll } : null,
+      lastMove: game.lastMove ? { ...game.lastMove, from: { ...game.lastMove.from }, to: { ...game.lastMove.to }, path: game.lastMove.path?.map((c) => ({ ...c })), capture: game.lastMove.capture ? { ...game.lastMove.capture } : null } : null,
+      legalMoves: game.legalMoves.map((m) => ({ ...m, from: { ...m.from }, to: { ...m.to }, path: m.path?.map((c) => ({ ...c })), capture: m.capture ? { ...m.capture } : null })),
+      winners: game.winners ? [...game.winners] : null,
+      log: game.log.map((e) => ({ ...e })),
+      stats: game.stats.map((s) => ({ ...s })),
+      played: game.played ? game.played.map((p) => ({ ...p })) : undefined,
+      clockOffSeat: this.clockOffSeat,
+    };
+    const dice = rollStuntDice(roller, game.marbles, game.variant, secureDie);
+    const stunt = { id: newId(), kind: 'dice', seat: roller, byUserId: armed.byUserId, dice, activeDieId: null, t: now };
+    const first = this.queueStuntDie(stunt);
+    game.lastRoll = { seat: roller, die: first ? first.die : dice[0].die, noMoves: !first, t: now };
+    game.stunts = [stunt];
+    rules.addLog(game, `${this.seats[roller]?.name || 'Someone'} dumped ${dice.length} dice on the table`, roller);
+    this.clockOffSeat = roller;
   }
 
   cutStunt(userId, id) {
@@ -941,6 +953,7 @@ class Room {
 
   changed() {
     this.touch();
+    this.maybeFireDiceStorm();
     this.updatePause();
     this.scheduleAutoplay();
     this.hooks.onChange(this);
