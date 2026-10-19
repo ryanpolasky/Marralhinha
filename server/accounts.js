@@ -107,6 +107,7 @@ class Accounts {
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
       moveReports: db.prepare('UPDATE reports SET user_id = ? WHERE user_id = ?'),
+      dropSharedMatches: db.prepare('DELETE FROM match_players WHERE user_id = ? AND match_id IN (SELECT match_id FROM match_players WHERE user_id = ?)'),
       moveMatchPlayers: db.prepare('UPDATE match_players SET user_id = ? WHERE user_id = ?'),
       moveReigns: db.prepare('UPDATE luckiest_reigns SET player_id = ? WHERE player_id = ?'),
       deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
@@ -458,11 +459,23 @@ class Accounts {
     this.q.moveSessions.run(intoId, guest.id);
     this.q.moveLedger.run(intoId, guest.id);
     this.q.moveReports.run(intoId, guest.id);
+    this.q.dropSharedMatches.run(guest.id, intoId);
     this.q.moveMatchPlayers.run(intoId, guest.id);
     this.q.moveReigns.run(intoId, guest.id);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     this.q.setPacks.run(JSON.stringify([...new Set([...this.grantedPacks(into), ...this.grantedPacks(guest)])]), intoId);
     this.q.deleteUser.run(guest.id);
+  }
+
+  // Admin recovery: fold a guest into another account; the guest's browsers end up signed into `intoId`
+  mergeAccounts(fromId, intoId) {
+    const from = this.requireUser(fromId);
+    const into = this.requireUser(intoId);
+    if (from.id === into.id) throw new AccountError('Pick two different accounts');
+    if (from.discord_id) throw new AccountError("Discord accounts can't be merged away, keep that one instead");
+    if (from.banned_at || into.banned_at) throw new AccountError('Unban both accounts first');
+    transaction(this.db, () => this.mergeGuest(from, into.id));
+    return this.getUser(into.id);
   }
 
   search(query, limit = 40, { guests = true } = {}) {

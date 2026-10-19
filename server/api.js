@@ -11,7 +11,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, onBan = () => {}, syncPurchases, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, onBan = () => {}, onMerge = () => {}, syncPurchases, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -416,6 +416,21 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
       const user = target(req);
       accounts.unban(user.id);
       return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/merge',
+    auth,
+    admin,
+    handle((req) => {
+      const from = target(req);
+      const into = accounts.requireUser(String(req.body?.into || ''));
+      if (from.id === req.user.id) throw new ApiError("You can't merge your own account away");
+      if (rooms && rooms.roomsWithUser(from.id).length) throw new ApiError(`${from.name} is in a room right now, try again once they leave`);
+      accounts.mergeAccounts(from.id, into.id);
+      onMerge({ fromId: from.id, intoId: into.id });
+      return adminResult(into, { merged: from.id });
     })
   );
 
