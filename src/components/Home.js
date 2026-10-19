@@ -5,6 +5,7 @@ import RulesButton from './Rules';
 import { DieIcon } from './Icons';
 import { Credit, LegalLinks } from './About';
 import InstallButton from './Install';
+import ResumeSaved from './ResumeSaved';
 
 export function Logo() {
   return (
@@ -63,7 +64,7 @@ export function Pronunciation() {
   );
 }
 
-export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin, onLocal, onResume }) {
+export default function Home({ name, onNameChange, initialCode, busy, onCreate, onQuickPlay, onJoin, onLocal, onResume, onDiscard }) {
   const [code, setCode] = useState(initialCode || '');
   const [spin, setSpin] = useState(0);
   const nameOk = name.trim().length > 0;
@@ -131,11 +132,7 @@ export default function Home({ name, onNameChange, initialCode, busy, onCreate, 
                 Local
               </button>
             </div>
-            {onResume && (
-              <button className="btn ghost block" onClick={onResume}>
-                Resume your pass &amp; play game
-              </button>
-            )}
+            {onResume && <ResumeSaved label="Resume your pass & play game" onResume={onResume} onDiscard={onDiscard} />}
           </>
         )}
 

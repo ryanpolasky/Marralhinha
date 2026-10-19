@@ -1210,7 +1210,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
       onBitStart={() => onAction('game:pauseClock')}
     />
   );
-  const cameraBtn = !(local && room.table) && (
+  const cameraBtn = (
     <button className={`icon-btn${cameraOff ? ' attention' : ''}`} onClick={onResetView} aria-label="Reset camera" title="Reset camera">
       <Camera />
     </button>

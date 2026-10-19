@@ -4,6 +4,7 @@ import useMedia, { PHONE_QUERY } from './useMedia';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
 import RulesButton from './Rules';
 import { Credit } from './About';
+import ResumeSaved from './ResumeSaved';
 import BOARDS from '../shared/boards.json';
 
 const KINDS = [
@@ -17,7 +18,7 @@ const kindOf = (p) => (!p ? 'empty' : p.isBot ? 'bot' : 'human');
 const SIDES = ['bottom', 'right', 'top', 'left'];
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches && !window.matchMedia('(any-pointer: coarse)').matches;
 
-export default function LocalLobby({ room, onAction, onBack, onResume }) {
+export default function LocalLobby({ room, onAction, onBack, onResume, onDiscard }) {
   const [screenRef, panelRef] = useFitPanel(false, room, { reserveBar: true, bottom: 100 });
   const [error, setError] = useState('');
   const seated = room.seats.filter(Boolean).length;
@@ -129,11 +130,7 @@ export default function LocalLobby({ room, onAction, onBack, onResume }) {
           <button className={`btn primary big block${seated >= 2 && humans ? ' play-btn' : ''}`} disabled={seated < 2 || !humans} onClick={start}>
             Start game
           </button>
-          {onResume && (
-            <button className="btn ghost block" onClick={onResume}>
-              Resume saved game
-            </button>
-          )}
+          {onResume && <ResumeSaved label="Resume saved game" onResume={onResume} onDiscard={onDiscard} />}
           <div className="row">
             <button className="btn link" onClick={onBack}>
               Back

@@ -10957,3 +10957,14 @@ body {
     height: 22px;
   }
 }
+
+.resume-saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resume-trash {
+  flex: none;
+  height: 44px;
+}

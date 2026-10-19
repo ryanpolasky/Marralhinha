@@ -28,6 +28,17 @@ export const savedGameExists = () => {
   return !!saved?.game && saved.game.phase !== 'over';
 };
 
+export const savedGameAt = () => loadLocal()?.savedAt || null;
+
+// Drops the unfinished game but keeps the seat setup for the next lobby
+export function discardSavedGame() {
+  const saved = loadLocal();
+  if (!saved) return;
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...saved, game: null }));
+  } catch {}
+}
+
 export class LocalRoom {
   constructor(saved = null) {
     const keep = saved || {};
@@ -100,7 +111,7 @@ export class LocalRoom {
 
   persist() {
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify({ seats: this.seats, variant: this.variant, teams: this.teams, table: this.table, game: this.game, lastHuman: this.lastHuman }));
+      localStorage.setItem(LOCAL_KEY, JSON.stringify({ seats: this.seats, variant: this.variant, teams: this.teams, table: this.table, game: this.game, lastHuman: this.lastHuman, savedAt: Date.now() }));
     } catch {}
   }
 

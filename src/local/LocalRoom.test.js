@@ -1,4 +1,4 @@
-import { LocalRoom, loadLocal, savedGameExists } from './LocalRoom';
+import { LocalRoom, loadLocal, savedGameExists, savedGameAt, discardSavedGame } from './LocalRoom';
 
 beforeEach(() => localStorage.clear());
 
@@ -53,6 +53,17 @@ test('saves to localStorage and resumes an unfinished game', () => {
   const resumed = new LocalRoom(saved);
   expect(resumed.seats[0].name).toBe('Ana');
   expect(resumed.game.turn).toBe(room.game.turn);
+});
+
+test('discarding a saved game keeps the seat setup but drops the game', () => {
+  const room = new LocalRoom();
+  room.action('local:rename', { seat: 0, name: 'Ana' });
+  room.action('game:start');
+  expect(savedGameAt()).toBeGreaterThan(0);
+  discardSavedGame();
+  expect(savedGameExists()).toBe(false);
+  expect(loadLocal().seats[0].name).toBe('Ana');
+  room.dispose();
 });
 
 test('rematch starts a fresh game with the winner first', () => {

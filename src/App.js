@@ -18,7 +18,7 @@ import BOARDS from './shared/boards.json';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import LocalLobby from './components/LocalLobby';
-import { LocalRoom, loadLocal, savedGameExists } from './local/LocalRoom';
+import { LocalRoom, loadLocal, savedGameExists, savedGameAt, discardSavedGame } from './local/LocalRoom';
 import { applyUpdate } from './serviceWorkerRegistration';
 import { useWakeLock } from './game/wakeLock';
 import Game from './components/Game';
@@ -346,6 +346,16 @@ const App = () => {
     [account?.equipped]
   );
 
+  const [, setSavedTick] = useState(0);
+  const discardSaved = useCallback(async () => {
+    const at = savedGameAt();
+    const when = at ? ` from ${new Date(at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : '';
+    const ok = await ask({ title: 'Delete saved game?', message: `Delete your pass & play game${when}? This can't be undone.`, confirm: 'Delete', cancel: 'Keep it', tone: 'danger' });
+    if (!ok) return;
+    discardSavedGame();
+    setSavedTick((n) => n + 1);
+  }, []);
+
   const closeLocal = useCallback(() => {
     localRef.current?.dispose();
     localRef.current = null;
@@ -503,7 +513,7 @@ const App = () => {
     const g = view.game;
     const diceBit = (g.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
     const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat) || (!!account?.admin && !!diceBit)) && g.phase !== 'over' && !view.paused;
-    if (!(view.local && held)) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
+    if (!(view.local && (held || !boardRevealed))) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
     return {
       mode: 'game',
       board: held ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
@@ -516,7 +526,7 @@ const App = () => {
       canRoll: myTurn && g.phase === 'roll' && !held && !startPending,
       canPickDie: myTurn && !!diceBit && !held,
     };
-  }, [inRoom, view, mySeat, account?.equipped, account?.admin, held, startPending, viewOverride]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inRoom, view, mySeat, account?.equipped, account?.admin, held, startPending, viewOverride, boardRevealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [resetKey, setResetKey] = useState(0);
   // True while the camera is panned/zoomed/orbited away from the default view (pulses the reset button)
@@ -567,7 +577,7 @@ const App = () => {
 
   let screen;
   if (localView && !localView.game) {
-    screen = <LocalLobby room={localView} onAction={onAction} onBack={closeLocal} onResume={savedGameExists() ? () => openLocal(true) : undefined} />;
+    screen = <LocalLobby room={localView} onAction={onAction} onBack={closeLocal} onResume={savedGameExists() ? () => openLocal(true) : undefined} onDiscard={discardSaved} />;
   } else if (authError && !localView) {
     screen = (
       <div className="screen">
@@ -615,6 +625,7 @@ const App = () => {
         }
         onLocal={() => openLocal(false)}
         onResume={savedGameExists() ? () => openLocal(true) : undefined}
+        onDiscard={discardSaved}
         onJoin={(code) =>
           run(async () => {
             await ensureName();

@@ -77,7 +77,7 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
-    controls.enabled = game && !locked;
+    controls.enabled = game;
   }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout]);
 
   // The dev hit: a slow push in on a point of the board, a cinematic orbit around it after the shot, then home
