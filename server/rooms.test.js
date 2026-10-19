@@ -826,7 +826,47 @@ test('dev stunts are theatre: one at a time, a Rocky run ends in its home row, a
   assert.deepStrictEqual(room.game.stunts.map((s) => s.kind), ['flash']);
   room.cutStunt('u1', room.game.stunts[0].id);
   room.stunt('u1', { kind: 'ufo', seat: a, marble: 0 });
+  room.stuntWarm('u1', 's1', room.game.stuntPrep.id);
+  room.stuntWarm('u2', 's2', room.game.stuntPrep.id);
   assert.deepStrictEqual(room.game.stunts.map((s) => s.kind), ['ufo']);
+});
+
+test('the ufo waits for every connected screen to warm up, or 15s, before it plays', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1e6 });
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.join({ userId: 'viewer', name: 'Watcher' });
+  room.attach('viewer', 's9');
+  room.attach('u1', 's1b');
+  const a = room.game.turn;
+  room.stunt('u1', { kind: 'ufo', seat: a, marble: 0 });
+  const { id } = room.view().game.stuntPrep;
+  assert.ok(!room.game.stunts?.length, 'nothing plays while warming');
+  assert.throws(() => room.stunt('u1', { kind: 'flash', seat: a, marble: 1 }), /Cut the last bit/);
+  room.stuntWarm('u1', 's1', 'stale');
+  room.stuntWarm('u1', 's1', id);
+  room.stuntWarm('u2', 's2', id);
+  room.stuntWarm('viewer', 's9', id);
+  assert.ok(!room.game.stunts?.length, 'the second device still counts');
+  room.detach('u1', 's1b');
+  assert.deepStrictEqual(room.game.stunts.map((s) => s.id), [id]);
+  assert.ok(!room.game.stuntPrep);
+  assert.ok(room.view().game.stunts[0].age >= 0);
+
+  room.cutStunt('u1', id);
+  room.stunt('u1', { kind: 'ufo', seat: a, marble: 0 });
+  const slow = room.game.stuntPrep.id;
+  t.mock.timers.tick(14999);
+  assert.ok(room.game.stuntPrep, 'still waiting on everyone');
+  t.mock.timers.tick(1);
+  assert.strictEqual(room.game.stunts[0].id, slow, 'a stuck screen cannot hold the table forever');
+
+  room.cutStunt('u1', slow);
+  room.stunt('u1', { kind: 'ufo', seat: a, marble: 0 });
+  room.cutStunt('u1', room.game.stuntPrep.id);
+  assert.ok(!room.game.stuntPrep);
+  t.mock.timers.tick(15000);
+  assert.strictEqual(room.game.stunts[0].id, slow, 'cutting while warming calls it off');
 });
 
 test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts everything when cut', (t) => {
@@ -930,6 +970,9 @@ test('a bot waits out a close encounter instead of moving the marble that is up 
   room.start('u1');
   const rolls = () => room.game.stats[1].rolls;
   room.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
+  t.mock.timers.tick(5000);
+  assert.strictEqual(rolls(), 0, 'the bot holds while everyone warms up');
+  room.stuntWarm('u1', 's1', room.game.stuntPrep.id);
   t.mock.timers.tick(UFO.end * 1000 - 100);
   assert.strictEqual(rolls(), 0, 'the bot holds while the bit plays');
   t.mock.timers.tick(8000);
@@ -943,6 +986,7 @@ test('a bot waits out a close encounter instead of moving the marble that is up 
   quick.pickStarter = () => ({ seat: 1, reason: 'winner' });
   quick.start('u1');
   quick.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
+  quick.stuntWarm('u1', 's1', quick.game.stuntPrep.id);
   quick.cutStunt('u1', quick.game.stunts[0].id);
   t.mock.timers.tick(8000);
   assert.ok(quick.game.stats[1].rolls > 0, 'cutting the bit frees the bot straight away');

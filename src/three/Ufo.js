@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { fx } from './fx';
@@ -1009,7 +1009,7 @@ function Saucer({ stunt, board, clock, spot }) {
   );
 }
 
-export function UfoFx({ stunt, board, layout, skins, colors }) {
+export function UfoFx({ stunt, board, layout, skins, colors, warming = false, onWarm }) {
   const { camera } = useThree();
   const root = useRef();
   const held = useRef(false);
@@ -1020,7 +1020,13 @@ export function UfoFx({ stunt, board, layout, skins, colors }) {
   const palette = colors || board.colors || SEAT_COLORS;
   const seatColor = palette[stunt.seat] || SEAT_COLORS[stunt.seat];
   const marbleMat = useMemo(() => marbleSkin(skins?.[stunt.seat], stunt.seat, seatColor).material, [skins, stunt.seat, seatColor]);
-  const clock = () => (stunt.cut ? null : stuntClock(stunt));
+  const clock = () => (warming || stunt.cut ? null : stuntClock(stunt));
+  const onWarmRef = useRef(onWarm);
+  onWarmRef.current = onWarm;
+  const warmCount = useRef(0);
+  const warmed = useCallback(() => {
+    if (++warmCount.current === 2) onWarmRef.current?.(stunt.id);
+  }, [stunt.id]);
   // A rematch or leaving the table mid-bit hands the camera back
   useEffect(
     () => () => {
@@ -1030,6 +1036,7 @@ export function UfoFx({ stunt, board, layout, skins, colors }) {
   );
 
   useFrame(() => {
+    if (warming) return;
     const t = stuntClock(stunt);
     if (!isOn(stunt, board, t)) {
       if (held.current) {
@@ -1074,8 +1081,8 @@ export function UfoFx({ stunt, board, layout, skins, colors }) {
 
   return (
     <group ref={root}>
-      <UfoWarmer root={root} />
-      <UfoTransition clock={clock} />
+      <UfoWarmer root={root} onDone={warmed} />
+      <UfoTransition clock={clock} onWarm={warmed} />
       <Saucer stunt={stunt} board={board} clock={clock} spot={spot} />
       <LabSet stunt={stunt} board={board} clock={clock} marbleMat={marbleMat} />
       <KitchenSet stunt={stunt} board={board} clock={clock} />

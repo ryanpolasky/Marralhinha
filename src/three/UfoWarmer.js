@@ -2,14 +2,15 @@ import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { onIdle, warmSet } from './ufoWarm';
 
-export default function UfoWarmer({ root }) {
+export default function UfoWarmer({ root, onDone }) {
   const { gl, scene, camera } = useThree();
   useEffect(() => {
     let stopped = false;
     let cancel = () => {};
     const queue = ['ufo-saucer-set', 'ufo-lab-set', 'ufo-kitchen-set'];
     const next = () => {
-      if (stopped || !queue.length) return;
+      if (stopped) return;
+      if (!queue.length) return onDone?.();
       cancel = onIdle(() => {
         if (stopped) return;
         const source = root.current?.getObjectByName(queue.shift());
@@ -24,6 +25,6 @@ export default function UfoWarmer({ root }) {
       stopped = true;
       cancel();
     };
-  }, [gl, scene, camera, root]);
+  }, [gl, scene, camera, root, onDone]);
   return null;
 }
