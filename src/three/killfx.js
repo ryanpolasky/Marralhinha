@@ -311,6 +311,20 @@ const KILL_FX = {
     sfx('splash');
   },
 
+  lucky: (emit, { at, sfx, seq }) => {
+    const base = ground(at);
+    const gold = ['#fff3b8', '#ffd166', '#f0b93a', '#c48a1c'];
+    emit('dome', { position: at, color: '#ffd166', size: 1.6, life: 0.45 });
+    emit('decal', { position: base, kind: 'scorch', color: '#f0b93a', size: 3, life: 1.6, grow: 0.4, add: true });
+    emit('shard', { shape: 'box', position: off(at, 0, 0.1), colors: gold, n: 30, speed: 2.4, up: 5, size: 0.11, life: 1.9, bounce: 0.5, spin: 9 });
+    seq(8, 60, (k, i) => emit('spr', { position: off(at, 0, 0.2), n: 4, tile: TILE.ring, c: i % 3 ? gold : ['#7dffb4', '#0e7a43'], rot: 0, speed: 2.2, up: 3.4, uj: 1.4, size: 0.2, size2: 0.16, life: 1.2, grav: 1.4, land: true, flick: 10 }));
+    emit('spr', { position: at, n: 26, tile: TILE.star, c: ['#ffffff', '#fff3b8', '#7dffb4'], sphere: true, speed: 3, up: 1.6, size: 0.26, size2: 0, life: 1.1, drag: 1, flick: 24 });
+    emit('beam', { position: base, color: '#ffd166', size: 1.8, height: 2.2, life: 0.55 });
+    seq(2, 140, (k) => emit('ring', { position: base, color: k ? '#7dffb4' : '#ffd166', size: 3 - k, life: 0.6 }));
+    emit('shake', { amount: 0.3 });
+    sfx('twinkle');
+  },
+
   // Ghosts and bats swirl up out of a glowing circle
   halloween: (emit, { at, victim, sfx, later, seq }) => {
     emit('decal', { position: ground(at), kind: 'rune', color: '#7bf1a8', size: 3.2, life: 1.9, spin: -1, grow: 0.3, add: true });

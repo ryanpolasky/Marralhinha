@@ -18,9 +18,9 @@
       "color": "#ffd166",
       "admin": false,
       "auto": true,
-      "blurb": "Highest luck score across the last 10 completed games.",
-      "source": "Earned by holding the highest luck score across the last 10 completed games.",
-      "unlock": "Hold Luckiest for three cumulative days to unlock the Golden Die permanently."
+      "blurb": "Best single-game six rate this month.",
+      "source": "Earned by holding this month's best single-game six rate.",
+      "unlock": "Win a month as Luckiest to pick a piece of the Luckiest set. One pick per month won."
     },
     "halloween": { "label": "Haunted", "color": "#ff9a3c", "admin": false, "auto": true, "blurb": "Sat in on the séance.", "source": "Earned by purchasing the Halloween Pack.", "unlock": "The Halloween Pack is a one-time $3.99 purchase through Discord, sold only in October. Once it's yours, it's yours for good." }
   },
@@ -62,6 +62,7 @@
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
+    { "id": "marble.lucky", "slot": "marble", "name": "Gilded Glass", "rarity": "exclusive", "tag": "lucky", "desc": "Your color in glass, wrapped in cracked gold leaf. Glitter catches the light as it rolls. Part of the Luckiest set." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
@@ -88,6 +89,7 @@
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
+    { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer laid with gold filigree, glittering like a jackpot. Part of the Luckiest set." },
     { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "mythic", "desc": "Ants (ants)" },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
@@ -114,7 +116,7 @@
     { "id": "dice.beta", "slot": "dice", "name": "Test Build", "rarity": "exclusive", "tag": "beta", "desc": "May contain bugs. Rolls anyway." },
     { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
     { "id": "dice.supporter", "slot": "dice", "name": "Beacon", "rarity": "exclusive", "tag": "supporter", "desc": "Brushed midnight metal with luminous porcelain faces and crisp turquoise pips. Just as fair as every other die." },
-    { "id": "dice.lucky", "slot": "dice", "name": "Golden Die", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Permanently unlocked after three cumulative days as Luckiest." },
+    { "id": "dice.lucky", "slot": "dice", "name": "Golden Die", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Part of the Luckiest set." },
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },
@@ -142,6 +144,7 @@
     { "id": "plate.beta", "slot": "nameplate", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "Drafted by an early tester." },
     { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" },
     { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." },
+    { "id": "plate.lucky", "slot": "nameplate", "name": "Gilt", "rarity": "exclusive", "tag": "lucky", "desc": "Deep emerald framed in polished gold, with a glint that never sits still. Part of the Luckiest set." },
 
     { "id": "fx.pop", "slot": "fx", "name": "Pop", "rarity": "default", "desc": "The classic send-off." },
     { "id": "fx.fountain", "slot": "fx", "name": "Fountain", "rarity": "common", "desc": "Up, up and away." },
@@ -164,6 +167,7 @@
     { "id": "fx.beta", "slot": "fx", "name": "Blue Screen", "rarity": "exclusive", "tag": "beta", "desc": "That marble has stopped responding." },
     { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },
     { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." },
+    { "id": "fx.lucky", "slot": "fx", "name": "Jackpot", "rarity": "exclusive", "tag": "lucky", "desc": "Pays out in gold coins. Part of the Luckiest set." },
 
     { "id": "trail.dust", "slot": "trail", "name": "Dust", "rarity": "default", "desc": "Kicks up a little something." },
     { "id": "trail.sparkle", "slot": "trail", "name": "Stardust", "rarity": "common", "desc": "Glitter in your wake." },
@@ -183,6 +187,7 @@
     { "id": "trail.minecraft", "slot": "trail", "name": "Experience", "rarity": "mythic", "desc": "Little green and gold motes bob along behind you. Save them for the enchanting table." },
     { "id": "trail.defuse", "slot": "trail", "name": "Brass", "rarity": "mythic", "desc": "Spent casings everywhere you go. Somebody has to sweep these up." },
     { "id": "trail.supporter", "slot": "trail", "name": "Wake", "rarity": "exclusive", "tag": "supporter", "desc": "Even the tide makes way." },
+    { "id": "trail.lucky", "slot": "trail", "name": "Gold Rush", "rarity": "exclusive", "tag": "lucky", "desc": "Gold glitter and the odd emerald glint. Part of the Luckiest set." },
     { "id": "trail.halloween", "slot": "trail", "name": "Haunting", "rarity": "exclusive", "tag": "halloween", "desc": "Something follows behind." },
     { "id": "trail.beta", "slot": "trail", "name": "Wireframe", "rarity": "exclusive", "tag": "beta", "desc": "Now with rendering issues." },
     { "id": "trail.dev", "slot": "trail", "name": "Accretion", "rarity": "exclusive", "tag": "dev", "desc": "Whatever you pass falls in behind you." },

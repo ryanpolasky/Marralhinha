@@ -70,16 +70,16 @@ const emitToSeats = (room, seats, event, payload) => {
 
 const announceLucky = (change) => {
   if (!change) return;
-  const { holder, previous, reclaimed, unlocked } = change;
+  const { holder, previous, reclaimed, champions = [] } = change;
+  for (const { id, monthName } of champions) {
+    const name = accounts.getUser(id)?.name;
+    if (name) io.emit('luckiest:change', `${name} won Luckiest for ${monthName}!`);
+  }
   if (holder !== previous && holder) {
     const name = accounts.getUser(holder)?.name;
     if (name) io.emit('luckiest:change', `${name} has ${reclaimed ? 'reclaimed' : 'taken'} Luckiest${previous && !reclaimed ? ` from ${accounts.getUser(previous)?.name || 'the previous holder'}` : ''}!`);
   }
-  for (const id of unlocked) {
-    const name = accounts.getUser(id)?.name;
-    if (name) io.emit('luckiest:change', `${name} unlocked the Golden Die after reigning as Luckiest for 3 total days!`);
-  }
-  new Set([holder, previous, ...unlocked].filter(Boolean)).forEach(pushProfile);
+  new Set([holder, previous, ...champions.map((c) => c.id)].filter(Boolean)).forEach(pushProfile);
 };
 
 const rooms = new RoomManager({
@@ -111,7 +111,6 @@ const rooms = new RoomManager({
         const lucky = accounts.refreshLucky();
         const winner = players.find((p) => p.userId === lucky?.holder);
         if (winner && lucky?.previous !== lucky.holder) rewards[winner.seat].luckyTag = true;
-        for (const player of players) if (lucky?.unlocked.includes(player.userId)) rewards[player.seat].goldenDie = true;
         return { rewards, lucky };
       });
       setTimeout(() => {
@@ -125,12 +124,11 @@ const rooms = new RoomManager({
     }
   },
 });
-accounts.refreshGoldenUnlocks().forEach(pushProfile);
-announceLucky(accounts.refreshLucky(Date.now(), { inactivityOnly: true }));
+announceLucky(accounts.refreshLucky());
 setInterval(() => {
   rooms.sweep();
   try {
-    announceLucky(accounts.refreshLucky(Date.now(), { inactivityOnly: true }));
+    announceLucky(accounts.refreshLucky());
   } catch (err) {
     console.error('[luckiest]', err);
   }

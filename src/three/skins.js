@@ -1015,6 +1015,74 @@ const MARBLES = {
       onBeforeCompile, customProgramCacheKey: () => 'marble-supporter-tide',
       animate: (m, t) => { uniforms.uTide.value = reducedMotion?.matches ? 0 : t + seat * 1.7; } };
   },
+  lucky: (c, seat) => {
+    const [canvas, ctx] = makeCanvas(512, 256);
+    const [glow, gctx] = makeCanvas(512, 256);
+    const rand = seeded(777 + seat);
+    const glass = ctx.createLinearGradient(0, 0, 0, 256);
+    glass.addColorStop(0, mix(c.dark, '#041a10', 0.35));
+    glass.addColorStop(0.5, mix(c.main, '#0e7a43', 0.18));
+    glass.addColorStop(1, mix(c.dark, '#041a10', 0.35));
+    ctx.fillStyle = glass;
+    ctx.fillRect(0, 0, 512, 256);
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 22; i++) {
+      const x = rand() * 512;
+      const y = 30 + rand() * 196;
+      const r = 14 + rand() * 30;
+      const pts = Array.from({ length: 7 }, (_, k) => [Math.cos((k / 7) * TAU) * r * (0.6 + rand() * 0.5), Math.sin((k / 7) * TAU) * r * (0.35 + rand() * 0.35)]);
+      for (const dx of [-512, 0, 512]) {
+        const leaf = ctx.createLinearGradient(x + dx - r, y - r, x + dx + r, y + r);
+        leaf.addColorStop(0, '#fff3b8');
+        leaf.addColorStop(0.5, '#f0b93a');
+        leaf.addColorStop(1, '#a8741c');
+        for (const [g, fill, a] of [[ctx, leaf, 0.92], [gctx, '#ffcf5a', 0.55]]) {
+          g.globalAlpha = a;
+          g.fillStyle = fill;
+          g.beginPath();
+          pts.forEach(([px, py], k) => (k ? g.lineTo(x + dx + px, y + py) : g.moveTo(x + dx + px, y + py)));
+          g.closePath();
+          g.fill();
+        }
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = '#7a4d08';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    gctx.globalAlpha = 1;
+    for (let i = 0; i < 420; i++) {
+      const x = rand() * 512;
+      const y = rand() * 256;
+      const s = 0.6 + rand() * 1.6;
+      ctx.fillStyle = rand() > 0.5 ? 'rgba(255,248,214,0.85)' : 'rgba(255,209,102,0.7)';
+      ctx.fillRect(x, y, s, s);
+      gctx.fillStyle = rand() > 0.3 ? '#fff6d0' : '#7dffb4';
+      gctx.fillRect(x, y, s, s);
+    }
+    const map = finishMarble(canvas);
+    const emissiveMap = finishMarble(glow);
+    const uniforms = { uGlint: { value: 0 } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uGlint;')
+        .replace('#include <emissivemap_fragment>', `{
+          vec2 uv = vEmissiveMapUv;
+          vec3 flecks = texture2D(emissiveMap, uv).rgb;
+          float sweep = pow(max(sin(uv.x * 12.566 + uv.y * 4.0 - uGlint * 1.6), 0.0), 14.0);
+          float twinkle = 0.55 + 0.45 * sin(uGlint * 3.0 + dot(uv, vec2(173.0, 311.0)));
+          float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.6);
+          totalEmissiveRadiance = flecks * (0.28 + sweep * 1.6) * twinkle + vec3(1.0, 0.82, 0.4) * (rim * 0.32 + sweep * 0.12);
+        }`);
+    };
+    return { map, emissiveMap, emissive: '#ffffff', emissiveIntensity: 1, roughness: 0.1, metalness: 0.22, clearcoat: 1, clearcoatRoughness: 0.04,
+      onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-gilt',
+      animate: (m, t) => { uniforms.uGlint.value = reducedMotion?.matches ? 0 : t + seat * 1.3; } };
+  },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
   halloween: (c, seat) => {
     const W = 512;
@@ -1806,6 +1874,62 @@ function oceanCanvases() {
     const spec = { y0: rand() * 1024, amp: 20 + rand() * 60, k: 2 + Math.floor(rand() * 4), phase: rand() * TAU, width: 2 + rand() * 6, w: 1024 };
     wavyLine(bctx, { ...spec, color: '#8fe3ff', alpha: 0.18 + rand() * 0.25 });
     wavyLine(gctx, { ...spec, color: '#5fd0ff', alpha: 0.35 + rand() * 0.4 });
+  }
+  return [base, glow];
+}
+
+function highRollerCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  const rand = seeded(777);
+  const g = bctx.createRadialGradient(512, 512, 60, 512, 512, 720);
+  g.addColorStop(0, '#13854d');
+  g.addColorStop(0.6, '#0a5a33');
+  g.addColorStop(1, '#04301a');
+  bctx.fillStyle = g;
+  bctx.fillRect(0, 0, 1024, 1024);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  const T = 256;
+  for (let ty = 0; ty < 4; ty++) {
+    for (let tx = 0; tx < 4; tx++) {
+      for (const [ctx, color, width, alpha] of [[bctx, '#e9b94a', 5, 0.9], [gctx, '#ffcf5a', 3, 0.6]]) {
+        ctx.save();
+        ctx.translate(tx * T + T / 2, ty * T + T / 2);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        for (let k = 0; k < 4; k++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(0, -18);
+          ctx.bezierCurveTo(40, -40, 50, -90, 0, -110);
+          ctx.bezierCurveTo(-50, -90, -40, -40, 0, -18);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(-T / 2, -T / 2, 46, 0, Math.PI / 2);
+          ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+  bctx.globalAlpha = 1;
+  gctx.globalAlpha = 1;
+  for (let i = 0; i < 5200; i++) {
+    const x = rand() * 1024;
+    const y = rand() * 1024;
+    const s = 0.8 + rand() * 1.8;
+    const bright = rand();
+    bctx.fillStyle = bright > 0.75 ? 'rgba(255,248,214,0.8)' : `rgba(255,209,102,${0.12 + rand() * 0.3})`;
+    bctx.fillRect(x, y, s, s);
+    if (bright > 0.75) {
+      gctx.fillStyle = '#fff3c0';
+      gctx.fillRect(x, y, s, s);
+    }
   }
   return [base, glow];
 }
@@ -4436,6 +4560,10 @@ const SPECIAL_BOARDS = {
   aurora: () => {
     const [base, glow] = auroraCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
+  },
+  lucky: () => {
+    const [base, glow] = highRollerCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 0.8, repeat: 0.06, roughness: 0.16, clearcoat: 1, dish: '#0a5a33', felt: '#04301a', cup: '#021a0e', core: '#f0b93a', accent: { color: '#f0b93a', metalness: 1, roughness: 0.2, emissive: '#c48a1c', emissiveIntensity: 0.25 } };
   },
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);

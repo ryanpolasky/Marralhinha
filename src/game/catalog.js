@@ -22,7 +22,7 @@ export const rarityOf = (item) => {
   const base = RARITIES[item.rarity];
   if (!item.tag) return base;
   const tag = TAGS[item.tag];
-  if (item.id === 'dice.lucky') return { ...base, label: 'Reign reward', short: 'Reign reward', color: tag.color };
+  if (item.tag === 'lucky') return { ...base, label: 'Luckiest set', short: 'Luckiest set', color: tag.color };
   return { ...base, label: `${tag.label} exclusive`, short: tag.label, color: tag.color };
 };
 
@@ -33,7 +33,7 @@ export const canUse = (account, itemId) => {
   if (item.rarity === 'default') return true;
   if ((account?.tags || []).includes('dev')) return true;
   if ((account?.inventory || []).includes(itemId)) return true;
-  if (itemId === 'dice.lucky') return !!account?.lucky?.goldenDieUnlocked;
+  if (item.tag === 'lucky') return !!account?.lucky?.setOwned?.includes(itemId);
   if (item.tag) return (account?.tags || []).includes(item.tag);
   return false;
 };

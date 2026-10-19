@@ -191,6 +191,15 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
   }));
 
   router.post(
+    '/me/luckiest/claim',
+    auth,
+    handle((req) => {
+      const claim = accounts.claimLucky(req.user.id, String(req.body?.month ?? ''), req.body?.item ?? null);
+      return { claim, profile: changed(req.user.id) };
+    })
+  );
+
+  router.post(
     '/me/name',
     auth,
     handle((req) => {

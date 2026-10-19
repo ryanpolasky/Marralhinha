@@ -97,6 +97,17 @@ CREATE TABLE IF NOT EXISTS luckiest_reigns (
 );
 CREATE INDEX IF NOT EXISTS luckiest_reigns_player ON luckiest_reigns(player_id);
 CREATE UNIQUE INDEX IF NOT EXISTS luckiest_reigns_open ON luckiest_reigns ((1)) WHERE ended_at IS NULL;
+CREATE TABLE IF NOT EXISTS luckiest_months (
+  month TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  match_id INTEGER,
+  rolls INTEGER NOT NULL,
+  sixes INTEGER NOT NULL,
+  settled_at INTEGER NOT NULL,
+  claimed_item TEXT,
+  claimed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS luckiest_months_player ON luckiest_months(player_id);
 CREATE TABLE IF NOT EXISTS ip_bans (
   ip TEXT PRIMARY KEY,
   name TEXT,
