@@ -25,7 +25,7 @@ void main() {
   gl_FragColor = mix(texture2D(before, uv), texture2D(after, uv), blend);
 }`;
 
-export default function UfoTransition({ clock }) {
+export default function UfoTransition({ clock, onWarm }) {
   const { gl, scene, camera } = useThree();
   const captured = useRef(null);
   const motion = useRef(null);
@@ -76,13 +76,16 @@ export default function UfoTransition({ clock }) {
         } finally {
           gl.setRenderTarget(previous);
         }
-      }).catch((error) => console.warn('UFO transition prewarm failed', error)).finally(() => tiny.dispose());
+      }).catch((error) => console.warn('UFO transition prewarm failed', error)).finally(() => {
+        tiny.dispose();
+        if (!stopped) onWarm?.();
+      });
     });
     return () => {
       stopped = true;
       cancel();
     };
-  }, [gl, scene, camera, pass]);
+  }, [gl, scene, camera, pass, onWarm]);
 
   useEffect(() => {
     motion.current = window.matchMedia?.('(prefers-reduced-motion: reduce)') || null;

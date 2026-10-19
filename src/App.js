@@ -550,6 +550,7 @@ const App = () => {
   const canPing = !!game && !localView && (mySeat >= 0 || !!account?.admin);
   const teamMode = game?.mode === 'teams' && mySeat >= 0;
   const sendPing = useCallback((ping) => onAction('game:ping', ping), [onAction]);
+  const sceneStuntWarm = useCallback((id) => onAction('game:stuntWarm', { id }), [onAction]);
   const myTeamLog = inRoom && teamLog.code === view.code && game ? teamLog.entries.filter((e) => e.t >= (game.pick?.t || 0)) : [];
 
   const accountBar = (
@@ -689,6 +690,7 @@ const App = () => {
               teams={game?.mode === 'teams'}
               canPing={canPing}
               onPing={sendPing}
+              onStuntWarm={sceneStuntWarm}
               onPingMenu={setPingMenu}
               onCameraOffView={setCameraOff}
             />

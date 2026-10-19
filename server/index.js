@@ -341,6 +341,7 @@ io.on('connection', (socket) => {
   handle('game:pickStuntDie', ({ dieId } = {}) => {
     current().pickStuntDie(userId, dieId);
   });
+  handle('game:stuntWarm', ({ id } = {}) => current().stuntWarm(userId, socket.id, id));
   handle('game:cutStunt', ({ id } = {}) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can cut a bit');
     current().cutStunt(userId, id);

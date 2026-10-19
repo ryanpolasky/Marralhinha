@@ -440,7 +440,7 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, boardSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, boardSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false, onStuntWarm }) {
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
   const pointer = useRef(null);
@@ -508,7 +508,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
           layout={layout}
         />
         <Hits hits={board.hits} board={board} layout={layout} />
-        <Stunts stunts={board.stunts} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
+        <Stunts stunts={board.stunts} prep={board.stuntPrep} onWarm={onStuntWarm} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}

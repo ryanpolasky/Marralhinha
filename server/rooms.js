@@ -17,6 +17,7 @@ const AWAY_GRACE_MS = 20000;
 // After this many timed-out turns in a row a player counts as away and gets played for quickly
 const IDLE_MISSES = 2;
 const IDLE_DELAY_MS = 2500;
+const STUNT_WARM_MAX_MS = 15000;
 // A disconnected host hands the host role to the next connected player after this long
 const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 15 * 60 * 1000;
@@ -226,6 +227,7 @@ class Room {
       }
       if (!this.anyoneConnected()) this.emptyAt = Date.now();
     }
+    this.checkWarm();
     this.changed();
   }
 
@@ -541,7 +543,7 @@ class Room {
     const still = (a, b) => a.zone === b.zone && a.idx === b.idx && a.slot === b.slot;
     // Rocky celebrates until cut, unless the game has since moved its marble for real
     const running = (s) => !s.cutAt && now - s.t < stuntSeconds(s) * 1000 && (s.kind === 'flash' || s.kind === 'dice' || still(s.at, game.marbles[s.seat][s.marble]));
-    if ((game.stunts || []).some(running)) throw new UserError('Cut the last bit first');
+    if (game.stuntPrep || (game.stunts || []).some(running)) throw new UserError('Cut the last bit first');
     if (kind === 'dice') {
       // The storm is armed, not instant: it dumps on the victim's next roll
       const target = game.active.includes(seat) ? seat : (this.findByUser(userId)?.seat ?? game.turn);
@@ -554,6 +556,42 @@ class Room {
     if ((game.hits || []).some((h) => !h.undoneAt && h.victim === seat && h.victimMarble === marble && still(h.victimAt, game.marbles[seat][marble]))) throw new UserError('That marble is in no state for that');
     const stunt = { id: newId(), kind, seat, marble, at: { ...game.marbles[seat][marble] }, t: now };
     if (kind === 'rocky') stunt.path = rockyPath(seat, marble, game.marbles, game.variant);
+    if (kind === 'ufo') return this.prepStunt(stunt);
+    this.playStunt(stunt);
+  }
+  // Heavy bits wait for every connected screen to say it's compiled the scene, so nobody freezes mid-show
+  prepStunt(stunt) {
+    const { t, ...prep } = stunt;
+    this.game.stuntPrep = prep;
+    this.warmSockets = new Set();
+    clearTimeout(this.prepTimer);
+    this.prepTimer = setTimeout(() => this.playPrep(), STUNT_WARM_MAX_MS);
+    this.changed();
+  }
+  stuntWarm(userId, socketId, id) {
+    if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (this.game?.stuntPrep?.id !== id) return;
+    this.warmSockets.add(socketId);
+    this.checkWarm();
+  }
+  checkWarm() {
+    if (!this.game?.stuntPrep) return;
+    const sockets = [...this.seats.filter((p) => p && !p.isBot), ...this.spectators.values()].flatMap((p) => (p.connected ? [...p.sockets] : []));
+    if (sockets.every((id) => this.warmSockets.has(id))) this.playPrep();
+  }
+  playPrep() {
+    clearTimeout(this.prepTimer);
+    const game = this.game;
+    const prep = game?.stuntPrep;
+    if (!prep) return;
+    delete game.stuntPrep;
+    const at = game.marbles[prep.seat]?.[prep.marble];
+    if (game.phase === 'over' || !at || at.zone !== prep.at.zone || at.idx !== prep.at.idx || at.slot !== prep.at.slot) return this.changed();
+    this.playStunt({ ...prep, t: Date.now() });
+  }
+  playStunt(stunt) {
+    const game = this.game;
+    const { seat, kind } = stunt;
     game.stunts = [stunt];
     const who = this.seats[seat]?.name || 'Someone';
     rules.addLog(game, kind === 'flash' ? `${who} threw a flashbang` : kind === 'ufo' ? `${who} was abducted by aliens` : `${who} went the distance`, null);
@@ -605,6 +643,11 @@ class Room {
 
   cutStunt(userId, id) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
+    if (this.game?.stuntPrep?.id === id) {
+      clearTimeout(this.prepTimer);
+      delete this.game.stuntPrep;
+      return this.changed();
+    }
     const stunt = this.game?.stunts?.find((s) => s.id === id && !s.cutAt);
     if (!stunt) throw new UserError('Nothing to cut');
     stunt.cutAt = Date.now();
@@ -991,13 +1034,13 @@ class Room {
     const cover = player ? this.coverFor(game.turn) : null;
     if (this.clockOffSeat !== game?.turn) this.clockOffSeat = null;
     const bit = game?.stunts?.[0];
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused, bit?.id, bit?.cutAt].join('|');
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused, bit?.id, bit?.cutAt, game.stuntPrep?.id].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
     this.timerKey = key;
     this.turnDeadline = null;
-    if (!player || this.paused || this.liveDiceStunt()) return;
+    if (!player || this.paused || this.liveDiceStunt() || game.stuntPrep) return;
     const human = !player.isBot;
     // Waiting on a person: the player themselves, or their partner covering while they're away
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
@@ -1049,6 +1092,7 @@ class Room {
 
   dispose() {
     clearTimeout(this.timer);
+    clearTimeout(this.prepTimer);
     clearTimeout(this.pauseTimer);
     this.cancelHostHandoff();
     this.banterTimers.forEach(clearTimeout);

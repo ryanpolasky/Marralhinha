@@ -157,8 +157,9 @@ function RockyFx({ stunt, board, layout }) {
   return <group ref={root} />;
 }
 
-export default function Stunts({ stunts, board, layout, skins, colors }) {
-  return (stunts || [])
+export default function Stunts({ stunts, prep, board, layout, skins, colors, onWarm }) {
+  const warming = prep?.kind === 'ufo' && !(stunts || []).some((s) => s.id === prep.id);
+  const live = (stunts || [])
     .filter((s) => s.kind !== 'dice' && stuntClock(s) < stuntSeconds(s) + 2)
     .map((s) =>
       s.kind === 'flash' ? (
@@ -169,4 +170,5 @@ export default function Stunts({ stunts, board, layout, skins, colors }) {
         <RockyFx key={s.id} stunt={s} board={board} layout={layout} />
       )
     );
+  return warming ? [...live, <UfoFx key={prep.id} stunt={prep} board={board} layout={layout} skins={skins} colors={colors} warming onWarm={onWarm} />] : live;
 }
