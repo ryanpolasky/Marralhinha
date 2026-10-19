@@ -171,6 +171,18 @@ test('rooms with only bots are swept after the last human leaves', () => {
   assert.deepStrictEqual(closed, [room]);
 });
 
+test('a lobby with one tab still connected closes after sitting idle', () => {
+  const manager = new RoomManager({ onChange: () => {} });
+  const room = manager.create();
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.attach('u1', 's0');
+  const now = Date.now();
+  assert.strictEqual(room.isAbandoned(now + 9 * 60 * 1000), false);
+  assert.strictEqual(room.isAbandoned(now + 11 * 60 * 1000), true);
+  room.lastActive = now + 9 * 60 * 1000;
+  assert.strictEqual(room.isAbandoned(now + 11 * 60 * 1000), false, 'activity in the lobby resets the clock');
+});
+
 test('a results screen with one tab still connected closes after sitting idle', () => {
   const manager = new RoomManager({ onChange: () => {} });
   const room = manager.create();
