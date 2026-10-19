@@ -1,45 +1,79 @@
-# Marralhinha Online
+<p align="center">
+  <a href="https://marralhinha.app"><img src="docs/media/cover.jpg" alt="Marralhinha! The classic marble game from the Açores, now online." /></a>
+</p>
 
-![Marralhinha Online](public/og-image.jpg)
+<p align="center">
+  <b>The marble game from Terceira, Açores. Now online, free, and one link away.</b><br />
+  2–4 players · friends or bots · browser, phone, or right inside Discord
+</p>
 
-**Play now at [marralhinha.app](https://marralhinha.app), or inside Discord as a voice channel Activity.**
+<p align="center">
+  <a href="https://marralhinha.app"><img src="https://img.shields.io/badge/Play_now-marralhinha.app-ff8a3d?style=for-the-badge" alt="Play now at marralhinha.app" /></a>
+  <a href="https://discord.gg/T4Efqprrd8"><img src="https://img.shields.io/badge/Discord-Join_the_table-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Discord" /></a>
+</p>
 
-Marralhinha (say it like "mah-hah-LEEN-yah") is the traditional marble board game from Terceira, in the Azores. Race your marbles around the board, capture your opponents', and take the shortcut through the center if you dare. This is it online: 2–4 players, with friends or bots, on desktop or mobile.
-Made by [Ryan Polasky](https://github.com/ryanpolasky).
+<p align="center">
+  <img src="docs/media/gameplay.jpg" alt="A Blitz game against bots" />
+</p>
 
-| Gameplay | Captures |
-| --- | --- |
-| ![Gameplay](docs/media/gameplay.jpg) | ![Capture](docs/media/capture.jpg) |
-| **Lootboxes** | **Locker** |
-| ![Legendary drop](docs/media/shop-legendary.jpg) | ![Locker](docs/media/locker.jpg) |
-| **Victory + rewards** | **Mobile** |
-| ![Win screen](docs/media/win.jpg) | <img src="docs/media/mobile-game.jpg" alt="Mobile" width="220" /> |
+Marralhinha (say it like "mah-hah-LEEN-yah") is what Terceira plays at the kitchen table: race your marbles around the cross, knock your friends back to their dish, and gamble on the shortcut through the center. It's easy enough to learn in one game and mean enough to start arguments in the second.
 
-## How to play
+## Why you'll like it
 
-- Race all your marbles around the board and into your colored home column. First player with every marble home wins.
-- Roll a 6 and you roll again. Anything else, and the turn passes.
-- Land on an opponent's marble to capture it and send it back to their dish.
-- On any brass corner except the last one before your home, a 1 or 6 jumps you into the center. From the center, another 1 or 6 drops you on that last corner, right by your home. The shortcut is worth chasing.
-- In the home column you need the exact roll to move: no overshooting, and no jumping your own marbles.
+- **No download, no signup.** Open [marralhinha.app](https://marralhinha.app) and you're already holding dice. Everyone gets a guest account instantly.
+- **Bring your people.** Share a four-letter room code, or launch it as a **Discord Activity** and everyone in the voice channel lands at the same table.
+- **Never short a player.** Bots fill empty seats, cover anyone who drops, and play your turns while you grab a snack.
+- **Plays great on a phone.** Same game, same rooms, desktop and mobile at one table.
+- **Looks good, plays fair.** Unlock marbles, boards, dice, nameplates, kill effects, move trails and emotes. All of it is cosmetic; nothing you can buy changes the game.
 
-**Controls:** Space rolls, Tab then Enter picks a move. Drag to spin the board, scroll to zoom, and ping a spot with H (G warns teammates) or right-click / long-press. The full rules live under the ? button in game.
+## Pick your poison
 
-## Modes
+| **Classic** | **Blitz** | **2v2 Teams** |
+| --- | --- | --- |
+| Five marbles on the full board. The real deal, full rewards. | Three marbles on a smaller board, about a third of the time. | Partners sit opposite, can't capture each other, and finish each other's runs. |
 
-- **Classic**: five marbles on the full board.
-- **Blitz**: three marbles on a smaller board, roughly a third of the time.
-- **2v2 teams**: with four players the host can team you up. Partners sit opposite each other, can't capture each other, and once your own marbles are home you move your partner's.
+Playing on one device? **Local** mode passes the dice around the couch.
 
-Short on humans? Bots fill empty seats, and they take over for players who drop (you get one reconnect grace period). Need a break mid-game? Hit the coffee cup and a bot plays your turns while you're away.
+## Screens
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/capture.jpg" alt="Capturing a marble" /><br /><b>Send them home.</b> Land on a marble and it goes right back to its dish.</td>
+    <td width="50%"><img src="docs/media/win.jpg" alt="Victory screen" /><br /><b>Win loud.</b> Confetti, Marbucks, and awards for whoever got bullied the most.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/locker.jpg" alt="The locker" /><br /><b>Show off.</b> 150+ marbles, boards, dice, nameplates, kill effects, trails and emotes to collect.</td>
+    <td width="50%"><img src="docs/media/shop.jpg" alt="The shop" /><br /><b>Crack chests.</b> Earn Marbucks by playing, then roll for something shiny.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/home.jpg" alt="Home screen" /><br /><b>Jump in.</b> Make a room for friends, fight the bots, or pass the dice around the couch.</td>
+    <td width="50%" align="center"><img src="docs/media/mobile-game.jpg" alt="Playing on a phone" width="48%" /> <img src="docs/media/mobile-home.jpg" alt="Home screen on a phone" width="48%" /><br /><b>Pocket-sized.</b> Built for touch from the start.</td>
+  </tr>
+</table>
+
+## How it plays
+
+1. **Get out.** Roll a 1 or a 6 to move a marble from your dish onto the board.
+2. **Race.** Run every marble around the cross and into your colored home column. First to bring them all home wins.
+3. **Roll a 6, roll again.** Anything else and the turn passes.
+4. **Capture.** Land on an opponent and send them back to their dish.
+5. **Take the shortcut.** From a brass corner (except the last one before your home), a 1 or 6 drops you into the center. Another 1 or 6 jumps you out to the corner right by your home.
+6. **Finish exact.** In the home column you need the exact roll. No overshooting, no hopping your own marbles.
+
+**Controls:** Space rolls, Tab then Enter picks a move. Drag to spin the board, scroll to zoom, and ping a spot with H (G warns teammates) or right-click / long-press. The full illustrated rules live under the **?** button in game.
 
 ## Progression
 
-Everyone gets a guest account instantly. Play games to earn **Marbucks**, then spend them on chests and daily featured cosmetics: marbles, boards, dice and nameplates. Profiles track match history, player cards and leaderboards, and in-game chat supports team messages and optional event logs.
+Play games to earn **Marbucks**, claim a daily reward, and spend them on chests and the rotating featured shop. Your profile tracks match history, stats and a player card, and the leaderboards keep score. Link Discord to carry your progress across devices.
 
-Everything is cosmetic. Marbucks can't be bought, so nothing purchasable changes the game. The optional one-time **Supporter Pack** helps fund the server and grants a badge plus four exclusive cosmetics. The seasonal **Halloween Pack** works the same way, but it is only sold during October. Link your Discord account to keep progress across devices and to launch the game as an Activity inside voice channels, where everyone in the channel lands at the same table automatically.
+Want to chip in for the server? The one-time **Supporter Pack** adds a badge and exclusive cosmetics, and the seasonal **Halloween Pack** is sold only in October. Only the look changes, never the gameplay. Marbucks can't be bought.
 
-## Community
+---
 
-- Support Discord: [discord.gg/T4Efqprrd8](https://discord.gg/T4Efqprrd8)
-- [Terms of Service](TERMS.md) · [Privacy Policy](PRIVACY.md)
+<p align="center">
+  <a href="https://marralhinha.app"><b>Play Marralhinha</b></a> ·
+  <a href="https://discord.gg/T4Efqprrd8">Discord</a> ·
+  <a href="TERMS.md">Terms</a> ·
+  <a href="PRIVACY.md">Privacy</a><br />
+  Made with ❤️ by <a href="https://github.com/ryanpolasky">Ryan Polasky</a>
+</p>
