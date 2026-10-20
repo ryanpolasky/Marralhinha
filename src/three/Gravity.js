@@ -464,15 +464,148 @@ export function Warps({ bus = fx }) {
 
 const MARBLE_WARP = 0.6;
 
+const DEBRIS_VERT = `
+varying vec2 vUv;
+varying vec3 vColor;
+void main() {
+  vUv = position.xy;
+  vColor = instanceColor;
+  vec4 c = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  c.xy += position.xy * length(instanceMatrix[0].xyz);
+  gl_Position = projectionMatrix * c;
+}`;
+
+const DEBRIS_FRAG = `
+varying vec2 vUv;
+varying vec3 vColor;
+void main() {
+  float r = length(vUv) * 2.0;
+  if (r > 1.0) discard;
+  float k = exp(-r * r * 10.0) * 1.4 + (1.0 - r) * (1.0 - r) * 0.12;
+  gl_FragColor = vec4(vColor * k, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  gl_FragColor.a = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+}`;
+
+const DEBRIS_GEO = new THREE.PlaneGeometry(1, 1);
+const TAU = Math.PI * 2;
+const FALLERS = 8;
+const MOONS = 2;
+const TAIL = 12;
+const RIN_DEBRIS = 2.3;
+
+const rng = (seed) => {
+  let a = (seed * 2654435761) >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const spawnMote = (m, rand, fresh) => {
+  m.theta = rand() * TAU;
+  if (m.moon) {
+    m.r0 = 7.6 + rand() * 1.4;
+    m.tilt = (rand() < 0.5 ? -1 : 1) * (0.45 + rand() * 0.35);
+    m.size = 0.85 + rand() * 0.3;
+    return m;
+  }
+  m.r0 = 6.4 + rand() * 2.8;
+  m.tilt = (rand() - 0.5) * (rand() < 0.3 ? 1.1 : 0.25);
+  m.life = 5 + rand() * 4;
+  m.p = fresh ? rand() : 0;
+  m.size = 0.55 + rand() * 0.5;
+  return m;
+};
+
+
+// Motes in hole units: a few spiral in and get swallowed, a couple of moons ride tilted orbits further out
+export const makeDebris = (seed = 0) => {
+  const rand = rng(seed + 1);
+  return { rand, motes: Array.from({ length: FALLERS + MOONS }, (_, i) => spawnMote({ moon: i >= FALLERS, p: 0 }, rand, true)) };
+};
+
+const _a = new THREE.Vector3();
+const _b = new THREE.Vector3();
+const _v = new THREE.Vector3();
+
+export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
+  let k = 0;
+  debris.motes.forEach((m) => {
+    if (!m.moon) {
+      m.p += dt / m.life;
+      if (m.p >= 1) spawnMote(m, debris.rand, false);
+    }
+    const p = m.moon ? 0 : m.p;
+    const r = m.moon ? m.r0 : m.r0 + (RIN_DEBRIS - m.r0) * p ** 2.2;
+    const w = 22 * r ** -1.5;
+    m.theta += w * dt;
+    const fade = m.moon ? 1 : Math.min(1, p / 0.12) * (1 - Math.max(0, (p - 0.9) / 0.1));
+    _a.copy(e1);
+    _b.copy(e2).multiplyScalar(Math.cos(m.tilt)).addScaledVector(n, Math.sin(m.tilt));
+    for (let j = 0; j < TAIL; j++) {
+      const th = m.theta - j * Math.min(w * 0.024, 0.16 / r);
+      const rr = r * (1 + j * 0.006);
+      const c = Math.cos(th);
+      const s = Math.sin(th);
+      const x = (_a.x * c + _b.x * s) * rr;
+      const y = (_a.y * c + _b.y * s) * rr;
+      const z = (_a.z * c + _b.z * s) * rr;
+      _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
+      const tail = 1 - j / TAIL;
+      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: x * toCam.x + y * toCam.y + z * toCam.z > 0, toward: _v.dot(toCam), size: m.size * tail ** 0.5, glow: fade * tail ** 1.4, moon: m.moon });
+      k += 1;
+    }
+  });
+  out.length = k;
+  return out;
+};
+
+const debrisLayer = (renderOrder) => {
+  const material = new THREE.ShaderMaterial({
+    vertexShader: DEBRIS_VERT,
+    fragmentShader: DEBRIS_FRAG,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+  });
+  const mesh = new THREE.InstancedMesh(DEBRIS_GEO, material, (FALLERS + MOONS) * TAIL);
+  mesh.setColorAt(0, new THREE.Color());
+  mesh.frustumCulled = false;
+  mesh.renderOrder = renderOrder;
+  mesh.count = 0;
+  return mesh;
+};
+
+const _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion();
+const _pos = new THREE.Vector3();
+const _scale = new THREE.Vector3();
+const _col = new THREE.Color();
+const _center = new THREE.Vector3();
+const _toCam = new THREE.Vector3();
+
 // energy eases between idle (~0.3) and moving (1)
-export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0 }) {
+export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 1.7 }) {
   const { camera } = useThree();
-  const { material, card } = useMemo(() => {
+  const { material, group, back, front, debris, placed } = useMemo(() => {
     const material = holeMaterial();
     material.uniforms.uWarp.value = MARBLE_WARP;
-    return { material, card: lensMesh(CARD_GEO, material, -1) };
-  }, []);
-  useEffect(() => () => material.dispose(), [material]);
+    const group = new THREE.Group();
+    // Behind-the-hole motes draw before the grab so they get lensed and swallowed by the shadow
+    const back = debrisLayer(-2);
+    const front = debrisLayer(0);
+    group.add(back, lensMesh(CARD_GEO, material, -1), front);
+    return { material, group, back, front, debris: makeDebris(seed), placed: [] };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => [material, back.material, front.material].forEach((m) => m.dispose()), [material, back, front]);
   useEffect(() => {
     paintHole(material.uniforms, color);
   }, [material, color]);
@@ -480,18 +613,42 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
 
   useFrame((_, dt) => {
     const e = energy?.current ?? 0.5;
-    clock.current += Math.min(dt, 0.05) * (0.7 + 0.9 * e);
+    const step = Math.min(dt, 0.05) * (0.7 + 0.9 * e);
+    clock.current += step;
     const u = material.uniforms;
+    const unit = (size * 0.8) / BCRIT;
     u.uTime.value = clock.current;
-    u.uUnit.value = (size * 0.8) / BCRIT;
+    u.uUnit.value = unit;
     u.uFront.value = size * 2.2;
     u.uLens.value = size * 1.8;
     u.uDisk.value = 1.1 + 0.9 * e;
     u.uGlow.value = 0.6 + 0.7 * e;
     diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value);
+
+    group.getWorldPosition(_center);
+    _toCam.copy(camera.position).sub(_center).normalize();
+    stepDebris(debris, step, u.uNormal.value, u.uE1.value, u.uE2.value, _toCam, placed);
+    const bright = 0.55 + 0.6 * e;
+    back.count = front.count = 0;
+    placed.forEach((d) => {
+      const layer = d.front ? front : back;
+      const heat = Math.min(1.4, (RIN_DEBRIS / d.r) ** 1.1 * (d.moon ? 0.75 : 1) * (1 + 0.35 * d.toward));
+      _col.copy(u.uCool.value).lerp(u.uMid.value, THREE.MathUtils.smoothstep(heat, 0.2, 0.5));
+      _col.lerp(u.uHot.value, THREE.MathUtils.smoothstep(heat, 0.45, 0.9));
+      _col.multiplyScalar(d.glow * bright * (1 + 0.6 * d.toward) ** 2 * (d.moon ? 1.6 : 2));
+      _pos.set(d.x, d.y, d.z).multiplyScalar(unit);
+      _scale.setScalar(d.size * unit * 0.75 * motes);
+      layer.setMatrixAt(layer.count, _m.compose(_pos, _q, _scale));
+      layer.setColorAt(layer.count, _col);
+      layer.count += 1;
+    });
+    [back, front].forEach((l) => {
+      l.instanceMatrix.needsUpdate = true;
+      l.instanceColor.needsUpdate = true;
+    });
   });
 
-  return <primitive object={card} />;
+  return <primitive object={group} />;
 }
 
 export const SHADOW_ONLY = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });

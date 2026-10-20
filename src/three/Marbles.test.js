@@ -6,7 +6,7 @@ import { ITEMS } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
 import { KILL_FX, DEV_RED } from './killfx';
 import { TRAILS } from './trails';
-import { diskFrame, holeEnvelope } from './Gravity';
+import { diskFrame, holeEnvelope, makeDebris, stepDebris, HOLE_BOUND } from './Gravity';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -265,6 +265,35 @@ test('a singularity grows in, holds and collapses, and its disk stays nearly edg
   expect(n.dot(e1)).toBeCloseTo(0);
   expect(n.dot(e2)).toBeCloseTo(0);
   expect(e1.length()).toBeCloseTo(1);
+});
+
+test('Singularity debris keeps orbiting: fallers spiral in and respawn, moons hold, and each mote sits on the right side of the hole', () => {
+  const [n, e1, e2] = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)];
+  const toCam = new THREE.Vector3(0, 0.2, 1).normalize();
+  const debris = makeDebris(3);
+  const faller = debris.motes.find((m) => !m.moon);
+  const moon = debris.motes.find((m) => m.moon);
+  const placed = [];
+  const radius = (m) => m.r0 + (2.3 - m.r0) * m.p ** 2.2;
+  let last = radius(faller);
+  let respawned = false;
+  let climbed = false;
+  for (let i = 0; i < 600; i++) {
+    const before = faller.p;
+    stepDebris(debris, 1 / 30, n, e1, e2, toCam, placed);
+    if (faller.p < before) respawned = true;
+    else if (radius(faller) > last + 1e-9) climbed = true;
+    last = radius(faller);
+    placed.forEach((d) => {
+      expect(Math.hypot(d.x, d.y, d.z)).toBeLessThan(HOLE_BOUND * 1.15);
+      expect(d.front).toBe(d.x * toCam.x + d.y * toCam.y + d.z * toCam.z > 0);
+    });
+  }
+  expect(respawned).toBe(true);
+  expect(climbed).toBe(false);
+  expect(placed.filter((d) => d.front).length).toBeGreaterThan(0);
+  expect(placed.filter((d) => !d.front).length).toBeGreaterThan(0);
+  expect(moon.r0).toBeGreaterThan(7);
 });
 
 test('Accretion trail ripples without spawning holes, and the Supernova kill ends on a single vwomp', () => {
