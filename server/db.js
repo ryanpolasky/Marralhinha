@@ -136,6 +136,7 @@ const MIGRATIONS = [
   ['users', 'banned_at', 'INTEGER'],
   ['users', 'ban_reason', 'TEXT'],
   ['users', 'last_ip', 'TEXT'],
+  ['users', 'lucky_picks', 'INTEGER NOT NULL DEFAULT 0'],
   ['match_players', 'roll_count', 'INTEGER'],
   ['match_players', 'six_count', 'INTEGER'],
 ];

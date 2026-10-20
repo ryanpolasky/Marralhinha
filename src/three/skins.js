@@ -1017,70 +1017,105 @@ const MARBLES = {
   },
   lucky: (c, seat) => {
     const [canvas, ctx] = makeCanvas(512, 256);
-    const [glow, gctx] = makeCanvas(512, 256);
     const rand = seeded(777 + seat);
     const glass = ctx.createLinearGradient(0, 0, 0, 256);
-    glass.addColorStop(0, mix(c.dark, '#041a10', 0.35));
-    glass.addColorStop(0.5, mix(c.main, '#0e7a43', 0.18));
-    glass.addColorStop(1, mix(c.dark, '#041a10', 0.35));
+    glass.addColorStop(0, mix(c.dark, '#000000', 0.25));
+    glass.addColorStop(0.5, mix(c.main, c.light, 0.25));
+    glass.addColorStop(1, mix(c.dark, '#000000', 0.25));
     ctx.fillStyle = glass;
     ctx.fillRect(0, 0, 512, 256);
-    gctx.fillStyle = '#000';
-    gctx.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 70; i++) {
       const x = rand() * 512;
-      const y = 30 + rand() * 196;
-      const r = 14 + rand() * 30;
-      const pts = Array.from({ length: 7 }, (_, k) => [Math.cos((k / 7) * TAU) * r * (0.6 + rand() * 0.5), Math.sin((k / 7) * TAU) * r * (0.35 + rand() * 0.35)]);
-      for (const dx of [-512, 0, 512]) {
-        const leaf = ctx.createLinearGradient(x + dx - r, y - r, x + dx + r, y + r);
-        leaf.addColorStop(0, '#fff3b8');
-        leaf.addColorStop(0.5, '#f0b93a');
-        leaf.addColorStop(1, '#a8741c');
-        for (const [g, fill, a] of [[ctx, leaf, 0.92], [gctx, '#ffcf5a', 0.55]]) {
-          g.globalAlpha = a;
-          g.fillStyle = fill;
-          g.beginPath();
-          pts.forEach(([px, py], k) => (k ? g.lineTo(x + dx + px, y + py) : g.moveTo(x + dx + px, y + py)));
-          g.closePath();
-          g.fill();
-        }
-        ctx.globalAlpha = 0.5;
-        ctx.strokeStyle = '#7a4d08';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
+      const y = 40 + rand() * 176;
+      const r = 0.8 + rand() * 2.2;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillRect(x - r * 0.4, y - r * 0.4, 0.8, 0.8);
     }
-    ctx.globalAlpha = 1;
-    gctx.globalAlpha = 1;
-    for (let i = 0; i < 420; i++) {
-      const x = rand() * 512;
-      const y = rand() * 256;
-      const s = 0.6 + rand() * 1.6;
-      ctx.fillStyle = rand() > 0.5 ? 'rgba(255,248,214,0.85)' : 'rgba(255,209,102,0.7)';
-      ctx.fillRect(x, y, s, s);
-      gctx.fillStyle = rand() > 0.3 ? '#fff6d0' : '#7dffb4';
-      gctx.fillRect(x, y, s, s);
-    }
-    const map = finishMarble(canvas);
-    const emissiveMap = finishMarble(glow);
     const uniforms = { uGlint: { value: 0 } };
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vLkPos;\nvarying vec3 vLkCam;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          mat4 lkModel = modelMatrix;
+          #ifdef USE_INSTANCING
+            lkModel = modelMatrix * instanceMatrix;
+          #endif
+          vLkPos = position;
+          vLkCam = (inverse(lkModel) * vec4(cameraPosition, 1.0)).xyz;`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uGlint;')
+        .replace('#include <common>', `#include <common>
+          uniform float uGlint;
+          varying vec3 vLkPos;
+          varying vec3 vLkCam;
+          float lkLeaf(vec2 q, float a) {
+            vec2 dir = vec2(cos(a), sin(a));
+            vec2 side = vec2(-dir.y, dir.x);
+            float lobes = min(length(q - dir * 0.2 - side * 0.068), length(q - dir * 0.2 + side * 0.068)) - 0.1;
+            vec2 lq = vec2(dot(q, dir), abs(dot(q, side)));
+            float wedge = max(lq.y - lq.x * 0.75, max(-lq.x, lq.x - 0.22));
+            return min(lobes, wedge);
+          }
+          float lkClover(vec2 q, out float vein) {
+            float d = 1e3;
+            vein = 1e3;
+            for (int i = 0; i < 4; i++) {
+              float a = 0.785398 + float(i) * 1.570796;
+              d = min(d, lkLeaf(q, a));
+              vec2 dir = vec2(cos(a), sin(a));
+              float t = clamp(dot(q, dir), 0.0, 0.26);
+              vein = min(vein, length(q - dir * t));
+            }
+            vec2 sq = q - vec2(0.0, -0.05);
+            float bend = sq.x - 0.12 * sq.y * sq.y;
+            float stem = max(abs(bend) - 0.026, max(sq.y + 0.46, -sq.y));
+            return min(min(d, stem), length(q) - 0.09);
+          }`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float lkMask = 0.0;
+          float lkShade = 0.0;
+          float lkVein = 0.0;
+          {
+            float R = length(vLkPos);
+            vec3 n = vLkPos / R;
+            vec3 rd = refract(normalize(vLkPos - vLkCam), n, 1.0 / 1.45);
+            vec3 pn = normalize(vLkCam);
+            float denom = dot(rd, pn);
+            if (denom < -0.0001) {
+              vec3 hit = vLkPos + rd * (-dot(vLkPos, pn) / denom);
+              vec3 up = abs(pn.y) > 0.95 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+              vec3 u = normalize(cross(up, pn));
+              vec3 v = cross(pn, u);
+              vec2 q = vec2(dot(hit, u), dot(hit, v)) / R * 0.95;
+              float vein;
+              float d = lkClover(q, vein);
+              float aa = fwidth(d) * 1.2 + 0.004;
+              lkMask = 1.0 - smoothstep(-aa, aa, d);
+              lkShade = smoothstep(0.0, 0.07, -d);
+              lkVein = (1.0 - smoothstep(0.003, 0.009, vein)) * 0.6;
+            }
+          }
+          vec3 lkGold = mix(vec3(0.42, 0.22, 0.02), vec3(1.0, 0.74, 0.18), lkShade) * (1.0 - lkVein * 0.5);
+          diffuseColor.rgb = mix(diffuseColor.rgb, lkGold, lkMask);`)
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.85, lkMask);')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, lkMask);')
         .replace('#include <emissivemap_fragment>', `{
-          vec2 uv = vEmissiveMapUv;
-          vec3 flecks = texture2D(emissiveMap, uv).rgb;
+          vec2 uv = vMapUv;
           float sweep = pow(max(sin(uv.x * 12.566 + uv.y * 4.0 - uGlint * 1.6), 0.0), 14.0);
-          float twinkle = 0.55 + 0.45 * sin(uGlint * 3.0 + dot(uv, vec2(173.0, 311.0)));
           float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.6);
-          totalEmissiveRadiance = flecks * (0.28 + sweep * 1.6) * twinkle + vec3(1.0, 0.82, 0.4) * (rim * 0.32 + sweep * 0.12);
+          float glint = 0.5 + 0.5 * sin(uGlint * 2.2);
+          totalEmissiveRadiance = vec3(1.0, 0.7, 0.2) * lkMask * (0.1 + 0.25 * glint * lkShade + sweep * 0.9) * (1.0 - lkVein * 0.6)
+            + vec3(1.0, 0.9, 0.6) * (rim * 0.22 + sweep * 0.1);
         }`);
     };
-    return { map, emissiveMap, emissive: '#ffffff', emissiveIntensity: 1, roughness: 0.1, metalness: 0.22, clearcoat: 1, clearcoatRoughness: 0.04,
-      onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-gilt',
+    return { map: finishMarble(canvas), emissive: '#ffffff', emissiveIntensity: 1, roughness: 0.05, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03,
+      onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-clover',
       animate: (m, t) => { uniforms.uGlint.value = reducedMotion?.matches ? 0 : t + seat * 1.3; } };
   },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often

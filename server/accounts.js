@@ -107,6 +107,9 @@ class Accounts {
       pendingMonths: db.prepare('SELECT * FROM luckiest_months WHERE player_id = ? AND claimed_at IS NULL ORDER BY month'),
       claimMonth: db.prepare('UPDATE luckiest_months SET claimed_item = ?, claimed_at = ? WHERE month = ? AND player_id = ? AND claimed_at IS NULL'),
       moveMonths: db.prepare('UPDATE luckiest_months SET player_id = ? WHERE player_id = ?'),
+      removeItem: db.prepare('DELETE FROM inventory WHERE user_id = ? AND item_id = ?'),
+      lockDie: db.prepare('UPDATE users SET golden_die_unlocked = 0, golden_die_unlocked_at = NULL WHERE id = ?'),
+      addPicks: db.prepare('UPDATE users SET lucky_picks = MAX(0, lucky_picks + ?) WHERE id = ?'),
       endReign: db.prepare('UPDATE luckiest_reigns SET ended_at = ?, duration_seconds = ? WHERE id = ?'),
       addReign: db.prepare('INSERT INTO luckiest_reigns (player_id, started_at) VALUES (?, ?)'),
       reignTime: db.prepare('UPDATE users SET luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?) WHERE id = ?'),
@@ -246,7 +249,7 @@ class Accounts {
       monthsWon: this.q.monthsWon.get(user.id).n,
       setOwned: LUCKY_SET.filter((id) => this.ownsLucky(user, id)),
       set: LUCKY_SET, minRolls: LUCK_MIN_ROLLS, expectedRate: LUCK_EXPECTED_SIX_RATE,
-      ...(self ? { pending: this.q.pendingMonths.all(user.id).map((row) => ({ month: row.month, monthName: monthName(row.month), rolls: row.rolls, sixes: row.sixes })) } : {}),
+      ...(self ? { pending: [...this.q.pendingMonths.all(user.id).map((row) => ({ month: row.month, monthName: monthName(row.month), rolls: row.rolls, sixes: row.sixes })), ...Array.from({ length: user.lucky_picks || 0 }, () => ({ month: 'pick', granted: true }))] } : {}),
     };
   }
 
@@ -290,7 +293,8 @@ class Accounts {
   claimLucky(userId, month, itemId) {
     const user = this.requireUser(userId);
     return transaction(this.db, () => {
-      const pending = this.q.pendingMonths.all(user.id).find((row) => row.month === month);
+      const granted = month === 'pick';
+      const pending = granted ? user.lucky_picks > 0 : this.q.pendingMonths.all(user.id).some((row) => row.month === month);
       if (!pending) throw new AccountError('Nothing to claim for that month');
       const missing = LUCKY_SET.filter((id) => !this.ownsLucky(user, id));
       if (missing.length) {
@@ -302,8 +306,28 @@ class Accounts {
         this.q.addCoins.run(LUCKY_FULL_SET_COINS, user.id);
         this.q.ledger.run(user.id, LUCKY_FULL_SET_COINS, 'luckiest', Date.now());
       }
-      this.q.claimMonth.run(itemId || 'coins', Date.now(), month, user.id);
+      if (granted) this.q.addPicks.run(-1, user.id);
+      else this.q.claimMonth.run(itemId || 'coins', Date.now(), month, user.id);
       return { item: itemId, coins: itemId ? 0 : LUCKY_FULL_SET_COINS };
+    });
+  }
+
+  grantLuckyPick(userId, delta) {
+    const user = this.requireUser(userId);
+    const step = Math.sign(Number(delta) || 0);
+    if (!step) throw new AccountError('Nothing to change');
+    if (step < 0 && !user.lucky_picks) throw new AccountError(`${user.name} has no Luckiest picks waiting`);
+    this.q.addPicks.run(step, user.id);
+  }
+
+  revokeItem(userId, itemId) {
+    const user = this.requireUser(userId);
+    const item = ITEMS.get(itemId);
+    const owned = this.inventory(user.id).includes(itemId) || (itemId === LUCKY_ITEM && !!user.golden_die_unlocked);
+    if (!item || !owned) throw new AccountError(`${user.name} doesn't own that`);
+    transaction(this.db, () => {
+      this.q.removeItem.run(user.id, itemId);
+      if (itemId === LUCKY_ITEM) this.q.lockDie.run(user.id);
     });
   }
 
@@ -475,6 +499,7 @@ class Accounts {
     this.q.moveMatchPlayers.run(intoId, guest.id);
     this.q.moveReigns.run(intoId, guest.id);
     this.q.moveMonths.run(intoId, guest.id);
+    this.q.addPicks.run(guest.lucky_picks || 0, intoId);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     this.q.setPacks.run(JSON.stringify([...new Set([...this.grantedPacks(into), ...this.grantedPacks(guest)])]), intoId);
     this.q.deleteUser.run(guest.id);
@@ -554,6 +579,8 @@ class Accounts {
       packs: Object.fromEntries(PACKS.map((pack) => [pack, this.grantedPacks(user).includes(pack)])),
       equipped: this.equipped(user),
       items: this.inventory(user.id).length,
+      owned: [...new Set([...this.inventory(user.id), ...(user.golden_die_unlocked ? [LUCKY_ITEM] : [])])],
+      luckyPicks: user.lucky_picks || 0,
       stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,
