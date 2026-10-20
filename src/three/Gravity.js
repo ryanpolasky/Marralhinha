@@ -482,16 +482,18 @@ void main() {
   float r = length(vUv) * 2.0;
   if (r > 1.0) discard;
   float k = exp(-r * r * 10.0) * 1.4 + (1.0 - r) * (1.0 - r) * 0.12;
-  gl_FragColor = vec4(vColor * k, 1.0);
+  float peak = max(vColor.r, max(vColor.g, vColor.b));
+  gl_FragColor = vec4(vColor * k + peak * exp(-r * r * 40.0) * 0.5, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  gl_FragColor.a = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+  float lit = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+  gl_FragColor.a = max(lit, min(1.0, peak * 0.45) * (1.0 - smoothstep(0.35, 0.8, r)));
 }`;
 
 const DEBRIS_GEO = new THREE.PlaneGeometry(1, 1);
 const TAU = Math.PI * 2;
 const FALLERS = 8;
-const MOONS = 2;
+const MOONS = 3;
 const TAIL = 12;
 const RIN_DEBRIS = 2.3;
 
@@ -556,7 +558,7 @@ export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
       const z = (_a.z * c + _b.z * s) * rr;
       _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
       const tail = 1 - j / TAIL;
-      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: x * toCam.x + y * toCam.y + z * toCam.z > 0, toward: _v.dot(toCam), size: m.size * tail ** 0.5, glow: fade * tail ** 1.4, moon: m.moon });
+      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: x * toCam.x + y * toCam.y + z * toCam.z > 0, toward: _v.dot(toCam), size: m.size * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
       k += 1;
     }
   });
@@ -572,7 +574,7 @@ const debrisLayer = (renderOrder) => {
     depthWrite: false,
     blending: THREE.CustomBlending,
     blendSrc: THREE.OneFactor,
-    blendDst: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
     blendSrcAlpha: THREE.OneFactor,
     blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
   });
@@ -593,7 +595,7 @@ const _center = new THREE.Vector3();
 const _toCam = new THREE.Vector3();
 
 // energy eases between idle (~0.3) and moving (1)
-export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 1.7 }) {
+export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 3.4 }) {
   const { camera } = useThree();
   const { material, group, back, front, debris, placed } = useMemo(() => {
     const material = holeMaterial();
