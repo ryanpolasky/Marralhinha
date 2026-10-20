@@ -278,12 +278,18 @@ test('Singularity debris keeps orbiting: fallers spiral in and respawn, moons ho
   let last = radius(faller);
   let respawned = false;
   let climbed = false;
+  let seen = [];
+  let jump = 0;
   for (let i = 0; i < 600; i++) {
     const before = faller.p;
     stepDebris(debris, 1 / 30, n, e1, e2, toCam, placed);
     if (faller.p < before) respawned = true;
     else if (radius(faller) > last + 1e-9) climbed = true;
     last = radius(faller);
+    const vis = debris.motes.map((_, j) => (placed[j * 12].front ? placed[j * 12].glow * placed[j * 12].size : null));
+    const prev = seen;
+    if (i) jump = Math.max(jump, ...vis.map((v, j) => (v === null || prev[j] === null ? 0 : Math.abs(v - prev[j]))));
+    seen = vis;
     placed.forEach((d) => {
       expect(Math.hypot(d.x, d.y, d.z)).toBeLessThan(HOLE_BOUND * 1.15);
       expect(d.front).toBe(d.x * toCam.x + d.y * toCam.y + d.z * toCam.z > 0);
@@ -291,6 +297,7 @@ test('Singularity debris keeps orbiting: fallers spiral in and respawn, moons ho
   }
   expect(respawned).toBe(true);
   expect(climbed).toBe(false);
+  expect(jump).toBeLessThan(0.15);
   expect(placed.filter((d) => d.front).length).toBeGreaterThan(0);
   expect(placed.filter((d) => !d.front).length).toBeGreaterThan(0);
   expect(moon.r0).toBeGreaterThan(7);

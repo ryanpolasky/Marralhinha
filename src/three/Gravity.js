@@ -545,7 +545,8 @@ export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
     const r = m.moon ? m.r0 : m.r0 + (RIN_DEBRIS - m.r0) * p ** 2.2;
     const w = 22 * r ** -1.5;
     m.theta += w * dt;
-    const fade = m.moon ? 1 : Math.min(1, p / 0.12) * (1 - Math.max(0, (p - 0.9) / 0.1));
+    const fade = m.moon ? 1 : THREE.MathUtils.smoothstep(p, 0, 0.4);
+    const shrink = m.moon ? 1 : 1 - THREE.MathUtils.smoothstep(p, 0.55, 1);
     _a.copy(e1);
     _b.copy(e2).multiplyScalar(Math.cos(m.tilt)).addScaledVector(n, Math.sin(m.tilt));
     for (let j = 0; j < TAIL; j++) {
@@ -559,8 +560,8 @@ export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
       _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
       const tail = 1 - j / TAIL;
       const depth = x * toCam.x + y * toCam.y + z * toCam.z;
-      const hide = depth > 0 ? 1 : THREE.MathUtils.smoothstep(Math.sqrt(Math.max(0, rr * rr - depth * depth)), BCRIT, BCRIT * 1.3);
-      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: depth > 0, toward: _v.dot(toCam), size: m.size * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * hide * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
+      const hide = 1 - THREE.MathUtils.smoothstep(-depth, 0, 0.5) * (1 - THREE.MathUtils.smoothstep(Math.sqrt(Math.max(0, rr * rr - depth * depth)), BCRIT * 0.9, BCRIT * 1.1));
+      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: depth > 0, toward: _v.dot(toCam), size: m.size * shrink * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * hide * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
       k += 1;
     }
   });
