@@ -68,7 +68,7 @@
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
-    { "id": "marble.lucky", "slot": "marble", "name": "Gilded Glass", "rarity": "exclusive", "tag": "lucky", "desc": "Your color in glass, wrapped in cracked gold leaf. Glitter catches the light as it rolls. Part of the Luckiest set." },
+    { "id": "marble.lucky", "slot": "marble", "name": "Four-Leaf", "rarity": "exclusive", "tag": "lucky", "desc": "A gold four-leaf clover suspended in your color of glass, like a lucky paperweight. Part of the Luckiest set." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },

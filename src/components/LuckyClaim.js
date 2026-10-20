@@ -32,9 +32,9 @@ export default function LuckyClaim({ account, onClaimed, onLater, notify }) {
       <div className="panel modal lucky-claim" role="dialog" aria-modal="true" aria-label="Pick your Luckiest reward">
         <div className="lucky-claim-head">
           <TagBadge tag="lucky" />
-          <h2>Luckiest of {claim.monthName}!</h2>
+          <h2>{claim.granted ? 'You got a Luckiest pick!' : `Luckiest of ${claim.monthName}!`}</h2>
           <p className="muted">
-            {claim.sixes} sixes in {claim.rolls} rolls ({((claim.sixes / claim.rolls) * 100).toFixed(1)}%) was the luckiest game of the month.{' '}
+            {!claim.granted && `${claim.sixes} sixes in ${claim.rolls} rolls (${((claim.sixes / claim.rolls) * 100).toFixed(1)}%) was the luckiest game of the month. `}
             {chosen ? 'Pick a piece of the Luckiest set to keep forever.' : 'You already own the whole set, so this one pays out in coins.'}
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function LuckyClaim({ account, onClaimed, onLater, notify }) {
             {busy ? 'Claiming…' : chosen ? `Claim ${ITEMS[chosen].name}` : <>Collect <Coins amount={LUCKY_FULL_SET_COINS} animate={false} /></>}
           </button>
         </div>
-        {account.lucky.pending.length > 1 && <p className="muted small-text center">{account.lucky.pending.length - 1} more month{account.lucky.pending.length > 2 ? 's' : ''} to claim after this one</p>}
+        {account.lucky.pending.length > 1 && <p className="muted small-text center">{account.lucky.pending.length - 1} more pick{account.lucky.pending.length > 2 ? 's' : ''} after this one</p>}
       </div>
     </div>
   );

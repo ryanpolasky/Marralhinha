@@ -310,6 +310,27 @@ test('a lucky pick grants one unowned piece per month won, then coins once the s
   assert.throws(() => accounts.grantItem(a.id, 'marble.lucky'), /Luckiest tag/);
 });
 
+test('admins can grant Luckiest picks and take cosmetics back, including a legacy Golden Die', () => {
+  const { accounts } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  accounts.db.prepare('UPDATE users SET golden_die_unlocked = 1 WHERE id = ?').run(a.id);
+  assert.ok(accounts.owns(a.id, 'dice.lucky'));
+  assert.ok(accounts.adminView(accounts.getUser(a.id)).owned.includes('dice.lucky'));
+  accounts.revokeItem(a.id, 'dice.lucky');
+  assert.ok(!accounts.owns(a.id, 'dice.lucky'));
+  assert.throws(() => accounts.revokeItem(a.id, 'dice.lucky'), /doesn't own/);
+  assert.throws(() => accounts.grantLuckyPick(a.id, -1), /no Luckiest picks/);
+  accounts.grantLuckyPick(a.id, 1);
+  accounts.grantLuckyPick(a.id, 1);
+  assert.equal(accounts.adminView(accounts.getUser(a.id)).luckyPicks, 2);
+  assert.deepEqual(accounts.profile(a.id).lucky.pending.map((p) => p.month), ['pick', 'pick']);
+  assert.deepEqual(accounts.claimLucky(a.id, 'pick', 'board.lucky'), { item: 'board.lucky', coins: 0 });
+  assert.equal(accounts.profile(a.id).lucky.pending.length, 1);
+  accounts.grantLuckyPick(a.id, -1);
+  assert.throws(() => accounts.claimLucky(a.id, 'pick', 'trail.lucky'), /Nothing to claim/);
+  assert.equal(accounts.luckyStatus(accounts.getUser(a.id)).monthsWon, 0, 'granted picks are not month wins');
+});
+
 test('legacy games without roll totals never qualify for Luckiest', () => {
   const { db, accounts } = setup();
   const a = accounts.createUser({ name: 'A' });
