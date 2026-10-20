@@ -492,8 +492,8 @@ void main() {
 
 const DEBRIS_GEO = new THREE.PlaneGeometry(1, 1);
 const TAU = Math.PI * 2;
-const FALLERS = 8;
-const MOONS = 3;
+const FALLERS = 5;
+const MOONS = 2;
 const TAIL = 12;
 const RIN_DEBRIS = 2.3;
 
@@ -558,7 +558,9 @@ export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
       const z = (_a.z * c + _b.z * s) * rr;
       _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
       const tail = 1 - j / TAIL;
-      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: x * toCam.x + y * toCam.y + z * toCam.z > 0, toward: _v.dot(toCam), size: m.size * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
+      const depth = x * toCam.x + y * toCam.y + z * toCam.z;
+      const hide = depth > 0 ? 1 : THREE.MathUtils.smoothstep(Math.sqrt(Math.max(0, rr * rr - depth * depth)), BCRIT, BCRIT * 1.3);
+      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: depth > 0, toward: _v.dot(toCam), size: m.size * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * hide * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
       k += 1;
     }
   });
@@ -601,8 +603,7 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     const material = holeMaterial();
     material.uniforms.uWarp.value = MARBLE_WARP;
     const group = new THREE.Group();
-    // Behind-the-hole motes draw before the grab so they get lensed and swallowed by the shadow
-    const back = debrisLayer(-2);
+    const back = debrisLayer(0);
     const front = debrisLayer(0);
     group.add(back, lensMesh(CARD_GEO, material, -1), front);
     return { material, group, back, front, debris: makeDebris(seed), placed: [] };
