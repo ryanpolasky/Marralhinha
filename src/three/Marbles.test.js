@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { planMove, MARBLE_R } from './Marbles';
+import { planMove } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
 import { KILL_FX, DEV_RED } from './killfx';
 import { TRAILS } from './trails';
-import { diskFrame, holeEnvelope, makeDebris, stepDebris, HOLE_BOUND } from './Gravity';
+import { diskFrame, holeEnvelope } from './Gravity';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -267,60 +267,29 @@ test('a singularity grows in, holds and collapses, and its disk stays nearly edg
   expect(e1.length()).toBeCloseTo(1);
 });
 
-test('Singularity crumbs get pulled straight in, stretch as they fall, flash out, and respawn without popping', () => {
-  const [n, e1, e2] = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)];
-  const toCam = new THREE.Vector3(0, 0.2, 1).normalize();
-  const debris = makeDebris(3);
-  const crumb = debris.motes[0];
-  const placed = [];
-  const stretch = (d) => Math.hypot(d[0].x - d[11].x, d[0].y - d[11].y, d[0].z - d[11].z);
-  let respawned = false;
-  let climbed = false;
-  let lastR = Infinity;
-  let early = 0;
-  let late = 0;
-  let seen = [];
-  let jump = 0;
-  let peak = 0;
-  for (let i = 0; i < 1200; i++) {
-    const before = crumb.p;
-    stepDebris(debris, 1 / 30, n, e1, e2, toCam, placed);
-    if (crumb.p < before) respawned = true;
-    else if (crumb.p > 0 && before > 0 && placed[0].r > lastR + 1e-9) climbed = true;
-    lastR = placed[0].r;
-    if (crumb.p > 0.1 && crumb.p < 0.3) early = Math.max(early, stretch(placed));
-    if (crumb.p > 0.8) late = Math.max(late, stretch(placed));
-    const vis = debris.motes.map((_, j) => (placed[j * 12].front ? placed[j * 12].glow * placed[j * 12].size : null));
-    const prev = seen;
-    if (i) jump = Math.max(jump, ...vis.map((v, j) => (v === null || prev[j] === null ? 0 : Math.abs(v - prev[j]))));
-    peak = Math.max(peak, ...vis.filter((v) => v !== null));
-    seen = vis;
-    placed.forEach((d) => {
-      expect(Math.hypot(d.x, d.y, d.z)).toBeLessThan(HOLE_BOUND);
-      expect(d.front).toBe(d.x * toCam.x + d.y * toCam.y + d.z * toCam.z > 0);
-    });
-  }
-  expect(respawned).toBe(true);
-  expect(climbed).toBe(false);
-  expect(late).toBeGreaterThan(early * 2);
-  expect(jump).toBeLessThan(peak * 0.2);
-  expect(placed.filter((d) => d.front).length).toBeGreaterThan(0);
-});
-
-test('Flat Singularity crumbs on the board stay above the wood', () => {
-  const [up, east, south] = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)];
-  const toCam = new THREE.Vector3(0, 1, 1).normalize();
-  const unit = (MARBLE_R * 0.8) / 2.598;
-  const placed = [];
-  let lowest = Infinity;
-  [0, 1, 2, 3, 4, 5].forEach((seed) => {
-    const debris = makeDebris(seed, true);
-    for (let i = 0; i < 400; i++) {
-      stepDebris(debris, 1 / 30, up, east, south, toCam, placed);
-      lowest = Math.min(lowest, ...placed.map((d) => d.y * unit + 0.07));
+test('Singularity disk wobbles hard but never flips face-on', () => {
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 34, 34);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const view = new THREE.Vector3();
+  camera.getWorldDirection(view);
+  const [n, e1, e2] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const swing = (wob) => {
+    let lo = 1;
+    let hi = -1;
+    for (let t = 0; t < 60; t += 0.1) {
+      diskFrame(camera, t, n, e1, e2, wob);
+      const d = n.dot(view);
+      lo = Math.min(lo, d);
+      hi = Math.max(hi, d);
     }
-  });
-  expect(lowest).toBeGreaterThan(0.03);
+    return [lo, hi];
+  };
+  const [lo0, hi0] = swing(0);
+  const [lo, hi] = swing(1);
+  expect(hi - lo).toBeGreaterThan(2.5 * (hi0 - lo0));
+  expect(Math.max(-lo, hi)).toBeLessThan(0.7);
 });
 
 test('Accretion trail ripples without spawning holes, and the Supernova kill ends on a single vwomp', () => {
