@@ -115,6 +115,7 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
                   <RarityTag item={item} />
                   <h3>{item.name}</h3>
                   <p className="muted">{item.desc}</p>
+                  {item.note && <p className="muted item-note">{item.note}</p>}
                   {owns(item.id) ? (
                     <button className="btn primary block" disabled={isEquipped} onClick={() => onEquip(slot, item.id)}>
                       {isEquipped ? 'Equipped' : 'Equip'}
@@ -123,6 +124,8 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
                     <div className="exclusive-note">
                       <TagBadge tag={item.tag} /> {TAGS[item.tag].unlock || `Only players with the ${TAGS[item.tag].label} tag can wear this.`}
                     </div>
+                  ) : item.unobtainable ? (
+                    <div className="exclusive-note">No longer obtainable.</div>
                   ) : item.set ? (
                     <div className="exclusive-note">Part of the {SETS[item.set].name} set. Pull the whole set from a Golden Chest.</div>
                   ) : (

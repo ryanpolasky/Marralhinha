@@ -10,7 +10,7 @@ const ADMIN_TAGS = TAG_KEYS.filter((key) => TAGS[key].admin);
 // Tags the server hands out on its own (e.g. Luckiest); never stored or toggled by admins
 const AUTO_TAGS = TAG_KEYS.filter((key) => TAGS[key].auto);
 // Tag-exclusive items never drop from boxes or show up in the featured shop
-const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag);
+const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag && !item.unobtainable);
 const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 const itemsOfRarity = (rarity) => DROPPABLE.filter((item) => item.rarity === rarity);

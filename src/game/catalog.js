@@ -11,10 +11,10 @@ export const ITEMS = Object.fromEntries(catalog.items.map((item) => [item.id, it
 export const BOXES = catalog.boxes;
 export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slot, catalog.slots[slot].default]));
 export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
-const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'beta', 'dev'];
-export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag);
+const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'ants', 'beta', 'dev'];
+export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag && !item.unobtainable);
 export const SETS = Object.fromEntries(Object.entries(catalog.sets || {}).map(([key, set]) => [key, { ...set, key, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }]));
-export const unobtainable = (item, now = Date.now()) => ['dev', 'beta'].includes(item.tag) || (item.tag === 'halloween' && new Date(now).getUTCMonth() !== 9);
+export const unobtainable = (item, now = Date.now()) => item.unobtainable || ['dev', 'beta'].includes(item.tag) || (item.tag === 'halloween' && new Date(now).getUTCMonth() !== 9);
 
 export const itemsForSlot = (slot) =>
   catalog.items.filter((item) => item.slot === slot).sort((a, b) => LOCKER_ORDER.indexOf(a.tag || a.rarity) - LOCKER_ORDER.indexOf(b.tag || b.rarity));
@@ -43,7 +43,7 @@ export const canUse = (account, itemId) => {
 
 // Items that count towards "collected": everything obtainable, plus exclusives you actually have access to
 export const collectible = (account) =>
-  catalog.items.filter((item) => !item.tag || (account?.tags || []).includes('dev') || canUse(account, item.id));
+  catalog.items.filter((item) => (!item.tag && !item.unobtainable) || (account?.tags || []).includes('dev') || canUse(account, item.id));
 
 export const skinKey = (id) => (id || '').split('.')[1] || '';
 export const cosmeticsOf = (seat) => ({ ...DEFAULT_COSMETICS, ...(seat?.cosmetics || {}) });

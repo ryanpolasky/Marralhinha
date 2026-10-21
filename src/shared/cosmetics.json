@@ -7,7 +7,8 @@
     "epic": { "label": "Epic", "color": "#b36bff", "dupe": 150 },
     "legendary": { "label": "Legendary", "color": "#ffb627", "dupe": 500 },
     "mythic": { "label": "Mythic", "color": "#ff5f3a", "dupe": 1500 },
-    "exclusive": { "label": "Exclusive", "color": "#ff4fd8", "dupe": 0 }
+    "exclusive": { "label": "Exclusive", "color": "#ff4fd8", "dupe": 0 },
+    "ants": { "label": "Ants", "color": "#7fd65a", "dupe": 0 }
   },
   "tags": {
     "dev": { "label": "Dev", "color": "#ff4a5a", "admin": true, "blurb": "Built this thing.", "source": "Reserved for Ryan, the dev." },
@@ -93,7 +94,7 @@
     { "id": "board.beta", "slot": "board", "name": "Blueprint", "rarity": "exclusive", "tag": "beta", "desc": "A living draft of the board itself. The plotter never stops redrawing it, and it signed off on you." },
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
-    { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "legendary", "desc": "Ants (ants)" },
+    { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "ants", "unobtainable": true, "desc": "Ants (ants)", "note": "A custom request from the first person to buy the Supporter Pack." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },

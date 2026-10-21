@@ -158,7 +158,6 @@ function SetReveal({ result, account }) {
   const fresh = result.items.filter((id) => !result.owned.includes(id));
   return (
     <>
-      <RarityTag item={ITEMS[focus]} />
       <PreviewStage itemId={focus} playerName={account.name} />
       <h2 className="reveal-name">{set.name} set</h2>
       <p className="reveal-desc">{result.duplicate ? 'You already had every piece.' : fresh.length === result.items.length ? 'Every piece, all at once.' : `${fresh.length} new pieces to finish the set.`}</p>
