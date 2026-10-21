@@ -132,6 +132,23 @@ const KILL_FX = {
     emit('spr', { position: at, tile: TILE.glow, c: ['#ffe38a'], size: 0.3, size2: 1.4, life: 0.25 });
   },
 
+  // A pinhole opens up and the marble zips off like a balloon somebody let go of
+  deflate: (emit, { at, victim, sfx }) => {
+    emit('spr', { position: at, n: 10, tile: TILE.smoke, c: ['#f4f4f4', '#dfe5e8', col(victim).light], add: false, speed: 1.6, up: 0.6, size: 0.25, size2: 0.9, life: 0.6, a: 0.7, drag: 2.2 });
+    emit('spr', { position: at, n: 6, tile: TILE.streak, c: ['#ffffff'], sphere: true, speed: 3, size: 0.4, size2: 0.05, life: 0.3, drag: 2 });
+    sfx('wheeze');
+  },
+
+  // A vaudeville cane hooks the marble from the wings and drags it off, to a sad trombone
+  stage: (emit, { at, sfx, later }) => {
+    emit('cane', { position: at, side: at[0] >= 0 ? 1 : -1 });
+    later(440, () => {
+      emit('spr', { position: at, n: 12, tile: TILE.smoke, c: ['#d9cdb8', '#bfb39e'], add: false, speed: 1.4, up: 0.4, size: 0.3, size2: 0.9, life: 0.7, a: 0.6, drag: 2 });
+      emit('shake', { amount: 0.14 });
+    });
+    sfx('trombone');
+  },
+
   // Electric discharge arcing around the marble
   volt: (emit, { at, by, sfx, later, seq }) => {
     const hub = off(at, 0, 0.05);

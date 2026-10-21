@@ -8,6 +8,7 @@ import { boardSurfaceY, burnClock, cutClock, stuntClock, stuntLive } from '../ga
 import { sfx } from '../game/sound';
 import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
+import { skinKey } from '../game/catalog';
 import { TABLE_Y, DISH_BEVEL } from './Board';
 import { fx } from './fx';
 import { useRainbow } from '../game/rainbow';
@@ -18,6 +19,10 @@ const ROLL_TIME = ROLL_REVEAL_MS / 1000;
 const LAND_HOLD = 1.3;
 const SPRING_STEP = 1 / 120;
 const UP = new THREE.Vector3(0, 1, 0);
+const SLUG_GEO = new THREE.SphereGeometry(0.12, 20, 14);
+const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85, roughness: 0.45 });
+const _down = new THREE.Vector3();
+const _inv = new THREE.Quaternion();
 const FACE_NORMALS = { 2: [1, 0, 0], 5: [-1, 0, 0], 1: [0, 1, 0], 6: [0, -1, 0], 3: [0, 0, 1], 4: [0, 0, -1] };
 
 const spot = ([r, c], y = REST_Y) => new THREE.Vector3(c, y, r);
@@ -69,6 +74,8 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
   const ref = useRef();
   const glow = useRef();
   const label = useRef();
+  const slug = useRef();
+  const loaded = skinKey(skin) === 'loaded';
   const anim = useRef(null);
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
@@ -161,6 +168,10 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
       if (canRoll) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
       if (shrink > 0) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
     }
+    if (slug.current) {
+      _down.set(0, -1, 0).applyQuaternion(_inv.copy(mesh.quaternion).invert()).multiplyScalar(SIZE * 0.26);
+      slug.current.position.lerp(_down, 1 - Math.exp(-dt * 7));
+    }
     glow.current.visible = canRoll && !a.roll && a.scale > 0.6;
     glow.current.position.set(a.pos.x, TABLE_Y + 0.02, a.pos.z);
     glow.current.material.opacity = 0.4 + Math.sin(now * 5) * 0.3;
@@ -195,7 +206,9 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
 
   return (
     <group>
-      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive} />
+      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive}>
+        {loaded && <mesh ref={slug} geometry={SLUG_GEO} material={LEAD} />}
+      </mesh>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, 0.95, 48]} />
         <meshBasicMaterial color="#ffd166" transparent toneMapped={false} depthWrite={false} />

@@ -1266,6 +1266,7 @@ const DICE = {
   copper: { bg: 'copper', pip: '#2b1a10', one: '#2b1a10', roughness: 0.3, metalness: 0.9 },
   lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
   candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
+  loaded: { bg: '#d9edf3', pip: '#1d2a33', one: '#c62828', roughness: 0.04, clearcoat: 1, extra: { transmission: 0.9, thickness: 0.6, ior: 1.5 } },
   holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
@@ -1819,6 +1820,36 @@ function oceanCanvases() {
     const spec = { y0: rand() * 1024, amp: 20 + rand() * 60, k: 2 + Math.floor(rand() * 4), phase: rand() * TAU, width: 2 + rand() * 6, w: 1024 };
     wavyLine(bctx, { ...spec, color: '#8fe3ff', alpha: 0.18 + rand() * 0.25 });
     wavyLine(gctx, { ...spec, color: '#5fd0ff', alpha: 0.35 + rand() * 0.4 });
+  }
+  return [base, glow];
+}
+
+function poolCanvases() {
+  const [base, bctx] = makeCanvas(1024, 1024);
+  const [glow, gctx] = makeCanvas(1024, 1024);
+  const rand = seeded(53);
+  bctx.fillStyle = '#3cb6d3';
+  bctx.fillRect(0, 0, 1024, 1024);
+  for (let y = 0; y < 1024; y += 32) for (let x = 0; x < 1024; x += 32) {
+    bctx.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '10,90,130'},${0.03 + rand() * 0.06})`;
+    bctx.fillRect(x + 2, y + 2, 28, 28);
+  }
+  bctx.strokeStyle = 'rgba(220,250,255,0.45)';
+  bctx.lineWidth = 3;
+  for (let i = 0; i <= 1024; i += 32) {
+    bctx.beginPath();
+    bctx.moveTo(i, 0);
+    bctx.lineTo(i, 1024);
+    bctx.moveTo(0, i);
+    bctx.lineTo(1024, i);
+    bctx.stroke();
+  }
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 46; i++) {
+    const spec = { y0: rand() * 1024, amp: 14 + rand() * 40, k: 3 + Math.floor(rand() * 5), phase: rand() * TAU, width: 2 + rand() * 4, w: 1024 };
+    wavyLine(bctx, { ...spec, color: '#effdff', alpha: 0.2 + rand() * 0.25 });
+    wavyLine(gctx, { ...spec, color: '#bff6ff', alpha: 0.3 + rand() * 0.35 });
   }
   return [base, glow];
 }
@@ -4449,6 +4480,10 @@ const SPECIAL_BOARDS = {
   aurora: () => {
     const [base, glow] = auroraCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
+  },
+  pool: () => {
+    const [base, glow] = poolCanvases();
+    return { canvas: base, glowCanvas: glow, glowIntensity: 0.3, repeat: 0.05, roughness: 0.05, clearcoat: 1, dish: '#1f8db5', felt: '#d8d1c2', cup: '#0e4d69', accent: { color: '#e8edf2', metalness: 1, roughness: 0.15 } };
   },
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);

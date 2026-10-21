@@ -6285,6 +6285,16 @@ img.emote-glyph {
   animation: plate-flow 2.5s linear infinite;
 }
 
+.plate-chrome {
+  --plate-ink: #15191e;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #8d969f, #f4f7fa 22%, #5f6871 40%, #e3e8ed 58%, #9aa3ac 78%, #8d969f) !important;
+  background-size: 300% 100% !important;
+  border-color: #f4f7fa !important;
+  box-shadow: 0 0 18px rgba(220, 230, 240, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: plate-flow 3s linear infinite;
+}
+
 .plate-diamond::before,
 .plate-diamond::after {
   content: '✦';
