@@ -14,6 +14,9 @@ const down = (p, dy = 0.15) => [p[0], Math.max(0.1, p[1] - dy), p[2]];
 
 let tick = 0;
 
+const BUMP_R = 0.37;
+const overBumps = (x, z, bumps) => bumps.reduce((y, [bx, bz]) => Math.max(y, 0.08 + Math.sqrt(Math.max(0, BUMP_R * BUMP_R - (x - bx) ** 2 - (z - bz) ** 2))), 0.09);
+
 // Called every ~0.34 units of hop travel with info = { by, prev, n }, so keep each call cheap
 const TRAILS = {
   // XP orbs that bob up and wink out, plus grass and dirt crumbs kicked up on every other hop
@@ -47,7 +50,7 @@ const TRAILS = {
   },
 
   // two rubber streaks laid flat on the floor
-  skid: (emit, p, { prev, n }) => {
+  skid: (emit, p, { prev, n, bumps = [] }) => {
     const from = prev || p;
     const len = Math.hypot(p[0] - from[0], p[2] - from[2]) || 1;
     const dx = (p[0] - from[0]) / len;
@@ -56,7 +59,9 @@ const TRAILS = {
     for (let k = 0; k < steps; k++) {
       const t = (k + 0.5) / steps;
       [-0.11, 0.11].forEach((side) => {
-        emit('spr', { position: [from[0] + (p[0] - from[0]) * t - dz * side, 0.09, from[2] + (p[2] - from[2]) * t + dx * side], tile: TILE.square, c: ['#1d1b1a', '#272422'], add: false, rot: 0, size: 0.13, size2: 0.13, life: 2.2, fade: 1.2, jitter: 0, a: 0.85 });
+        const x = from[0] + (p[0] - from[0]) * t - dz * side;
+        const z = from[2] + (p[2] - from[2]) * t + dx * side;
+        emit('spr', { position: [x, overBumps(x, z, bumps), z], tile: TILE.square, c: ['#1d1b1a', '#272422'], add: false, rot: 0, size: 0.13, size2: 0.13, life: 2.2, fade: 1.2, jitter: 0, a: 0.85 });
       });
     }
     if (n % 2 === 0) emit('spr', { position: down(p), tile: TILE.smoke, c: ['#9a9590', '#b9b4ae'], add: false, speed: 0.3, up: 0.4, size: 0.25, size2: 0.8, life: 0.7, a: 0.4, drag: 1.4 });

@@ -15,7 +15,6 @@ import { playTrail } from './trails';
 import * as THREE from 'three';
 import { MARBLE_GEO, victimPlan } from './Marbles';
 import { skinKey } from '../game/catalog';
-import { SolCorona } from './Corona';
 import { SingularityAura } from './Gravity';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
@@ -41,7 +40,6 @@ function MarblePreview({ itemId, seat, color }) {
       <mesh material={skin.material}>
         <sphereGeometry args={[1.35, 64, 40]} />
       </mesh>
-      {skin.aura === 'corona' && <SolCorona size={1.35} color={color || SEAT_COLORS[seat]} seed={seat} />}
     </Spinner>
   );
 }
@@ -164,6 +162,7 @@ const RUN_PAUSE = 1.4;
 const RUN_LEG = RUN * RUN_HOP_TIME;
 const RUN_PERIOD = 2 * (RUN_LEG + RUN_PAUSE);
 const STACK_Y = 0.07 + 0.335 * 1.95;
+const BLOCKER = [[0, 1]];
 
 // Same lane as the kill fx stage, but the stand-in sits one cell into the path so the runner stacks onto it and hops off like a real over-jump
 function TrailPreview({ itemId, seat, replay }) {
@@ -198,7 +197,7 @@ function TrailPreview({ itemId, seat, replay }) {
       const p = m.current.position;
       if (!last.current) last.current = p.clone();
       else if (p.distanceTo(last.current) > 0.32) {
-        playTrail(itemId, [p.x, p.y - 0.08, p.z], { by: seat, prev: [last.current.x, last.current.y - 0.08, last.current.z] }, { emit: bus.emit });
+        playTrail(itemId, [p.x, p.y - 0.08, p.z], { by: seat, prev: [last.current.x, last.current.y - 0.08, last.current.z], bumps: BLOCKER }, { emit: bus.emit });
         last.current.copy(p);
       }
     } else {

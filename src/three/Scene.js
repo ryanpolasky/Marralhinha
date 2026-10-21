@@ -491,7 +491,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       onPointerMissed={() => setSelected(null)}
       onCreated={tuneRenderer}
     >
-      <FrameCap paused={paused} fps={phone ? PHONE_FPS : 60} />
+      <FrameCap paused={paused} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors])} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />

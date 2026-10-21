@@ -187,6 +187,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     if (plan && planKey !== a.seen && (!a.seen || planKey > a.seen)) {
       a.seen = planKey;
       a.segs = plan.map((s) => ({ ...s, start: null }));
+      a.bumps = plan.filter((s) => s.tap).map((s) => [s.to.x, s.to.z]);
     }
   }, [plan, planKey]);
 
@@ -201,7 +202,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const dropTrail = (drop = 0.08) => {
       if (!a.trailAt) a.trailAt = a.pos.clone();
       else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
-        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, color: tint, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
+        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, color: tint, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z], bumps: a.bumps });
         a.trailAt.copy(a.pos);
       }
     };

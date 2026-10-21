@@ -140,7 +140,7 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
           <div className="item-grid">
             {listed.map(card)}
             {gone.length > 0 && (
-              <details key={slot} className="locker-unobtainable">
+              <details key={slot} className="locker-unobtainable" open={gone.some((i) => (account.inventory || []).includes(i.id))}>
                 <summary>
                   Unobtainable
                   <span className="tab-count">
