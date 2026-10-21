@@ -42,7 +42,7 @@ const left = (t) => {
   return s >= 86400 ? `${Math.floor(s / 86400)}d left` : s >= 3600 ? `${Math.floor(s / 3600)}h left` : `${Math.ceil(s / 60)}m left`;
 };
 
-export function LuckiestPanel({ lucky }) {
+export function LuckiestPanel({ lucky, onClaim }) {
   if (!lucky?.month) return null;
   const { best, leader, holder } = lucky;
   const owned = lucky.setOwned?.length || 0;
@@ -57,6 +57,7 @@ export function LuckiestPanel({ lucky }) {
             <span style={{ width: `${leader && best ? (best.rate / leader.rate) * 100 : 0}%` }} />
           </span>
         </span>
+        {onClaim && lucky.pending?.length > 0 && <button type="button" className="btn primary small profile-lucky-claim" onClick={(e) => { e.preventDefault(); onClaim(); }}>Claim reward</button>}
         <span className="profile-lucky-chevron" aria-hidden="true" />
       </summary>
       <div className="profile-lucky-details">

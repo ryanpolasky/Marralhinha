@@ -8087,6 +8087,7 @@ select.admin-input optgroup {
 .profile-lucky-overview { flex: 1; min-width: 0; display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .profile-lucky-track { display: block; height: 6px; border-radius: 99px; overflow: hidden; background: rgba(255, 209, 102, 0.16); }
 .profile-lucky-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c49027, #ffe08a); }
+.profile-lucky-claim { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
 .profile-lucky-chevron { width: 8px; height: 8px; border-right: 2px solid var(--gold); border-bottom: 2px solid var(--gold); transform: rotate(45deg); transition: transform 0.2s; }
 .profile-lucky[open] .profile-lucky-chevron { transform: rotate(225deg); }
 .profile-lucky-details { display: grid; gap: 12px; padding: 14px; border-top: 1px solid rgba(255, 209, 102, 0.24); }

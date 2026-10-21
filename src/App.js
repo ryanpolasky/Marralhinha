@@ -733,7 +733,7 @@ const App = () => {
           }
         />
       )}
-      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} onReport={() => setModal('report')} />}
+      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} onReport={() => setModal('report')} onClaimLucky={() => { setModal(null); setLuckyLater(false); }} />}
       {modal === 'boards' && account && <Leaderboard meId={account.id} onClose={() => setModal(null)} onPlayer={(u) => setPeek({ ...u, userId: u.id })} />}
       {modal === 'report' && account && <ReportModal onClose={() => setModal(null)} notify={notify} />}
       {!modal && !game && !localView && !luckyLater && account?.lucky?.pending?.length > 0 && <LuckyClaim key={account.lucky.pending[0].month} account={account} onClaimed={setAccount} onLater={() => setLuckyLater(true)} notify={(text) => notify(text, 'good')} />}
