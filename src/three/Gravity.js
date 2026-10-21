@@ -330,8 +330,10 @@ const WORLD_X = new THREE.Vector3(1, 0, 0);
 const _wobble = new THREE.Vector3();
 
 // The disk leans with the camera so it's always seen nearly edge-on, like in the films
-export const diskFrame = (camera, t, n, e1, e2) => {
-  n.setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(0.8).add(_wobble.set(0.16 * Math.sin(t * 0.31), 0.4, 0.16 * Math.cos(t * 0.23))).normalize();
+export const diskFrame = (camera, t, n, e1, e2, wob = 0) => {
+  const k = 0.16 + 0.3 * wob;
+  const f = 1 + 1.6 * wob;
+  n.setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(0.8).add(_wobble.set(k * Math.sin(t * 0.31 * f), 0.4, k * Math.cos(t * 0.23 * f))).normalize();
   e1.crossVectors(n, Math.abs(n.y) < 0.9 ? WORLD_UP : WORLD_X).normalize();
   e2.crossVectors(n, e1);
 };
@@ -488,7 +490,7 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     u.uLens.value = size * 1.8;
     u.uDisk.value = 1.1 + 0.9 * e;
     u.uGlow.value = 0.6 + 0.7 * e;
-    diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value);
+    diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value, 1);
   });
 
   return <primitive object={card} />;
