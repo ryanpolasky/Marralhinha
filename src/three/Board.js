@@ -334,15 +334,20 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
   const warmed = useRef(new Set());
   const uploaded = useRef(new Set());
   const mounted = useRef(true);
+  // Prop sets mount hidden on warm instead of at the swap: mount is when their canvases paint and
+  // materials compile, so doing it early (then a visibility flip) keeps the swap frame free of stalls
+  const mountedProps = useRef(new Set());
+  const propsGroups = useRef({});
+  const [, propsBumped] = useState(0);
   useEffect(() => () => { mounted.current = false; }, []);
   const prepareSkin = useCallback(
-    (id, upload = true) => {
+    async (id, upload = true) => {
       const key = `${id}:${layout.spec.id}`;
       let mats;
       try {
         mats = boardSkin(id, layout);
       } catch {
-        return Promise.resolve();
+        return;
       }
       if (!warmed.current.has(key)) {
         warmed.current.add(key);
@@ -353,6 +358,23 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
           scratch.add(probe);
         });
         gl.compile(scratch, camera, scene);
+      }
+      const propsKey = table && BOARD_PROPS[skinKey(id)] ? skinKey(id) : null;
+      if (propsKey && !mountedProps.current.has(propsKey)) {
+        mountedProps.current.add(propsKey);
+        propsBumped((n) => n + 1);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        if (!mounted.current) return;
+        const group = propsGroups.current[propsKey];
+        if (group) {
+          // compile() traverses invisible objects too, so the hidden set's programs build against
+          // the real scene lights; textures upload while it's still hidden
+          gl.compile(scene, camera);
+          group.traverse((o) => {
+            const list = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+            list.forEach((m) => Object.values(m).forEach((v) => v?.isTexture && gl.initTexture(v)));
+          });
+        }
       }
       if (upload && !uploaded.current.has(key)) {
         uploaded.current.add(key);
@@ -372,7 +394,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
         check();
       });
     },
-    [gl, scene, camera, layout]
+    [gl, scene, camera, layout, table]
   );
 
   // DOM pickers announce hover/open through the bridge; only the real table board answers
@@ -417,13 +439,22 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
   const accentHoles = useMemo(() => [...layout.INNER_CORNERS.map((i) => layout.RING[i]), CENTER], [layout]);
 
   if (!materials) return <group />;
-  const Props = table && BOARD_PROPS[skinKey(shownSkin)];
+  const liveProps = table && skinKey(shownSkin);
+  const propKeys = table ? new Set(mountedProps.current) : new Set();
+  if (BOARD_PROPS[liveProps]) propKeys.add(liveProps);
 
   return (
     <group>
       {table && <Table materials={materials} />}
       {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
-      {Props && <Props layout={layout} y={TABLE_Y} preview={preview} />}
+      {[...propKeys].map((key) => {
+        const Props = BOARD_PROPS[key];
+        return (
+          <group key={key} ref={(el) => (propsGroups.current[key] = el)} visible={key === liveProps}>
+            <Props layout={layout} y={TABLE_Y} preview={preview} />
+          </group>
+        );
+      })}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
       <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.core || materials.cup} receiveShadow>
