@@ -141,6 +141,41 @@ export function ItemThumb({ itemId, seat = 0, color: colorProp = null }) {
   );
 }
 
+const loadedEmotes = new Set();
+const loadEmote = (src) =>
+  new Promise((done) => {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      loadedEmotes.add(src);
+      done();
+    };
+    img.src = src;
+  });
+
+function EmotePreview({ item }) {
+  const emotes = item.emotes || [];
+  const srcs = emotes.filter((e) => e.img).map((e) => e.img);
+  const [ready, setReady] = useState(() => srcs.every((src) => loadedEmotes.has(src)));
+  useEffect(() => {
+    if (ready) return undefined;
+    let live = true;
+    Promise.all(srcs.map(loadEmote)).then(() => live && setReady(true));
+    return () => {
+      live = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="preview-stage emote-preview">
+      {emotes.map((e) => (
+        <span key={e.key} className="emote-sample" title={e.hint} style={ready ? undefined : { visibility: 'hidden' }}>
+          <EmoteGlyph emote={e} />
+        </span>
+      ))}
+      {!ready && <PreviewLoader />}
+    </div>
+  );
+}
+
 export function PreviewStage({ itemId, seat = 0, color = null, playerName, replay = 0 }) {
   const item = ITEMS[itemId];
   if (!item) return null;
@@ -157,17 +192,7 @@ export function PreviewStage({ itemId, seat = 0, color = null, playerName, repla
       </div>
     );
   }
-  if (item.slot === 'emotes') {
-    return (
-      <div className="preview-stage emote-preview">
-        {(item.emotes || []).map((e) => (
-          <span key={e.key} className="emote-sample" title={e.hint}>
-            <EmoteGlyph emote={e} />
-          </span>
-        ))}
-      </div>
-    );
-  }
+  if (item.slot === 'emotes') return <EmotePreview key={itemId} item={item} />;
   return <ModelStage itemId={itemId} seat={seat} color={color} replay={replay} />;
 }
 
