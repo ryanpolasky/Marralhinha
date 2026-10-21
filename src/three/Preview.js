@@ -12,6 +12,7 @@ import { makeFxBus } from './fx';
 import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
 import { MARBLE_GEO } from './Marbles';
+import { SolCorona } from './Corona';
 import { SingularityAura } from './Gravity';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
@@ -37,6 +38,7 @@ function MarblePreview({ itemId, seat, color }) {
       <mesh material={skin.material}>
         <sphereGeometry args={[1.35, 64, 40]} />
       </mesh>
+      {skin.aura === 'corona' && <SolCorona size={1.35} color={color || SEAT_COLORS[seat]} seed={seat} />}
     </Spinner>
   );
 }

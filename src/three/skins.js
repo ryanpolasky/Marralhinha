@@ -12,7 +12,7 @@ const cached = (key, build) => {
   return cache.get(key);
 };
 
-const mix = (a, b, t) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
+export const mix = (a, b, t) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
 const TAU = Math.PI * 2;
 
 function wavyLine(ctx, { y0, amp, k, phase, width, color, alpha = 1, w = 512 }) {
@@ -835,7 +835,7 @@ const MARBLES = {
             vec2 cells = solCells(warped, uTime * 0.9);
             float gran = (1.0 - smoothstep(0.1, 0.95, cells.x)) * smoothstep(0.0, 0.4, cells.y - cells.x);
             float fine = mix(solNoise(q * 34.0 + uTime * 0.4), 0.5, smoothstep(0.3, 0.9, length(fwidth(q * 34.0))));
-            gran = mix(gran, 0.3, far);
+            gran = mix(gran, 0.62, far);
             gran = 0.5 + 0.5 * gran * (0.8 + 0.4 * fine);
             float belt = 1.0 - smoothstep(0.12, 0.3, abs(abs(p.y) - 0.32));
             float region = solFbm(q * 3.2 + 7.3);
@@ -845,13 +845,13 @@ const MARBLES = {
             vec3 flareAt = normalize(vec3(0.55, 0.33, 0.77));
             float flare = exp(-dot(q - flareAt, q - flareAt) / 0.012) * uFlare;
             float facing = max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
-            float limb = 0.3 + 0.7 * pow(facing, 0.9);
-            float heat = gran * (0.55 + 0.75 * convect);
+            float limb = mix(0.3 + 0.7 * pow(facing, 0.9), 0.12 + 0.88 * pow(facing, 0.7), far);
+            float heat = gran * mix(0.55 + 0.75 * convect, 0.2 + 1.3 * convect, far);
             heat = heat * (1.0 - penumbra * 0.45 - umbra * 0.5) + faculae * 0.18 + flare * 0.9;
             heat *= limb;
             vec3 col = mix(uCool, uMid, smoothstep(0.1, 0.6, heat));
             col = mix(col, uHot, smoothstep(0.85, 1.2, heat));
-            float rim = pow(1.0 - facing, 3.5);
+            float rim = pow(1.0 - facing, 3.5) * (1.0 - 0.75 * far);
             float licks = mix(solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0)), 0.5, far);
             diffuseColor.rgb = col * 0.08;
             totalEmissiveRadiance = col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8);
@@ -862,9 +862,9 @@ const MARBLES = {
       color: '#ffffff',
       emissive: '#ffffff',
       emissiveIntensity: 1,
-      roughness: 0.4,
-      clearcoat: 0.4,
-      clearcoatRoughness: 0.15,
+      roughness: 0.55,
+      envMapIntensity: 0.15,
+      specularIntensity: 0.3,
       onBeforeCompile,
       customProgramCacheKey: () => 'marble-sol-star',
       animate: (m, t) => {
@@ -1236,7 +1236,7 @@ export function marbleSkin(itemId, seat, color = null) {
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 
