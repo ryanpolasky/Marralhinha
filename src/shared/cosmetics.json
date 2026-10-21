@@ -68,7 +68,7 @@
     { "id": "marble.beta", "slot": "marble", "name": "Prototype", "rarity": "exclusive", "tag": "beta", "desc": "Straight off the drawing board. A scanner keeps checking its tolerances." },
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
-    { "id": "marble.lucky", "slot": "marble", "name": "Four-Leaf", "rarity": "exclusive", "tag": "lucky", "desc": "A gold four-leaf clover suspended in your color of glass, like a lucky paperweight. Part of the Luckiest set." },
+    { "id": "marble.lucky", "slot": "marble", "name": "Molten", "rarity": "exclusive", "tag": "lucky", "desc": "Rivers of molten gold flowing through your color of glass. Part of the Luckiest set." },
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
@@ -97,7 +97,7 @@
     { "id": "board.dev", "slot": "board", "name": "Event Horizon", "rarity": "exclusive", "tag": "dev", "desc": "A black hole where the center hole used to be. The whole table is falling in, slowly." },
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
     { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "ants", "unobtainable": true, "desc": "Ants (ants)", "note": "A custom request from the first person to buy the Supporter Pack." },
-    { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer laid with gold filigree, glittering like a jackpot. Part of the Luckiest set." },
+    { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer under a gold art-deco sunburst that pulses with light. Part of the Luckiest set." },
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },

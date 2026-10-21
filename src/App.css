@@ -11098,17 +11098,19 @@ body {
 
 .thumb-marble.skin-lucky {
   background: radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85) 0 5%, transparent 16%),
-    radial-gradient(circle at 41% 41%, #ffe08a 0 9%, transparent 10%), radial-gradient(circle at 59% 41%, #ffd166 0 9%, transparent 10%),
-    radial-gradient(circle at 41% 59%, #f0b93a 0 9%, transparent 10%), radial-gradient(circle at 59% 59%, #e0a42a 0 9%, transparent 10%),
-    radial-gradient(circle at 50% 50%, #c48a1c 0 5%, transparent 6%),
+    radial-gradient(ellipse 34% 14% at 36% 44%, transparent 0 58%, #ffe08a 64% 78%, transparent 84%),
+    radial-gradient(ellipse 30% 16% at 66% 62%, transparent 0 56%, #f2c14e 62% 78%, transparent 84%),
+    radial-gradient(ellipse 22% 11% at 52% 24%, transparent 0 52%, #e0a42a 60% 80%, transparent 88%),
+    radial-gradient(ellipse 18% 10% at 40% 76%, transparent 0 50%, #f0b93a 58% 80%, transparent 90%),
     radial-gradient(circle at 54% 56%, var(--seat-light), var(--seat) 50%, var(--seat-dark) 92%);
   box-shadow: inset -7px -9px 14px rgba(0, 0, 0, 0.45), inset 4px 4px 11px rgba(255, 255, 255, 0.35), 0 0 14px rgba(255, 209, 102, 0.5);
   animation: lucky-shine 2.2s ease-in-out infinite;
 }
 .thumb-board.skin-lucky {
-  background: radial-gradient(circle at 22% 28%, #fff 0 1px, transparent 2px), radial-gradient(circle at 72% 64%, #fff 0 1px, transparent 2px), radial-gradient(circle at 60% 22%, #fff3b8 0 1px, transparent 2px),
-    repeating-conic-gradient(from 45deg at 50% 50%, rgba(240, 185, 58, 0.55) 0 4deg, transparent 4deg 45deg),
-    radial-gradient(circle at 50% 50%, #f0b93a 0 8%, #13854d 10%, #0a5a33 55%, #04301a);
+  background: radial-gradient(circle at 50% 50%, #f0b93a 0 9%, transparent 10% 14%, #f0b93a 14% 16%, transparent 17%),
+    repeating-conic-gradient(from 43deg at 50% 50%, rgba(242, 193, 78, 0.9) 0 4deg, transparent 4deg 90deg),
+    radial-gradient(circle at 50% 50%, #0f6b3c 0, #07442a 55%, #032216);
+  box-shadow: inset 0 0 0 2px #f0b93a;
   filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.55));
   animation: lucky-shine 2.6s ease-in-out infinite;
 }

@@ -1016,107 +1016,45 @@ const MARBLES = {
       animate: (m, t) => { uniforms.uTide.value = reducedMotion?.matches ? 0 : t + seat * 1.7; } };
   },
   lucky: (c, seat) => {
-    const [canvas, ctx] = makeCanvas(512, 256);
-    const rand = seeded(777 + seat);
-    const glass = ctx.createLinearGradient(0, 0, 0, 256);
-    glass.addColorStop(0, mix(c.dark, '#000000', 0.25));
-    glass.addColorStop(0.5, mix(c.main, c.light, 0.25));
-    glass.addColorStop(1, mix(c.dark, '#000000', 0.25));
-    ctx.fillStyle = glass;
-    ctx.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 70; i++) {
-      const x = rand() * 512;
-      const y = 40 + rand() * 176;
-      const r = 0.8 + rand() * 2.2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, TAU);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillRect(x - r * 0.4, y - r * 0.4, 0.8, 0.8);
-    }
-    const uniforms = { uGlint: { value: 0 } };
+    const W = 512;
+    const H = 256;
+    const [canvas, ctx] = makeCanvas(W, H);
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const glass = ctx.createLinearGradient(0, 0, 0, H);
+    glass.addColorStop(0, mix(c.dark, '#000000', 0.3));
+    glass.addColorStop(0.5, c.main);
+    glass.addColorStop(1, mix(c.dark, '#000000', 0.3));
+    ctx.fillStyle = glass;
+    ctx.fillRect(0, 0, W, H);
+    const uniforms = { uTime: { value: 0 } };
     const onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vLkPos;\nvarying vec3 vLkCam;')
-        .replace('#include <begin_vertex>', `#include <begin_vertex>
-          mat4 lkModel = modelMatrix;
-          #ifdef USE_INSTANCING
-            lkModel = modelMatrix * instanceMatrix;
-          #endif
-          vLkPos = position;
-          vLkCam = (inverse(lkModel) * vec4(cameraPosition, 1.0)).xyz;`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>
-          uniform float uGlint;
-          varying vec3 vLkPos;
-          varying vec3 vLkCam;
-          float lkLeaf(vec2 q, float a) {
-            vec2 dir = vec2(cos(a), sin(a));
-            vec2 side = vec2(-dir.y, dir.x);
-            float lobes = min(length(q - dir * 0.2 - side * 0.068), length(q - dir * 0.2 + side * 0.068)) - 0.1;
-            vec2 lq = vec2(dot(q, dir), abs(dot(q, side)));
-            float wedge = max(lq.y - lq.x * 0.75, max(-lq.x, lq.x - 0.22));
-            return min(lobes, wedge);
-          }
-          float lkClover(vec2 q, out float vein) {
-            float d = 1e3;
-            vein = 1e3;
-            for (int i = 0; i < 4; i++) {
-              float a = 0.785398 + float(i) * 1.570796;
-              d = min(d, lkLeaf(q, a));
-              vec2 dir = vec2(cos(a), sin(a));
-              float t = clamp(dot(q, dir), 0.0, 0.26);
-              vein = min(vein, length(q - dir * t));
-            }
-            vec2 sq = q - vec2(0.0, -0.05);
-            float bend = sq.x - 0.12 * sq.y * sq.y;
-            float stem = max(abs(bend) - 0.026, max(sq.y + 0.46, -sq.y));
-            return min(min(d, stem), length(q) - 0.09);
-          }`)
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\n${SKIN_NOISE_GLSL}`)
         .replace('#include <map_fragment>', `#include <map_fragment>
-          float lkMask = 0.0;
-          float lkShade = 0.0;
-          float lkVein = 0.0;
+          float mgMask = 0.0;
+          float mgShade = 0.0;
           {
-            float R = length(vLkPos);
-            vec3 n = vLkPos / R;
-            vec3 rd = refract(normalize(vLkPos - vLkCam), n, 1.0 / 1.45);
-            vec3 pn = normalize(vLkCam);
-            float denom = dot(rd, pn);
-            if (denom < -0.0001) {
-              vec3 hit = vLkPos + rd * (-dot(vLkPos, pn) / denom);
-              vec3 up = abs(pn.y) > 0.95 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
-              vec3 u = normalize(cross(up, pn));
-              vec3 v = cross(pn, u);
-              vec2 q = vec2(dot(hit, u), dot(hit, v)) / R * 0.95;
-              float vein;
-              float d = lkClover(q, vein);
-              float aa = fwidth(d) * 1.2 + 0.004;
-              lkMask = 1.0 - smoothstep(-aa, aa, d);
-              lkShade = smoothstep(0.0, 0.07, -d);
-              lkVein = (1.0 - smoothstep(0.003, 0.009, vein)) * 0.6;
-            }
+            float a = vMapUv.x * 6.2831;
+            float b = vMapUv.y * 3.14159;
+            vec3 q = vec3(cos(a) * sin(b), sin(a) * sin(b), cos(b)) * 2.2;
+            float n = skNoise3(q + vec3(0.0, 0.0, uTime * 0.25)) * 2.0 - 1.0 + (skNoise3(q * 2.3 - vec3(uTime * 0.2, 0.0, uTime * 0.1)) - 0.5);
+            float band = min(abs(n), abs(abs(n) - 0.7));
+            mgMask = 1.0 - smoothstep(0.05, 0.12, band);
+            mgShade = 1.0 - smoothstep(0.0, 0.07, band);
           }
-          vec3 lkGold = mix(vec3(0.42, 0.22, 0.02), vec3(1.0, 0.74, 0.18), lkShade) * (1.0 - lkVein * 0.5);
-          diffuseColor.rgb = mix(diffuseColor.rgb, lkGold, lkMask);`)
-        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.85, lkMask);')
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, lkMask);')
+          vec3 mgGold = mix(vec3(0.45, 0.24, 0.03), vec3(1.0, 0.8, 0.3), mgShade);
+          diffuseColor.rgb = mix(diffuseColor.rgb, mgGold, mgMask);`)
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.9, mgMask);')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.25, mgMask);')
         .replace('#include <emissivemap_fragment>', `{
-          vec2 uv = vMapUv;
-          float sweep = pow(max(sin(uv.x * 12.566 + uv.y * 4.0 - uGlint * 1.6), 0.0), 14.0);
-          float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.6);
-          float glint = 0.5 + 0.5 * sin(uGlint * 2.2);
-          totalEmissiveRadiance = vec3(1.0, 0.7, 0.2) * lkMask * (0.1 + 0.25 * glint * lkShade + sweep * 0.9) * (1.0 - lkVein * 0.6)
-            + vec3(1.0, 0.9, 0.6) * (rim * 0.22 + sweep * 0.1);
+          float sweep = pow(max(sin(vMapUv.x * 12.566 - uTime * 1.3), 0.0), 10.0);
+          totalEmissiveRadiance = vec3(1.0, 0.72, 0.25) * mgMask * (0.12 + 0.35 * mgShade + sweep * 0.7);
         }`);
     };
-    return { map: finishMarble(canvas), emissive: '#ffffff', emissiveIntensity: 1, roughness: 0.05, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03,
-      onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-clover',
-      animate: (m, t) => { uniforms.uGlint.value = reducedMotion?.matches ? 0 : t + seat * 1.3; } };
+    return { map: finishMarble(canvas), emissive: '#ffffff', emissiveIntensity: 1, roughness: 0.06, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03,
+      onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-molten',
+      animate: (m, t) => { uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 2.1; } };
   },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
   halloween: (c, seat) => {
@@ -1997,60 +1935,136 @@ function deckFeltCanvas() {
   return canvas;
 }
 
-function highRollerCanvases() {
-  const [base, bctx] = makeCanvas(1024, 1024);
-  const [glow, gctx] = makeCanvas(1024, 1024);
-  const rand = seeded(777);
-  const g = bctx.createRadialGradient(512, 512, 60, 512, 512, 720);
-  g.addColorStop(0, '#13854d');
-  g.addColorStop(0.6, '#0a5a33');
-  g.addColorStop(1, '#04301a');
-  bctx.fillStyle = g;
-  bctx.fillRect(0, 0, 1024, 1024);
-  gctx.fillStyle = '#000';
-  gctx.fillRect(0, 0, 1024, 1024);
-  const T = 256;
-  for (let ty = 0; ty < 4; ty++) {
-    for (let tx = 0; tx < 4; tx++) {
-      for (const [ctx, color, width, alpha] of [[bctx, '#e9b94a', 5, 0.9], [gctx, '#ffcf5a', 3, 0.6]]) {
-        ctx.save();
-        ctx.translate(tx * T + T / 2, ty * T + T / 2);
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        for (let k = 0; k < 4; k++) {
-          ctx.rotate(Math.PI / 2);
-          ctx.beginPath();
-          ctx.moveTo(0, -18);
-          ctx.bezierCurveTo(40, -40, 50, -90, 0, -110);
-          ctx.bezierCurveTo(-50, -90, -40, -40, 0, -18);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(-T / 2, -T / 2, 46, 0, Math.PI / 2);
-          ctx.stroke();
-        }
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, TAU);
-        ctx.stroke();
-        ctx.restore();
-      }
+function goldRails(ctx, W, L, inset, radius) {
+  [[inset, '#6e4a0c', 0.12], [inset, '#f2c14e', 0.065], [inset + 0.012, 'rgba(255,245,200,0.8)', 0.012], [inset + 0.26, '#d9a73a', 0.022]].forEach(([d, stroke, width]) => {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    roundedCross(W - d, L - d, radius).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.stroke();
+  });
+}
+
+function decoBoardCanvas(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(1929);
+  const lac = ctx.createRadialGradient(C, C, 40, C, C, S * 0.75);
+  lac.addColorStop(0, '#0f6b3c');
+  lac.addColorStop(0.55, '#07442a');
+  lac.addColorStop(1, '#032216');
+  ctx.fillStyle = lac;
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 40; i++) {
+    ctx.strokeStyle = `rgba(120,230,170,${0.03 + rand() * 0.05})`;
+    ctx.lineWidth = 1 + rand() * 3;
+    ctx.beginPath();
+    let x = rand() * S;
+    let y = rand() * S;
+    ctx.moveTo(x, y);
+    for (let n = 0; n < 6; n++) {
+      x += (rand() - 0.5) * 300;
+      y += (rand() - 0.5) * 300;
+      ctx.lineTo(x, y);
     }
+    ctx.stroke();
   }
-  bctx.globalAlpha = 1;
-  gctx.globalAlpha = 1;
-  for (let i = 0; i < 5200; i++) {
-    const x = rand() * 1024;
-    const y = rand() * 1024;
-    const s = 0.8 + rand() * 1.8;
-    const bright = rand();
-    bctx.fillStyle = bright > 0.75 ? 'rgba(255,248,214,0.8)' : `rgba(255,209,102,${0.12 + rand() * 0.3})`;
-    bctx.fillRect(x, y, s, s);
-    if (bright > 0.75) {
-      gctx.fillStyle = '#fff3c0';
-      gctx.fillRect(x, y, s, s);
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  ctx.setTransform(k, 0, 0, k, C, C);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  goldRails(ctx, W, L, 0.28, 0.45);
+  ctx.strokeStyle = '#f2c14e';
+  for (let q = 0; q < 4; q++) {
+    const base = Math.PI / 4 + (q * Math.PI) / 2;
+    for (let i = -3; i <= 3; i++) {
+      const a = base + i * 0.075;
+      const r1 = 0.75 + Math.abs(i) * 0.1;
+      const r2 = 3.55 - Math.abs(i) * 0.5;
+      ctx.lineWidth = i === 0 ? 0.05 : 0.025;
+      ctx.globalAlpha = 1 - Math.abs(i) * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+      ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+      ctx.stroke();
     }
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.rotate(base);
+    ctx.translate(3.65, 0);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#f2c14e';
+    ctx.fillRect(-0.17, -0.17, 0.34, 0.34);
+    ctx.fillStyle = '#073d22';
+    ctx.fillRect(-0.08, -0.08, 0.16, 0.16);
+    ctx.restore();
   }
-  return [base, glow];
+  [0.62, 0.74].forEach((r, i) => {
+    ctx.lineWidth = i ? 0.02 : 0.045;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.stroke();
+  });
+  for (let q = 0; q < 4; q++) {
+    ctx.save();
+    ctx.rotate((q * Math.PI) / 2);
+    [L - 1.0, L - 1.35, L - 1.7].forEach((x, i) => {
+      ctx.lineWidth = 0.035 - i * 0.008;
+      ctx.beginPath();
+      ctx.moveTo(x - 0.55, -W + 0.55);
+      ctx.lineTo(x, -W + 1.1);
+      ctx.moveTo(x - 0.55, W - 0.55);
+      ctx.lineTo(x, W - 1.1);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+  for (let i = 0; i < 500; i++) {
+    const x = (rand() - 0.5) * 2 * L;
+    const y = (rand() - 0.5) * 2 * L;
+    ctx.fillStyle = `rgba(255,236,170,${0.2 + rand() * 0.6})`;
+    ctx.fillRect(x, y, 0.015 + rand() * 0.025, 0.015 + rand() * 0.025);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+function decoSideCanvas() {
+  const S = 1024;
+  const H = 84;
+  const [canvas, ctx] = makeCanvas(S, H);
+  const lac = ctx.createLinearGradient(0, 0, 0, H);
+  lac.addColorStop(0, '#0b4d2c');
+  lac.addColorStop(1, '#042a18');
+  ctx.fillStyle = lac;
+  ctx.fillRect(0, 0, S, H);
+  ctx.fillStyle = '#f2c14e';
+  ctx.fillRect(0, 0, S, 5);
+  ctx.fillRect(0, H - 6, S, 6);
+  ctx.fillStyle = '#8a5f12';
+  ctx.fillRect(0, 5, S, 2);
+  ctx.fillRect(0, H - 8, S, 2);
+  ctx.strokeStyle = '#f2c14e';
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  for (let x = 0; x < S; x += 64) {
+    ctx.beginPath();
+    ctx.moveTo(x + 8, H - 16);
+    ctx.lineTo(x + 32, 18);
+    ctx.lineTo(x + 56, H - 16);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 18, H - 16);
+    ctx.lineTo(x + 32, 34);
+    ctx.lineTo(x + 46, H - 16);
+    ctx.stroke();
+    ctx.fillStyle = '#f2c14e';
+    ctx.fillRect(x - 3, H / 2 - 3, 6, 6);
+  }
+  return canvas;
 }
 
 function auroraCanvases() {
@@ -4581,6 +4595,22 @@ const PICNIC_BLANKET_SHADER = `{
   diffuseColor.rgb *= 1.0 - 0.12 * min(crease, 1.5) + 0.05 * min(shine, 1.0);
 }`;
 
+const LUCKY_SHADER = `{
+  vec2 p = vSkinPos.xz;
+  float t = uSkinTime;
+  float top = smoothstep(0.6, 0.95, vSkinTop);
+  if (vSkinTop < 0.95) diffuseColor.rgb = texture2D(uSide, vec2((vSkinPos.x + vSkinPos.z) / 16.0, 1.0 + vSkinPos.y / 0.66)).rgb;
+  float gold = smoothstep(0.06, 0.22, diffuseColor.r - diffuseColor.g) * step(0.3, diffuseColor.r);
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+  float h = fract(sin(dot(floor(p * 9.0), vec2(127.1, 311.7))) * 43758.5);
+  float twinkle = pow(max(sin(t * 2.5 + h * 6.2831), 0.0), 18.0) * step(0.9, h);
+  float a = pow(max(sin(r * 2.2 - t * 2.4), 0.0), 8.0) * 0.9 + pow(max(cos(ang - t * 0.7), 0.0), 20.0) * 0.7;
+  float sideGlint = (1.0 - top) * pow(max(sin((vSkinPos.x + vSkinPos.z) * 0.8 - t * 1.5), 0.0), 10.0);
+  vec3 goldC = vec3(1.0, 0.78, 0.3);
+  totalEmissiveRadiance += goldC * (top * (gold * (a + twinkle) * 0.9 + twinkle * 0.3) + gold * sideGlint * 0.6);
+}`;
+
 const SPECIAL_BOARDS = {
   // An oak deck with a log rim, stump trays with bark sides, and a crafting table in the middle.
   // Outer walls get bark; hole walls carry the planks down into the divots
@@ -4681,10 +4711,14 @@ const SPECIAL_BOARDS = {
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
   },
   pool: (layout) => ({ canvas: poolBoard(layout), repeat: BOARD_R, roughness: 0.3, clearcoat: 0.5, side: '#e4eef0', dish: '#d9e7ea', feltCanvas: deckFeltCanvas(), cup: '#1d5f86', accent: { color: '#dfe6ec', metalness: 1, roughness: 0.2 } }),
-  lucky: () => {
-    const [base, glow] = highRollerCanvases();
-    return { canvas: base, glowCanvas: glow, glowIntensity: 0.8, repeat: 0.06, roughness: 0.16, clearcoat: 1, dish: '#0a5a33', felt: '#04301a', cup: '#021a0e', core: '#f0b93a', accent: { color: '#f0b93a', metalness: 1, roughness: 0.2, emissive: '#c48a1c', emissiveIntensity: 0.25 } };
-  },
+  lucky: (layout) => ({
+    canvas: decoBoardCanvas(layout), repeat: BOARD_R, roughness: 0.42, clearcoat: 0.6, params: { specularIntensity: 0.35, clearcoatRoughness: 0.35 },
+    dish: '#07442a', felt: '#04301a', cup: '#021a0e', core: '#f0b93a',
+    accent: { color: '#f0b93a', metalness: 1, roughness: 0.2, emissive: '#c48a1c', emissiveIntensity: 0.2 },
+    shaderCommon: 'uniform sampler2D uSide;',
+    uniforms: { uSide: { value: finish(decoSideCanvas()) } },
+    shader: LUCKY_SHADER,
+  }),
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -4754,7 +4788,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
