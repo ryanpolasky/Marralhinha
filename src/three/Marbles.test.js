@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { planMove } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle, devTintSat } from './skins';
 import { layoutFor } from '../game/geometry';
-import { ITEMS } from '../game/catalog';
+import { ITEMS, rarityOf } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
 import { KILL_FX, DEV_RED } from './killfx';
 import { TRAILS } from './trails';
@@ -185,10 +185,11 @@ test('Minecraft materials are distinct, pixel filtered, and motion safe on both 
   }
 });
 
-test('the Minecraft set registers all six mythic slots without paid entitlements', () => {
+test('the Voxel set registers all six mythic slots without paid entitlements', () => {
   const set = Object.values(ITEMS).filter((item) => item.id.endsWith('.minecraft'));
   expect(set.map((item) => item.slot).sort()).toEqual(['board', 'dice', 'fx', 'marble', 'nameplate', 'trail']);
-  expect(set.every((item) => item.rarity === 'mythic' && !item.tag)).toBe(true);
+  expect(set.every((item) => item.rarity === 'mythic' && item.set === 'voxel' && !item.tag)).toBe(true);
+  expect(rarityOf(set[0]).label).toBe('Voxel set');
 });
 
 test.each(['classic', 'blitz'])('Minecraft scenery keeps every block off the %s board, trays, and die spots', (variant) => {

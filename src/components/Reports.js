@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, post } from '../net/api';
-import { CURRENCY, BOXES, ITEMS } from '../game/catalog';
+import { CURRENCY, BOXES, ITEMS, SETS } from '../game/catalog';
 import { sfx } from '../game/sound';
 import { Coin, TagBadge } from './Economy';
 import { Bug, Close } from './Icons';
@@ -145,8 +145,9 @@ export function RepliesModal({ replies: incoming, onClose, onClaim }) {
     try {
       if (r.gift) {
         const res = await post(`/reports/${r.id}/claim`);
-        const got = res.result?.item ? ITEMS[res.result.item]?.name : giftLabel(r.gift);
-        setResults((m) => ({ ...m, [r.id]: res.result?.duplicate ? `${got} (dupe, refunded ${res.result.refund} ${CURRENCY})` : `Claimed ${got}!` }));
+        const got = res.result?.set ? `the ${SETS[res.result.set].name} set` : res.result?.item ? ITEMS[res.result.item]?.name : giftLabel(r.gift);
+        const note = res.result?.duplicate ? `${got} (dupe, refunded ${res.result.refund} ${CURRENCY})` : res.result?.refund ? `Claimed ${got}! (+${res.result.refund} ${CURRENCY} for pieces you had)` : `Claimed ${got}!`;
+        setResults((m) => ({ ...m, [r.id]: note }));
         sfx.coins();
         onClaim?.(res.profile);
       } else {

@@ -13,6 +13,8 @@ export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slo
 export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
 const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag);
+export const SETS = Object.fromEntries(Object.entries(catalog.sets || {}).map(([key, set]) => [key, { ...set, key, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }]));
+export const unobtainable = (item, now = Date.now()) => ['dev', 'beta'].includes(item.tag) || (item.tag === 'halloween' && new Date(now).getUTCMonth() !== 9);
 
 export const itemsForSlot = (slot) =>
   catalog.items.filter((item) => item.slot === slot).sort((a, b) => LOCKER_ORDER.indexOf(a.tag || a.rarity) - LOCKER_ORDER.indexOf(b.tag || b.rarity));
@@ -20,6 +22,7 @@ export const itemsForSlot = (slot) =>
 // Tag-exclusive items borrow their tag's color and label ("Dev exclusive") instead of the generic rarity
 export const rarityOf = (item) => {
   const base = RARITIES[item.rarity];
+  if (item.set) return { ...base, label: `${SETS[item.set].name} set`, short: SETS[item.set].name };
   if (!item.tag) return base;
   const tag = TAGS[item.tag];
   if (item.id === 'dice.lucky') return { ...base, label: 'Reign reward', short: 'Reign reward', color: tag.color };

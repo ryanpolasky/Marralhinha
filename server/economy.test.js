@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { openDb } = require('./db');
 const { Accounts, levelInfo } = require('./accounts');
 const { Economy, featuredFor, utcDay } = require('./economy');
-const { catalog, BOXES, REWARDS } = require('./catalog');
+const { catalog, ITEMS, BOXES, SETS, REWARDS } = require('./catalog');
 
 function setup() {
   const db = openDb(':memory:');
@@ -75,6 +75,43 @@ test('boxes cost coins, drop items, refund duplicates and honor pity', () => {
 
   const gold = economy.openBox(id, 'box.gold', alwaysFirst);
   assert.notEqual(gold.rarity, 'common', 'gold box never drops commons');
+});
+
+test('mythic means a whole set: every set covers all six slots and nothing else is mythic', () => {
+  assert.deepEqual(SETS.map((s) => s.name), ['Arcade', 'Voxel', 'Bombsite']);
+  for (const set of SETS) assert.deepEqual(set.items.map((id) => ITEMS.get(id).slot).sort(), ['board', 'dice', 'fx', 'marble', 'nameplate', 'trail']);
+  assert.ok(catalog.items.filter((i) => i.rarity === 'mythic').every((i) => i.set));
+  assert.ok(catalog.items.filter((i) => i.set).every((i) => i.rarity === 'mythic'));
+});
+
+test('mythic chest hits grant whole sets, fill gaps, refund pieces you had, and never come from pity', () => {
+  const { accounts, economy } = setup();
+  const { id } = accounts.createUser({ name: 'A' });
+  const gold = BOXES.get('box.gold');
+  economy.credit(id, gold.price * 50, 'test');
+  const mythicRoll = (n) => (n > 1000 ? n - 1 : 0);
+  const dupe = catalog.rarities.mythic.dupe;
+  accounts.grantItem(id, SETS[0].items[0]);
+
+  const first = economy.openBox(id, 'box.gold', mythicRoll);
+  assert.equal(first.set, SETS[0].key);
+  assert.deepEqual(first.items, SETS[0].items);
+  assert.deepEqual(first.owned, [SETS[0].items[0]]);
+  assert.equal(first.refund, dupe);
+  assert.equal(first.duplicate, false);
+  assert.ok(first.items.every((item) => accounts.owns(id, item)));
+
+  assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, SETS[1].key, 'completed sets are skipped');
+  assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, SETS[2].key);
+  const before = accounts.getUser(id).coins;
+  const full = economy.openBox(id, 'box.gold', mythicRoll);
+  assert.equal(full.duplicate, true);
+  assert.equal(full.refund, SETS[0].items.length * dupe);
+  assert.equal(accounts.getUser(id).coins, before - gold.price + full.refund);
+
+  const pity = economy.openBox(id, 'box.gold', mythicRoll);
+  assert.equal(pity.rarity, 'legendary', 'set pulls do not reset pity, and pity never lands on mythic');
+  assert.ok(pity.item);
 });
 
 test('match rewards: full for human games, halved and capped for bot games', () => {
@@ -183,6 +220,7 @@ test('featured shop is deterministic per day and purchasable once', () => {
   assert.deepEqual(featured, featuredFor(day));
   assert.equal(featured.length, catalog.featured.count);
   assert.ok(featured.some((f) => ['epic', 'legendary'].includes(catalog.items.find((i) => i.id === f.id).rarity)));
+  for (let d = 0; d < 120; d++) assert.ok(featuredFor(utcDay(Date.parse('2026-01-01T00:00:00Z') + d * 86400000)).every((f) => !ITEMS.get(f.id).set), 'set pieces never hit the featured shop');
 
   const { id } = accounts.createUser({ name: 'A' });
   const now = Date.parse('2026-03-03T10:00:00Z');

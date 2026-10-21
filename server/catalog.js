@@ -14,5 +14,6 @@ const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !i
 const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 const itemsOfRarity = (rarity) => DROPPABLE.filter((item) => item.rarity === rarity);
+const SETS = Object.entries(catalog.sets || {}).map(([key, set]) => ({ key, name: set.name, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }));
 
-module.exports = { catalog, ITEMS, BOXES, SLOTS, DEFAULTS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS, DROPPABLE, RARITY_ORDER, itemsOfRarity, REWARDS: catalog.rewards };
+module.exports = { catalog, ITEMS, BOXES, SLOTS, DEFAULTS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS, DROPPABLE, RARITY_ORDER, itemsOfRarity, SETS, REWARDS: catalog.rewards };

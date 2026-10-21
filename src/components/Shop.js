@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BOXES, ITEMS, RARITIES, CURRENCY, catalog, canUse } from '../game/catalog';
+import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
@@ -152,9 +152,35 @@ export function BoxArt({ box, shaking = false, glow }) {
   );
 }
 
-function BoxOpening({ opening, account, onAgain, onEquip, onDone }) {
+function SetReveal({ result, account }) {
+  const set = SETS[result.set];
+  const [focus, setFocus] = useState(() => result.items.find((id) => ITEMS[id].slot === 'board') || result.items[0]);
+  const fresh = result.items.filter((id) => !result.owned.includes(id));
+  return (
+    <>
+      <RarityTag item={ITEMS[focus]} />
+      <PreviewStage itemId={focus} playerName={account.name} />
+      <h2 className="reveal-name">{set.name} set</h2>
+      <p className="reveal-desc">{result.duplicate ? 'You already had every piece.' : fresh.length === result.items.length ? 'Every piece, all at once.' : `${fresh.length} new pieces to finish the set.`}</p>
+      <div className="reveal-set-grid">
+        {result.items.map((id) => (
+          <ItemCard key={id} itemId={id} selected={focus === id} onClick={() => setFocus(id)} footer={<span className={`set-piece-state${fresh.includes(id) ? '' : ' dupe'}`}>{fresh.includes(id) ? 'NEW' : 'Had it'}</span>} />
+        ))}
+      </div>
+      {result.refund > 0 && (
+        <div className="reveal-dupe">
+          {result.duplicate ? 'Duplicate set!' : 'Pieces you had:'} converted to <Coins amount={result.refund} animate={false} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function BoxOpening({ opening, account, onAgain, onEquip, onEquipSet, onDone }) {
   const { box, phase, result } = opening;
   const item = result && ITEMS[result.item];
+  const isSet = !!result?.set;
+  const setWorn = isSet && result.items.every((id) => account.equipped[ITEMS[id].slot] === id);
   const rarity = result ? RARITIES[result.rarity] : null;
   const canAgain = account.coins >= box.price;
   const equipped = item && account.equipped[item.slot] === item.id;
@@ -167,7 +193,25 @@ function BoxOpening({ opening, account, onAgain, onEquip, onDone }) {
         </div>
       )}
       {phase === 'burst' && <div className="opening-flash" />}
-      {phase === 'reveal' && item && <div className="reveal-rays" />}
+      {phase === 'reveal' && (item || isSet) && <div className="reveal-rays" />}
+      {phase === 'reveal' && isSet && (
+        <div className="reveal-card reveal-set rarity-mythic">
+          <SetReveal key={result.set} result={result} account={account} />
+          <div className="row center">
+            {!result.duplicate && !setWorn && (
+              <button className="btn secondary" onClick={() => onEquipSet(result.items)}>
+                Equip set
+              </button>
+            )}
+            <button className="btn primary" disabled={!canAgain} onClick={onAgain}>
+              Open another <Coin size={16} /> {box.price}
+            </button>
+            <button className="btn ghost" onClick={onDone}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
       {phase === 'reveal' && item && (
         <div className={`reveal-card rarity-${result.rarity}`}>
           <RarityTag rarity={result.rarity} />
@@ -348,7 +392,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                         .filter(([, w]) => w > 0)
                         .map(([rarity, w]) => (
                           <li key={rarity}>
-                            <RarityTag rarity={rarity} /> <span>{w}%</span>
+                            <RarityTag rarity={rarity} /> <span>{rarity === 'mythic' ? `${w}% (full set)` : `${w}%`}</span>
                           </li>
                         ))}
                       <li className="muted small-text">Duplicates convert to {CURRENCY}.</li>
@@ -476,6 +520,10 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
           onAgain={() => openBox(opening.box)}
           onEquip={async (item) => {
             await onEquip(item.slot, item.id);
+            setOpening(null);
+          }}
+          onEquipSet={async (ids) => {
+            for (const id of ids) await onEquip(ITEMS[id].slot, id);
             setOpening(null);
           }}
           onDone={() => setOpening(null)}
