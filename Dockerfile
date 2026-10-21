@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY public ./public
 COPY src ./src
+COPY scripts ./scripts
 RUN npm run build
 
 FROM node:22-alpine
