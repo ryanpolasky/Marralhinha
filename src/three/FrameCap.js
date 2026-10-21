@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 
-const FRAME_MS = 1000 / 60;
-
-// ProMotion screens fire rAF at 120Hz; render at most 60 and not at all while paused
-export default function FrameCap({ paused = false }) {
+// ProMotion screens fire rAF at 120Hz; render at most `fps` (30 on phones) and not at all while paused
+export default function FrameCap({ paused = false, fps = 60 }) {
+  const frameMs = 1000 / fps;
   const advance = useThree((s) => s.advance);
   const size = useThree((s) => s.size);
   const time = useRef(0);
@@ -19,13 +18,13 @@ export default function FrameCap({ paused = false }) {
     const tick = (now) => {
       frame = requestAnimationFrame(tick);
       if (now < due) return;
-      due = Math.max(due + FRAME_MS, now + FRAME_MS - 4);
+      due = Math.max(due + frameMs, now + frameMs - 4);
       time.current += Math.min(Math.max(now - last, 0), 100) / 1000;
       last = now;
       advance(time.current);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [advance, paused, size]);
+  }, [advance, paused, size, frameMs]);
   return null;
 }

@@ -10,3 +10,8 @@ export const renderDpr = (q) => Math.min(window.devicePixelRatio || 1, q.dpr);
 
 // MSAA buys little once the canvas renders at 1.5x or more
 export const antialiasFor = (q) => q.msaa === 'always' || (q.msaa === 'low-dpr' && renderDpr(q) < 1.5);
+
+// Shader error checks force a sync wait on every program's first draw; prod gets the parallel compile instead
+export const tuneRenderer = ({ gl }) => {
+  if (process.env.NODE_ENV === 'production') gl.debug.checkShaderErrors = false;
+};
