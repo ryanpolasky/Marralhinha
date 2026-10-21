@@ -194,8 +194,9 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   }, [wheel, pick.t, elapsedAtMount]);
 
   const palette = game.colors || SEAT_COLORS;
-  const stops = contenders.map((s, i) => `${(palette[s] || SEAT_COLORS[s]).main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
-  const color = palette[pick.seat] || SEAT_COLORS[pick.seat];
+  const livePalette = useRainbow(contenders.map((s) => palette[s] || SEAT_COLORS[s]));
+  const stops = contenders.map((s, i) => `${livePalette[i].main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
+  const color = useRainbowColor(palette[pick.seat] || SEAT_COLORS[pick.seat]);
   const starter = nameOf(pick.seat);
   const boardSeat = game.boardSeat ?? pick.seat;
   const board = seats[boardSeat]?.cosmetics?.board;
@@ -211,7 +212,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
       <div className="start-card" style={{ '--seat': color.main, '--seat-light': color.light }}>
         <div className="start-kicker">{wheel ? (landed ? 'The wheel says' : 'Who starts?') : 'Champion starts'}</div>
         <div className="start-name">
-          <span className="marble-dot" />
+          <span className={`marble-dot${color.rainbow ? ' rainbow' : ''}`} />
           {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : 'Spinning…'}
         </div>
         {landed && <div className="start-sub">Playing on {boardSeat === mySeat ? 'your' : `${nameOf(boardSeat)}'s`} board{ITEMS[board] ? ` · ${ITEMS[board].name}` : ''}</div>}
