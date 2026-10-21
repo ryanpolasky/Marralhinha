@@ -30,3 +30,26 @@ test('caps a 120Hz screen at 60 by default and 30 on phones', () => {
   expect(framesAt(30)).toBeGreaterThanOrEqual(28);
   expect(framesAt(30)).toBeLessThanOrEqual(31);
 });
+
+test('a paused table renders a short burst when wake changes, then stops', () => {
+  mockAdvance.mockClear();
+  const queue = [];
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => queue.push(cb));
+  jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+  let now = 0;
+  jest.spyOn(performance, 'now').mockImplementation(() => now);
+  const { rerender, unmount } = render(<FrameCap paused wake="a" />);
+  expect(mockAdvance).toHaveBeenCalledTimes(1);
+  expect(queue).toHaveLength(0);
+  rerender(<FrameCap paused wake="b" />);
+  for (let i = 0; i < 240 && queue.length; i++) {
+    now += 1000 / 60;
+    queue.shift()(now);
+  }
+  const frames = mockAdvance.mock.calls.length;
+  expect(frames).toBeGreaterThan(60);
+  expect(frames).toBeLessThan(120);
+  expect(queue).toHaveLength(0);
+  unmount();
+  jest.restoreAllMocks();
+});
