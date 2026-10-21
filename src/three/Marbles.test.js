@@ -267,6 +267,31 @@ test('a singularity grows in, holds and collapses, and its disk stays nearly edg
   expect(e1.length()).toBeCloseTo(1);
 });
 
+test('Singularity disk wobbles hard but never flips face-on', () => {
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 34, 34);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const view = new THREE.Vector3();
+  camera.getWorldDirection(view);
+  const [n, e1, e2] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const swing = (wob) => {
+    let lo = 1;
+    let hi = -1;
+    for (let t = 0; t < 60; t += 0.1) {
+      diskFrame(camera, t, n, e1, e2, wob);
+      const d = n.dot(view);
+      lo = Math.min(lo, d);
+      hi = Math.max(hi, d);
+    }
+    return [lo, hi];
+  };
+  const [lo0, hi0] = swing(0);
+  const [lo, hi] = swing(1);
+  expect(hi - lo).toBeGreaterThan(2.5 * (hi0 - lo0));
+  expect(Math.max(-lo, hi)).toBeLessThan(0.7);
+});
+
 test('Accretion trail ripples without spawning holes, and the Supernova kill ends on a single vwomp', () => {
   const emit = jest.fn();
   const types = () => emit.mock.calls.map(([type]) => type);
