@@ -781,6 +781,8 @@ class Room {
     // Activity seats held by closed clients free up for the next round instead of staying locked
     const gone = (p) => p.standIn || (this.instanceId && !p.isBot && !p.connected);
     this.seats = this.seats.map((p) => (p && gone(p) ? null : p));
+    this.seats.forEach((p) => p && delete p.troll);
+    this.seatColors = [null, null, null, null];
     this.rematchVotes.clear();
     if (!this.hostPlayer()) {
       const next = this.seats.find((p) => p && !p.isBot && p.connected);
