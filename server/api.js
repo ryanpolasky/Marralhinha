@@ -191,6 +191,15 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
   }));
 
   router.post(
+    '/me/luckiest/claim',
+    auth,
+    handle((req) => {
+      const claim = accounts.claimLucky(req.user.id, String(req.body?.month ?? ''), req.body?.item ?? null);
+      return { claim, profile: changed(req.user.id) };
+    })
+  );
+
+  router.post(
     '/me/name',
     auth,
     handle((req) => {
@@ -380,6 +389,28 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     handle((req) => {
       const user = target(req);
       accounts.grantItem(user.id, String(req.body?.item || ''));
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/items/remove',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.revokeItem(user.id, String(req.body?.item || ''));
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/luckiest-picks',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.grantLuckyPick(user.id, req.body?.delta);
       return adminResult(user);
     })
   );

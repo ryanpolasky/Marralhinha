@@ -5,7 +5,7 @@ import { ItemThumb, Nameplate, TagBadges } from './Economy';
 import { StatGrid, MatchHistory, LuckiestPanel, MATCH_LIMIT } from './Stats';
 import { Close } from './Icons';
 
-export default function Profile({ account, onClose, onLocker, onReport, history }) {
+export default function Profile({ account, onClose, onLocker, onReport, onClaimLucky, history }) {
   const [matches, setMatches] = useState(history || null);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function Profile({ account, onClose, onLocker, onReport, history 
 
         <StatGrid stats={stats} />
 
-        <LuckiestPanel lucky={account.lucky} />
+        <LuckiestPanel lucky={account.lucky} onClaim={onClaimLucky} />
 
         <h3 className="profile-section">Match history <span className="muted small-text">(last {MATCH_LIMIT})</span></h3>
         <MatchHistory matches={matches} meId={account.id} />

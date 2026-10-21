@@ -229,6 +229,7 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
   const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState(500);
   const [item, setItem] = useState(DROPPABLE[0].id);
+  const [drop, setDrop] = useState('');
   const [name, setName] = useState(user.name);
   const [reason, setReason] = useState('');
   const [banIp, setBanIp] = useState(!user.discordLinked && !!user.lastIp);
@@ -261,6 +262,8 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
   };
 
   const grouped = useMemo(() => SLOT_KEYS.map((slot) => [slot, DROPPABLE.filter((i) => i.slot === slot)]), []);
+  const owned = SLOT_KEYS.map((slot) => [slot, (user.owned || []).filter((id) => ITEMS[id]?.slot === slot)]).filter(([, ids]) => ids.length);
+  const dropping = owned.some(([, ids]) => ids.includes(drop)) ? drop : owned[0]?.[1][0];
 
   return (
     <div className="admin-editor">
@@ -343,6 +346,43 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
           </button>
         </div>
         <p className="muted small-text">Dev and Beta cosmetics come with the tag, so hand those out with the toggles above.</p>
+      </div>
+
+      <div className="admin-section">
+        <h4>Remove an item</h4>
+        {dropping ? (
+          <div className="admin-row-inline">
+            <select className="admin-input grow" value={dropping} onChange={(e) => setDrop(e.target.value)} aria-label="Owned item">
+              {owned.map(([slot, ids]) => (
+                <optgroup key={slot} label={SLOTS[slot].label}>
+                  {ids.map((id) => (
+                    <option key={id} value={id}>
+                      {ITEMS[id].name} ({rarityOf(ITEMS[id]).label})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <button className="btn ghost" disabled={busy} onClick={() => act('/items/remove', { item: dropping }, `${ITEMS[dropping].name} taken from ${user.name}`)}>
+              Remove
+            </button>
+          </div>
+        ) : (
+          <p className="muted small-text">{user.name} doesn't own any items yet.</p>
+        )}
+      </div>
+
+      <div className="admin-section">
+        <h4>Luckiest picks {user.luckyPicks > 0 && <span className="badge">{user.luckyPicks} waiting</span>}</h4>
+        <div className="admin-row-inline">
+          <button className="btn secondary" disabled={busy} onClick={() => act('/luckiest-picks', { delta: 1 }, `${user.name} got a Luckiest pick`)}>
+            Grant a pick
+          </button>
+          <button className="btn ghost" disabled={busy || !user.luckyPicks} onClick={() => act('/luckiest-picks', { delta: -1 }, `Took a Luckiest pick back from ${user.name}`)}>
+            Take one back
+          </button>
+        </div>
+        <p className="muted small-text">They choose any Luckiest set piece they don't own yet, the same picker monthly winners get.</p>
       </div>
 
       <MergeAccounts user={user} me={me} onMerged={onMerged} notify={notify} />

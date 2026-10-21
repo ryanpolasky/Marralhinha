@@ -5,11 +5,18 @@ const { nameBlocked } = require('./namefilter');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
 const LUCKY_ITEM = 'dice.lucky';
-const LUCK_WINDOW_GAMES = 10;
-const LUCK_ACTIVITY_DAYS = 14;
+const LUCKY_SET = [...ITEMS.values()].filter((item) => item.tag === 'lucky').map((item) => item.id);
+const LUCK_MIN_ROLLS = 30;
 const LUCK_EXPECTED_SIX_RATE = 1 / 6;
-const GOLDEN_DIE_REQUIRED_SECONDS = 3 * 86400;
-const LUCK_ACTIVITY_MS = LUCK_ACTIVITY_DAYS * 86400000;
+const LUCKY_FULL_SET_COINS = 2500;
+const monthKey = (t) => new Date(t).toISOString().slice(0, 7);
+const monthStart = (key) => Date.parse(`${key}-01T00:00:00Z`);
+const shiftMonth = (key, by) => {
+  const d = new Date(monthStart(key));
+  d.setUTCMonth(d.getUTCMonth() + by);
+  return monthKey(d.getTime());
+};
+const monthName = (key) => new Date(monthStart(key)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 const SESSION_TOUCH_MS = 5 * 60 * 1000;
 const MAX_COIN_GRANT = 1000000;
@@ -91,18 +98,23 @@ class Accounts {
       getMeta: db.prepare('SELECT value FROM meta WHERE key = ?'),
       setMeta: db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
       luckiest: db.prepare('SELECT * FROM luckiest_reigns WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1'),
-      luckGames: db.prepare(`SELECT mp.roll_count AS rolls, mp.six_count AS sixes, m.ended_at AS endedAt
-        FROM match_players mp JOIN matches m ON m.id = mp.match_id
-        WHERE mp.user_id = ? AND mp.roll_count >= mp.six_count AND mp.six_count >= 0 AND m.ended_at <= ?
-        ORDER BY m.ended_at DESC, m.id DESC LIMIT ?`),
-      luckyCandidates: db.prepare(`SELECT DISTINCT mp.user_id AS id FROM match_players mp JOIN matches m ON m.id = mp.match_id
-        WHERE m.ended_at >= ? AND m.ended_at <= ? AND mp.roll_count >= mp.six_count AND mp.six_count >= 0`),
+      monthBest: db.prepare(`SELECT mp.user_id AS id, mp.match_id AS matchId, mp.roll_count AS rolls, mp.six_count AS sixes, m.ended_at AS endedAt
+        FROM match_players mp JOIN matches m ON m.id = mp.match_id JOIN users u ON u.id = mp.user_id
+        WHERE m.ended_at >= ? AND m.ended_at < ? AND mp.roll_count >= ? AND mp.six_count >= 0 AND mp.six_count <= mp.roll_count AND u.banned_at IS NULL AND (? IS NULL OR mp.user_id = ?)
+        ORDER BY mp.six_count * 1.0 / mp.roll_count DESC, m.ended_at ASC, m.id ASC LIMIT 1`),
+      addMonth: db.prepare('INSERT OR IGNORE INTO luckiest_months (month, player_id, match_id, rolls, sixes, settled_at) VALUES (?, ?, ?, ?, ?, ?)'),
+      monthsWon: db.prepare('SELECT COUNT(*) AS n FROM luckiest_months WHERE player_id = ?'),
+      pendingMonths: db.prepare('SELECT * FROM luckiest_months WHERE player_id = ? AND claimed_at IS NULL ORDER BY month'),
+      claimMonth: db.prepare('UPDATE luckiest_months SET claimed_item = ?, claimed_at = ? WHERE month = ? AND player_id = ? AND claimed_at IS NULL'),
+      moveMonths: db.prepare('UPDATE luckiest_months SET player_id = ? WHERE player_id = ?'),
+      removeItem: db.prepare('DELETE FROM inventory WHERE user_id = ? AND item_id = ?'),
+      lockDie: db.prepare('UPDATE users SET golden_die_unlocked = 0, golden_die_unlocked_at = NULL WHERE id = ?'),
+      addPicks: db.prepare('UPDATE users SET lucky_picks = MAX(0, lucky_picks + ?) WHERE id = ?'),
       endReign: db.prepare('UPDATE luckiest_reigns SET ended_at = ?, duration_seconds = ? WHERE id = ?'),
       addReign: db.prepare('INSERT INTO luckiest_reigns (player_id, started_at) VALUES (?, ?)'),
       reignTime: db.prepare('UPDATE users SET luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?) WHERE id = ?'),
       reignCount: db.prepare('UPDATE users SET luckiest_reign_count = luckiest_reign_count + 1 WHERE id = ?'),
       unlockDie: db.prepare('UPDATE users SET golden_die_unlocked = 1, golden_die_unlocked_at = ? WHERE id = ? AND golden_die_unlocked = 0'),
-      earnedDie: db.prepare('SELECT id FROM users WHERE luckiest_total_seconds >= ? AND golden_die_unlocked = 0'),
       moveInventory: db.prepare('INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?'),
       moveSessions: db.prepare('UPDATE sessions SET user_id = ? WHERE user_id = ?'),
       moveLedger: db.prepare('UPDATE ledger SET user_id = ? WHERE user_id = ?'),
@@ -218,80 +230,104 @@ class Accounts {
     return this.q.luckiest.get()?.player_id || null;
   }
 
-  luckWindow(userId, now = Date.now()) {
-    const games = this.q.luckGames.all(userId, now, LUCK_WINDOW_GAMES);
-    const rolls = games.reduce((sum, game) => sum + game.rolls, 0);
-    const sixes = games.reduce((sum, game) => sum + game.sixes, 0);
-    const eligible = games.length === LUCK_WINDOW_GAMES && games[0].endedAt >= now - LUCK_ACTIVITY_MS && rolls > 0;
-    const expected = rolls * LUCK_EXPECTED_SIX_RATE;
-    return { games: games.length, rolls, sixes, eligible, lastCompletedAt: games[0]?.endedAt ?? null, rate: rolls ? sixes / rolls : 0,
-      score: eligible ? (sixes - expected) / Math.sqrt(expected * (1 - LUCK_EXPECTED_SIX_RATE)) : null };
+  monthBest(key, userId = null) {
+    const next = shiftMonth(key, 1);
+    const row = this.q.monthBest.get(monthStart(key), monthStart(next), LUCK_MIN_ROLLS, userId, userId);
+    return row ? { ...row, rate: row.sixes / row.rolls } : null;
   }
 
-  // What the profile card needs to show progress towards the Luckiest tag
-  luckyStatus(user, now = Date.now()) {
-    const reign = this.q.luckiest.get();
-    const window = this.luckWindow(user.id, now);
-    const end = window.lastCompletedAt !== null ? Math.min(now, window.lastCompletedAt + LUCK_ACTIVITY_MS) : now;
-    const activeSeconds = reign?.player_id === user.id ? Math.max(0, Math.floor((end - reign.started_at) / 1000)) : 0;
-    const totalSeconds = user.luckiest_total_seconds + activeSeconds;
-    return { ...window, holder: reign?.player_id === user.id && window.eligible,
-      totalSeconds, longestSeconds: Math.max(user.luckiest_longest_reign_seconds, activeSeconds),
-      reignCount: user.luckiest_reign_count, goldenDieUnlocked: !!user.golden_die_unlocked,
-      goldenDieRemainingSeconds: Math.max(0, GOLDEN_DIE_REQUIRED_SECONDS - totalSeconds),
-      goldenDieRequiredSeconds: GOLDEN_DIE_REQUIRED_SECONDS,
-      requiredGames: LUCK_WINDOW_GAMES, expectedRate: LUCK_EXPECTED_SIX_RATE };
+  luckyStatus(user, now = Date.now(), { self = false } = {}) {
+    const month = monthKey(now);
+    const leader = this.monthBest(month);
+    const best = this.monthBest(month, user.id);
+    const leaderUser = leader && this.getUser(leader.id);
+    const game = (row) => row && { rate: row.rate, rolls: row.rolls, sixes: row.sixes, endedAt: row.endedAt };
+    return {
+      month, monthName: monthName(month), endsAt: monthStart(shiftMonth(month, 1)),
+      holder: this.luckyHolder() === user.id, best: game(best),
+      leader: leader && leaderUser ? { ...game(leader), id: leader.id, name: leaderUser.name } : null,
+      monthsWon: this.q.monthsWon.get(user.id).n,
+      setOwned: LUCKY_SET.filter((id) => this.ownsLucky(user, id)),
+      set: LUCKY_SET, minRolls: LUCK_MIN_ROLLS, expectedRate: LUCK_EXPECTED_SIX_RATE,
+      ...(self ? { pending: [...this.q.pendingMonths.all(user.id).map((row) => ({ month: row.month, monthName: monthName(row.month), rolls: row.rolls, sixes: row.sixes })), ...Array.from({ length: user.lucky_picks || 0 }, () => ({ month: 'pick', granted: true }))] } : {}),
+    };
   }
 
-  refreshGoldenUnlocks(now = Date.now()) {
+  ownsLucky(user, itemId) {
+    return this.inventory(user.id).includes(itemId) || (itemId === LUCKY_ITEM && !!user.golden_die_unlocked);
+  }
+
+  settleLuckyMonths(now) {
+    const current = monthKey(now);
+    let last = this.q.getMeta.get('luckiest_settled')?.value || shiftMonth(current, -1);
+    const champions = [];
+    while (last < shiftMonth(current, -1)) {
+      last = shiftMonth(last, 1);
+      const best = this.monthBest(last);
+      if (best && this.q.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last) });
+    }
+    this.q.setMeta.run('luckiest_settled', last);
+    return champions;
+  }
+
+  refreshLucky(now = Date.now()) {
     return transaction(this.db, () => {
-      const ids = this.q.earnedDie.all(GOLDEN_DIE_REQUIRED_SECONDS).map(({ id }) => id);
-      for (const id of ids) {
-        this.q.unlockDie.run(now, id);
-        this.q.addItem.run(id, LUCKY_ITEM, now);
-      }
-      return ids;
-    });
-  }
-
-  // The Luckiest tag moves only when an eligible player's last 10 completed games have the best score.
-  // Reigns accumulate towards a permanent die, including time from earlier reigns.
-  refreshLucky(now = Date.now(), { inactivityOnly = false } = {}) {
-    return transaction(this.db, () => {
+      const champions = this.settleLuckyMonths(now);
       const current = this.q.luckiest.get();
-      const holder = current && this.getUser(current.player_id);
-      const unlocked = [];
-      const unlock = (user, seconds) => {
-        if (!user?.golden_die_unlocked && seconds >= GOLDEN_DIE_REQUIRED_SECONDS) {
-          this.q.unlockDie.run(now, user.id);
-          this.q.addItem.run(user.id, LUCKY_ITEM, now);
-          unlocked.push(user.id);
-        }
-      };
-      const holderWindow = holder && this.luckWindow(holder.id, now);
-      const reignEnd = holderWindow?.lastCompletedAt != null ? Math.min(now, holderWindow.lastCompletedAt + LUCK_ACTIVITY_MS) : now;
-      const reignSeconds = current ? Math.max(0, Math.floor((reignEnd - current.started_at) / 1000)) : 0;
-      if (current && holder) unlock(holder, holder.luckiest_total_seconds + reignSeconds);
-      if (inactivityOnly && (!current || (holder && holderWindow.eligible))) {
-        return unlocked.length ? { holder: current?.player_id || null, previous: current?.player_id || null, unlocked } : null;
-      }
-      const candidates = this.q.luckyCandidates.all(now - LUCK_ACTIVITY_MS, now)
-        .map(({ id }) => ({ id, ...this.luckWindow(id, now) }))
-        .filter((entry) => entry.eligible)
-        .sort((a, b) => b.score - a.score || (a.id === current?.player_id ? -1 : b.id === current?.player_id ? 1 : a.id.localeCompare(b.id)));
-      const next = candidates[0]?.id || null;
-      if (next === (current?.player_id || null)) return unlocked.length ? { holder: next, previous: next, unlocked } : null;
+      const next = this.monthBest(monthKey(now))?.id || null;
+      if (next === (current?.player_id || null)) return champions.length ? { holder: next, previous: next, champions } : null;
       if (current) {
-        const seconds = reignSeconds;
-        this.q.endReign.run(reignEnd, seconds, current.id);
-        if (holder) this.q.reignTime.run(seconds, seconds, holder.id);
+        const seconds = Math.max(0, Math.floor((now - current.started_at) / 1000));
+        this.q.endReign.run(now, seconds, current.id);
+        this.q.reignTime.run(seconds, seconds, current.player_id);
       }
       const nextUser = next && this.getUser(next);
       if (nextUser) {
         this.q.addReign.run(next, now);
         this.q.reignCount.run(next);
       }
-      return { holder: next, previous: current?.player_id || null, reclaimed: !!nextUser?.luckiest_reign_count, unlocked };
+      return { holder: next, previous: current?.player_id || null, reclaimed: !!nextUser?.luckiest_reign_count, champions };
+    });
+  }
+
+  claimLucky(userId, month, itemId) {
+    const user = this.requireUser(userId);
+    return transaction(this.db, () => {
+      const granted = month === 'pick';
+      const pending = granted ? user.lucky_picks > 0 : this.q.pendingMonths.all(user.id).some((row) => row.month === month);
+      if (!pending) throw new AccountError('Nothing to claim for that month');
+      const missing = LUCKY_SET.filter((id) => !this.ownsLucky(user, id));
+      if (missing.length) {
+        if (!missing.includes(itemId)) throw new AccountError('Pick a Luckiest piece you don\'t have yet');
+        this.q.addItem.run(user.id, itemId, Date.now());
+        if (itemId === LUCKY_ITEM) this.q.unlockDie.run(Date.now(), user.id);
+      } else {
+        itemId = null;
+        this.q.addCoins.run(LUCKY_FULL_SET_COINS, user.id);
+        this.q.ledger.run(user.id, LUCKY_FULL_SET_COINS, 'luckiest', Date.now());
+      }
+      if (granted) this.q.addPicks.run(-1, user.id);
+      else this.q.claimMonth.run(itemId || 'coins', Date.now(), month, user.id);
+      return { item: itemId, coins: itemId ? 0 : LUCKY_FULL_SET_COINS };
+    });
+  }
+
+  grantLuckyPick(userId, delta) {
+    const user = this.requireUser(userId);
+    const step = Math.sign(Number(delta) || 0);
+    if (!step) throw new AccountError('Nothing to change');
+    if (step < 0 && !user.lucky_picks) throw new AccountError(`${user.name} has no Luckiest picks waiting`);
+    this.q.addPicks.run(step, user.id);
+  }
+
+  revokeItem(userId, itemId) {
+    const user = this.requireUser(userId);
+    const item = ITEMS.get(itemId);
+    const owned = this.inventory(user.id).includes(itemId) || (itemId === LUCKY_ITEM && !!user.golden_die_unlocked);
+    if (!item || !owned) throw new AccountError(`${user.name} doesn't own that`);
+    transaction(this.db, () => {
+      this.q.removeItem.run(user.id, itemId);
+      if (itemId === LUCKY_ITEM) this.q.lockDie.run(user.id);
     });
   }
 
@@ -351,7 +387,7 @@ class Accounts {
     const tags = this.tags(user);
     if (tags.includes('dev')) return true;
     if (this.inventory(user.id).includes(itemId)) return true;
-    if (itemId === LUCKY_ITEM) return !!user.golden_die_unlocked;
+    if (item.tag === 'lucky') return this.ownsLucky(user, itemId);
     if (item.tag) return tags.includes(item.tag);
     return false;
   }
@@ -362,7 +398,7 @@ class Accounts {
     const inv = this.inventory(user.id);
     const valid = (slot, id) => {
       const item = ITEMS.get(id);
-      return item && item.slot === slot && (tags.includes('dev') || !item.tag || (id !== LUCKY_ITEM && tags.includes(item.tag)) || inv.includes(id) || (id === LUCKY_ITEM && user.golden_die_unlocked));
+      return item && item.slot === slot && (tags.includes('dev') || !item.tag || (item.tag !== 'lucky' && tags.includes(item.tag)) || inv.includes(id) || (id === LUCKY_ITEM && user.golden_die_unlocked));
     };
     return Object.fromEntries(SLOTS.map((slot) => [slot, valid(slot, stored[slot]) ? stored[slot] : DEFAULTS[slot]]));
   }
@@ -462,6 +498,8 @@ class Accounts {
     this.q.dropSharedMatches.run(guest.id, intoId);
     this.q.moveMatchPlayers.run(intoId, guest.id);
     this.q.moveReigns.run(intoId, guest.id);
+    this.q.moveMonths.run(intoId, guest.id);
+    this.q.addPicks.run(guest.lucky_picks || 0, intoId);
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     this.q.setPacks.run(JSON.stringify([...new Set([...this.grantedPacks(into), ...this.grantedPacks(guest)])]), intoId);
     this.q.deleteUser.run(guest.id);
@@ -510,7 +548,7 @@ class Accounts {
       admin: this.isAdmin(user),
       pity: parse(user.pity, {}),
       stats: this.statLine(user),
-      lucky: this.luckyStatus(user),
+      lucky: this.luckyStatus(user, Date.now(), { self: true }),
       ...extras,
     };
   }
@@ -541,6 +579,8 @@ class Accounts {
       packs: Object.fromEntries(PACKS.map((pack) => [pack, this.grantedPacks(user).includes(pack)])),
       equipped: this.equipped(user),
       items: this.inventory(user.id).length,
+      owned: [...new Set([...this.inventory(user.id), ...(user.golden_die_unlocked ? [LUCKY_ITEM] : [])])],
+      luckyPicks: user.lucky_picks || 0,
       stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,

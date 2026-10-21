@@ -36,51 +36,45 @@ export function StatGrid({ stats }) {
   );
 }
 
-const duration = (seconds) => {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return days ? `${days}d ${hours}h` : hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+const pct = (rate) => `${(rate * 100).toFixed(1)}%`;
+const left = (t) => {
+  const s = Math.max(0, (t - Date.now()) / 1000);
+  return s >= 86400 ? `${Math.floor(s / 86400)}d left` : s >= 3600 ? `${Math.floor(s / 3600)}h left` : `${Math.ceil(s / 60)}m left`;
 };
 
-export function LuckiestPanel({ lucky }) {
-  if (!lucky) return null;
-  const games = Math.min(lucky.games, lucky.requiredGames);
-  const remaining = lucky.requiredGames - games;
-  const goldRequired = lucky.goldenDieRequiredSeconds || 259200;
-  const goldProgress = lucky.goldenDieUnlocked ? goldRequired : Math.min(lucky.totalSeconds, goldRequired);
-  const status = lucky.holder ? 'Current holder' : remaining ? `${remaining} more ${remaining === 1 ? 'game' : 'games'} to qualify` : lucky.eligible ? `Eligible · luck score ${lucky.score.toFixed(2)}` : lucky.rolls ? 'Inactive · finish a game to rejoin' : 'No recorded rolls yet';
+export function LuckiestPanel({ lucky, onClaim }) {
+  if (!lucky?.month) return null;
+  const { best, leader, holder } = lucky;
+  const owned = lucky.setOwned?.length || 0;
+  const status = holder ? `Leading ${lucky.monthName}` : best ? `${pct(leader.rate - best.rate)} behind ${leader.name}` : `No qualifying game yet · ${lucky.minRolls}+ of your own rolls`;
   return (
-    <details className={`profile-lucky${lucky.holder ? ' holder' : ''}`}>
+    <details className={`profile-lucky${holder ? ' holder' : ''}`}>
       <summary className="profile-lucky-head">
         <TagBadge tag="lucky" small />
         <span className="profile-lucky-overview">
-          <span>{lucky.holder ? 'Current holder' : !remaining && !lucky.eligible ? 'Play a game to requalify' : `${games} / ${lucky.requiredGames} games`}</span>
-          <span className="profile-lucky-track" role="progressbar" aria-label="Games toward Luckiest eligibility" aria-valuemin={0} aria-valuemax={lucky.requiredGames} aria-valuenow={games}>
-            <span style={{ width: `${(games / lucky.requiredGames) * 100}%` }} />
+          <span>{holder ? 'Current holder' : best ? `Best this month ${pct(best.rate)}` : 'Not in the race yet'}</span>
+          <span className="profile-lucky-track" role="progressbar" aria-label="Your best six rate against this month's leader" aria-valuemin={0} aria-valuemax={100} aria-valuenow={leader && best ? Math.round((best.rate / leader.rate) * 100) : 0}>
+            <span style={{ width: `${leader && best ? (best.rate / leader.rate) * 100 : 0}%` }} />
           </span>
         </span>
+        {onClaim && lucky.pending?.length > 0 && <button type="button" className="btn primary small profile-lucky-claim" onClick={(e) => { e.preventDefault(); onClaim(); }}>Claim reward</button>}
         <span className="profile-lucky-chevron" aria-hidden="true" />
       </summary>
       <div className="profile-lucky-details">
         <div className="profile-lucky-status">{status}</div>
         <div className="profile-lucky-metrics">
-          <div><b>{lucky.sixes.toLocaleString()}</b><span>Sixes</span></div>
-          <div><b>{lucky.rolls.toLocaleString()}</b><span>Rolls</span></div>
-          <div><b>{(lucky.rate * 100).toFixed(1)}%</b><span>Six rate <small>· {(lucky.expectedRate * 100).toFixed(1)}% expected</small></span></div>
+          <div><b>{best ? pct(best.rate) : '–'}</b><span>Best game <small>· {pct(lucky.expectedRate)} expected</small></span></div>
+          <div><b>{best ? `${best.sixes} / ${best.rolls}` : '–'}</b><span>Sixes / rolls</span></div>
+          <div><b>{lucky.monthsWon}</b><span>Months won</span></div>
         </div>
         <div className="profile-lucky-section">
-          <h4>Time holding Luckiest</h4>
-          <div className="profile-lucky-metrics">
-            <div><b>{duration(lucky.totalSeconds)}</b><span>Total</span></div>
-            <div><b>{duration(lucky.longestSeconds)}</b><span>Longest reign</span></div>
-            <div><b>{lucky.reignCount}</b><span>Reigns</span></div>
-          </div>
+          <div className="profile-lucky-gold-head"><h4>{lucky.monthName}</h4><span>{left(lucky.endsAt)}</span></div>
+          <div className="profile-lucky-leader">{leader ? <><b>{leader.name}</b> leads with {pct(leader.rate)} <small>({leader.sixes} sixes in {leader.rolls} rolls)</small></> : 'Nobody has qualified yet. Finish a game to take it.'}</div>
         </div>
         <div className="profile-lucky-section">
-          <div className="profile-lucky-gold-head"><h4>Progress to Golden Die</h4><span>{lucky.goldenDieUnlocked ? 'Unlocked permanently' : `${duration(lucky.goldenDieRemainingSeconds)} left`}</span></div>
-          <span className="profile-lucky-track gold" role="progressbar" aria-label="Golden Die reign time" aria-valuemin={0} aria-valuemax={goldRequired} aria-valuenow={goldProgress}>
-            <span style={{ width: `${(goldProgress / goldRequired) * 100}%` }} />
+          <div className="profile-lucky-gold-head"><h4>Luckiest set</h4><span>{owned} / {lucky.set.length} collected</span></div>
+          <span className="profile-lucky-track gold" role="progressbar" aria-label="Luckiest set pieces collected" aria-valuemin={0} aria-valuemax={lucky.set.length} aria-valuenow={owned}>
+            <span style={{ width: `${(owned / lucky.set.length) * 100}%` }} />
           </span>
         </div>
       </div>

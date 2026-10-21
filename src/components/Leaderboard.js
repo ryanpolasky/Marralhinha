@@ -9,6 +9,7 @@ const BOARDS = [
   ['sixes', 'Sixes', (u) => u.sixes.toLocaleString(), () => 'all-time sixes rolled'],
   ['captures', 'Captures', (u) => u.captures.toLocaleString(), () => 'marbles sent home'],
   ['home', 'Marbles home', (u) => u.home.toLocaleString(), () => 'marbles brought home'],
+  ['lucky', 'Luckiest', (u) => `${u.luckyMonths}×`, (u) => `last won ${new Date(`${u.luckyLast}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })}`],
   ['level', 'Level', (u) => `Lv ${u.level}`, (u) => `${u.xp.toLocaleString()} XP`],
 ];
 

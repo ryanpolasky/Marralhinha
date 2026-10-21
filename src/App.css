@@ -8087,6 +8087,7 @@ select.admin-input optgroup {
 .profile-lucky-overview { flex: 1; min-width: 0; display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .profile-lucky-track { display: block; height: 6px; border-radius: 99px; overflow: hidden; background: rgba(255, 209, 102, 0.16); }
 .profile-lucky-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c49027, #ffe08a); }
+.profile-lucky-claim { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
 .profile-lucky-chevron { width: 8px; height: 8px; border-right: 2px solid var(--gold); border-bottom: 2px solid var(--gold); transform: rotate(45deg); transition: transform 0.2s; }
 .profile-lucky[open] .profile-lucky-chevron { transform: rotate(225deg); }
 .profile-lucky-details { display: grid; gap: 12px; padding: 14px; border-top: 1px solid rgba(255, 209, 102, 0.24); }
@@ -8100,6 +8101,8 @@ select.admin-input optgroup {
 .profile-lucky-section h4 { margin: 0 0 7px; font-size: 12px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
 .profile-lucky-gold-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 12px; color: var(--ink-dim); }
 .profile-lucky-track.gold { height: 7px; }
+.profile-lucky-leader { font-size: 13px; color: var(--ink-dim); }
+.profile-lucky-leader b { color: var(--gold); }
 .profile-lucky-gold-head + .profile-lucky-track { margin-top: 7px; }
 
 .profile-section {
@@ -8486,7 +8489,8 @@ select.admin-input optgroup {
 /* ---------- Leaderboards ---------- */
 
 .board-modal {
-  width: min(560px, 96vw);
+  width: min(640px, 96vw);
+  max-width: 96vw;
 }
 
 .modal-head h2 svg {
@@ -11065,3 +11069,84 @@ body {
   --fx2: #fff3c0;
   --fx-bg: #2a1408;
 }
+
+.plate-lucky {
+  --plate-ink: #fff6d6;
+  --flow-to: 190px 0, 0 0, 166.667% 0;
+  border: 2px solid transparent !important;
+  background-image: linear-gradient(105deg, transparent 25%, rgba(255, 236, 170, 0.2) 48%, transparent 72%), linear-gradient(125deg, #04301a, #0e6b3b 55%, #053a20), linear-gradient(90deg, #a8741c, #fff3b8, #f0b93a, #a8741c) !important;
+  background-clip: padding-box, padding-box, border-box !important;
+  background-origin: padding-box, padding-box, border-box !important;
+  background-size: 190px 100%, 100% 100%, 250% 100% !important;
+  box-shadow: inset 0 0 14px rgba(255, 209, 102, 0.16), 0 0 16px rgba(255, 196, 70, 0.4);
+  animation: plate-flow 4s linear infinite;
+}
+.plate-lucky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 12% 28%, #fff3b8 0 0.8px, transparent 1.6px), radial-gradient(circle at 88% 70%, #fff3b8 0 0.8px, transparent 1.6px),
+    radial-gradient(circle at 58% 16%, #fff 0 0.7px, transparent 1.4px), radial-gradient(circle at 34% 84%, #ffd166 0 0.7px, transparent 1.4px);
+  animation: glitter 2s steps(2) infinite;
+  pointer-events: none;
+}
+.plate-lucky .account-name,
+.plate-lucky .chip-name-text,
+.plate-lucky .seat-name-text,
+.plate-lucky.big > span:not(.avatar) { text-shadow: 0 0 7px rgba(255, 196, 70, 0.55), 0 1px 3px #021a0e; }
+.plate-lucky .badge { background: rgba(255, 255, 255, 0.16); }
+
+.thumb-marble.skin-lucky {
+  background: radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85) 0 5%, transparent 16%),
+    radial-gradient(ellipse 34% 14% at 36% 44%, transparent 0 58%, #ffe08a 64% 78%, transparent 84%),
+    radial-gradient(ellipse 30% 16% at 66% 62%, transparent 0 56%, #f2c14e 62% 78%, transparent 84%),
+    radial-gradient(ellipse 22% 11% at 52% 24%, transparent 0 52%, #e0a42a 60% 80%, transparent 88%),
+    radial-gradient(ellipse 18% 10% at 40% 76%, transparent 0 50%, #f0b93a 58% 80%, transparent 90%),
+    radial-gradient(circle at 54% 56%, var(--seat-light), var(--seat) 50%, var(--seat-dark) 92%);
+  box-shadow: inset -7px -9px 14px rgba(0, 0, 0, 0.45), inset 4px 4px 11px rgba(255, 255, 255, 0.35), 0 0 14px rgba(255, 209, 102, 0.5);
+  animation: lucky-shine 2.2s ease-in-out infinite;
+}
+.thumb-board.skin-lucky {
+  background: radial-gradient(circle at 50% 50%, #f0b93a 0 9%, transparent 10% 14%, #f0b93a 14% 16%, transparent 17%),
+    repeating-conic-gradient(from 43deg at 50% 50%, rgba(242, 193, 78, 0.9) 0 4deg, transparent 4deg 90deg),
+    radial-gradient(circle at 50% 50%, #0f6b3c 0, #07442a 55%, #032216);
+  box-shadow: inset 0 0 0 2px #f0b93a;
+  filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.55));
+  animation: lucky-shine 2.6s ease-in-out infinite;
+}
+.thumb-fx.skin-lucky {
+  --fx: #ffd166;
+  --fx2: #7dffb4;
+  --fx-bg: #04301a;
+}
+.thumb-trail.skin-lucky {
+  --t1: #f0b93a;
+  --t2: #fff3b8;
+  --t-bg: #04301a;
+}
+.item-card.locked .thumb-marble.skin-lucky,
+.item-card.locked .thumb-board.skin-lucky { animation: none; }
+
+.lucky-claim { width: min(1120px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); overflow-y: auto; border: 1px solid rgba(255, 209, 102, 0.45); box-shadow: 0 0 40px rgba(255, 196, 70, 0.22), 0 20px 60px rgba(0, 0, 0, 0.5); }
+.lucky-claim-head { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.lucky-claim-head h2 { margin: 0; color: var(--gold); font-size: clamp(22px, 4vw, 30px); }
+.lucky-claim-head p { margin: 0; max-width: 620px; line-height: 1.45; }
+.lucky-claim-body { display: grid; gap: 18px; margin: 16px 0; }
+.lucky-claim-stage { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr; column-gap: 28px; row-gap: 8px; align-items: center; }
+.lucky-claim-stage .preview-stage { grid-row: 1 / -1; height: clamp(230px, 38vh, 360px); }
+.lucky-claim-stage h3 { grid-row: 2; margin: 0; font-size: 26px; color: var(--gold); }
+.lucky-claim-stage p { grid-row: 3; margin: 0; font-size: 15px; line-height: 1.5; }
+.lucky-claim-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.lucky-claim-grid .item-card { min-width: 0; }
+.lucky-claim-actions { gap: 10px; }
+@media (max-width: 760px) {
+  .lucky-claim-stage { grid-template-columns: 1fr; grid-template-rows: none; text-align: center; row-gap: 4px; }
+  .lucky-claim-stage .preview-stage { grid-row: auto; height: 230px; }
+  .lucky-claim-stage h3, .lucky-claim-stage p { grid-row: auto; }
+  .lucky-claim-stage h3 { font-size: 20px; }
+  .lucky-claim-stage p { font-size: 13px; }
+  .lucky-claim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+.item-card .thumb.thumb-nameplate,
+.item-card .thumb-nameplate .plate { width: 100%; max-width: 84px; box-sizing: border-box; }
