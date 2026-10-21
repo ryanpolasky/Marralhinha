@@ -12,7 +12,7 @@ const cached = (key, build) => {
   return cache.get(key);
 };
 
-const mix = (a, b, t) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
+export const mix = (a, b, t) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
 const TAU = Math.PI * 2;
 
 function wavyLine(ctx, { y0, amp, k, phase, width, color, alpha = 1, w = 512 }) {
@@ -835,7 +835,7 @@ const MARBLES = {
             vec2 cells = solCells(warped, uTime * 0.9);
             float gran = (1.0 - smoothstep(0.1, 0.95, cells.x)) * smoothstep(0.0, 0.4, cells.y - cells.x);
             float fine = mix(solNoise(q * 34.0 + uTime * 0.4), 0.5, smoothstep(0.3, 0.9, length(fwidth(q * 34.0))));
-            gran = mix(gran, 0.3, far);
+            gran = mix(gran, 0.62, far);
             gran = 0.5 + 0.5 * gran * (0.8 + 0.4 * fine);
             float belt = 1.0 - smoothstep(0.12, 0.3, abs(abs(p.y) - 0.32));
             float region = solFbm(q * 3.2 + 7.3);
@@ -845,16 +845,16 @@ const MARBLES = {
             vec3 flareAt = normalize(vec3(0.55, 0.33, 0.77));
             float flare = exp(-dot(q - flareAt, q - flareAt) / 0.012) * uFlare;
             float facing = max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
-            float limb = 0.3 + 0.7 * pow(facing, 0.9);
-            float heat = gran * (0.55 + 0.75 * convect);
+            float limb = mix(0.3 + 0.7 * pow(facing, 0.9), 0.12 + 0.88 * pow(facing, 0.7), far);
+            float heat = gran * mix(0.55 + 0.75 * convect, 0.2 + 1.3 * convect, far);
             heat = heat * (1.0 - penumbra * 0.45 - umbra * 0.5) + faculae * 0.18 + flare * 0.9;
             heat *= limb;
             vec3 col = mix(uCool, uMid, smoothstep(0.1, 0.6, heat));
             col = mix(col, uHot, smoothstep(0.85, 1.2, heat));
-            float rim = pow(1.0 - facing, 3.5);
+            float rim = pow(1.0 - facing, 3.5) * (1.0 - 0.75 * far);
             float licks = mix(solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0)), 0.5, far);
             diffuseColor.rgb = col * 0.08;
-            totalEmissiveRadiance = col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8);
+            totalEmissiveRadiance = (col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8)) * 0.82;
           }`
         );
     };
@@ -862,9 +862,9 @@ const MARBLES = {
       color: '#ffffff',
       emissive: '#ffffff',
       emissiveIntensity: 1,
-      roughness: 0.4,
-      clearcoat: 0.4,
-      clearcoatRoughness: 0.15,
+      roughness: 0.55,
+      envMapIntensity: 0.15,
+      specularIntensity: 0.3,
       onBeforeCompile,
       customProgramCacheKey: () => 'marble-sol-star',
       animate: (m, t) => {
@@ -1236,7 +1236,7 @@ export function marbleSkin(itemId, seat, color = null) {
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 
@@ -1266,6 +1266,7 @@ const DICE = {
   copper: { bg: 'copper', pip: '#2b1a10', one: '#2b1a10', roughness: 0.3, metalness: 0.9 },
   lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
   candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
+  loaded: { bg: '#eef8fb', pip: '#1d2a33', one: '#c62828', roughness: 0.02, clearcoat: 1, extra: { transmission: 1, thickness: 0.4, ior: 1.45, attenuationColor: new THREE.Color('#bfe6f0'), attenuationDistance: 2 } },
   holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },
@@ -1821,6 +1822,76 @@ function oceanCanvases() {
     wavyLine(gctx, { ...spec, color: '#5fd0ff', alpha: 0.35 + rand() * 0.4 });
   }
   return [base, glow];
+}
+
+function poolBoard(layout) {
+  const S = 2048;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(53);
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  const cross = (inset, r) => {
+    ctx.beginPath();
+    roundedCross(W - inset, L - inset, r).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  };
+  ctx.fillStyle = '#e4eef0';
+  ctx.fillRect(0, 0, S, S);
+  ctx.setTransform(k, 0, 0, k, C, C);
+  ctx.strokeStyle = 'rgba(120,150,158,0.55)';
+  ctx.lineWidth = 0.035;
+  for (let v = -L; v <= L; v += 0.3) {
+    ctx.beginPath();
+    ctx.moveTo(v, -L);
+    ctx.lineTo(v, L);
+    ctx.moveTo(-L, v);
+    ctx.lineTo(L, v);
+    ctx.stroke();
+  }
+  cross(0.55, 0.45);
+  ctx.strokeStyle = '#1d5f86';
+  ctx.lineWidth = 0.16;
+  ctx.stroke();
+  ctx.save();
+  cross(0.62, 0.4);
+  ctx.clip();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createRadialGradient(C, C, 0, C, C, L * k);
+  g.addColorStop(0, '#3a9fc2');
+  g.addColorStop(1, '#1f7ea3');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 90; i++) {
+    wavyLine(ctx, { y0: rand() * S, amp: 10 + rand() * 30, k: 4 + Math.floor(rand() * 6), phase: rand() * TAU, width: 3 + rand() * 6, color: '#bdeef8', alpha: 0.12 + rand() * 0.16, w: S });
+  }
+  for (let i = 0; i < 40; i++) softBlob(ctx, rand() * S, rand() * S, (0.6 + rand() * 1.6) * k, i % 2 ? '#56b8d6' : '#15688c', 0.12);
+  ctx.restore();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+function deckFeltCanvas() {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(71);
+  const H = 64;
+  for (let y = 0; y < S; y += H) {
+    const shift = rand() * S;
+    for (let x = -S; x < S * 2; x += 256) {
+      const tone = ['#d3c4a8', '#cbbb9d', '#dacdb4', '#c6b596'][Math.floor(rand() * 4)];
+      ctx.fillStyle = tone;
+      ctx.fillRect(x + shift, y, 256, H);
+      for (let i = 0; i < 14; i++) {
+        ctx.fillStyle = `rgba(${rand() < 0.5 ? '255,250,238' : '120,100,72'},${0.06 + rand() * 0.1})`;
+        ctx.fillRect(x + shift + rand() * 256, y + 4 + rand() * (H - 8), 40 + rand() * 120, 1 + rand() * 2);
+      }
+      ctx.fillStyle = 'rgba(70,55,38,0.55)';
+      ctx.fillRect(x + shift, y, 2, H);
+    }
+    ctx.fillStyle = 'rgba(55,42,28,0.7)';
+    ctx.fillRect(0, y, S, 4);
+  }
+  return canvas;
 }
 
 function auroraCanvases() {
@@ -4450,6 +4521,7 @@ const SPECIAL_BOARDS = {
     const [base, glow] = auroraCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
   },
+  pool: (layout) => ({ canvas: poolBoard(layout), repeat: BOARD_R, roughness: 0.3, clearcoat: 0.5, side: '#e4eef0', dish: '#d9e7ea', feltCanvas: deckFeltCanvas(), cup: '#1d5f86', accent: { color: '#dfe6ec', metalness: 1, roughness: 0.2 } }),
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -4589,6 +4661,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       board,
       dish,
       dishes: dishes || [dish, dish, dish, dish],
+      side: spec.side ? new THREE.MeshPhysicalMaterial({ color: spec.side, roughness: spec.roughness, clearcoat: spec.clearcoat || 0 }) : null,
       surfaces: [board, ...(dishes || [dish])],
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),

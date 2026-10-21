@@ -220,7 +220,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       onPointerLeave={onPointerLeave}
       onFocus={onFocus}
       onBlur={onBlur}
-      title={item.desc}
+      title={item.note ? `${item.desc}\n${item.note}` : item.desc}
       aria-label={label}
       aria-disabled={disabled || undefined}
     >

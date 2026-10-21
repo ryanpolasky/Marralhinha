@@ -5,6 +5,7 @@ import { makeBoardClip } from './boardClip';
 import Particles from './Particles';
 import Shockwaves from './Shockwaves';
 import Spectacle from './Spectacle';
+import Cane from './Cane';
 
 // Every kill-effect renderer in one group, aware of the board outline so floor effects don't spill into the void
 const NO_ORIGIN = [0, 0];
@@ -26,6 +27,7 @@ export default function KillFxLayer({ bus = fx, layout, origin = NO_ORIGIN }) {
       <Particles bus={bus} />
       <Shockwaves bus={bus} clip={clip} />
       <Spectacle bus={bus} clip={clip} />
+      <Cane bus={bus} />
     </group>
   );
 }

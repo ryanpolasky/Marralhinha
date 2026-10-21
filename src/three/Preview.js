@@ -5,13 +5,17 @@ import { Lights } from './Stage';
 import FrameCap from './FrameCap';
 import { tuneRenderer } from './quality';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
+import { LeadSlug } from './Die';
 import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
 import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
-import { MARBLE_GEO } from './Marbles';
+import * as THREE from 'three';
+import { MARBLE_GEO, victimPlan } from './Marbles';
+import { skinKey } from '../game/catalog';
+import { SolCorona } from './Corona';
 import { SingularityAura } from './Gravity';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
@@ -37,6 +41,7 @@ function MarblePreview({ itemId, seat, color }) {
       <mesh material={skin.material}>
         <sphereGeometry args={[1.35, 64, 40]} />
       </mesh>
+      {skin.aura === 'corona' && <SolCorona size={1.35} color={color || SEAT_COLORS[seat]} seed={seat} />}
     </Spinner>
   );
 }
@@ -47,7 +52,9 @@ function DicePreview({ itemId }) {
   const geometry = useMemo(() => new RoundedBoxGeometry(1.9, 1.9, 1.9, 6, 0.28), []);
   return (
     <Spinner speed={0.8} tilt={0.6}>
-      <mesh geometry={geometry} material={materials} />
+      <mesh geometry={geometry} material={materials}>
+        {skinKey(itemId) === 'loaded' && <LeadSlug size={1.9} />}
+      </mesh>
     </Spinner>
   );
 }
@@ -70,6 +77,25 @@ const HOP_TIME = 0.2;
 const START = 0.9;
 const PERIOD = 5.5;
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+const FLIGHTS = ['deflate', 'stage'];
+const VICTIM_AT = new THREE.Vector3(0, 0.07, 0);
+const ACROSS = new THREE.Vector3(0, 0, -1);
+
+function flightAt({ segs }, t) {
+  let from = VICTIM_AT;
+  for (const seg of segs) {
+    if (t < seg.dur) {
+      const k = Math.max(0, t) / seg.dur;
+      const e = easeInOut(k);
+      const p = from.clone().lerp(seg.to, e);
+      p.y = from.y + (seg.to.y - from.y) * e + Math.sin(Math.PI * k) * seg.height;
+      return { p, seg };
+    }
+    t -= seg.dur;
+    from = seg.to;
+  }
+  return null;
+}
 
 // A strip of the real board: one marble hops three cells onto another, then the kill effect plays. Private bus so nothing leaks into a live game
 function FxPreview({ itemId, seat, replay }) {
@@ -81,6 +107,7 @@ function FxPreview({ itemId, seat, replay }) {
   const attacker = useRef();
   const target = useRef();
   const fired = useRef(false);
+  const flight = useRef(null);
   const origin = useRef(null);
   useFrame(({ clock }) => {
     if (!origin.current || origin.current.replay !== replay) {
@@ -95,14 +122,28 @@ function FxPreview({ itemId, seat, replay }) {
     const i = Math.min(HOPS - 1, Math.floor(h));
     const e = h >= HOPS ? 1 : h - i;
     attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e));
+    if (flight.current) {
+      const at = flightAt(flight.current, t - flight.current.at);
+      if (at) {
+        target.current.position.copy(at.p);
+        if (at.seg.puff) bus.emit('spr', { position: at.p.toArray(), tile: 1, c: ['#f2f4f5', '#dfe5e8'], add: false, speed: 0.3, size: 0.18, size2: 0.5, life: 0.45, a: 0.55, drag: 2 });
+      } else {
+        target.current.visible = false;
+        flight.current = null;
+      }
+    }
     if (t < START && fired.current) {
       fired.current = false;
+      flight.current = null;
+      target.current.position.copy(VICTIM_AT);
       target.current.visible = true;
     } else if (h >= HOPS && !fired.current) {
       fired.current = true;
-      target.current.visible = false;
+      const kind = skinKey(itemId);
+      if (FLIGHTS.includes(kind)) flight.current = { at: t, segs: victimPlan(kind, VICTIM_AT, new THREE.Vector3(0, 7, 0), {}, ACROSS) };
+      else target.current.visible = false;
       sfx.capture('mine');
-      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim }, { bus, sfx: (name, ...args) => sfx[name]?.(...args) });
+      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim, across: ACROSS.toArray() }, { bus, sfx: (name, ...args) => sfx[name]?.(...args) });
     }
   });
   return (

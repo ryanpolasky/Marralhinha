@@ -8,6 +8,7 @@ import { boardSurfaceY, burnClock, cutClock, stuntClock, stuntLive } from '../ga
 import { sfx } from '../game/sound';
 import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
+import { skinKey } from '../game/catalog';
 import { TABLE_Y, DISH_BEVEL } from './Board';
 import { fx } from './fx';
 import { useRainbow } from '../game/rainbow';
@@ -18,6 +19,22 @@ const ROLL_TIME = ROLL_REVEAL_MS / 1000;
 const LAND_HOLD = 1.3;
 const SPRING_STEP = 1 / 120;
 const UP = new THREE.Vector3(0, 1, 0);
+const SLUG_GEO = new THREE.SphereGeometry(0.12, 20, 14);
+const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85, roughness: 0.45 });
+const _down = new THREE.Vector3();
+const _inv = new THREE.Quaternion();
+
+export function LeadSlug({ size = SIZE }) {
+  const ref = useRef();
+  useFrame((_, dt) => {
+    const m = ref.current;
+    if (!m?.parent) return;
+    m.parent.getWorldQuaternion(_inv).invert();
+    _down.set(0, -1, 0).applyQuaternion(_inv).multiplyScalar(0.22);
+    m.position.lerp(_down, 1 - Math.exp(-Math.min(dt, 0.1) * 7));
+  });
+  return <mesh ref={ref} geometry={SLUG_GEO} material={LEAD} scale={size / SIZE} />;
+}
 const FACE_NORMALS = { 2: [1, 0, 0], 5: [-1, 0, 0], 1: [0, 1, 0], 6: [0, -1, 0], 3: [0, 0, 1], 4: [0, 0, -1] };
 
 const spot = ([r, c], y = REST_Y) => new THREE.Vector3(c, y, r);
@@ -69,6 +86,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
   const ref = useRef();
   const glow = useRef();
   const label = useRef();
+  const loaded = skinKey(skin) === 'loaded';
   const anim = useRef(null);
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
@@ -195,7 +213,9 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
 
   return (
     <group>
-      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive} />
+      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive}>
+        {loaded && <LeadSlug />}
+      </mesh>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, 0.95, 48]} />
         <meshBasicMaterial color="#ffd166" transparent toneMapped={false} depthWrite={false} />

@@ -1,7 +1,7 @@
 const { randomInt, createHash } = require('crypto');
 const { transaction } = require('./db');
 const { levelInfo } = require('./accounts');
-const { catalog, ITEMS, BOXES, DROPPABLE, RARITY_ORDER, itemsOfRarity, REWARDS } = require('./catalog');
+const { catalog, ITEMS, BOXES, DROPPABLE, RARITY_ORDER, itemsOfRarity, SETS, REWARDS } = require('./catalog');
 
 class EconomyError extends Error {}
 
@@ -33,7 +33,7 @@ function featuredFor(day) {
     seed = (seed * 1103515245 + 12345) % 2147483648;
     return seed % n;
   };
-  const pool = DROPPABLE.filter((i) => catalog.featured.prices[i.rarity]);
+  const pool = DROPPABLE.filter((i) => catalog.featured.prices[i.rarity] && !i.set);
   const picks = [];
   const fancy = pool.filter((i) => i.rarity === 'epic' || i.rarity === 'legendary');
   picks.push(fancy[rand(fancy.length)]);
@@ -41,13 +41,7 @@ function featuredFor(day) {
     const item = pool[rand(pool.length)];
     if (!picks.includes(item)) picks.push(item);
   }
-  const offers = picks.map((item) => ({ id: item.id, price: catalog.featured.prices[item.rarity] }));
-  const { price, chance } = catalog.featured.mythic;
-  if (rand(100) < chance) {
-    const mythics = itemsOfRarity('mythic');
-    offers[offers.length - 1] = { id: mythics[rand(mythics.length)].id, price };
-  }
-  return offers;
+  return picks.map((item) => ({ id: item.id, price: catalog.featured.prices[item.rarity] }));
 }
 
 class Economy {
@@ -174,16 +168,14 @@ class Economy {
     const sinceLegendary = counters.legendary + 1;
 
     let rarity;
-    const mythic = box.weights.mythic || 0;
     if (sinceLegendary >= box.pity.legendary) rarity = 'legendary';
-    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary, mythic }, rand);
+    else if (sinceEpic >= box.pity.epic) rarity = weightedPick({ epic: box.weights.epic, legendary: box.weights.legendary }, rand);
     else rarity = weightedPick(box.weights, rand);
 
-    pity[box.id] = {
-      epic: RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('epic') ? 0 : sinceEpic,
-      legendary: RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('legendary') ? 0 : sinceLegendary,
-    };
+    const reached = (tier) => rarity !== 'mythic' && RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf(tier);
+    pity[box.id] = { epic: reached('epic') ? 0 : sinceEpic, legendary: reached('legendary') ? 0 : sinceLegendary };
     this.q.pity.run(JSON.stringify(pity), user.id);
+    if (rarity === 'mythic') return this.grantSet(user, rand);
 
     const pool = itemsOfRarity(rarity);
     const item = pool[rand(pool.length)];
@@ -192,6 +184,18 @@ class Economy {
     if (duplicate) this.credit(user.id, refund, `dupe:${item.id}`);
     else this.q.addItem.run(user.id, item.id, Date.now());
     return { item: item.id, rarity, duplicate, refund };
+  }
+
+  grantSet(user, rand) {
+    const missing = (set) => set.items.some((id) => !this.accounts.owns(user.id, id));
+    const pool = SETS.some(missing) ? SETS.filter(missing) : SETS;
+    const set = pool[rand(pool.length)];
+    const owned = set.items.filter((id) => this.accounts.owns(user.id, id));
+    const refund = owned.length * catalog.rarities.mythic.dupe;
+    if (refund) this.credit(user.id, refund, `dupe:set.${set.key}`);
+    const now = Date.now();
+    set.items.filter((id) => !owned.includes(id)).forEach((id) => this.q.addItem.run(user.id, id, now));
+    return { set: set.key, items: set.items, owned, rarity: 'mythic', duplicate: owned.length === set.items.length, refund };
   }
 
   openBox(userId, boxId, rand = (n) => randomInt(n)) {

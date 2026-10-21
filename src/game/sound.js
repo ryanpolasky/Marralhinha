@@ -745,6 +745,12 @@ export const sfx = {
     tone({ freq: 300, to: 760 + n * 140, type: 'triangle', dur: 0.14, vol: 0.05 });
     noise({ dur: 0.03, vol: 0.08, freq: 3800, q: 2 });
   },
+  wheeze: () => {
+    noise({ dur: 1.1, vol: 0.12, freq: 2400, to: 700, q: 3 });
+    tone({ freq: 620, to: 170, type: 'sawtooth', dur: 1.05, vol: 0.025, attack: 0.03 });
+  },
+  trombone: () =>
+    [[392, 370], [370, 349], [349, 330], [330, 262]].forEach(([f, to], i) => tone({ freq: f, to, type: 'sawtooth', dur: i === 3 ? 1.1 : 0.32, vol: 0.05, delay: i * 0.34, attack: 0.03 })),
   squeak: () => {
     tone({ freq: 1800, to: 2700, type: 'sine', dur: 0.12, vol: 0.12, attack: 0.01 });
     tone({ freq: 2700, to: 1500, type: 'sine', dur: 0.18, vol: 0.1, delay: 0.12 });

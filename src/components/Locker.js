@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SLOTS, SLOT_KEYS, ITEMS, TAGS, TAG_KEYS, itemsForSlot, canUse, collectible } from '../game/catalog';
+import { SLOTS, SLOT_KEYS, ITEMS, TAGS, TAG_KEYS, itemsForSlot, canUse, collectible, unobtainable, SETS } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
 import { ItemCard, PreviewStage, RarityTag, TagBadge, visibleTags, shownTags } from './Economy';
 import { warmBoardSkin } from '../game/skinWarm';
@@ -60,6 +60,11 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
   const item = ITEMS[selected];
   const isEquipped = account.equipped[slot] === selected;
   const slotItems = (key) => itemsForSlot(key).filter((i) => pool.includes(i));
+  const gone = itemsForSlot(slot).filter((i) => unobtainable(i));
+  const listed = itemsForSlot(slot).filter((i) => !unobtainable(i));
+  const card = (i, idx) => (
+    <ItemCard key={i.id} thumbLoading={idx >= shown} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => pick(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
+  );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -110,6 +115,7 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
                   <RarityTag item={item} />
                   <h3>{item.name}</h3>
                   <p className="muted">{item.desc}</p>
+                  {item.note && <p className="muted item-note">{item.note}</p>}
                   {owns(item.id) ? (
                     <button className="btn primary block" disabled={isEquipped} onClick={() => onEquip(slot, item.id)}>
                       {isEquipped ? 'Equipped' : 'Equip'}
@@ -118,6 +124,10 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
                     <div className="exclusive-note">
                       <TagBadge tag={item.tag} /> {TAGS[item.tag].unlock || `Only players with the ${TAGS[item.tag].label} tag can wear this.`}
                     </div>
+                  ) : item.unobtainable ? (
+                    <div className="exclusive-note">No longer obtainable.</div>
+                  ) : item.set ? (
+                    <div className="exclusive-note">Part of the {SETS[item.set].name} set. Pull the whole set from a Golden Chest.</div>
                   ) : (
                     <button className="btn secondary block" onClick={onShop}>
                       Find it in the shop
@@ -128,9 +138,18 @@ export default function Locker({ account, onClose, onEquip, onTagLoadout, onShop
             )}
           </div>
           <div className="item-grid">
-            {itemsForSlot(slot).map((i, idx) => (
-              <ItemCard key={i.id} thumbLoading={idx >= shown} itemId={i.id} seat={seat} owned={owns(i.id)} equipped={account.equipped[slot] === i.id} selected={selected === i.id} onClick={() => pick(i.id)} onPointerEnter={slot === 'board' ? () => warmBoardSkin(i.id) : undefined} />
-            ))}
+            {listed.map(card)}
+            {gone.length > 0 && (
+              <details key={slot} className="locker-unobtainable">
+                <summary>
+                  Unobtainable
+                  <span className="tab-count">
+                    {gone.filter((i) => owns(i.id)).length}/{gone.length}
+                  </span>
+                </summary>
+                <div className="locker-unobtainable-grid">{gone.map((i, idx) => card(i, listed.length + idx))}</div>
+              </details>
+            )}
           </div>
         </div>
         )}

@@ -6,9 +6,11 @@ import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { SHADOW_ONLY, SingularityAura } from './Gravity';
+import { SolCorona } from './Corona';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
+import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
@@ -46,7 +48,7 @@ function hopTiming(dist) {
   return { dur: 0.3 + dist * 0.05, height: 0.5 + dist * 0.22 };
 }
 
-export function planMove(lastMove, board, layout = CLASSIC_LAYOUT) {
+export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) {
   const plans = {};
   if (!lastMove) return plans;
   const { seat, marble, capture } = lastMove;
@@ -73,11 +75,24 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT) {
   if (lastMove.kind === 'enter') last.burst = { colors: [SEAT_COLORS[seat].light, '#ffffff'], count: 18, up: 2, speed: 2, size: 0.07 };
   plans[`${seat}-${marble}`] = hops;
   if (capture) {
-    plans[`${capture.seat}-${capture.marble}`] = [
-      { to: worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), dur: 0.9, height: 3.4, delay: total - 0.04, impact: { by: seat, victim: capture.seat }, final: true },
-    ];
+    plans[`${capture.seat}-${capture.marble}`] = victimPlan(skinKey(killFx[seat]), last.to, worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), { delay: total - 0.04, impact: { by: seat, victim: capture.seat } });
   }
   return plans;
+}
+
+export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(spot.x >= 0 ? 1 : -1, 0, 0)) {
+  if (kind === 'deflate') {
+    const zips = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ to: new THREE.Vector3(spot.x + Math.sin(i * 2.3 + spot.z) * 1.1, 0.7 + i * 0.32, spot.z + Math.cos(i * 1.7 + spot.x) * 1.1), dur: 0.15, height: 0.12, puff: true }));
+    return [{ ...zips[0], ...start }, ...zips.slice(1), { to: home, dur: 0.8, height: 1.2, final: true }];
+  }
+  if (kind === 'stage') {
+    return [
+      { to: spot.clone(), dur: 0.44, height: 0, ...start },
+      { to: spot.clone().addScaledVector(across, 9).setY(spot.y + 0.15), dur: 0.32, height: 0.1 },
+      { to: home, dur: 0.9, height: 2.6, final: true },
+    ];
+  }
+  return [{ to: home, dur: 0.9, height: 3.4, ...start, final: true }];
 }
 
 function setCursor(pointer) {
@@ -164,6 +179,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   const energy = useRef(0.3);
   const rocky = star && stunt?.kind === 'rocky';
   const aura = skinAura === 'singularity' && !rocky;
+  const corona = skinAura === 'corona' && !rocky;
   if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
@@ -231,7 +247,8 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         const e = easeInOut(t);
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
-        if (!seg.impact) dropTrail();
+        if (seg.puff) fx.emit('spr', { position: [a.pos.x, a.pos.y, a.pos.z], tile: 1, c: ['#f2f4f5', '#dfe5e8'], add: false, speed: 0.3, size: 0.18, size2: 0.5, life: 0.45, a: 0.55, drag: 2 });
+        else if (!seg.impact) dropTrail();
       }
     } else if (a.pos.distanceToSquared(target) > 1e-6) {
       a.trailAt = null;
@@ -326,6 +343,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       <group ref={group}>
         <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow />
         {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} />}
+        {corona && <SolCorona size={MARBLE_R} color={color} seed={seed} />}
         {rocky && <Limbs rig={rig} />}
         {down && (
           <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
@@ -417,7 +435,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
   const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, basePalette[s]));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
-  const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  const plans = useMemo(() => planMove(board.lastMove, board, layout, killFx), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = board.lastMove?.t;
   const focus = selected || hovered;
   const focusMoves = focus ? movesForMarble(moves, focus.seat, focus.marble, board.marbles[focus.seat][focus.marble]) : [];
