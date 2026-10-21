@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
 import { Bubble } from './Hits';
-import { UfoFx } from './Ufo';
+import { UfoFx, UfoSceneLights } from './Ufo';
 import { SEAT_COLORS } from '../game/geometry';
 import { clamp01 } from '../game/hits';
 import { sfx } from '../game/sound';
@@ -170,5 +170,7 @@ export default function Stunts({ stunts, prep, board, layout, skins, colors, onW
         <RockyFx key={s.id} stunt={s} board={board} layout={layout} />
       )
     );
-  return warming ? [...live, <UfoFx key={prep.id} stunt={prep} board={board} layout={layout} skins={skins} colors={colors} warming onWarm={onWarm} />] : live;
+  const ufo = warming ? [...live, <UfoFx key={prep.id} stunt={prep} board={board} layout={layout} skins={skins} colors={colors} warming onWarm={onWarm} />] : live;
+  // Always mounted so toggling sets never changes the light count mid-game (that recompiles every shader)
+  return [<UfoSceneLights key="ufo-lights" />, ...ufo];
 }

@@ -20,6 +20,34 @@ const KITCHEN_AT = [0, 40, SET_Z];
 const ZORP = 0;
 const KLARG = 1;
 
+// The set lights live outside the visible-toggled groups: a light count that changes mid-scene makes three
+// rebuild every shader program, which is the hitch clients felt on each cut. They sit 320 units past the fog
+// with distance-limited falloff, so they can't reach the board.
+export const ufoLights = { spot: null, glow: null, target: null };
+
+export function UfoSceneLights() {
+  const labTarget = useMemo(() => new THREE.Object3D(), []);
+  const saucerTarget = useMemo(() => (ufoLights.target = new THREE.Object3D()), []);
+  return (
+    <>
+      <group position={LAB_AT}>
+        <spotLight position={[0, 4.1, 0.4]} angle={0.55} penumbra={0.7} intensity={45} distance={9} color="#d9fff1" target={labTarget} />
+        <primitive object={labTarget} position={[0, 1, 0]} />
+        <pointLight position={[0, 2.5, 2.2]} intensity={9} distance={9} color="#5ce6ff" />
+        <pointLight position={[-2.3, 2.2, -3.2]} intensity={5} distance={5} color="#5effa3" />
+        <pointLight position={[2.6, 1.6, -2.4]} intensity={4} distance={5} color="#ffc14d" />
+      </group>
+      <group position={KITCHEN_AT}>
+        <pointLight position={[0, 3.05, 0.4]} intensity={12} distance={13} color="#ffe2b8" />
+        <pointLight position={[2.3, 2.2, -2.2]} intensity={2} distance={6} color="#9fc2ff" />
+      </group>
+      <spotLight ref={(l) => (ufoLights.spot = l)} angle={0.34} penumbra={0.55} intensity={0} distance={16} color="#e9fff3" target={saucerTarget} />
+      <primitive object={saucerTarget} />
+      <pointLight ref={(l) => (ufoLights.glow = l)} intensity={0} distance={7} color="#5effa3" />
+    </>
+  );
+}
+
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
@@ -357,7 +385,6 @@ function LabSet({ stunt, board, clock, marbleMat }) {
   const beat = useBeats(stunt);
   const fieldMat = useMemo(() => FIELD.clone(), []);
   const buttonMat = useMemo(() => BUTTON.clone(), []);
-  const spotTarget = useMemo(() => new THREE.Object3D(), []);
   const globe = useMemo(() => earthTexture(), []);
   useEffect(
     () => () => {
@@ -450,11 +477,6 @@ function LabSet({ stunt, board, clock, marbleMat }) {
 
   return (
     <group name="ufo-lab-set" ref={root} position={LAB_AT} visible={false}>
-      <spotLight position={[0, 4.1, 0.4]} angle={0.55} penumbra={0.7} intensity={45} distance={9} color="#d9fff1" target={spotTarget} />
-      <primitive object={spotTarget} position={[0, 1, 0]} />
-      <pointLight position={[0, 2.5, 2.2]} intensity={9} distance={9} color="#5ce6ff" />
-      <pointLight position={[-2.3, 2.2, -3.2]} intensity={5} distance={5} color="#5effa3" />
-      <pointLight position={[2.6, 1.6, -2.4]} intensity={4} distance={5} color="#ffc14d" />
       <mesh material={HULL} position-y={-0.06} rotation-x={-Math.PI / 2}>
         <circleGeometry args={[4.8, 48]} />
       </mesh>
@@ -723,8 +745,6 @@ function KitchenSet({ stunt, board, clock }) {
 
   return (
     <group name="ufo-kitchen-set" ref={root} position={KITCHEN_AT} visible={false}>
-      <pointLight position={[0, 3.05, 0.4]} intensity={12} distance={13} color="#ffe2b8" />
-      <pointLight position={[2.3, 2.2, -2.2]} intensity={2} distance={6} color="#9fc2ff" />
       <mesh geometry={BOX} material={floorMat} position-y={-0.05} scale={[12, 0.1, 7]} />
       <mesh geometry={BOX} material={WALL} position={[0, 2.05, -2.7]} scale={[12, 4.2, 0.15]} />
       <mesh geometry={BOX} material={WAINSCOT} position={[0, 0.6, -2.61]} scale={[12, 1.2, 0.04]} />
@@ -858,10 +878,7 @@ function Saucer({ stunt, board, clock, spot }) {
   const beamRings = useRef([]);
   const spotRing = useRef();
   const search = useRef();
-  const searchLight = useRef();
-  const glow = useRef();
   const beat = useBeats(stunt);
-  const target = useMemo(() => new THREE.Object3D(), []);
   const lastMote = useRef(0);
   const lastSpark = useRef(0);
   const beamMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#4eff9b', transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }), []);
@@ -876,7 +893,11 @@ function Saucer({ stunt, board, clock, spot }) {
     const on = ufoPhase(t) === 'board' && isOn(stunt, board, t) && t >= UFO.arrive - 0.1;
     root.current.visible = on;
     spotRing.current.visible = false;
-    if (!on) return;
+    if (!on) {
+      if (ufoLights.spot) ufoLights.spot.intensity = 0;
+      if (ufoLights.glow) ufoLights.glow.intensity = 0;
+      return;
+    }
     const g = root.current;
     const enter = clamp01((t - UFO.arrive) / (UFO.lock - UFO.arrive));
     const leave = clamp01((t - UFO.leave) / (UFO.end - UFO.leave - 0.3));
@@ -890,15 +911,17 @@ function Saucer({ stunt, board, clock, spot }) {
     g.position.set(x, y, z);
     g.rotation.set(Math.sin(t * 3) * 0.035 + (1 - dropIn) * 0.18, 0, (1 - dropIn) * -0.38 + Math.sin(t * 2.1) * 0.025 + flyOut * 0.7);
     rim.current.rotation.y += dt * (3.5 + flyOut * 14 + (t > UFO.beam && t < UFO.aboard ? 4 : 0));
+    if (ufoLights.spot) ufoLights.spot.position.copy(g.position).y -= 0.36;
+    if (ufoLights.glow) ufoLights.glow.position.copy(g.position).y -= 0.6;
 
     const hunting = t < UFO.beam;
     const settle = clamp01((t - UFO.lock + 0.7) / 0.9);
     search.current.visible = hunting && enter > 0.2;
-    searchLight.current.intensity = hunting ? 70 * clamp01((enter - 0.2) / 0.3) : 0;
+    if (ufoLights.spot) ufoLights.spot.intensity = hunting ? 70 * clamp01((enter - 0.2) / 0.3) : 0;
     if (hunting) {
       const wander = 1 - smooth(settle);
-      target.position.set(sx + Math.sin(t * 1.9) * 3.2 * wander, 0, sz + Math.cos(t * 1.3) * 2.4 * wander);
-      g.worldToLocal(_a.copy(target.position).applyMatrix4(g.parent.matrixWorld));
+      ufoLights.target?.position.set(sx + Math.sin(t * 1.9) * 3.2 * wander, 0, sz + Math.cos(t * 1.3) * 2.4 * wander);
+      g.worldToLocal(_a.copy(ufoLights.target?.position ?? _b.set(0, 0, 0)).applyMatrix4(g.parent.matrixWorld));
       _a.y += 0.36;
       const len = _a.length();
       search.current.quaternion.setFromUnitVectors(DOWN, _b.copy(_a).normalize());
@@ -909,7 +932,7 @@ function Saucer({ stunt, board, clock, spot }) {
     const outbound = t >= UFO.eject - 0.1;
     beamGroup.current.visible = beaming;
     spotRing.current.visible = beaming;
-    glow.current.intensity = beaming ? 26 + Math.sin(t * 18) * 6 : t >= UFO.lock ? 6 : 0;
+    if (ufoLights.glow) ufoLights.glow.intensity = beaming ? 26 + Math.sin(t * 18) * 6 : t >= UFO.lock ? 6 : 0;
     if (beaming) {
       beamMat.opacity = 0.2 + Math.sin(t * 16) * 0.05;
       spotMat.opacity = 0.35 + Math.sin(t * 16) * 0.12;
@@ -965,7 +988,6 @@ function Saucer({ stunt, board, clock, spot }) {
         <mesh material={NEON_GREEN} position-y={-0.345} rotation-x={Math.PI / 2}>
           <circleGeometry args={[0.44, 28]} />
         </mesh>
-        <pointLight ref={glow} position-y={-0.6} intensity={0} distance={7} color="#5effa3" />
         <group ref={rim} position-y={-0.08}>
           {Array.from({ length: 10 }, (_, i) => {
             const a = (i / 10) * Math.PI * 2;
@@ -989,7 +1011,6 @@ function Saucer({ stunt, board, clock, spot }) {
             <cylinderGeometry args={[0.12, 1.1, 1, 24, 1, true]} />
           </mesh>
         </group>
-        <spotLight ref={searchLight} position-y={-0.36} angle={0.34} penumbra={0.55} intensity={0} distance={16} color="#e9fff3" target={target} />
         <group ref={beamGroup} position-y={-0.36} visible={false}>
           <mesh material={beamMat} position-y={-HATCH / 2} renderOrder={11}>
             <cylinderGeometry args={[0.38, 1.05, HATCH, 28, 1, true]} />
@@ -1001,7 +1022,6 @@ function Saucer({ stunt, board, clock, spot }) {
           ))}
         </group>
       </group>
-      <primitive object={target} />
       <mesh ref={spotRing} material={spotMat} position={[sx, 0.03, sz]} rotation-x={-Math.PI / 2} renderOrder={10} visible={false}>
         <ringGeometry args={[0.25, 1.05, 32]} />
       </mesh>
