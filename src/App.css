@@ -11032,3 +11032,36 @@ body {
 .reveal-set-grid .thumb.thumb-nameplate,
 .reveal-set-grid .thumb-nameplate .plate { width: min(84px, 100%); }
 .reveal-set-grid .item-thumb-slot { overflow: hidden; }
+
+.thumb-board.skin-pool {
+  background: linear-gradient(rgba(228, 238, 240, 0.55) 0 1px, transparent 1px) 0 0 / 7px 7px, linear-gradient(90deg, rgba(228, 238, 240, 0.55) 0 1px, transparent 1px) 0 0 / 7px 7px, radial-gradient(circle, #3a9fc2 0 30%, #1f7ea3 75%);
+}
+.thumb-dice.skin-loaded {
+  --face: radial-gradient(circle at 62% 70%, #6b7075 0 13%, transparent 15%), linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(200, 232, 242, 0.55));
+  --pip: #1d2a33;
+}
+.thumb-trail.skin-skid {
+  --t1: #2a2725;
+  --t2: #8a8580;
+}
+.thumb-trail.skin-skid::before {
+  height: 9px;
+  background: linear-gradient(transparent 0 1px, #1d1b1a 1px 3px, transparent 3px 6px, #1d1b1a 6px 8px, transparent 8px);
+}
+.thumb-trail.skin-paper {
+  --t1: #f4f1e8;
+  --t2: #ffffff;
+}
+.thumb-trail.skin-paper::before {
+  height: 7px;
+  background: repeating-linear-gradient(90deg, transparent 0 3px, #f4f1e8 3px 9px);
+}
+.thumb-fx.skin-deflate {
+  --fx: #dfe5e8;
+  --fx2: #ffffff;
+}
+.thumb-fx.skin-stage {
+  --fx: #e8c35c;
+  --fx2: #fff3c0;
+  --fx-bg: #2a1408;
+}

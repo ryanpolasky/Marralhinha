@@ -1824,34 +1824,74 @@ function oceanCanvases() {
   return [base, glow];
 }
 
-function poolCanvases() {
-  const [base, bctx] = makeCanvas(1024, 1024);
-  const [glow, gctx] = makeCanvas(1024, 1024);
+function poolBoard(layout) {
+  const S = 2048;
+  const k = BOARD_R * S;
+  const C = S / 2;
+  const [canvas, ctx] = makeCanvas(S, S);
   const rand = seeded(53);
-  bctx.fillStyle = '#3cb6d3';
-  bctx.fillRect(0, 0, 1024, 1024);
-  for (let y = 0; y < 1024; y += 32) for (let x = 0; x < 1024; x += 32) {
-    bctx.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '10,90,130'},${0.03 + rand() * 0.06})`;
-    bctx.fillRect(x + 2, y + 2, 28, 28);
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  const cross = (inset, r) => {
+    ctx.beginPath();
+    roundedCross(W - inset, L - inset, r).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  };
+  ctx.fillStyle = '#e4eef0';
+  ctx.fillRect(0, 0, S, S);
+  ctx.setTransform(k, 0, 0, k, C, C);
+  ctx.strokeStyle = 'rgba(120,150,158,0.55)';
+  ctx.lineWidth = 0.035;
+  for (let v = -L; v <= L; v += 0.3) {
+    ctx.beginPath();
+    ctx.moveTo(v, -L);
+    ctx.lineTo(v, L);
+    ctx.moveTo(-L, v);
+    ctx.lineTo(L, v);
+    ctx.stroke();
   }
-  bctx.strokeStyle = 'rgba(220,250,255,0.45)';
-  bctx.lineWidth = 3;
-  for (let i = 0; i <= 1024; i += 32) {
-    bctx.beginPath();
-    bctx.moveTo(i, 0);
-    bctx.lineTo(i, 1024);
-    bctx.moveTo(0, i);
-    bctx.lineTo(1024, i);
-    bctx.stroke();
+  cross(0.55, 0.45);
+  ctx.strokeStyle = '#1d5f86';
+  ctx.lineWidth = 0.16;
+  ctx.stroke();
+  ctx.save();
+  cross(0.62, 0.4);
+  ctx.clip();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createRadialGradient(C, C, 0, C, C, L * k);
+  g.addColorStop(0, '#3a9fc2');
+  g.addColorStop(1, '#1f7ea3');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 90; i++) {
+    wavyLine(ctx, { y0: rand() * S, amp: 10 + rand() * 30, k: 4 + Math.floor(rand() * 6), phase: rand() * TAU, width: 3 + rand() * 6, color: '#bdeef8', alpha: 0.12 + rand() * 0.16, w: S });
   }
-  gctx.fillStyle = '#000';
-  gctx.fillRect(0, 0, 1024, 1024);
-  for (let i = 0; i < 46; i++) {
-    const spec = { y0: rand() * 1024, amp: 14 + rand() * 40, k: 3 + Math.floor(rand() * 5), phase: rand() * TAU, width: 2 + rand() * 4, w: 1024 };
-    wavyLine(bctx, { ...spec, color: '#effdff', alpha: 0.2 + rand() * 0.25 });
-    wavyLine(gctx, { ...spec, color: '#bff6ff', alpha: 0.3 + rand() * 0.35 });
+  for (let i = 0; i < 40; i++) softBlob(ctx, rand() * S, rand() * S, (0.6 + rand() * 1.6) * k, i % 2 ? '#56b8d6' : '#15688c', 0.12);
+  ctx.restore();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+function deckFeltCanvas() {
+  const S = 512;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = seeded(71);
+  const H = 64;
+  for (let y = 0; y < S; y += H) {
+    const shift = rand() * S;
+    for (let x = -S; x < S * 2; x += 256) {
+      const tone = ['#d3c4a8', '#cbbb9d', '#dacdb4', '#c6b596'][Math.floor(rand() * 4)];
+      ctx.fillStyle = tone;
+      ctx.fillRect(x + shift, y, 256, H);
+      for (let i = 0; i < 14; i++) {
+        ctx.fillStyle = `rgba(${rand() < 0.5 ? '255,250,238' : '120,100,72'},${0.06 + rand() * 0.1})`;
+        ctx.fillRect(x + shift + rand() * 256, y + 4 + rand() * (H - 8), 40 + rand() * 120, 1 + rand() * 2);
+      }
+      ctx.fillStyle = 'rgba(70,55,38,0.55)';
+      ctx.fillRect(x + shift, y, 2, H);
+    }
+    ctx.fillStyle = 'rgba(55,42,28,0.7)';
+    ctx.fillRect(0, y, S, 4);
   }
-  return [base, glow];
+  return canvas;
 }
 
 function auroraCanvases() {
@@ -4481,10 +4521,7 @@ const SPECIAL_BOARDS = {
     const [base, glow] = auroraCanvases();
     return { canvas: base, glowCanvas: glow, glowIntensity: 1, repeat: 0.05, roughness: 0.25, clearcoat: 0.8, dish: '#0e1233', felt: '#04061a', cup: '#03040f', accent: { color: '#8cf2e2', emissive: '#2fd2a0', emissiveIntensity: 1.1, roughness: 0.3 } };
   },
-  pool: () => {
-    const [base, glow] = poolCanvases();
-    return { canvas: base, glowCanvas: glow, glowIntensity: 0.3, repeat: 0.05, roughness: 0.05, clearcoat: 1, dish: '#1f8db5', felt: '#d8d1c2', cup: '#0e4d69', accent: { color: '#e8edf2', metalness: 1, roughness: 0.15 } };
-  },
+  pool: (layout) => ({ canvas: poolBoard(layout), repeat: BOARD_R, roughness: 0.3, clearcoat: 0.5, side: '#e4eef0', dish: '#d9e7ea', feltCanvas: deckFeltCanvas(), cup: '#1d5f86', accent: { color: '#dfe6ec', metalness: 1, roughness: 0.2 } }),
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -4624,6 +4661,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       board,
       dish,
       dishes: dishes || [dish, dish, dish, dish],
+      side: spec.side ? new THREE.MeshPhysicalMaterial({ color: spec.side, roughness: spec.roughness, clearcoat: spec.clearcoat || 0 }) : null,
       surfaces: [board, ...(dishes || [dish])],
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),

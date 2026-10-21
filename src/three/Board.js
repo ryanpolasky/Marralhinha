@@ -455,7 +455,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
           </group>
         );
       })}
-      <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />
+      <mesh geometry={boardGeometry} material={materials.side ? [materials.board, materials.side] : materials.board} castShadow receiveShadow />
       <Divots points={plainHoles} geometry={DIVOT_PLAIN_GEO} material={materials.cup} y={-BEVEL * 0.9} />
       <mesh position={[CENTER[1], -BEVEL * 0.9, CENTER[0]]} material={materials.core || materials.cup} receiveShadow>
         <sphereGeometry args={[CENTER_R - 0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
