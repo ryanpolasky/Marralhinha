@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { planMove } from './Marbles';
+import { planMove, MARBLE_R } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS } from '../game/catalog';
@@ -301,6 +301,22 @@ test('Singularity debris keeps orbiting: fallers spiral in and respawn, moons ho
   expect(placed.filter((d) => d.front).length).toBeGreaterThan(0);
   expect(placed.filter((d) => !d.front).length).toBeGreaterThan(0);
   expect(moon.r0).toBeGreaterThan(7);
+});
+
+test('Flat Singularity debris on the board stays above the wood', () => {
+  const [up, east, south] = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)];
+  const toCam = new THREE.Vector3(0, 1, 1).normalize();
+  const unit = (MARBLE_R * 0.8) / 2.598;
+  const placed = [];
+  let lowest = Infinity;
+  [0, 1, 2, 3, 4, 5].forEach((seed) => {
+    const debris = makeDebris(seed, true);
+    for (let i = 0; i < 400; i++) {
+      stepDebris(debris, 1 / 30, up, east, south, toCam, placed);
+      lowest = Math.min(lowest, ...placed.map((d) => d.y * unit + 0.07));
+    }
+  });
+  expect(lowest).toBeGreaterThan(0.03);
 });
 
 test('Accretion trail ripples without spawning holes, and the Supernova kill ends on a single vwomp', () => {

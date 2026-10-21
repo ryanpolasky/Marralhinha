@@ -525,9 +525,13 @@ const spawnMote = (m, rand, fresh) => {
 
 
 // Motes in hole units: a few spiral in and get swallowed, a couple of moons ride tilted orbits further out
-export const makeDebris = (seed = 0) => {
+const _up = new THREE.Vector3(0, 1, 0);
+const _east = new THREE.Vector3(1, 0, 0);
+const _south = new THREE.Vector3(0, 0, 1);
+
+export const makeDebris = (seed = 0, flat = false) => {
   const rand = rng(seed + 1);
-  return { rand, motes: Array.from({ length: FALLERS + MOONS }, (_, i) => spawnMote({ moon: i >= FALLERS, p: 0 }, rand, true)) };
+  return { rand, tiltK: flat ? 0.12 : 1, lift: flat ? 1.6 : 0, motes: Array.from({ length: FALLERS + MOONS }, (_, i) => spawnMote({ moon: i >= FALLERS, p: 0 }, rand, true)) };
 };
 
 const _a = new THREE.Vector3();
@@ -548,15 +552,16 @@ export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
     const fade = m.moon ? 1 : THREE.MathUtils.smoothstep(p, 0, 0.4);
     const shrink = m.moon ? 1 : 1 - THREE.MathUtils.smoothstep(p, 0.55, 1);
     _a.copy(e1);
-    _b.copy(e2).multiplyScalar(Math.cos(m.tilt)).addScaledVector(n, Math.sin(m.tilt));
+    _b.copy(e2).multiplyScalar(Math.cos(m.tilt * debris.tiltK)).addScaledVector(n, Math.sin(m.tilt * debris.tiltK));
     for (let j = 0; j < TAIL; j++) {
       const th = m.theta - j * Math.min(w * 0.024, 0.16 / r);
       const rr = r * (1 + j * 0.006);
       const c = Math.cos(th);
       const s = Math.sin(th);
-      const x = (_a.x * c + _b.x * s) * rr;
-      const y = (_a.y * c + _b.y * s) * rr;
-      const z = (_a.z * c + _b.z * s) * rr;
+      const lift = debris.lift * THREE.MathUtils.smoothstep(rr, RIN_DEBRIS, 6);
+      const x = (_a.x * c + _b.x * s) * rr + n.x * lift;
+      const y = (_a.y * c + _b.y * s) * rr + n.y * lift;
+      const z = (_a.z * c + _b.z * s) * rr + n.z * lift;
       _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
       const tail = 1 - j / TAIL;
       const depth = x * toCam.x + y * toCam.y + z * toCam.z;
@@ -598,7 +603,7 @@ const _center = new THREE.Vector3();
 const _toCam = new THREE.Vector3();
 
 // energy eases between idle (~0.3) and moving (1)
-export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 3.4 }) {
+export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 3.4, flat = false }) {
   const { camera } = useThree();
   const { material, group, back, front, debris, placed } = useMemo(() => {
     const material = holeMaterial();
@@ -607,7 +612,7 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     const back = debrisLayer(0);
     const front = debrisLayer(0);
     group.add(back, lensMesh(CARD_GEO, material, -1), front);
-    return { material, group, back, front, debris: makeDebris(seed), placed: [] };
+    return { material, group, back, front, debris: makeDebris(seed, flat), placed: [] };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => [material, back.material, front.material].forEach((m) => m.dispose()), [material, back, front]);
   useEffect(() => {
@@ -631,7 +636,8 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
 
     group.getWorldPosition(_center);
     _toCam.copy(camera.position).sub(_center).normalize();
-    stepDebris(debris, step, u.uNormal.value, u.uE1.value, u.uE2.value, _toCam, placed);
+    if (flat) stepDebris(debris, step, _up, _east, _south, _toCam, placed);
+    else stepDebris(debris, step, u.uNormal.value, u.uE1.value, u.uE2.value, _toCam, placed);
     const bright = 0.55 + 0.6 * e;
     back.count = front.count = 0;
     placed.forEach((d) => {

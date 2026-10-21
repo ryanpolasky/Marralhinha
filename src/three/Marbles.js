@@ -325,7 +325,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     <>
       <group ref={group}>
         <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow />
-        {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} />}
+        {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} flat />}
         {rocky && <Limbs rig={rig} />}
         {down && (
           <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
