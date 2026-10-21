@@ -854,7 +854,7 @@ const MARBLES = {
             float rim = pow(1.0 - facing, 3.5) * (1.0 - 0.75 * far);
             float licks = mix(solFbm(vec3(p.x * 5.0, p.y * 5.0 - uTime * 0.5, p.z * 5.0)), 0.5, far);
             diffuseColor.rgb = col * 0.08;
-            totalEmissiveRadiance = col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8);
+            totalEmissiveRadiance = (col * (0.12 + heat * 0.95) + uHot * pow(facing, 5.0) * 0.18 + uMid * rim * (0.4 + licks * 1.2) * (1.0 + uFlare * 0.8)) * 0.82;
           }`
         );
     };
@@ -1266,7 +1266,7 @@ const DICE = {
   copper: { bg: 'copper', pip: '#2b1a10', one: '#2b1a10', roughness: 0.3, metalness: 0.9 },
   lava: { bg: 'lava', pip: '#ffd27a', one: '#ffffff', roughness: 0.45, glow: 1.4 },
   candy: { bg: 'candy', pip: '#b8182a', one: '#1e7a4f', roughness: 0.08, clearcoat: 1 },
-  loaded: { bg: '#d9edf3', pip: '#1d2a33', one: '#c62828', roughness: 0.04, clearcoat: 1, extra: { transmission: 0.9, thickness: 0.6, ior: 1.5 } },
+  loaded: { bg: '#eef8fb', pip: '#1d2a33', one: '#c62828', roughness: 0.02, clearcoat: 1, extra: { transmission: 1, thickness: 0.4, ior: 1.45, attenuationColor: new THREE.Color('#bfe6f0'), attenuationDistance: 2 } },
   holo: { bg: '#151b40', pip: '#0b1020', one: '#0b1020', roughness: 0.16, clearcoat: 1, extra: { metalness: 0.2, iridescence: 0.8, iridescenceIOR: 1.4, iridescenceThicknessRange: [160, 500], envMapIntensity: 1.2 } },
   dev: { bg: 'dev', pip: '#ff4a5a', one: '#ffd166', roughness: 0.06, clearcoat: 1, glow: 1.8 },
   beta: { bg: 'beta', pip: '#ffffff', one: '#ffd166', roughness: 0.3, clearcoat: 0.5 },

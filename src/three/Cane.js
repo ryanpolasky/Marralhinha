@@ -21,13 +21,13 @@ const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
 export default function Cane({ bus = fx }) {
   const group = useRef();
-  const state = useRef({ alive: false, t: 0, side: 1, at: [0, 0, 0] });
+  const state = useRef({ alive: false, t: 0, across: [1, 0, 0], at: [0, 0, 0] });
   const geometry = useMemo(() => new THREE.TubeGeometry(caneCurve(), 160, 0.06, 12, false), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({ color: '#4a2a14', roughness: 0.35, metalness: 0.1 }), []);
   const tip = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e8c35c', roughness: 0.25, metalness: 0.9 }), []);
   useEffect(() => bus.on((type, d) => {
     if (type !== 'cane') return;
-    Object.assign(state.current, { alive: true, t: 0, side: d.side || 1, at: d.position });
+    Object.assign(state.current, { alive: true, t: 0, across: d.across, at: d.position });
   }), [bus]);
   useFrame((_, dt) => {
     const s = state.current;
@@ -38,8 +38,8 @@ export default function Cane({ bus = fx }) {
     const t = s.t;
     const off = t < IN ? (1 - ease(t / IN)) * REACH : t < IN + HOLD ? 0 : easeInOut(Math.min(1, (t - IN - HOLD) / OUT)) * REACH;
     if (t > IN + HOLD + OUT) s.alive = false;
-    g.position.set(s.at[0] + s.side * off, s.at[1] - 0.33, s.at[2]);
-    g.scale.set(s.side, 1, 1);
+    g.position.set(s.at[0] + s.across[0] * off, s.at[1] - 0.33, s.at[2] + s.across[2] * off);
+    g.rotation.y = Math.atan2(-s.across[2], s.across[0]);
   });
   return (
     <group ref={group} visible={false}>

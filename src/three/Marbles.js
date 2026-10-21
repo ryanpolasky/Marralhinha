@@ -80,16 +80,15 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) 
   return plans;
 }
 
-function victimPlan(kind, spot, home, start) {
+export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(spot.x >= 0 ? 1 : -1, 0, 0)) {
   if (kind === 'deflate') {
-    const zips = [0, 1, 2, 3, 4, 5].map((i) => ({ to: new THREE.Vector3(spot.x + Math.sin(i * 2.3 + spot.z) * 1.4, 1.1 + i * 0.6, spot.z + Math.cos(i * 1.7 + spot.x) * 1.4), dur: 0.17, height: 0.15, puff: true }));
+    const zips = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ to: new THREE.Vector3(spot.x + Math.sin(i * 2.3 + spot.z) * 1.1, 0.7 + i * 0.32, spot.z + Math.cos(i * 1.7 + spot.x) * 1.1), dur: 0.15, height: 0.12, puff: true }));
     return [{ ...zips[0], ...start }, ...zips.slice(1), { to: home, dur: 0.8, height: 1.2, final: true }];
   }
   if (kind === 'stage') {
-    const side = spot.x >= 0 ? 1 : -1;
     return [
       { to: spot.clone(), dur: 0.44, height: 0, ...start },
-      { to: new THREE.Vector3(spot.x + side * 9, spot.y + 0.15, spot.z), dur: 0.32, height: 0.1 },
+      { to: spot.clone().addScaledVector(across, 9).setY(spot.y + 0.15), dur: 0.32, height: 0.1 },
       { to: home, dur: 0.9, height: 2.6, final: true },
     ];
   }

@@ -33,7 +33,7 @@ const coronaMaterial = () =>
         float glow = pow(max(1.0 - out_ / reach, 0.0), 2.2) * edge;
         float halo = exp(-out_ * 5.0) * edge;
         vec3 col = mix(uMid, uHot, clamp(halo * 0.6, 0.0, 1.0));
-        float alpha = min(glow * 0.75 + halo * 0.4, 0.85);
+        float alpha = min(glow * 0.6 + halo * 0.32, 0.7);
         gl_FragColor = vec4(col, alpha);
       }`,
     transparent: true,

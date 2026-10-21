@@ -140,8 +140,8 @@ const KILL_FX = {
   },
 
   // A vaudeville cane hooks the marble from the wings and drags it off, to a sad trombone
-  stage: (emit, { at, sfx, later }) => {
-    emit('cane', { position: at, side: at[0] >= 0 ? 1 : -1 });
+  stage: (emit, { at, across, sfx, later }) => {
+    emit('cane', { position: at, across: across || [at[0] >= 0 ? 1 : -1, 0, 0] });
     later(440, () => {
       emit('spr', { position: at, n: 12, tile: TILE.smoke, c: ['#d9cdb8', '#bfb39e'], add: false, speed: 1.4, up: 0.4, size: 0.3, size2: 0.9, life: 0.7, a: 0.6, drag: 2 });
       emit('shake', { amount: 0.14 });

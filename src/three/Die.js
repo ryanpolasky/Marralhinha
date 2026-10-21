@@ -23,6 +23,18 @@ const SLUG_GEO = new THREE.SphereGeometry(0.12, 20, 14);
 const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85, roughness: 0.45 });
 const _down = new THREE.Vector3();
 const _inv = new THREE.Quaternion();
+
+export function LeadSlug({ size = SIZE }) {
+  const ref = useRef();
+  useFrame((_, dt) => {
+    const m = ref.current;
+    if (!m?.parent) return;
+    m.parent.getWorldQuaternion(_inv).invert();
+    _down.set(0, -1, 0).applyQuaternion(_inv).multiplyScalar(0.22);
+    m.position.lerp(_down, 1 - Math.exp(-Math.min(dt, 0.1) * 7));
+  });
+  return <mesh ref={ref} geometry={SLUG_GEO} material={LEAD} scale={size / SIZE} />;
+}
 const FACE_NORMALS = { 2: [1, 0, 0], 5: [-1, 0, 0], 1: [0, 1, 0], 6: [0, -1, 0], 3: [0, 0, 1], 4: [0, 0, -1] };
 
 const spot = ([r, c], y = REST_Y) => new THREE.Vector3(c, y, r);
@@ -74,7 +86,6 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
   const ref = useRef();
   const glow = useRef();
   const label = useRef();
-  const slug = useRef();
   const loaded = skinKey(skin) === 'loaded';
   const anim = useRef(null);
   if (!anim.current) {
@@ -168,10 +179,6 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
       if (canRoll) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
       if (shrink > 0) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
     }
-    if (slug.current) {
-      _down.set(0, -1, 0).applyQuaternion(_inv.copy(mesh.quaternion).invert()).multiplyScalar(SIZE * 0.26);
-      slug.current.position.lerp(_down, 1 - Math.exp(-dt * 7));
-    }
     glow.current.visible = canRoll && !a.roll && a.scale > 0.6;
     glow.current.position.set(a.pos.x, TABLE_Y + 0.02, a.pos.z);
     glow.current.material.opacity = 0.4 + Math.sin(now * 5) * 0.3;
@@ -207,7 +214,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
   return (
     <group>
       <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive}>
-        {loaded && <mesh ref={slug} geometry={SLUG_GEO} material={LEAD} />}
+        {loaded && <LeadSlug />}
       </mesh>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, 0.95, 48]} />

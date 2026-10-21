@@ -52,11 +52,11 @@ const TRAILS = {
     const len = Math.hypot(p[0] - from[0], p[2] - from[2]) || 1;
     const dx = (p[0] - from[0]) / len;
     const dz = (p[2] - from[2]) / len;
-    const steps = Math.max(1, Math.round(len / 0.07));
+    const steps = Math.max(1, Math.round(len / 0.045));
     for (let k = 0; k < steps; k++) {
       const t = (k + 0.5) / steps;
       [-0.11, 0.11].forEach((side) => {
-        emit('spr', { position: [from[0] + (p[0] - from[0]) * t - dz * side, 0.09, from[2] + (p[2] - from[2]) * t + dx * side], tile: TILE.square, c: ['#1d1b1a', '#272422'], add: false, rot: 0, size: 0.1, size2: 0.1, life: 2.2, fade: 1.2, jitter: 0, a: 0.85 });
+        emit('spr', { position: [from[0] + (p[0] - from[0]) * t - dz * side, 0.09, from[2] + (p[2] - from[2]) * t + dx * side], tile: TILE.square, c: ['#1d1b1a', '#272422'], add: false, rot: 0, size: 0.13, size2: 0.13, life: 2.2, fade: 1.2, jitter: 0, a: 0.85 });
       });
     }
     if (n % 2 === 0) emit('spr', { position: down(p), tile: TILE.smoke, c: ['#9a9590', '#b9b4ae'], add: false, speed: 0.3, up: 0.4, size: 0.25, size2: 0.8, life: 0.7, a: 0.4, drag: 1.4 });
@@ -64,7 +64,7 @@ const TRAILS = {
 
   // loose sheets of paper fluttering out behind you
   paper: (emit, p, { n }) => {
-    emit('spr', { position: p, n: n % 2 ? 1 : 2, tile: TILE.square, c: ['#ffffff', '#f4f1e8', '#e9e5d8'], add: false, speed: 0.7, up: 1.3, uj: 0.6, size: 0.24, size2: 0.2, life: 1.7, grav: 0.18, drag: 1.1, swirl: 1.6, rotv: 5, fade: 0.5 });
+    emit('spr', { position: p, n: n % 2 ? 1 : 2, tile: TILE.square, c: ['#ffffff', '#f4f1e8', '#e9e5d8'], add: false, speed: 0.8, up: 1.4, uj: 0.6, size: 0.42, size2: 0.36, life: 2, grav: 0.16, drag: 1.1, swirl: 1.6, rotv: 4, fade: 0.6 });
   },
 
   // petals shed along the path
