@@ -153,7 +153,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, down, pickable, onPick, stunt, star, knock, seed, layout }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, tint, down, pickable, onPick, stunt, star, knock, seed, layout }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -185,7 +185,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const dropTrail = (drop = 0.08) => {
       if (!a.trailAt) a.trailAt = a.pos.clone();
       else if (a.pos.distanceTo(a.trailAt) > TRAIL_GAP) {
-        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, color, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
+        playTrail(trail, [a.pos.x, a.pos.y - drop, a.pos.z], { by: seat, color: tint, prev: [a.trailAt.x, a.trailAt.y - drop, a.trailAt.z] });
         a.trailAt.copy(a.pos);
       }
     };
@@ -217,7 +217,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         seg.begun = true;
         if (seg.impact) {
           sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
-          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim, color: palette?.[seg.impact.by], victimColor: palette?.[seg.impact.victim] }, { sfx: (name, ...args) => sfx[name]?.(...args) });
+          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim, color: tint, victimColor: palette?.[seg.impact.victim] }, { sfx: (name, ...args) => sfx[name]?.(...args) });
         }
       }
       if (t >= 1) {
@@ -411,9 +411,10 @@ function PathDots({ move, color = SEAT_COLORS[move.seat], layout }) {
   });
 }
 
-export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, layout = CLASSIC_LAYOUT }) {
+export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, devSeat = -1, layout = CLASSIC_LAYOUT }) {
   const basePalette = colors || board.colors || SEAT_COLORS;
   const palette = useRainbow(basePalette);
+  const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, basePalette[s]));
   useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -473,6 +474,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               killFx={killFx}
               trail={trails[seat]}
               palette={palette}
+              tint={tint}
               down={downOf(seat, marble)}
               pickable={!!picking && seat !== picking.notSeat && !picking.skip?.includes(`${seat}:${marble}`)}
               onPick={() => fx.emit('picked', { seat, marble })}

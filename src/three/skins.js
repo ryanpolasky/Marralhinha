@@ -1179,23 +1179,26 @@ const MARBLES = {
   },
 };
 
-const hueGlsl = (name) => `
+const hueGlsl = (name, sat) => `
 uniform float ${name};
+${sat ? `uniform float ${name}Sat;` : ''}
 vec3 ${name}Spin(vec3 c, float a) {
   const vec3 k = vec3(0.57735);
-  return max(c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a)), 0.0);
+  vec3 spun = max(c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a)), 0.0);
+  return ${sat ? `mix(vec3(dot(spun, vec3(0.299, 0.587, 0.114))), spun, ${name}Sat)` : 'spun'};
 }
 void main() {`;
 
 // Spins the final lit color's hue on the GPU, so emissive shaders follow too
-function hueSpin(material, uniform, name, tag) {
+function hueSpin(material, uniform, name, tag, sat = null) {
   const prevCompile = material.onBeforeCompile;
   const baseKey = material.customProgramCacheKey();
   material.onBeforeCompile = (shader, renderer) => {
     prevCompile.call(material, shader, renderer);
     shader.uniforms[name] = uniform;
+    if (sat) shader.uniforms[`${name}Sat`] = sat;
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', hueGlsl(name))
+      .replace('void main() {', hueGlsl(name, !!sat))
       .replace('#include <opaque_fragment>', `outgoingLight = ${name}Spin(outgoingLight, ${name});\n#include <opaque_fragment>`);
   };
   material.customProgramCacheKey = () => `${baseKey}:${tag}`;
@@ -1213,6 +1216,16 @@ const _hsl = {};
 const _tint = new THREE.Color();
 const DEV_HUE = _tint.set('#ff4a5a').getHSL(_hsl).h;
 export const devTintAngle = (color) => (color?.main ? (_tint.set(color.main).getHSL(_hsl).h - DEV_HUE) * TAU : 0);
+const chroma = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return (Math.max(...rgb) - Math.min(...rgb)) / 255;
+};
+export const devTintSat = (color) => (color?.main ? Math.min(1, chroma(color.main) / 0.35) : 1);
+const setDevTint = ([angle, sat], color) => {
+  angle.value = devTintAngle(color);
+  sat.value = devTintSat(color);
+};
 
 export function marbleSkin(itemId, seat, color = null) {
   const key = MARBLES[skinKey(itemId)] ? skinKey(itemId) : 'classic';
@@ -1573,7 +1586,7 @@ export function diceSkin(itemId) {
   return cached(`dice:${key}`, () => {
     const spec = DICE[key];
     const time = { value: 0 };
-    const tint = { value: 0 };
+    const tint = [{ value: 0 }, { value: 1 }];
     return DIE_FACE_ORDER.map((value) => {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
@@ -1722,7 +1735,7 @@ export function diceSkin(itemId) {
         };
       }
       if (key === 'dev') {
-        hueSpin(material, tint, 'uDevTint', 'tint');
+        hueSpin(material, tint[0], 'uDevTint', 'tint', tint[1]);
         material.userData.devTint = tint;
       }
       return material;
@@ -1734,7 +1747,7 @@ export function animateDiceSkin(materials, color = null) {
   const time = materials[0]?.userData.skinTime;
   if (time) time.value = materials[0].userData.reducedMotion?.matches ? 0 : performance.now() / 1000;
   const tint = materials[0]?.userData.devTint;
-  if (tint) tint.value = devTintAngle(color);
+  if (tint) setDevTint(tint, color);
 }
 
 const WOODS = {
@@ -4617,11 +4630,16 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
     if (spec.core) mats.core = new THREE.MeshBasicMaterial({ color: spec.core });
     if (spec.animate) mats.animate = spec.animate;
     if (resolved === 'dev') {
-      mats.devTint = { value: 0 };
-      [...new Set([...mats.surfaces, mats.cup, mats.brass])].forEach((m) => hueSpin(m, mats.devTint, 'uDevTint', 'tint'));
+      mats.devTint = [{ value: 0 }, { value: 1 }];
+      [...new Set([...mats.surfaces, mats.cup, mats.brass])].forEach((m) => hueSpin(m, mats.devTint[0], 'uDevTint', 'tint', mats.devTint[1]));
     }
     return mats;
   });
+}
+
+export function tintTable(material, materials) {
+  if (materials.devTint) hueSpin(material, materials.devTint[0], 'uDevTint', 'tint', materials.devTint[1]);
+  return material;
 }
 
 // tint is the owner's seat color for skins that follow it; null keeps the skin's own colors
@@ -4631,5 +4649,5 @@ export function animateBoardSkin(materials, t, tint = null) {
     if (time) time.value = m.userData.reducedMotion?.matches ? 0 : t;
   });
   materials.animate?.(materials, t);
-  if (materials.devTint) materials.devTint.value = devTintAngle(tint);
+  if (materials.devTint) setDevTint(materials.devTint, tint);
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { planMove } from './Marbles';
-import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle } from './skins';
+import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle, devTintSat } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
@@ -328,6 +328,10 @@ test('Dev kit effects take the live seat color and fall back to red with no play
   expect(devTintAngle(null)).toBe(0);
   expect(Math.abs(devTintAngle(DEV_RED))).toBeLessThan(0.2);
   expect(Math.abs(devTintAngle(purple))).toBeGreaterThan(1);
+  expect(devTintSat(null)).toBe(1);
+  expect(devTintSat(DEV_RED)).toBe(1);
+  expect(devTintSat({ main: '#2e9e55' })).toBe(1);
+  expect(devTintSat({ main: '#eef2f8' })).toBeLessThan(0.15);
 });
 
 test('a marble hopping past another taps on top of it instead of passing through', () => {

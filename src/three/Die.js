@@ -403,8 +403,9 @@ function DiceStorm({ stunt, skin, color, assets, layout, onPickDie }) {
   );
 }
 
-export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, layout = layoutFor('classic') }) {
+export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, layout = layoutFor('classic') }) {
   const palette = useRainbow(colors);
+  const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const assets = useDieAssets();
   const diceStunt = (stunts || []).find((s) => s.kind === 'dice' && (stuntLive(s) || (s.cut && cutClock(s) < 0.5))) || null;
   const stormLive = !!diceStunt && !diceStunt.cut;
@@ -425,13 +426,13 @@ export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRol
 
   return (
     <>
-      {diceStunt && <DiceStorm key={diceStunt.id} stunt={diceStunt} skin={skins[diceStunt.seat]} color={palette?.[diceStunt.seat]} assets={assets} layout={layout} onPickDie={onPickDie} />}
+      {diceStunt && <DiceStorm key={diceStunt.id} stunt={diceStunt} skin={skins[diceStunt.seat]} color={tint} assets={assets} layout={layout} onPickDie={onPickDie} />}
       {dice.map((d) => (
         <DieBody
           key={`${d.seat}:${layout.spec.id}`}
           seat={d.seat}
           skin={skins[d.seat]}
-          color={palette?.[d.seat]}
+          color={tint}
           spawnT={d.spawnT}
           lastRoll={stormLive ? null : lastRoll}
           active={d.seat === activeSeat}
