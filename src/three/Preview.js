@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Lights } from './Stage';
 import FrameCap from './FrameCap';
+import { tuneRenderer } from './quality';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
 import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
@@ -225,7 +226,10 @@ export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
   return (
-    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={({ camera }) => camera.lookAt(0, stage ? 0.9 : 0, 0)} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
+    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={(state) => {
+        tuneRenderer(state);
+        state.camera.lookAt(0, stage ? 0.9 : 0, 0);
+      }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <FrameCap />
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />
       <CompileGate key={`${itemId}-${seat}-${color?.main || ''}`} onReady={onReady}>

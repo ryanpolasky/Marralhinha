@@ -9,14 +9,17 @@ import KillFxLayer from './KillFxLayer';
 import Hits from './Hits';
 import Stunts from './Stunts';
 import LoadoutWarmer from './LoadoutWarmer';
+import StaticWarmer from './StaticWarmer';
 import Pings, { snapToSpot } from './Pings';
 import { Lights } from './Stage';
 import { fx } from './fx';
-import { quality as defaultQuality, antialiasFor } from './quality';
+import { quality as defaultQuality, antialiasFor, tuneRenderer } from './quality';
 import FrameCap from './FrameCap';
+import useMedia, { PHONE_QUERY } from '../components/useMedia';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 
 const BG = '#0b1f24';
+const PHONE_FPS = 30;
 const NO_MOVES = [];
 const NO_COSMETICS = [];
 const NO_PINGS = [];
@@ -473,6 +476,9 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
   }, [onRoll]);
   const canvasRef = useRef(null);
   useTapToRoll(canvasRef, canRoll, roll);
+  const phoneScreen = useMedia(PHONE_QUERY);
+  const touch = useMedia('(pointer: coarse)');
+  const phone = phoneScreen && touch;
 
   return (
     <Canvas
@@ -483,8 +489,9 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       camera={{ fov: 38, near: 0.5, far: 400, position: [0, 34, 34] }}
       gl={{ antialias: antialiasFor(quality), powerPreference: 'high-performance' }}
       onPointerMissed={() => setSelected(null)}
+      onCreated={tuneRenderer}
     >
-      <FrameCap paused={paused} />
+      <FrameCap paused={paused} fps={phone ? PHONE_FPS : 60} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />
@@ -511,6 +518,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <Hits hits={board.hits} board={board} layout={layout} />
         <Stunts stunts={board.stunts} prep={board.stuntPrep} onWarm={onStuntWarm} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
+        <StaticWarmer />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} />

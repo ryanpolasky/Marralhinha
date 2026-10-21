@@ -32,7 +32,7 @@ import Leaderboard from './components/Leaderboard';
 import { ReportModal, RepliesModal } from './components/Reports';
 import { DialogHost, ask } from './components/Dialog';
 
-const Scene = lazy(() => import('./three/Scene'));
+const Scene = lazy(() => import(/* webpackPreload: true */ './three/Scene'));
 
 const ROOM_KEY = 'marralhinha:room';
 const NO_NAMES = [null, null, null, null];
