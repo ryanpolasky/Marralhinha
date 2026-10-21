@@ -440,7 +440,7 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, boardSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false, onStuntWarm }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, devSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false, onStuntWarm }) {
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
   const pointer = useRef(null);
@@ -489,7 +489,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />
       <Turntable viewSeat={viewSeat}>
-        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} colors={seatColors} ownerSeat={boardSeat} layout={layout} />
+        <Board active={board.active} names={names} turn={board.phase === 'over' ? null : board.turn} showNames={mode === 'lobby'} skin={boardSkinId} colors={seatColors} ownerSeat={devSeat} layout={layout} />
         <KillFxLayer layout={layout} />
         <Marbles
           board={board}
@@ -505,6 +505,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
           onMove={onMove}
           keyMove={keyMove}
           mySeat={mySeat}
+          devSeat={devSeat}
           layout={layout}
         />
         <Hits hits={board.hits} board={board} layout={layout} />
@@ -512,7 +513,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
-        <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} layout={layout} />
+        <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
     </Canvas>

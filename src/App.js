@@ -496,8 +496,9 @@ const App = () => {
   // A Dev's mid-game pick wins over the starter's board
   const tableBoard = game?.boardOverride || (game && game.boardSeat !== null && boardRevealed ? view.seats[game.boardSeat]?.cosmetics?.board : null);
   const boardSkinId = tableBoard || account?.equipped?.board;
-  // Whose seat color a color-following board takes
-  const boardSeat = game?.boardOverride ? view.seats.findIndex((s) => s?.tags?.includes('dev')) : tableBoard ? game.boardSeat : mySeat;
+  // The dev kit takes a seated dev's color, mine first; red when no dev is playing
+  const devSeats = inRoom ? [0, 1, 2, 3].filter((s) => view.seats[s]?.tags?.includes('dev')) : [];
+  const devSeat = devSeats.includes(mySeat) ? mySeat : devSeats[0] ?? -1;
   // Build the starter's board while the wheel spins (after the camera has settled) so the reveal swaps instead of hitching
   const pendingBoard = game && !boardRevealed && game.boardSeat !== null ? view.seats[game.boardSeat]?.cosmetics?.board : null;
   useEffect(() => {
@@ -692,7 +693,7 @@ const App = () => {
               paused={!!modal && sceneProps.mode !== 'game'}
               mySeat={inRoom ? mySeat : -1}
               boardSkinId={boardSkinId}
-              boardSeat={inRoom ? boardSeat : -1}
+              devSeat={devSeat}
               onRoll={sceneRoll}
               onMove={sceneMove}
               onPickDie={sceneProps.canPickDie ? scenePickDie : undefined}
