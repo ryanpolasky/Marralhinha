@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
-import { boardSkin, animateBoardSkin } from './skins';
+import { boardSkin, animateBoardSkin, tintTable } from './skins';
 import { itemsForSlot, skinKey } from '../game/catalog';
 import DefuseProps from './DefuseProps';
 import PicnicProps from './PicnicProps';
@@ -213,19 +213,22 @@ function TurnGem({ turn, colors = SEAT_COLORS, layout }) {
 
 const TABLE_R = 1200;
 
-function Table({ texture }) {
-  const map = useMemo(() => {
-    const t = texture.clone();
+function Table({ materials }) {
+  const texture = materials.felt;
+  const material = useMemo(() => {
+    const map = texture.clone();
     const repeat = TABLE_R * 2 / (texture.userData.tileSize || 12);
-    t.repeat.set(repeat, repeat);
-    t.needsUpdate = true;
-    return t;
-  }, [texture]);
-  useEffect(() => () => map.dispose(), [map]);
+    map.repeat.set(repeat, repeat);
+    map.needsUpdate = true;
+    return tintTable(new THREE.MeshStandardMaterial({ map, roughness: 0.95 }), materials);
+  }, [texture, materials]);
+  useEffect(() => () => {
+    material.map.dispose();
+    material.dispose();
+  }, [material]);
   return (
-    <mesh rotation-x={-Math.PI / 2} position={[0, TABLE_Y, 0]} receiveShadow>
+    <mesh rotation-x={-Math.PI / 2} position={[0, TABLE_Y, 0]} material={material} receiveShadow>
       <circleGeometry args={[TABLE_R, 96]} />
-      <meshStandardMaterial map={map} roughness={0.95} />
     </mesh>
   );
 }
@@ -418,7 +421,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
 
   return (
     <group>
-      {table && <Table texture={materials.felt} />}
+      {table && <Table materials={materials} />}
       {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
       {Props && <Props layout={layout} y={TABLE_Y} preview={preview} />}
       <mesh geometry={boardGeometry} material={materials.board} castShadow receiveShadow />

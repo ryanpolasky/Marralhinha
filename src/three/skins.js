@@ -4637,6 +4637,11 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
   });
 }
 
+export function tintTable(material, materials) {
+  if (materials.devTint) hueSpin(material, materials.devTint[0], 'uDevTint', 'tint', materials.devTint[1]);
+  return material;
+}
+
 // tint is the owner's seat color for skins that follow it; null keeps the skin's own colors
 export function animateBoardSkin(materials, t, tint = null) {
   materials.surfaces.forEach((m) => {
