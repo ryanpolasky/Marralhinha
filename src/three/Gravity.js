@@ -96,6 +96,7 @@ uniform float uDisk;
 uniform float uGlow;
 uniform float uFade;
 uniform float uWarp;
+uniform float uSwirl;
 uniform vec3 uNormal;
 uniform vec3 uE1;
 uniform vec3 uE2;
@@ -196,11 +197,28 @@ void main() {
     vec3 bent = exitW + dir * (den < -0.05 ? dot(plane - exitW, nv) / den : uLens);
     vec3 straight = cameraPosition + rd * (dot(plane - cameraPosition, nv) / dot(rd, nv));
     vec3 delta = (bent - straight) * (1.0 - smoothstep(0.45, 0.95, rim)) * uWarp;
-    vec4 g = grab(straight + delta);
-    bg = vec3(grab(straight + delta * 1.035).r, g.g, grab(straight + delta * 0.965).b);
-    bgA = g.a;
+    vec3 flow = vec3(0.0);
+    if (uSwirl > 0.0) {
+      vec3 v = straight + delta - vCenter;
+      v -= nv * dot(v, nv);
+      float rho = max(length(v) / uUnit, 0.01);
+      vec3 rh = v / (rho * uUnit);
+      flow = (cross(nv, rh) - rh * 0.45) * uSwirl * uUnit * pow(BCRIT / max(rho, BCRIT), 0.8) * (1.0 - smoothstep(0.6, 0.98, rim));
+    }
+    // Flow-map drain: two phases half a cycle apart, crossfaded so the board never winds up
+    float f1 = fract(uTime * 0.35);
+    float f2 = fract(uTime * 0.35 + 0.5);
+    float wgt = 1.0 - abs(2.0 * f1 - 1.0);
+    vec3 o1 = -flow * f1;
+    vec3 o2 = -flow * f2;
+    vec4 g1 = grab(straight + delta + o1);
+    vec4 g2 = grab(straight + delta + o2);
+    vec3 b1 = vec3(grab(straight + delta * 1.035 + o1).r, g1.g, grab(straight + delta * 0.965 + o1).b);
+    vec3 b2 = vec3(grab(straight + delta * 1.035 + o2).r, g2.g, grab(straight + delta * 0.965 + o2).b);
+    bg = mix(b2, b1, wgt);
+    bgA = mix(g2.a, g1.a, wgt);
     vec4 c0 = toClip(straight);
-    vec4 c1 = toClip(straight + delta);
+    vec4 c1 = toClip(straight + delta + flow);
     moved = smoothstep(0.0005, 0.003, length(c1.xy / c1.w - c0.xy / c0.w));
     vec3 stars = starfield(dir) * (1.0 - bgA);
     bg += stars;
@@ -294,6 +312,7 @@ export const holeMaterial = () => {
     uGlow: { value: 1 },
     uFade: { value: 1 },
     uWarp: { value: 1 },
+    uSwirl: { value: 0 },
     uNormal: { value: new THREE.Vector3(0, 1, 0) },
     uE1: { value: new THREE.Vector3(1, 0, 0) },
     uE2: { value: new THREE.Vector3(0, 0, 1) },
@@ -487,13 +506,12 @@ void main() {
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   float lit = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-  gl_FragColor.a = max(lit, min(1.0, peak * 0.45) * (1.0 - smoothstep(0.35, 0.8, r)));
+  gl_FragColor.a = max(lit, min(1.0, peak * 0.3) * (1.0 - smoothstep(0.2, 0.6, r)));
 }`;
 
 const DEBRIS_GEO = new THREE.PlaneGeometry(1, 1);
 const TAU = Math.PI * 2;
-const FALLERS = 5;
-const MOONS = 2;
+const CRUMBS = 4;
 const TAIL = 12;
 const RIN_DEBRIS = 2.3;
 
@@ -507,66 +525,57 @@ const rng = (seed) => {
   };
 };
 
-const spawnMote = (m, rand, fresh) => {
+const spawnCrumb = (m, rand, flat, fresh) => {
   m.theta = rand() * TAU;
-  if (m.moon) {
-    m.r0 = 7.6 + rand() * 1.4;
-    m.tilt = (rand() < 0.5 ? -1 : 1) * (0.45 + rand() * 0.35);
-    m.size = 0.85 + rand() * 0.3;
-    return m;
-  }
-  m.r0 = 6.4 + rand() * 2.8;
-  m.tilt = (rand() - 0.5) * (rand() < 0.3 ? 1.1 : 0.25);
-  m.life = 5 + rand() * 4;
-  m.p = fresh ? rand() : 0;
-  m.size = 0.55 + rand() * 0.5;
+  m.r0 = 5.5 + rand() * 3;
+  m.sweep = 0.8 + rand() * 0.8;
+  m.h0 = flat ? -0.2 : (rand() - 0.5) * 2;
+  m.life = 1.4 + rand() * 0.8;
+  m.p = fresh ? rand() * 1.4 - 0.8 : -(1.5 + rand() * 3) / m.life;
+  m.size = 0.6 + rand() * 0.4;
   return m;
 };
 
-
-// Motes in hole units: a few spiral in and get swallowed, a couple of moons ride tilted orbits further out
 const _up = new THREE.Vector3(0, 1, 0);
 const _east = new THREE.Vector3(1, 0, 0);
 const _south = new THREE.Vector3(0, 0, 1);
 
 export const makeDebris = (seed = 0, flat = false) => {
   const rand = rng(seed + 1);
-  return { rand, tiltK: flat ? 0.12 : 1, lift: flat ? 1.6 : 0, motes: Array.from({ length: FALLERS + MOONS }, (_, i) => spawnMote({ moon: i >= FALLERS, p: 0 }, rand, true)) };
+  return { rand, flat, motes: Array.from({ length: CRUMBS }, () => spawnCrumb({}, rand, flat, true)) };
+};
+
+const crumbAt = (m, p, n, e1, e2, out) => {
+  const q = p ** 1.8;
+  const r = m.r0 + (RIN_DEBRIS - m.r0) * q;
+  const th = m.theta + m.sweep * q;
+  return out.copy(e1).multiplyScalar(Math.cos(th) * r).addScaledVector(e2, Math.sin(th) * r).addScaledVector(n, m.h0 * (1 - q));
 };
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
-const _v = new THREE.Vector3();
 
+// Crumbs in hole units: lift off nearby, stretch as they accelerate in, flash and vanish at the horizon
 export const stepDebris = (debris, dt, n, e1, e2, toCam, out) => {
   let k = 0;
   debris.motes.forEach((m) => {
-    if (!m.moon) {
-      m.p += dt / m.life;
-      if (m.p >= 1) spawnMote(m, debris.rand, false);
-    }
-    const p = m.moon ? 0 : m.p;
-    const r = m.moon ? m.r0 : m.r0 + (RIN_DEBRIS - m.r0) * p ** 2.2;
-    const w = 22 * r ** -1.5;
-    m.theta += w * dt;
-    const fade = m.moon ? 1 : THREE.MathUtils.smoothstep(p, 0, 0.4);
-    const shrink = m.moon ? 1 : 1 - THREE.MathUtils.smoothstep(p, 0.55, 1);
-    _a.copy(e1);
-    _b.copy(e2).multiplyScalar(Math.cos(m.tilt * debris.tiltK)).addScaledVector(n, Math.sin(m.tilt * debris.tiltK));
+    m.p += dt / m.life;
+    if (m.p >= 1) spawnCrumb(m, debris.rand, debris.flat, false);
+    const p = Math.max(0, m.p);
+    const live = m.p >= 0 ? 1 : 0;
+    const glint = THREE.MathUtils.smoothstep(p, 0, 0.25);
+    const flash = 1 + THREE.MathUtils.smoothstep(p, 0.55, 0.85);
+    const shrink = 1 - THREE.MathUtils.smoothstep(p, 0.72, 1);
+    crumbAt(m, Math.max(0, p - 0.01), n, e1, e2, _b);
+    crumbAt(m, p, n, e1, e2, _a);
+    const toward = _a.distanceTo(_b) > 1e-6 ? _a.clone().sub(_b).normalize().dot(toCam) : 0;
     for (let j = 0; j < TAIL; j++) {
-      const th = m.theta - j * Math.min(w * 0.024, 0.16 / r);
-      const rr = r * (1 + j * 0.006);
-      const c = Math.cos(th);
-      const s = Math.sin(th);
-      const lift = debris.lift * THREE.MathUtils.smoothstep(rr, RIN_DEBRIS, 6);
-      const x = (_a.x * c + _b.x * s) * rr + n.x * lift;
-      const y = (_a.y * c + _b.y * s) * rr + n.y * lift;
-      const z = (_a.z * c + _b.z * s) * rr + n.z * lift;
-      _v.copy(_a).multiplyScalar(-s).addScaledVector(_b, c);
+      const { x, y, z } = crumbAt(m, Math.max(0, p - j * 0.018 * (0.5 + 1.5 * p)), n, e1, e2, _a);
+      const rr = Math.hypot(x, y, z);
       const tail = 1 - j / TAIL;
       const depth = x * toCam.x + y * toCam.y + z * toCam.z;
       const hide = 1 - THREE.MathUtils.smoothstep(-depth, 0, 0.5) * (1 - THREE.MathUtils.smoothstep(Math.sqrt(Math.max(0, rr * rr - depth * depth)), BCRIT * 0.9, BCRIT * 1.1));
-      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: depth > 0, toward: _v.dot(toCam), size: m.size * shrink * tail ** 1.1 * (j ? 1 : 1.35), glow: fade * hide * tail ** 1.4 * (j ? 1 : 1.5), moon: m.moon });
+      out[k] = Object.assign(out[k] || {}, { x, y, z, r: rr, front: depth > 0, toward, size: live * m.size * (0.55 + 0.6 * THREE.MathUtils.smoothstep(p, 0, 0.6)) * shrink * tail ** 1.1 * (j ? 1 : 1.35), glow: live * glint * flash * hide * tail ** 1.4 * (j ? 1 : 1.5) });
       k += 1;
     }
   });
@@ -586,7 +595,7 @@ const debrisLayer = (renderOrder) => {
     blendSrcAlpha: THREE.OneFactor,
     blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
   });
-  const mesh = new THREE.InstancedMesh(DEBRIS_GEO, material, (FALLERS + MOONS) * TAIL);
+  const mesh = new THREE.InstancedMesh(DEBRIS_GEO, material, CRUMBS * TAIL);
   mesh.setColorAt(0, new THREE.Color());
   mesh.frustumCulled = false;
   mesh.renderOrder = renderOrder;
@@ -603,7 +612,7 @@ const _center = new THREE.Vector3();
 const _toCam = new THREE.Vector3();
 
 // energy eases between idle (~0.3) and moving (1)
-export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, motes = 3.4, flat = false }) {
+export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy = null, seed = 0, crumbScale = 3.4, flat = false }) {
   const { camera } = useThree();
   const { material, group, back, front, debris, placed } = useMemo(() => {
     const material = holeMaterial();
@@ -632,6 +641,7 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     u.uLens.value = size * 1.8;
     u.uDisk.value = 1.1 + 0.9 * e;
     u.uGlow.value = 0.6 + 0.7 * e;
+    u.uSwirl.value = 1.6 + 1.2 * e;
     diskFrame(camera, clock.current, u.uNormal.value, u.uE1.value, u.uE2.value);
 
     group.getWorldPosition(_center);
@@ -642,12 +652,11 @@ export function SingularityAura({ size = 0.335, color = SEAT_COLORS[0], energy =
     back.count = front.count = 0;
     placed.forEach((d) => {
       const layer = d.front ? front : back;
-      const heat = Math.min(1.4, (RIN_DEBRIS / d.r) ** 1.1 * (d.moon ? 0.75 : 1) * (1 + 0.35 * d.toward));
-      _col.copy(u.uCool.value).lerp(u.uMid.value, THREE.MathUtils.smoothstep(heat, 0.2, 0.5));
-      _col.lerp(u.uHot.value, THREE.MathUtils.smoothstep(heat, 0.45, 0.9));
-      _col.multiplyScalar(d.glow * bright * (1 + 0.6 * d.toward) ** 2 * (d.moon ? 1.6 : 2));
+      const heat = Math.min(1.4, (RIN_DEBRIS / d.r) ** 1.1 * (1 + 0.35 * d.toward));
+      _col.copy(u.uMid.value).lerp(u.uHot.value, THREE.MathUtils.smoothstep(heat, 0.15, 0.7));
+      _col.multiplyScalar(d.glow * bright * (1 + 0.6 * d.toward) ** 2 * 3);
       _pos.set(d.x, d.y, d.z).multiplyScalar(unit);
-      _scale.setScalar(d.size * unit * 0.75 * motes);
+      _scale.setScalar(d.size * unit * 0.75 * crumbScale);
       layer.setMatrixAt(layer.count, _m.compose(_pos, _q, _scale));
       layer.setColorAt(layer.count, _col);
       layer.count += 1;
