@@ -72,7 +72,7 @@ class SceneBoundary extends React.Component {
 // The starter's board is part of the wheel's reveal: keep your own board until the wheel lands
 function useBoardRevealed(game) {
   const pick = game?.pick;
-  const wait = pick?.reason === 'wheel' ? START_WHEEL_SPIN_MS - (Date.now() - pick.t) : 0;
+  const wait = pick?.reason === 'wheel' ? (game.startPrep ? START_WHEEL_SPIN_MS : START_WHEEL_SPIN_MS - (Date.now() - pick.t)) : 0;
   const [, tick] = useState(0);
   useEffect(() => {
     if (wait <= 0) return undefined;

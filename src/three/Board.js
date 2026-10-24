@@ -403,20 +403,19 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
     if (!table) return undefined;
     let alive = true;
     const off = onBoardSkinWarm((id) => {
-      if (id) {
-        prepareSkin(id);
-        return;
-      }
+      if (id) return prepareSkin(id);
       const now = Date.now();
-      if (now - warmAllAt.current < 30000) return;
+      if (now - warmAllAt.current < 30000) return undefined;
       warmAllAt.current = now;
       const queue = itemsForSlot('board').map((b) => b.id);
-      const step = () => {
-        if (!alive || !queue.length) return;
-        prepareSkin(queue.shift(), false);
+      return new Promise((resolve) => {
+        const step = () => {
+          if (!alive || !queue.length) return resolve();
+          prepareSkin(queue.shift(), false);
+          idle(step);
+        };
         idle(step);
-      };
-      idle(step);
+      });
     });
     return () => {
       alive = false;

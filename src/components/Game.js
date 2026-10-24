@@ -169,7 +169,8 @@ function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, loc
 function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   const { pick } = game;
   const wheel = pick.reason === 'wheel';
-  const elapsedAtMount = useRef(Date.now() - pick.t).current;
+  const prep = !!game.startPrep;
+  const elapsedAtMount = useRef(prep ? 0 : Date.now() - pick.t).current;
   const [spun, setSpun] = useState(elapsedAtMount >= START_WHEEL_SPIN_MS);
   const [landed, setLanded] = useState(!wheel || elapsedAtMount >= START_WHEEL_SPIN_MS);
   const contenders = game.active;
@@ -180,7 +181,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   const target = 360 * 5 - (index * slice + slice / 2) + wobble;
 
   useEffect(() => {
-    if (!wheel || elapsedAtMount >= START_WHEEL_SPIN_MS) return undefined;
+    if (!wheel || prep || elapsedAtMount >= START_WHEEL_SPIN_MS) return undefined;
     const spin = requestAnimationFrame(() => setSpun(true));
     const elapsed = Date.now() - pick.t;
     const land = setTimeout(() => {
@@ -191,7 +192,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
       cancelAnimationFrame(spin);
       clearTimeout(land);
     };
-  }, [wheel, pick.t, elapsedAtMount]);
+  }, [wheel, prep, pick.t, elapsedAtMount]);
 
   const palette = game.colors || SEAT_COLORS;
   const livePalette = useRainbow(contenders.map((s) => palette[s] || SEAT_COLORS[s]));
@@ -213,10 +214,10 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
         <div className="start-kicker">{wheel ? (landed ? 'The wheel says' : 'Who starts?') : 'Champion starts'}</div>
         <div className="start-name">
           <span className={`marble-dot${color.rainbow ? ' rainbow' : ''}`} />
-          {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : 'Spinning…'}
+          {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : prep ? 'Getting ready…' : 'Spinning…'}
         </div>
         {landed && <div className="start-sub">Playing on {boardSeat === mySeat ? 'your' : `${nameOf(boardSeat)}'s`} board{ITEMS[board] ? ` · ${ITEMS[board].name}` : ''}</div>}
-        {landed && <button type="button" className="btn secondary start-continue" onClick={onDismiss}>Continue</button>}
+        {landed && !prep && <button type="button" className="btn secondary start-continue" onClick={onDismiss}>Continue</button>}
       </div>
     </div>
   );
@@ -1151,7 +1152,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
     );
   };
   const now = Date.now();
-  const shared = game.log.filter((entry) => (!entry.hold || entry.t <= now) && (!rollPending || entry.chat || entry.t < game.lastRoll.t));
+  const shared = game.log.filter((entry) => (!entry.hold || (entry.t <= now && !game.startPrep)) && (!rollPending || entry.chat || entry.t < game.lastRoll.t));
   const log = [...(room.chat || []), ...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);

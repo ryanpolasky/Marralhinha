@@ -19,6 +19,7 @@ export const PING_LIFE_MS = 3000;
 export const startPendingFor = (game, now = Date.now()) => {
   if (!game?.pick) return 0;
   const total = game.pick.reason === 'wheel' ? START_WHEEL_MS : START_WINNER_MS;
+  if (game.startPrep) return total;
   return Math.max(0, total - (now - game.pick.t));
 };
 

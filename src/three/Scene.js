@@ -17,6 +17,7 @@ import { quality as defaultQuality, antialiasFor, tuneRenderer } from './quality
 import FrameCap from './FrameCap';
 import useMedia, { PHONE_QUERY } from '../components/useMedia';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
+import { warmBoardSkin } from '../game/skinWarm';
 
 const BG = '#0b1f24';
 const PHONE_FPS = 30;
@@ -406,6 +407,30 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
+// While the server parks a fresh game on its ready-check: compile everything the first spin would
+// otherwise trip over (the live scene plus the starter's board skin), then report back
+function StartWarmer({ prep, skin, onWarm }) {
+  const { gl, camera, scene } = useThree();
+  const id = prep?.id;
+  useEffect(() => {
+    if (!id) return undefined;
+    let alive = true;
+    let compiled;
+    try {
+      compiled = gl.compileAsync ? gl.compileAsync(scene, camera) : Promise.resolve(gl.compile(scene, camera));
+    } catch {
+      compiled = Promise.resolve();
+    }
+    Promise.allSettled([compiled, skin ? warmBoardSkin(skin) : null]).then(() => {
+      if (alive) onWarm?.(id);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id, skin, gl, scene, camera, onWarm]);
+  return null;
+}
+
 const TAP_MS = 280;
 const TAP_SLOP = 10;
 
@@ -518,6 +543,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <Hits hits={board.hits} board={board} layout={layout} />
         <Stunts stunts={board.stunts} prep={board.stuntPrep} onWarm={onStuntWarm} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
+        <StartWarmer prep={board.startPrep} skin={cosmetics[board.boardSeat]?.board} onWarm={onStuntWarm} />
         <StaticWarmer />
         <Pings pings={pings} teams={teams} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}

@@ -182,6 +182,7 @@ test('completed games feed profile, public cards and the marbles-home leaderboar
   room.attach(ana.id, 'ana');
   room.attach(rui.id, 'rui');
   room.start(ana.id);
+  room.playStart();
   const game = room.game;
   game.turn = 0;
   game.phase = 'move';
@@ -217,6 +218,7 @@ test('reconnect: a disconnected player gets one grace window, then the bot plays
   room.attach('u2', 's2');
   room.pickStarter = () => ({ seat: 0, reason: 'winner' });
   room.start('u1');
+  room.playStart();
 
   // Ana drops mid-turn: the turn keeps waiting out the grace, no bot yet
   room.detach('u1', 's1');
@@ -253,6 +255,7 @@ test('step away while disconnected: still bot speed, no extra grace', (t) => {
   room.attach('u2', 's2');
   room.pickStarter = () => ({ seat: 0, reason: 'winner' });
   room.start('u1');
+  room.playStart();
 
   room.stepAway('u1', true);
   room.detach('u1', 's1');

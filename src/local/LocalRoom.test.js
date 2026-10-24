@@ -2,6 +2,8 @@ import { LocalRoom, loadLocal, savedGameExists, savedGameAt, discardSavedGame } 
 
 beforeEach(() => localStorage.clear());
 
+const go = (room) => room.action('game:stuntWarm', { id: room.game?.startPrep?.id });
+
 function playOut(room) {
   for (let i = 0; i < 20000 && room.game.phase !== 'over'; i++) {
     const { game } = room;
@@ -13,6 +15,7 @@ function playOut(room) {
 test('two humans can play a full game and the view follows the active player', () => {
   const room = new LocalRoom();
   room.action('game:start');
+  go(room);
   const first = room.view();
   expect(first.local).toBe(true);
   expect(first.seats[first.game.turn].id).toBe(first.activePlayerId);
@@ -36,6 +39,7 @@ test('humans cannot act on a bot turn', () => {
   const room = new LocalRoom();
   room.action('local:seat', { seat: 2, kind: 'bot' });
   room.action('game:start');
+  go(room);
   while (!room.seats[room.game.turn].isBot) {
     if (room.game.phase === 'roll') room.action('game:roll');
     else room.action('game:move', { moveId: room.game.legalMoves[0].id });
@@ -52,6 +56,7 @@ test('saves to localStorage and resumes an unfinished game', () => {
   const saved = loadLocal();
   const resumed = new LocalRoom(saved);
   expect(resumed.seats[0].name).toBe('Ana');
+  expect(resumed.game.startPrep).toBeUndefined();
   expect(resumed.game.turn).toBe(room.game.turn);
 });
 
@@ -59,6 +64,7 @@ test('discarding a saved game keeps the seat setup but drops the game', () => {
   const room = new LocalRoom();
   room.action('local:rename', { seat: 0, name: 'Ana' });
   room.action('game:start');
+  go(room);
   expect(savedGameAt()).toBeGreaterThan(0);
   discardSavedGame();
   expect(savedGameExists()).toBe(false);
@@ -69,9 +75,11 @@ test('discarding a saved game keeps the seat setup but drops the game', () => {
 test('rematch starts a fresh game with the winner first', () => {
   const room = new LocalRoom();
   room.action('game:start');
+  go(room);
   playOut(room);
   const winner = room.game.winners[0];
   room.action('game:rematch');
+  go(room);
   expect(room.game.phase).toBe('roll');
   expect(room.game.turn).toBe(winner);
 });

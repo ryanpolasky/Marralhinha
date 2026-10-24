@@ -13,6 +13,7 @@ function startedRoom() {
   room.attach('u1', 's1');
   room.attach('u2', 's2');
   room.start('u1');
+  room.playStart();
   return { room, reactions };
 }
 
@@ -286,6 +287,7 @@ test('connected players get a turn clock that chat never resets; timing out twic
   room.attach('u2', 's2');
   room.pickStarter = () => ({ seat: 0, reason: 'winner' });
   room.start('u1');
+  room.playStart();
   const first = room.view().turnEndsIn;
   assert.ok(first >= 30000 && first <= 33000, `turn clock starts after the intro (${first})`);
 
@@ -323,6 +325,7 @@ test('the host sets the turn timer in the lobby: 15-45s, or no limit at all', (t
   room.setTurnTime('u1', 15);
   room.pickStarter = () => ({ seat: 0, reason: 'winner' });
   room.start('u1');
+  room.playStart();
   assert.ok(room.view().turnEndsIn <= 15000 + 2200);
   assert.throws(() => room.setTurnTime('u1', 45), /already started/);
 
@@ -331,6 +334,7 @@ test('the host sets the turn timer in the lobby: 15-45s, or no limit at all', (t
   room.rematch('u1');
   room.setTurnTime('u1', null);
   room.start('u1');
+  room.playStart();
   assert.strictEqual(room.view().turnEndsIn, null, 'no clock without a limit');
   t.mock.timers.tick(10 * 60 * 1000);
   assert.strictEqual(room.seats[0].missed || 0, 0, 'nobody gets played for');
@@ -458,6 +462,7 @@ test('only an activity host can end a live game and bring the table back to lobb
   });
   assert.throws(() => room.endTable('u1'), /no active game/i);
   room.start('u1');
+  room.playStart();
   assert.ok(room.timer);
   assert.throws(() => room.endTable('u2'), /Only the host/);
   room.rematchVotes.add(room.seats[2].id);
@@ -613,6 +618,7 @@ function teamRoom(t, { botPartner = false } = {}) {
   room.seats.forEach((p, s) => p && !p.isBot && room.attach(p.userId, `s${s}`));
   room.setTeams('u0', true);
   room.start('u0');
+  room.playStart();
   return { room, sent };
 }
 
@@ -902,6 +908,59 @@ test('the ufo waits for every connected screen to warm up, or 15s, before it pla
   assert.strictEqual(room.game.stunts[0].id, slow, 'cutting while warming calls it off');
 });
 
+test('the start wheel waits for every connected screen to warm up, or 8s, before it spins', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1e6 });
+  const room = new Room('STRT', { onChange: () => {} });
+  t.after(() => room.dispose());
+  room.join({ userId: 'u1', name: 'Ana' });
+  room.join({ userId: 'u2', name: 'Rui' });
+  room.attach('u1', 's1');
+  room.attach('u2', 's2');
+  room.start('u1');
+  const { id } = room.view().game.startPrep;
+  assert.ok(id, 'the game parks on a ready-check');
+  assert.strictEqual(room.view().turnEndsIn, null, 'no turn clock while everyone warms');
+  const who = room.seats[room.game.turn].userId;
+  assert.throws(() => room.roll(who), /still loading/);
+  assert.throws(() => room.stunt('u1', { kind: 'flash', seat: 0, marble: 0 }), /still loading/);
+  const pickT = room.game.pick.t;
+  t.mock.timers.tick(500);
+  room.stuntWarm('u1', 's1', 'stale');
+  room.stuntWarm('u1', 's1', id);
+  assert.ok(room.game.startPrep, 'still waiting on the other player');
+  room.attach('u1', 's1b');
+  room.stuntWarm('u2', 's2', id);
+  assert.ok(room.game.startPrep, 'a second device counts too');
+  room.stuntWarm('u1', 's1b', id);
+  assert.ok(!room.game.startPrep);
+  assert.ok(room.game.pick.t > pickT, 'the wheel clock starts at go');
+  assert.strictEqual(room.game.log[0].t, room.game.pick.t + timing.START_WHEEL_SPIN_MS, 'the held feed entry lands with the wheel');
+  assert.ok(room.view().turnEndsIn > 0, 'the turn clock arms once everyone is warm');
+
+  const slow = new Room('SLOW', { onChange: () => {} });
+  t.after(() => slow.dispose());
+  slow.join({ userId: 'u1', name: 'Ana' });
+  slow.join({ userId: 'u2', name: 'Rui' });
+  slow.attach('u1', 's1');
+  slow.attach('u2', 's2');
+  slow.start('u1');
+  slow.detach('u2', 's2');
+  slow.stuntWarm('u1', 's1', slow.game.startPrep.id);
+  assert.ok(!slow.game.startPrep, 'a disconnected straggler cannot hold the lobby');
+
+  const stuck = new Room('STUK', { onChange: () => {} });
+  t.after(() => stuck.dispose());
+  stuck.join({ userId: 'u1', name: 'Ana' });
+  stuck.join({ userId: 'u2', name: 'Rui' });
+  stuck.attach('u1', 's1');
+  stuck.attach('u2', 's2');
+  stuck.start('u1');
+  t.mock.timers.tick(7999);
+  assert.ok(stuck.game.startPrep, 'still waiting on a stuck screen');
+  t.mock.timers.tick(1);
+  assert.ok(!stuck.game.startPrep, 'the cap fires and the wheel goes anyway');
+});
+
 test('dice storm rolls 50 dice, lets the dev burn them move by move, and reverts everything when cut', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
@@ -1001,6 +1060,7 @@ test('a bot waits out a close encounter instead of moving the marble that is up 
   room.addBot('u1', 1);
   room.pickStarter = () => ({ seat: 1, reason: 'winner' });
   room.start('u1');
+  room.playStart();
   const rolls = () => room.game.stats[1].rolls;
   room.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
   t.mock.timers.tick(5000);
@@ -1018,6 +1078,7 @@ test('a bot waits out a close encounter instead of moving the marble that is up 
   quick.addBot('u1', 1);
   quick.pickStarter = () => ({ seat: 1, reason: 'winner' });
   quick.start('u1');
+  quick.playStart();
   quick.stunt('u1', { kind: 'ufo', seat: 1, marble: 0 });
   quick.stuntWarm('u1', 's1', quick.game.stuntPrep.id);
   quick.cutStunt('u1', quick.game.stunts[0].id);

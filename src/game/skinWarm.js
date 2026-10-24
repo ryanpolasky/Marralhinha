@@ -8,4 +8,4 @@ export const onBoardSkinWarm = (fn) => {
   return () => warmers.delete(fn);
 };
 
-export const warmBoardSkin = (id = null) => warmers.forEach((fn) => fn(id));
+export const warmBoardSkin = (id = null) => Promise.all([...warmers].map((fn) => fn(id)));

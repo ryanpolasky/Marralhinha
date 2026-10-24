@@ -9,6 +9,8 @@ export const LOCAL_CODE = 'LOCAL';
 const BOT_DELAY_MS = 450;
 const BOT_NAMES = ['Rollo', 'Pebbles', 'Dicey', 'Clink'];
 
+const START_WARM_MAX_MS = 8000;
+
 const newId = () => Math.random().toString(36).slice(2, 10);
 const human = (n) => ({ id: newId(), name: `Player ${n}`, isBot: false, connected: true });
 const botSeat = (seat) => ({ id: newId(), name: BOT_NAMES[seat], isBot: true, connected: true });
@@ -51,7 +53,10 @@ export class LocalRoom {
     this.skin = null;
     this.listeners = new Set();
     this.timer = null;
-    this.schedule();
+    this.warmTimer = null;
+    // A saved game parked on the warm check just goes: nothing was connected to ack it
+    if (this.game?.startPrep) this.playStart();
+    else this.schedule();
   }
 
   subscribe(fn) {
@@ -65,6 +70,7 @@ export class LocalRoom {
 
   dispose() {
     clearTimeout(this.timer);
+    clearTimeout(this.warmTimer);
     this.listeners.clear();
   }
 
@@ -140,6 +146,8 @@ export class LocalRoom {
         return this.changed();
       case 'game:start':
         return this.start();
+      case 'game:stuntWarm':
+        return this.warm(payload.id);
       case 'game:roll':
         return this.roll();
       case 'game:move':
@@ -177,6 +185,31 @@ export class LocalRoom {
     const last = rematch ? this.game?.winners?.[0] : null;
     const starter = last !== undefined && last !== null && this.seats[last] ? { seat: last, reason: 'winner' } : { seat: this.active()[Math.floor(Math.random() * this.active().length)], reason: 'wheel' };
     this.game = rules.createGame(this.seats, { teams: this.teams, starter, boardSeat: null, variant: this.variant });
+    // Park the intro on the same ready-check as online rooms so the wheel never spins mid-compile
+    this.game.startPrep = { id: newId() };
+    clearTimeout(this.warmTimer);
+    this.warmTimer = setTimeout(() => this.playStart(), START_WARM_MAX_MS);
+    this.changed();
+  }
+
+  warm(id) {
+    if (this.game?.startPrep?.id !== id) return;
+    this.playStart();
+  }
+
+  playStart() {
+    clearTimeout(this.warmTimer);
+    const game = this.game;
+    if (!game?.startPrep) return;
+    delete game.startPrep;
+    const t = Date.now();
+    game.startedAt = t;
+    if (game.pick) {
+      game.pick.t = t;
+      game.log.forEach((e) => {
+        if (e.hold) e.t = t + timing.START_WHEEL_SPIN_MS;
+      });
+    }
     this.changed();
   }
 
@@ -188,12 +221,14 @@ export class LocalRoom {
 
   roll() {
     this.requireHumanTurn('roll');
+    if (this.game.startPrep) throw new Error('The game is still loading');
     rules.roll(this.game);
     this.changed();
   }
 
   move(moveId) {
     this.requireHumanTurn('move');
+    if (this.game.startPrep) throw new Error('The game is still loading');
     if (!this.game.legalMoves.some((m) => m.id === moveId)) throw new Error("That move isn't allowed");
     rules.move(this.game, moveId);
     this.changed();
@@ -203,7 +238,7 @@ export class LocalRoom {
     clearTimeout(this.timer);
     this.timer = null;
     const { game } = this;
-    if (!game || game.phase === 'over' || !this.seats[game.turn]?.isBot) return;
+    if (!game || game.phase === 'over' || game.startPrep || !this.seats[game.turn]?.isBot) return;
     const deadRoll = game.lastRoll?.noMoves && Date.now() - game.lastRoll.t < 250;
     const delay = BOT_DELAY_MS + Math.floor(Math.random() * 400) + timing.animationMs(game) + (deadRoll ? NO_MOVES_HOLD_MS : 0);
     this.timer = setTimeout(() => {
