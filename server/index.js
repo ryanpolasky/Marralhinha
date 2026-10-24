@@ -262,6 +262,8 @@ io.on('connection', (socket) => {
     socket.data.code = room.code;
     socket.join(room.code);
     room.attach(userId, socket.id, { blitz: socket.data.blitz });
+    // The join ack can still get dropped mid-flap, so the session is pushed on its own event too
+    socket.emit('room:joined', { code: room.code, playerId: player.id });
     // Team chat isn't in the shared state, so hand this device its team's history directly
     socket.emit('room:teamLog', { code: room.code, entries: room.teamLogFor(userId) });
     return { code: room.code, playerId: player.id };
@@ -280,11 +282,11 @@ io.on('connection', (socket) => {
     return res;
   });
   handle('room:join', (payload) => enter(rooms.get(payload.code), { spectate: payload.spectate === true, prefer: preferOf(payload) }));
-  // Whoever opens the activity first takes a seat; everyone else lands as a spectator and sits themselves
+  // First to open the activity takes a seat, later joins spectate; `seated` hands a reconnect's old seat back
   handle('room:joinInstance', (payload) => {
     const room = rooms.forInstance(payload.instanceId);
     const taken = room.seats.some((p) => p && !p.isBot);
-    return enter(room, { spectate: taken, prefer: preferOf(payload) });
+    return enter(room, { spectate: taken && payload.seated !== true, prefer: preferOf(payload) });
   });
   // Lets a second device pick up wherever this account is seated (live games first)
   handle('room:current', () => {

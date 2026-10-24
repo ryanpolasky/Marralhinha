@@ -147,7 +147,11 @@ const App = () => {
     let unPreview = () => {};
     const resume = async () => {
       try {
-        if (IS_ACTIVITY && instanceRef.current) return enter(await request('room:joinInstance', { instanceId: instanceRef.current, prefer: favorite() }));
+        if (IS_ACTIVITY && instanceRef.current) {
+          // A reconnect claims its old seat back (prefer) instead of landing as a spectator after a restart
+          const seat = mySeatRef.current;
+          return enter(await request('room:joinInstance', { instanceId: instanceRef.current, seated: seat >= 0, prefer: seat >= 0 ? seat : favorite() }));
+        }
         const invite = urlCode();
         const saved = sessionRef.current?.code || storedRoom();
         // No saved room on this device? Pick up wherever this account is already seated (e.g. on another device)
@@ -245,6 +249,7 @@ const App = () => {
       connect: onConnect,
       disconnect: onDisconnect,
       connect_error: onConnectError,
+      'room:joined': enter,
       'room:state': setRoom,
       'room:reaction': onReaction,
       'room:ping': onPing,
