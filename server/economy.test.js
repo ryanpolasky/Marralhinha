@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { openDb } = require('./db');
 const { Accounts, levelInfo } = require('./accounts');
 const { Economy, featuredFor, utcDay } = require('./economy');
-const { catalog, ITEMS, BOXES, SETS, REWARDS } = require('./catalog');
+const { catalog, ITEMS, BOXES, SETS, REWARDS, itemsOfRarity } = require('./catalog');
 
 function setup() {
   const db = openDb(':memory:');
@@ -75,6 +75,28 @@ test('boxes cost coins, drop items, refund duplicates and honor pity', () => {
 
   const gold = economy.openBox(id, 'box.gold', alwaysFirst);
   assert.notEqual(gold.rarity, 'common', 'gold box never drops commons');
+});
+
+test('chests prefer unowned items: dupes only roll once a rarity is complete', () => {
+  const { accounts, economy } = setup();
+  const { id } = accounts.createUser({ name: 'A' });
+  const box = { id: 'test', weights: { common: 1 }, pity: { epic: 99, legendary: 99 } };
+  const commons = itemsOfRarity('common');
+  const seen = new Set();
+  for (let i = 0; i < commons.length; i++) {
+    const roll = economy.rollBox(accounts.getUser(id), box, () => 0);
+    assert.equal(roll.rarity, 'common');
+    assert.equal(roll.duplicate, false);
+    assert.ok(!seen.has(roll.item), `${roll.item} dropped twice`);
+    seen.add(roll.item);
+  }
+  assert.equal(accounts.inventory(id).length, commons.length);
+
+  const before = accounts.getUser(id).coins;
+  const dupe = economy.rollBox(accounts.getUser(id), box, () => 0);
+  assert.equal(dupe.duplicate, true, 'owned out the whole rarity');
+  assert.equal(dupe.refund, catalog.rarities.common.dupe);
+  assert.equal(accounts.getUser(id).coins, before + dupe.refund);
 });
 
 test('mythic means a whole set: every set covers all six slots and nothing else is mythic', () => {

@@ -177,8 +177,12 @@ class Economy {
     this.q.pity.run(JSON.stringify(pity), user.id);
     if (rarity === 'mythic') return this.grantSet(user, rand);
 
+    // Fresh drops first; dupes only once they own the whole rarity
     const pool = itemsOfRarity(rarity);
-    const item = pool[rand(pool.length)];
+    const owned = new Set(this.accounts.inventory(user.id));
+    const fresh = pool.filter((item) => !owned.has(item.id));
+    const pick = fresh.length ? fresh : pool;
+    const item = pick[rand(pick.length)];
     const duplicate = this.accounts.owns(user.id, item.id);
     const refund = duplicate ? catalog.rarities[rarity].dupe : 0;
     if (duplicate) this.credit(user.id, refund, `dupe:${item.id}`);
