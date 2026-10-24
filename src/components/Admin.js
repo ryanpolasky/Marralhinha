@@ -275,7 +275,7 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
             {isMe && <span className="badge">you</span>}
           </div>
           <div className="muted small-text">
-            id <code>{user.id}</code> · Lv {user.level} · {user.stats.games} games, {user.stats.wins} wins · {user.items} items · seen {ago(user.lastSeen)}
+            id <code>{user.id}</code> · Lv {user.level} · {user.stats.games} games, {user.stats.wins} wins · {user.items} items · made {ago(user.createdAt)} · seen {ago(user.lastSeen)}
           </div>
         </div>
         <Coins amount={user.coins} className="coins-pill" />
@@ -727,6 +727,16 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
 
   const users = result?.users || [];
   const current = selected && (users.find((u) => u.id === selected.id) || selected);
+  const markSeen = async () => {
+    try {
+      const res = await post('/admin/users/seen');
+      setResult((r) => r && { ...r, newSince: res.newSince, newCount: 0, users: r.users.map((u) => ({ ...u, fresh: u.fresh && u.createdAt > res.newSince })) });
+      sfx.pop();
+      notify('All caught up', 'good');
+    } catch (err) {
+      notify(err.message);
+    }
+  };
   const onChange = (user) => {
     setSelected(user);
     setResult((r) => r && { ...r, users: r.users.map((u) => (u.id === user.id ? user : u)) });
@@ -741,7 +751,14 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
       <div className="panel modal admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Admin">
         <div className="modal-head admin-head">
           <h2>Admin</h2>
-          <span className="muted admin-count">{result && tab === 'players' ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}</span>
+          <span className="muted admin-count">
+            {result && tab === 'players' ? `${(result.total - result.throwaway).toLocaleString()} players · ${result.throwaway.toLocaleString()} drive-by guests` : ''}
+            {tab === 'players' && result?.newCount > 0 && (
+              <button type="button" className="btn tiny secondary admin-new-count" onClick={markSeen} title="Accounts created since you last checked. Click to clear the NEW badges.">
+                {result.newCount} new · mark seen
+              </button>
+            )}
+          </span>
           <button className="icon-close" onClick={onClose} aria-label="Close">
             <Close />
           </button>
@@ -757,6 +774,9 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
               {label}
             </button>
           ))}
+          <a className="btn tiny ghost admin-analytics" href="/analytics" target="_blank" rel="noreferrer">
+            Stats ↗
+          </a>
         </div>
 
         {tab === 'games' && <ActiveGames currentCode={currentCode} onSpectate={onSpectate} notify={notify} />}
@@ -776,6 +796,9 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
               <button type="button" className={`btn tiny ${query === '#banned' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#banned' ? '' : '#banned')}>
                 Banned
               </button>
+              <button type="button" className={`btn tiny ${query === '#new' ? 'secondary' : 'ghost'}`} onClick={() => setQuery(query === '#new' ? '' : '#new')} title="Accounts made since you last checked">
+                New
+              </button>
               <button type="button" className={`btn tiny ${guests ? 'secondary' : 'ghost'}`} onClick={() => setGuests((g) => !g)} title="Include guest accounts that never played (every fresh browser makes one)">
                 Guests
               </button>
@@ -790,6 +813,7 @@ export default function Admin({ account, onClose, notify, currentCode, onSpectat
                       <AccountMark user={u} />
                       {u.name}
                       <TagBadges tags={u.tags} small full />
+                      {u.fresh && <span className="badge gold">new</span>}
                     </span>
                     <span className="admin-row-meta">
                       Lv {u.level} · <Coin size={12} /> {u.coins.toLocaleString()} · {ago(u.lastSeen)}

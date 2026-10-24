@@ -8,6 +8,7 @@ const { Accounts } = require('./accounts');
 const { Economy } = require('./economy');
 const { Reports } = require('./reports');
 const { Matches } = require('./matches');
+const { Analytics } = require('./analytics');
 const discord = require('./discord');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
@@ -33,6 +34,7 @@ const accounts = new Accounts(db);
 const economy = new Economy(db, accounts);
 const reports = new Reports(db);
 const matches = new Matches(db, accounts);
+const analytics = new Analytics(db, accounts);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -158,7 +160,7 @@ const moveSockets = ({ fromId }) => {
 };
 
 app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
-app.use('/api', createApi({ accounts, economy, rooms, reports, matches, onProfileChange: pushProfile, onBan: kick, onMerge: moveSockets, syncPurchases, isAllowedOrigin }));
+app.use('/api', createApi({ accounts, economy, rooms, reports, matches, analytics, onProfileChange: pushProfile, onBan: kick, onMerge: moveSockets, syncPurchases, isAllowedOrigin }));
 legalRoutes(app);
 
 if (fs.existsSync(BUILD_DIR)) {

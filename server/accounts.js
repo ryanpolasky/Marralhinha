@@ -46,6 +46,7 @@ const pickableTags = (held) => (held.includes('dev') ? TAG_KEYS : held);
 const storableTags = (tags) => normalizeTags(tags).filter((tag) => !AUTO_TAGS.includes(tag));
 // Guest accounts every fresh browser creates that never played, linked Discord or got a tag
 const THROWAWAY = "(discord_id IS NULL AND games = 0 AND boxes_opened = 0 AND tags = '[]' AND granted_packs = '[]' AND banned_at IS NULL)";
+const isThrowaway = (user) => !user.discord_id && !user.games && !user.boxes_opened && user.tags === '[]' && user.granted_packs === '[]' && !user.banned_at;
 
 // CDN url for a linked account's Discord avatar; Discord picks a default from the id when none is set
 function avatarUrl(user) {
@@ -130,6 +131,8 @@ class Accounts {
       ),
       recent: db.prepare(`SELECT * FROM users WHERE (? OR NOT ${THROWAWAY}) ORDER BY last_seen DESC LIMIT ?`),
       tagged: db.prepare("SELECT * FROM users WHERE tags != '[]' ORDER BY last_seen DESC LIMIT ?"),
+      newUsers: db.prepare(`SELECT * FROM users WHERE created_at > ? AND NOT ${THROWAWAY} ORDER BY created_at DESC LIMIT ?`),
+      newSinceCount: db.prepare(`SELECT COUNT(*) AS n FROM users WHERE created_at > ? AND NOT ${THROWAWAY}`),
       setIp: db.prepare('UPDATE users SET last_ip = ? WHERE id = ?'),
       setBan: db.prepare('UPDATE users SET banned_at = ?, ban_reason = ? WHERE id = ?'),
       banned: db.prepare('SELECT * FROM users WHERE banned_at IS NOT NULL ORDER BY banned_at DESC LIMIT ?'),
@@ -521,6 +524,7 @@ class Accounts {
     const withGuests = guests ? 1 : 0;
     if (q === '#tagged') return this.q.tagged.all(limit);
     if (q === '#banned') return this.q.banned.all(limit);
+    if (q === '#new') return this.q.newUsers.all(this.newSince(), limit);
     if (!q) return this.q.recent.all(withGuests, limit);
     const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
     return this.q.search.all(q, q, like, withGuests, limit);
@@ -529,6 +533,23 @@ class Accounts {
   userCount() {
     const row = this.q.count.get();
     return { total: row.n, throwaway: row.throwaway || 0 };
+  }
+
+  // When the admin last checked for new accounts; first-ever call sets the baseline to now
+  newSince(now = Date.now()) {
+    const stored = this.q.getMeta.get('admin_new_since')?.value;
+    if (stored != null) return Number(stored) || 0;
+    this.q.setMeta.run('admin_new_since', String(now));
+    return now;
+  }
+
+  markUsersSeen(now = Date.now()) {
+    this.q.setMeta.run('admin_new_since', String(now));
+    return now;
+  }
+
+  newCount(since = this.newSince()) {
+    return this.q.newSinceCount.get(since).n;
   }
 
   profile(userOrId, extras = {}) {
@@ -584,6 +605,7 @@ class Accounts {
       stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,
+      fresh: user.created_at > this.newSince() && !isThrowaway(user),
       lastIp: user.last_ip,
       banned: !!user.banned_at,
       banReason: user.ban_reason,
@@ -610,4 +632,4 @@ class Accounts {
   }
 }
 
-module.exports = { Accounts, AccountError, levelInfo, cleanName, hashToken };
+module.exports = { Accounts, AccountError, levelInfo, cleanName, hashToken, THROWAWAY };

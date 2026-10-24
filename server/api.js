@@ -11,7 +11,7 @@ class ApiError extends Error {}
 const GUEST_LIMIT_PER_HOUR = 30;
 const randomKey = () => randomBytes(24).toString('base64url');
 
-function createApi({ accounts, economy, rooms, reports, matches, onProfileChange, onBan = () => {}, onMerge = () => {}, syncPurchases, isAllowedOrigin }) {
+function createApi({ accounts, economy, rooms, reports, matches, analytics, onProfileChange, onBan = () => {}, onMerge = () => {}, syncPurchases, isAllowedOrigin }) {
   const router = express.Router();
   router.use(express.json({ limit: '10kb' }));
 
@@ -346,8 +346,24 @@ function createApi({ accounts, economy, rooms, reports, matches, onProfileChange
     handle((req) => {
       const users = accounts.search(req.query.q, 40, { guests: req.query.guests === '1' }).map((u) => accounts.adminView(u));
       const { total, throwaway } = accounts.userCount();
-      return { users, total, throwaway };
+      const newSince = accounts.newSince();
+      return { users, total, throwaway, newSince, newCount: accounts.newCount(newSince) };
     })
+  );
+
+  // Watermark for the NEW badges: clears every account created up to right now
+  router.post(
+    '/admin/users/seen',
+    auth,
+    admin,
+    handle(() => ({ newSince: accounts.markUsersSeen() }))
+  );
+
+  router.get(
+    '/admin/analytics',
+    auth,
+    admin,
+    handle((req) => analytics.snapshot(rooms, req.user.id))
   );
 
   router.get(
