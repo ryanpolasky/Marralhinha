@@ -1986,121 +1986,189 @@ function corkCanvas() {
   return canvas;
 }
 
-function cardboardCanvas() {
-  const [canvas, ctx] = makeCanvas(1024, 1024);
+// Board-space helpers for the papercraft boards: draw in world units, with each arm's open strip between hole columns
+function boardSpace(layout, S = 1024) {
+  const [canvas, ctx] = makeCanvas(S, S);
+  const k = BOARD_R * S;
+  const { halfWidth: W, halfLength: L } = layout.spec;
+  const from = 2.45;
+  const to = L - 1.1;
+  const toWorld = () => ctx.setTransform(k, 0, 0, k, S / 2, S / 2);
+  const label = (text, x, z, { rot = 0, size = 0.5, max = 4, font = '700 100px sans-serif', color, align = 'center' }) => {
+    ctx.save();
+    ctx.translate(x, z);
+    ctx.rotate(rot);
+    ctx.font = font;
+    const scale = Math.min(size / 100, max / (ctx.measureText(text).width || 1));
+    ctx.scale(scale, scale);
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  };
+  return { canvas, ctx, S, W, L, toWorld, label, mid: (from + to) / 2, room: to - from };
+}
+
+function cardboardCanvas(layout) {
+  const { canvas, ctx, S, W, L, toWorld, label, mid, room } = boardSpace(layout);
   const rand = seeded(41);
-  ctx.fillStyle = '#c39a62';
-  ctx.fillRect(0, 0, 1024, 1024);
-  for (let x = 0; x < 1024; x += 16) {
-    ctx.fillStyle = 'rgba(120,82,40,0.12)';
-    ctx.fillRect(x, 0, 6, 1024);
+  ctx.fillStyle = '#c49b63';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 30; i++) softBlob(ctx, rand() * S, rand() * S, 60 + rand() * 160, i % 2 ? '#b38955' : '#d2ad76', 0.35);
+  for (let x = 0; x < S; x += 11) {
+    ctx.fillStyle = 'rgba(105,70,35,0.09)';
+    ctx.fillRect(x, 0, 4, S);
+    ctx.fillStyle = 'rgba(240,215,165,0.07)';
+    ctx.fillRect(x + 5, 0, 2, S);
   }
-  for (let i = 0; i < 5000; i++) {
-    ctx.fillStyle = rand() > 0.5 ? `rgba(110,72,32,${rand() * 0.2})` : `rgba(235,205,150,${rand() * 0.18})`;
-    ctx.fillRect(rand() * 1024, rand() * 1024, 1 + rand() * 3, 4 + rand() * 12);
+  for (let i = 0; i < 4000; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(95,62,28,${rand() * 0.18})` : `rgba(238,212,160,${rand() * 0.16})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 3 + rand() * 9);
   }
-  ctx.fillStyle = 'rgba(214,190,140,0.72)';
-  ctx.fillRect(0, 430, 1024, 150);
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.fillRect(0, 440, 1024, 10);
-  ctx.save();
-  ctx.translate(250, 220);
-  ctx.rotate(-0.12);
-  ctx.strokeStyle = 'rgba(190,40,36,0.85)';
-  ctx.fillStyle = 'rgba(190,40,36,0.85)';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(-190, -60, 380, 120);
-  ctx.font = '900 92px Impact, "Arial Black", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('FRAGILE', 0, 6);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(760, 820);
-  ctx.fillStyle = 'rgba(40,30,22,0.75)';
-  [-70, 70].forEach((x) => {
+  toWorld();
+  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = 'rgba(90,58,26,0.22)';
+  ctx.beginPath();
+  roundedCross(W, L, Math.min(0.65, W * 0.35)).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  const tape = (turned) => {
+    ctx.save();
+    if (turned) ctx.rotate(Math.PI / 2);
     ctx.beginPath();
-    ctx.moveTo(x, -80);
-    ctx.lineTo(x + 46, -20);
-    ctx.lineTo(x + 16, -20);
-    ctx.lineTo(x + 16, 60);
-    ctx.lineTo(x - 16, 60);
-    ctx.lineTo(x - 16, -20);
-    ctx.lineTo(x - 46, -20);
+    ctx.moveTo(-0.55, -L + 0.25);
+    for (let i = 1; i <= 10; i++) ctx.lineTo(-0.55 + i * 0.11, -L + 0.25 + (i % 2 ? 0.12 : 0));
+    ctx.lineTo(0.55, L - 0.25);
+    for (let i = 9; i >= 0; i--) ctx.lineTo(-0.55 + i * 0.11, L - 0.25 - (i % 2 ? 0.12 : 0));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(196,148,82,0.55)';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,205,0.16)';
+    ctx.fillRect(-0.42, -L + 0.45, 0.1, 2 * L - 0.9);
+    ctx.restore();
+  };
+  tape(false);
+  tape(true);
+  const red = 'rgba(178,38,34,0.82)';
+  ctx.save();
+  ctx.translate(-1, mid);
+  ctx.rotate(-Math.PI / 2 - 0.04);
+  const w = Math.min(4.2, room);
+  ctx.strokeStyle = red;
+  ctx.lineWidth = 0.07;
+  ctx.strokeRect(-w / 2, -0.42, w, 0.84);
+  label('FRAGILE', 0, 0.03, { size: 0.62, max: w - 0.3, font: '900 100px Impact, "Arial Black", sans-serif', color: red });
+  ctx.restore();
+  const dark = 'rgba(38,28,20,0.72)';
+  ctx.save();
+  ctx.translate(mid, 1);
+  ctx.fillStyle = dark;
+  [-room / 2 + 0.3, -room / 2 + 0.75].forEach((x) => {
+    ctx.beginPath();
+    ctx.moveTo(x, -0.38);
+    ctx.lineTo(x + 0.2, -0.12);
+    ctx.lineTo(x + 0.07, -0.12);
+    ctx.lineTo(x + 0.07, 0.3);
+    ctx.lineTo(x - 0.07, 0.3);
+    ctx.lineTo(x - 0.07, -0.12);
+    ctx.lineTo(x - 0.2, -0.12);
     ctx.closePath();
     ctx.fill();
   });
-  ctx.fillRect(-120, 80, 240, 12);
-  ctx.font = '700 34px "Arial Black", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('THIS SIDE UP', 0, 130);
+  label('THIS SIDE UP', -room / 2 + 1.1, 0, { size: 0.36, max: room - 1.2, font: '800 100px "Arial Black", sans-serif', color: dark, align: 'left' });
   ctx.restore();
+  label('MARBLES x20', 1, -mid, { rot: Math.PI / 2 + 0.06, size: 0.46, max: room, font: '700 100px "Segoe Print", "Comic Sans MS", cursive', color: 'rgba(25,22,20,0.8)' });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < 900; i++) {
+    ctx.fillStyle = `rgba(200,160,105,${0.3 + rand() * 0.4})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+  }
   return canvas;
 }
 
-function notebookCanvas() {
-  const [canvas, ctx] = makeCanvas(1024, 1024);
+function notebookCanvas(layout) {
+  const { canvas, ctx, S, W, L, toWorld, label, mid, room } = boardSpace(layout);
   const rand = seeded(57);
-  ctx.fillStyle = '#fbf8ef';
-  ctx.fillRect(0, 0, 1024, 1024);
-  ctx.fillStyle = 'rgba(70,130,200,0.45)';
-  for (let y = 24; y < 1024; y += 48) ctx.fillRect(0, y, 1024, 3);
-  ctx.fillStyle = 'rgba(220,70,80,0.55)';
-  ctx.fillRect(150, 0, 3, 1024);
-  ctx.fillRect(158, 0, 2, 1024);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const pen = (color, w) => {
+  ctx.fillStyle = '#fbf8f0';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 5000; i++) {
+    ctx.fillStyle = `rgba(140,120,85,${rand() * 0.06})`;
+    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+  }
+  toWorld();
+  ctx.fillStyle = 'rgba(86,146,210,0.6)';
+  for (let z = -L + 0.3; z < L; z += 0.45) ctx.fillRect(-L, z, 2 * L, 0.035);
+  ctx.fillStyle = 'rgba(222,82,92,0.6)';
+  ctx.fillRect(-W + 0.18, -L, 0.035, 2 * L);
+  ctx.fillRect(-W + 0.26, -L, 0.02, 2 * L);
+  const blue = 'rgba(38,72,160,0.88)';
+  const red = 'rgba(196,46,72,0.85)';
+  const hand = (weight) => `${weight} 100px "Segoe Print", "Comic Sans MS", cursive`;
+  const ink = (color = blue, w = 0.06) => {
     ctx.strokeStyle = color;
     ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
   };
-  const wob = (v) => v + (rand() - 0.5) * 4;
-  pen('#2a4fa8', 5);
-  ctx.beginPath();
-  for (let k = 0; k <= 5; k++) {
-    const a = -Math.PI / 2 + (k * 4 * Math.PI) / 5;
-    ctx[k ? 'lineTo' : 'moveTo'](wob(330 + Math.cos(a) * 60), wob(170 + Math.sin(a) * 60));
-  }
-  ctx.stroke();
-  pen('#2a4fa8', 5);
-  ctx.beginPath();
-  ctx.arc(760, 260, 58, 0, TAU);
-  ctx.moveTo(738, 245);
-  ctx.arc(738, 245, 4, 0, TAU);
-  ctx.moveTo(782, 245);
-  ctx.arc(782, 245, 4, 0, TAU);
-  ctx.moveTo(726, 280);
-  ctx.quadraticCurveTo(760, 312, 794, 280);
-  ctx.stroke();
-  pen('#c23048', 5);
-  ctx.beginPath();
-  ctx.moveTo(560, 640);
-  ctx.bezierCurveTo(520, 590, 470, 640, 560, 710);
-  ctx.bezierCurveTo(650, 640, 600, 590, 560, 640);
-  ctx.stroke();
-  pen('#2a4fa8', 4);
-  ctx.beginPath();
-  ctx.moveTo(250, 820);
-  for (let x = 250; x < 470; x += 22) ctx.lineTo(x + 11, 790 + (x % 44 ? 0 : 0) - ((x / 22) % 2) * 0 - 18 * ((x / 22) % 2 ? 1 : -1) + 18);
-  ctx.stroke();
-  ctx.font = 'italic 600 44px "Comic Sans MS", "Segoe Print", cursive';
-  ctx.fillStyle = 'rgba(42,79,168,0.9)';
-  ctx.fillText('gg ez', 760, 520);
-  ctx.save();
-  ctx.translate(320, 470);
-  ctx.rotate(-0.08);
-  ctx.fillText('6 = go again', 0, 0);
-  ctx.restore();
-  pen('#2a4fa8', 4);
-  [[820, 760], [860, 840], [780, 880]].forEach(([x, y]) => {
-    ctx.beginPath();
-    ctx.arc(x, y, 18, 0, TAU);
-    ctx.stroke();
+  const wob = (v) => v + (rand() - 0.5) * 0.03;
+  const scribble = (pts, passes = 2) => {
+    for (let p = 0; p < passes; p++) {
+      ctx.beginPath();
+      pts.forEach(([x, z], i) => ctx[i ? 'lineTo' : 'moveTo'](wob(x), wob(z)));
+      ctx.stroke();
+    }
+  };
+  ctx.fillStyle = 'rgba(255,232,40,0.5)';
+  ctx.fillRect(2.6, -1.58, room + 0.2, 0.34);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  softBlob(ctx, S / 2 + BOARD_R * S, S / 2 + mid * BOARD_R * S, 1.2 * BOARD_R * S, 'rgb(90,90,96)', 0.08);
+  toWorld();
+  ink('rgba(150,98,48,0.22)', 0.1);
+  scribble(circlePts(-(L - 1.5), 1, 0.62, 0.3, TAU - 0.2), 1);
+  ink('rgba(150,98,48,0.12)', 0.05);
+  scribble(circlePts(-(L - 1.52), 1.02, 0.55), 1);
+  ink();
+  layout.RING.filter((_, i) => i % 7 === 3).slice(0, 4).forEach(([r, c]) => {
+    const a = rand() * TAU;
+    scribble(circlePts(c, r, 0.5 + rand() * 0.05, a, a + TAU * 1.15), 1);
   });
-  for (let i = 0; i < 1500; i++) {
-    ctx.fillStyle = `rgba(150,130,90,${rand() * 0.05})`;
-    ctx.fillRect(rand() * 1024, rand() * 1024, 2, 2);
-  }
+  ink(red);
+  scribble([[-1.7, 1.05], [-1.2, 0.95], [-0.78, 0.68]], 1);
+  scribble([[-0.98, 0.62], [-0.78, 0.68], [-0.86, 0.88]], 1);
+  label('shortcut!', -1.55, 1.32, { rot: -0.25, size: 0.3, max: 1.2, font: hand(700), color: red });
+  ink();
+  label('6 = go again', -1, mid, { rot: -Math.PI / 2, size: 0.5, max: room - 0.4, font: `italic ${hand(700)}`, color: blue });
+  scribble(circlePts(1, -L + 1.6, 0.42));
+  ctx.fillStyle = blue;
+  [0.86, 1.14].forEach((x) => {
+    ctx.beginPath();
+    ctx.arc(x, -L + 1.5, 0.045, 0, TAU);
+    ctx.fill();
+  });
+  scribble(circlePts(1, -L + 1.58, 0.22, 0.4, Math.PI - 0.4), 1);
+  label('gg ez', 1, -mid + 0.7, { rot: Math.PI / 2, size: 0.52, max: room - 1.4, font: `italic ${hand(700)}`, color: blue });
+  ink(red);
+  scribble(Array.from({ length: 17 }, (_, i) => {
+    const t = (i / 16) * TAU;
+    return [mid + 0.38 * Math.sin(t) ** 3, 1 - (0.38 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))) / 16];
+  }));
+  ink('rgba(60,60,66,0.7)', 0.035);
+  const g = 0.3;
+  const tx = -mid;
+  [-0.5, 0.5].forEach((o) => {
+    scribble([[tx - g * 1.5, -1 + g * o], [tx + g * 1.5, -1 + g * o]], 1);
+    scribble([[tx + g * o, -1 - g * 1.5], [tx + g * o, -1 + g * 1.5]], 1);
+  });
+  [[-1, -1, 'x'], [0, 0, 'o'], [1, 1, 'x'], [1, -1, 'o'], [-1, 1, 'x']].forEach(([i, j, m]) => {
+    const [x, z] = [tx + i * g, -1 + j * g];
+    if (m === 'o') scribble(circlePts(x, z, 0.09), 1);
+    else {
+      scribble([[x - 0.08, z - 0.08], [x + 0.08, z + 0.08]], 1);
+      scribble([[x + 0.08, z - 0.08], [x - 0.08, z + 0.08]], 1);
+    }
+  });
+  scribble([[tx - g * 1.4, -1 - g * 1.4], [tx + g * 1.4, -1 + g * 1.4]], 1);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   return canvas;
 }
 
@@ -5095,8 +5163,8 @@ const SPECIAL_BOARDS = {
     const [base, glow] = neonCanvases();
     return { canvas: base, glowCanvas: glow, repeat: 0.06, roughness: 0.35, dish: '#1a0f33', felt: '#07061a', cup: '#05030c', accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 1.4, roughness: 0.3 } };
   },
-  cardboard: () => ({ canvas: cardboardCanvas(), repeat: 0.07, roughness: 0.92, dish: '#a07a48', felt: '#5b4128', cup: '#3a2816', side: '#b08850' }),
-  notebook: () => ({ canvas: notebookCanvas(), repeat: 0.06, roughness: 0.8, dish: '#f1ede2', felt: '#6b5444', cup: '#1d2a44', side: '#f4f0e6', accent: { color: '#b8bcc4', metalness: 1, roughness: 0.3 } }),
+  cardboard: (layout) => ({ canvas: cardboardCanvas(layout), repeat: BOARD_R, roughness: 0.92, dish: '#b38a55', felt: '#5b4128', cup: '#4a3320', side: '#a37b48', accent: { color: '#d4b07a', metalness: 0, roughness: 0.85 } }),
+  notebook: (layout) => ({ canvas: notebookCanvas(layout), repeat: BOARD_R, roughness: 0.82, dish: '#f3efe4', felt: '#4d5a6e', cup: '#22304d', side: '#ece6d6', accent: { color: '#c3c7cf', metalness: 1, roughness: 0.28 } }),
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
   terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#2b2e32', felt: '#2b3a44', cup: '#141618', accent: { color: '#d9d4ca', metalness: 0.3, roughness: 0.4 } }),
@@ -5194,7 +5262,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'notebook']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

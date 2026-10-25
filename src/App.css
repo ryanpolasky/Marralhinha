@@ -11455,10 +11455,12 @@ body {
     linear-gradient(180deg, var(--seat) 0 43%, #d5b571 44% 46%, #15272c 47% 53%, #d5b571 54% 56%, #e4ece4 57%);
 }
 .thumb-board.skin-cardboard {
-  background: linear-gradient(180deg, transparent 42%, rgba(214, 190, 140, 0.75) 42% 58%, transparent 58%), repeating-linear-gradient(90deg, transparent 0 4px, rgba(120, 82, 40, 0.14) 4px 6px), #c39a62;
+  background: linear-gradient(90deg, transparent 44%, rgba(196, 148, 82, 0.7) 44% 56%, transparent 56%), linear-gradient(180deg, transparent 44%, rgba(196, 148, 82, 0.7) 44% 56%, transparent 56%),
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(105, 70, 35, 0.12) 4px 6px), #c49b63;
 }
 .thumb-board.skin-notebook {
-  background: linear-gradient(90deg, transparent 18%, rgba(220, 70, 80, 0.6) 18% 20%, transparent 20%), repeating-linear-gradient(180deg, #fbf8ef 0 7px, rgba(70, 130, 200, 0.5) 7px 8px);
+  background: radial-gradient(circle at 68% 70%, transparent 0 9%, rgba(38, 72, 160, 0.85) 10% 13%, transparent 14%), linear-gradient(90deg, transparent 22%, rgba(222, 82, 92, 0.6) 22% 25%, transparent 25%),
+    repeating-linear-gradient(180deg, #fbf8f0 0 6px, rgba(86, 146, 210, 0.55) 6px 7px);
 }
 .thumb-board.skin-wild {
   background: linear-gradient(90deg, transparent 38%, #e9d49c 38% 62%, transparent 62%), linear-gradient(180deg, transparent 38%, #e9d49c 38% 62%, transparent 62%),
