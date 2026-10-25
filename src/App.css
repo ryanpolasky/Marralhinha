@@ -6301,6 +6301,45 @@ img.emote-glyph {
   animation: plate-flow 3.4s linear infinite;
 }
 
+.plate-wild {
+  --plate-ink: #f7efcf;
+  background: radial-gradient(circle at 100% 0, #3b6550, transparent 65%), linear-gradient(135deg, #183c35, #102924) !important;
+  border: 2px solid #cbb47b !important;
+  border-radius: 14px 5px 14px 5px !important;
+  box-shadow: 0 3px 0 #081c19, inset 0 0 0 2px #2d5141, 0 0 16px #9cce7a18;
+  padding-bottom: 11px !important;
+}
+
+.plate-wild::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid #e6d39c30;
+  border-radius: 9px 2px 9px 2px;
+  pointer-events: none;
+}
+
+.plate-wild::after {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--hp, #9de9a0) var(--hp-w, 100%), #081d19 0);
+  box-shadow: 0 0 0 1px #d6c48b70, 0 0 5px #b0ef9a35;
+  animation: plate-hp 7s steps(1, end) infinite;
+}
+
+@keyframes plate-hp {
+  0%, 55% { --hp-w: 100%; --hp: #9de9a0; }
+  60% { --hp-w: 70%; --hp: #9de9a0; }
+  68% { --hp-w: 42%; --hp: #f2cb70; }
+  76%, 88% { --hp-w: 16%; --hp: #ef8370; }
+  94% { --hp-w: 100%; --hp: #9de9a0; }
+}
+
 .plate-diamond {
   --plate-ink: #1a2a3a;
   --flow-to: 150% 0;
@@ -11411,11 +11450,19 @@ body {
   }
 }
 
+.thumb-marble.skin-wild {
+  background: radial-gradient(ellipse at 32% 24%, #ffffffb0, transparent 30%), radial-gradient(circle at 50% 50%, #effff2 0 9%, #86e7af 10% 12%, #15272c 13% 18%, transparent 19%),
+    linear-gradient(180deg, var(--seat) 0 43%, #d5b571 44% 46%, #15272c 47% 53%, #d5b571 54% 56%, #e4ece4 57%);
+}
 .thumb-board.skin-cardboard {
   background: linear-gradient(180deg, transparent 42%, rgba(214, 190, 140, 0.75) 42% 58%, transparent 58%), repeating-linear-gradient(90deg, transparent 0 4px, rgba(120, 82, 40, 0.14) 4px 6px), #c39a62;
 }
 .thumb-board.skin-notebook {
   background: linear-gradient(90deg, transparent 18%, rgba(220, 70, 80, 0.6) 18% 20%, transparent 20%), repeating-linear-gradient(180deg, #fbf8ef 0 7px, rgba(70, 130, 200, 0.5) 7px 8px);
+}
+.thumb-board.skin-wild {
+  background: linear-gradient(90deg, transparent 38%, #e9d49c 38% 62%, transparent 62%), linear-gradient(180deg, transparent 38%, #e9d49c 38% 62%, transparent 62%),
+    repeating-conic-gradient(#70ad60 0 25%, #78b567 0 50%) 0 0 / 12px 12px;
 }
 .thumb-dice.skin-sugar {
   --face: radial-gradient(circle, rgba(214, 204, 188, 0.6) 0 1px, transparent 1.5px) 0 0 / 5px 5px, #f6f2ea;
@@ -11429,6 +11476,10 @@ body {
   --face: linear-gradient(90deg, #2a2a32 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(180deg, #2a2a32 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(135deg, #f4f4f8, #8a8a94 50%, #e0e0e8);
   --pip: #ff4fd8;
 }
+.thumb-dice.skin-wild {
+  --face: linear-gradient(135deg, #345849, #102625);
+  --pip: #f0cf87;
+}
 .thumb-fx.skin-popper {
   --fx: #ff5f8f;
   --fx2: #ffd23f;
@@ -11440,6 +11491,10 @@ body {
 .thumb-fx.skin-claw {
   --fx: #d9dee4;
   --fx2: #e0283a;
+}
+.thumb-fx.skin-wild {
+  --fx: #e8331c;
+  --fx2: #f6f4ef;
 }
 .thumb-trail.skin-footprints {
   --t1: #3b2f2a;
@@ -11460,4 +11515,8 @@ body {
 .thumb-trail.skin-cash {
   --t1: #7ec86a;
   --t2: #ffe38a;
+}
+.thumb-trail.skin-wild {
+  --t1: #3f9634;
+  --t2: #7bd85a;
 }

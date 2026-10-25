@@ -5,6 +5,12 @@ import { fx } from './fx';
 
 export const ANVIL = { drop: 0.42, hold: 0.95, lift: 0.3 };
 export const CLAW = [[0, 6, 0, 1], [0.5, 0, 0, 1], [0.65, 0, 0, 0], [1.15, 2.2, 0, 0], [1.3, 2.2, 0.15, 0], [1.45, 2.2, -0.15, 0], [1.55, 2.2, 0, 1], [2.0, 2.2, 0, 1], [2.4, 0, 0, 1], [2.55, 0, 0, 0], [3.15, 6.5, 0, 0]];
+export const BALL = { absorb: 0.35, shakes: [0.85, 1.45, 2.05], shake: 0.4, click: 2.6, pop: 2.9 };
+// Sideways rock of the capturing marble, t seconds after impact; it rolls in place so the wobble reads like a ball tipping
+export const ballRock = (t) => BALL.shakes.reduce((x, at) => {
+  const k = (t - at) / BALL.shake;
+  return k > 0 && k < 1 ? Math.sin(k * Math.PI * 2) * Math.sin(k * Math.PI) * 0.13 : x;
+}, 0);
 
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const clamp01 = (k) => Math.min(1, Math.max(0, k));
