@@ -5,6 +5,9 @@ import { fx } from './fx';
 
 export const ANVIL = { drop: 0.42, hold: 0.95, lift: 0.3 };
 export const CLAW = [[0, 6, 0, 1], [0.5, 0, 0, 1], [0.65, 0, 0, 0], [1.15, 2.2, 0, 0], [1.3, 2.2, 0.15, 0], [1.45, 2.2, -0.15, 0], [1.55, 2.2, 0, 1], [2.0, 2.2, 0, 1], [2.4, 0, 0, 1], [2.55, 0, 0, 0], [3.15, 6.5, 0, 0]];
+export const BALL = { arrive: 0.35, pull: 0.3, drop: 0.3, settle: 0.2, shakes: [1.3, 1.9, 2.5], click: 3.0, pop: 3.5 };
+export const BALL_R = 0.42;
+export const BALL_REST = 0.3;
 
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const clamp01 = (k) => Math.min(1, Math.max(0, k));
@@ -102,11 +105,86 @@ function Claw({ bus }) {
   );
 }
 
+function ballTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#e8331c';
+  g.fillRect(0, 0, 512, 128);
+  g.fillStyle = '#f6f4ef';
+  g.fillRect(0, 128, 512, 128);
+  g.fillStyle = '#1a1a1e';
+  g.fillRect(0, 116, 512, 24);
+  g.fillStyle = 'rgba(255,255,255,0.25)';
+  g.fillRect(0, 20, 512, 18);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function Gotcha({ bus }) {
+  const g = useRef();
+  const spin = useRef();
+  const glow = useRef();
+  const s = useProp(bus, 'gotcha');
+  const mats = useMemo(() => ({
+    shell: new THREE.MeshPhysicalMaterial({ map: ballTexture(), roughness: 0.25, clearcoat: 1 }),
+    ring: new THREE.MeshStandardMaterial({ color: '#1a1a1e', roughness: 0.4 }),
+    button: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.3, emissive: '#ff2a2a', emissiveIntensity: 0 }),
+  }), []);
+  useFrame(({ camera }, dt) => {
+    const st = s.current;
+    g.current.visible = st.alive;
+    if (!st.alive) return;
+    st.t += Math.min(dt, 0.05);
+    const t = st.t;
+    const { arrive, pull, drop, settle, shakes, click, pop } = BALL;
+    const top = 1.3;
+    const landAt = arrive + pull + drop;
+    let y = top;
+    if (t < arrive) y = top + 2.2 * (1 - easeInOut(t / arrive));
+    else if (t < arrive + pull) y = top;
+    else if (t < landAt) y = top + (BALL_REST - top) * easeInOut((t - arrive - pull) / drop);
+    else y = BALL_REST + (t < landAt + settle ? Math.sin(((t - landAt) / settle) * Math.PI) * 0.15 : 0);
+    const shake = shakes.reduce((w, at) => (t > at && t < at + 0.36 ? Math.sin(((t - at) / 0.36) * Math.PI * 3) * 0.45 : w), 0);
+    const end = clamp01((t - pop) / 0.2);
+    if (t > pop + 0.2) st.alive = false;
+    g.current.position.set(st.at[0], y, st.at[2]);
+    g.current.rotation.y = Math.atan2(camera.position.x - st.at[0], camera.position.z - st.at[2]);
+    g.current.scale.setScalar(Math.max(0.001, 1 - end) * (t < arrive ? 0.6 + 0.4 * t / arrive : 1));
+    spin.current.rotation.set(t < arrive ? -t * 18 : 0, 0, shake);
+    const lit = shakes.some((at) => t > at && t < at + 0.36) ? 1.4 : t > click && t < click + 0.12 ? 3 : 0;
+    mats.button.emissiveIntensity = lit;
+    glow.current.visible = t > arrive && t < arrive + pull;
+  });
+  return (
+    <group ref={g} visible={false}>
+      <group ref={spin}>
+        <mesh material={mats.shell} castShadow>
+          <sphereGeometry args={[BALL_R, 40, 24]} />
+        </mesh>
+        <mesh material={mats.ring} position={[0, 0, BALL_R - 0.03]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.12, 0.12, 0.06, 24]} />
+        </mesh>
+        <mesh material={mats.button} position={[0, 0, BALL_R + 0.01]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.075, 0.075, 0.05, 24]} />
+        </mesh>
+      </group>
+      <mesh ref={glow} visible={false}>
+        <sphereGeometry args={[BALL_R * 1.25, 24, 16]} />
+        <meshBasicMaterial color="#ff4a4a" transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
 export default function Props({ bus = fx }) {
   return (
     <>
       <Anvil bus={bus} />
       <Claw bus={bus} />
+      <Gotcha bus={bus} />
     </>
   );
 }

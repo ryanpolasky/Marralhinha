@@ -10,7 +10,7 @@ import { SolCorona } from './Corona';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
-import { ANVIL } from './Props';
+import { ANVIL, BALL, BALL_REST } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
@@ -116,6 +116,19 @@ export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(s
       { to: spot.clone(), dur: 0.7, height: 0, quiet: true },
       { to: up(6.5), dur: 0.6, height: 0, quiet: true },
       { to: home, dur: 0.9, height: 1.2, final: true },
+    ];
+  }
+  if (kind === 'wild') {
+    const rest = spot.clone().setY(BALL_REST);
+    const tiny = [0.3, 0.3, 0.3];
+    const inside = BALL.arrive + BALL.pull + BALL.drop + BALL.settle;
+    return [
+      { to: spot.clone(), dur: BALL.arrive, height: 0, quiet: true, ...start },
+      { to: spot.clone().setY(1.3), dur: BALL.pull, height: 0, scale: tiny, quiet: true },
+      { to: rest, dur: BALL.drop, height: 0, scale: tiny, quiet: true },
+      { to: rest.clone(), dur: BALL.settle, height: 0.15, scale: tiny, quiet: true },
+      { to: rest.clone(), dur: BALL.pop + 0.1 - inside, height: 0, scale: tiny, quiet: true },
+      { to: home, dur: 0.9, height: 3, scale: [1, 1, 1], final: true },
     ];
   }
   return [{ to: home, dur: 0.9, height: 3.4, ...start, final: true }];

@@ -226,6 +226,14 @@ const TRAILS = {
     if (n % 3 === 0) emit('spr', { position: p, tile: TILE.star, c: ['#ffe38a', '#ffffff'], size: 0.3, size2: 0.02, life: 0.5, up: 0.4, flick: 20 });
   },
 
+  // grass tufts shake as you push through, and every so often something notices
+  wild: (emit, p, { n, bumps = [] }) => {
+    const [x, z] = [p[0] + rand(-0.15, 0.15), p[2] + rand(-0.15, 0.15)];
+    const at = [x, overBumps(x, z, bumps) + 0.13, z];
+    emit('spr', { position: at, tile: TILE.grass, c: ['#4fae3a', '#69c94a', '#3a8f2e'], add: false, rot: 0, size: 0.55, size2: 0.4, life: 0.9, up: 0.25, uj: 0, jitter: 0.03, fade: 0.5, fadeIn: 0.08 });
+    emit('spr', { position: p, n: 2, tile: TILE.petal, c: ['#7bd85a', '#a8e870'], add: false, speed: 0.8, up: 1.2, size: 0.16, size2: 0.12, life: 0.9, grav: 0.6, rotv: 5, drag: 0.8 });
+    if (n % 9 === 4) emit('spr', { position: [p[0], p[1] + 0.85, p[2]], tile: TILE.alert, c: ['#ff3b2f'], add: false, rot: 0, size: 0.5, size2: 0.55, life: 0.7, up: 0.15, uj: 0, jitter: 0, fadeIn: 0.05, fade: 0.25 });
+  },
 };
 
 export const playTrail = (itemId, pos, info = {}, { emit = fx.emit } = {}) => {

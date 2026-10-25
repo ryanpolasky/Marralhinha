@@ -163,6 +163,29 @@ const makeAtlas = () => {
     g.ellipse(0, 17, 8, 9, 0, 0, Math.PI * 2);
     g.fill();
   });
+  tile(14, () => {
+    g.fillStyle = white;
+    [[-14, 0.5], [-6, 0.2], [2, -0.15], [10, -0.45], [16, -0.7]].forEach(([x, lean]) => {
+      g.beginPath();
+      g.moveTo(x - 4, 28);
+      g.quadraticCurveTo(x + lean * 10, 0, x + lean * 26, -26);
+      g.quadraticCurveTo(x + lean * 8, 4, x + 4, 28);
+      g.fill();
+    });
+  });
+  tile(15, () => {
+    g.fillStyle = white;
+    g.beginPath();
+    g.moveTo(-8, -26);
+    g.lineTo(8, -26);
+    g.lineTo(4, 8);
+    g.lineTo(-4, 8);
+    g.closePath();
+    g.fill();
+    g.beginPath();
+    g.arc(0, 20, 6, 0, Math.PI * 2);
+    g.fill();
+  });
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
