@@ -345,21 +345,20 @@
       { "key": "thumbsup", "img": "/emotes/clash/king-thumbs-up.gif", "hint": "Good game" },
       { "key": "chicken", "img": "/emotes/clash/royale-chicken.gif", "hint": "Chicken!" }
     ] },
-    { "id": "emotes.party", "slot": "emotes", "name": "Party", "rarity": "common", "desc": "Somebody brought the parrots.", "emotes": [
-      { "key": "parrot", "img": "/emotes/party/parrot.gif", "hint": "Party" },
-      { "key": "rareparrot", "img": "/emotes/party/rareparrot.gif", "hint": "Rare" },
-      { "key": "clap", "img": "/emotes/party/clap.gif", "hint": "Clap" },
-      { "key": "petpet", "img": "/emotes/party/petpet.gif", "hint": "Pet pet" },
-      { "key": "alien", "img": "/emotes/party/alien.gif", "hint": "Dance" },
-      { "key": "steer", "img": "/emotes/party/steer.gif", "hint": "Steering" }
+    { "id": "emotes.capy", "slot": "emotes", "name": "Capy", "rarity": "rare", "desc": "Nothing bothers a capybara. Except you, maybe.", "emotes": [
+      { "key": "wave", "img": "/emotes/capy/wave.gif", "hint": "Hi" },
+      { "key": "yay", "img": "/emotes/capy/yay.png", "hint": "Yay" },
+      { "key": "giggle", "img": "/emotes/capy/giggle.gif", "hint": "Giggle" },
+      { "key": "tremble", "img": "/emotes/capy/tremble.gif", "hint": "Shaking" },
+      { "key": "sad", "img": "/emotes/capy/sad.png", "hint": "Sad" },
+      { "key": "heart", "img": "/emotes/capy/heart.png", "hint": "Love" }
     ] },
-    { "id": "emotes.time", "slot": "emotes", "name": "Time", "rarity": "legendary", "desc": "Tea time, piano time, any time but your turn.", "emotes": [
-      { "key": "tea", "img": "/emotes/time/tea.gif", "hint": "Tea time" },
-      { "key": "piano", "img": "/emotes/time/piano.gif", "hint": "Piano time" },
-      { "key": "rain", "img": "/emotes/time/rain.gif", "hint": "Rain time" },
-      { "key": "guitar", "img": "/emotes/time/guitar.gif", "hint": "Guitar time" },
-      { "key": "wine", "img": "/emotes/time/wine.gif", "hint": "Wine time" },
-      { "key": "crayon", "img": "/emotes/time/crayon.gif", "hint": "Crayon time" }
+    { "id": "emotes.groovin", "slot": "emotes", "name": "Groovin", "rarity": "legendary", "desc": "No thoughts. Just moves.", "emotes": [
+      { "key": "feelingit", "img": "/emotes/groovin/feelingit.gif", "hint": "Feelin' it" },
+      { "key": "strut", "img": "/emotes/groovin/strut.gif", "hint": "Strut" },
+      { "key": "shuffle", "img": "/emotes/groovin/shuffle.gif", "hint": "Shuffle" },
+      { "key": "skeleton", "img": "/emotes/groovin/skeleton.gif", "hint": "Spooky groove" },
+      { "key": "vibin", "img": "/emotes/groovin/vibin.gif", "hint": "Vibin" }
     ] }
   ],
   "boxes": [
