@@ -10,7 +10,7 @@ import { SolCorona } from './Corona';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
-import { ANVIL, BALL, BALL_REST } from './Props';
+import { ANVIL, BALL, ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
@@ -35,6 +35,8 @@ const FLING_HEIGHT = 3.2;
 const SHADE_GEO = new THREE.SphereGeometry(MARBLE_R * 1.015, 32, 20);
 const UP = new THREE.Vector3(0, 1, 0);
 const _sway = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _turn = new THREE.Quaternion();
 
 const CLASSIC_LAYOUT = layoutFor('classic');
 export const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
@@ -75,6 +77,7 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) 
   if (lastMove.to.zone === 'home' && lastMove.from.zone !== 'home') last.burst = { colors: ['#ffd166', '#fff3b0', SEAT_COLORS[seat].light], count: 40, up: 4, speed: 2.5 };
   if (lastMove.kind === 'enter') last.burst = { colors: [SEAT_COLORS[seat].light, '#ffffff'], count: 18, up: 2, speed: 2, size: 0.07 };
   plans[`${seat}-${marble}`] = hops;
+  if (capture && skinKey(killFx[seat]) === 'wild') hops.push({ to: last.to.clone(), dur: BALL.pop, height: 0, quiet: true, rock: true });
   if (capture) {
     plans[`${capture.seat}-${capture.marble}`] = victimPlan(skinKey(killFx[seat]), last.to, worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), { delay: total - 0.04, impact: { by: seat, victim: capture.seat } });
   }
@@ -119,16 +122,12 @@ export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(s
     ];
   }
   if (kind === 'wild') {
-    const rest = spot.clone().setY(BALL_REST);
-    const tiny = [0.3, 0.3, 0.3];
-    const inside = BALL.arrive + BALL.pull + BALL.drop + BALL.settle;
+    const tiny = [0.05, 0.05, 0.05];
     return [
-      { to: spot.clone(), dur: BALL.arrive, height: 0, quiet: true, ...start },
-      { to: spot.clone().setY(1.3), dur: BALL.pull, height: 0, scale: tiny, quiet: true },
-      { to: rest, dur: BALL.drop, height: 0, scale: tiny, quiet: true },
-      { to: rest.clone(), dur: BALL.settle, height: 0.15, scale: tiny, quiet: true },
-      { to: rest.clone(), dur: BALL.pop + 0.1 - inside, height: 0, scale: tiny, quiet: true },
-      { to: home, dur: 0.9, height: 3, scale: [1, 1, 1], final: true },
+      { to: spot.clone().setY(0.25), dur: BALL.absorb, height: 0, scale: tiny, quiet: true, ...start },
+      { to: spot.clone(), dur: BALL.pop - BALL.absorb, height: 0, scale: tiny, quiet: true },
+      { to: home.clone(), dur: 0.02, height: 0, scale: tiny, quiet: true },
+      { to: home, dur: 0.35, height: 0.35, scale: [1, 1, 1], final: true },
     ];
   }
   return [{ to: home, dur: 0.9, height: 3.4, ...start, final: true }];
@@ -289,6 +288,11 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         const e = easeInOut(t);
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
+        if (seg.rock) {
+          group.current.parent.getWorldQuaternion(_turn).invert();
+          _right.setFromMatrixColumn(state.camera.matrixWorld, 0).applyQuaternion(_turn).setY(0).normalize();
+          a.pos.addScaledVector(_right, ballRock(t * seg.dur));
+        }
         if (seg.puff) fx.emit('spr', { position: [a.pos.x, a.pos.y, a.pos.z], tile: 1, c: ['#f2f4f5', '#dfe5e8'], add: false, speed: 0.3, size: 0.18, size2: 0.5, life: 0.45, a: 0.55, drag: 2 });
         else if (!seg.impact && !seg.quiet) dropTrail();
         if (seg.scale) body.current.scale.fromArray(seg.fromScale.map((v, j) => v + (seg.scale[j] - v) * e));

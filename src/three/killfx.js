@@ -3,7 +3,7 @@ import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 import { videoFor } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
-import { ANVIL, BALL, BALL_REST } from './Props';
+import { ANVIL, BALL } from './Props';
 
 const col = (s) => SEAT_COLORS[s];
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
@@ -429,27 +429,25 @@ const KILL_FX = {
     later(2550, () => sfx('servo'));
   },
 
-  // A ball swallows the victim, shakes three times, and clicks shut
+  // The capturing marble is the ball: it swallows the victim, rocks three times, and clicks shut
   wild: (emit, { at, sfx, later }) => {
-    const spot = [at[0], 0.07, at[2]];
-    const rest = [at[0], BALL_REST, at[2]];
-    emit('gotcha', { position: spot });
+    const spot = [at[0], 0.4, at[2]];
     sfx('whip');
-    later(BALL.arrive * 1000, () => {
-      emit('bolt', { from: off(spot, 0, 1.3), to: spot, color: '#ff4a4a', radius: 0.05, life: 0.3, jag: 0.15, branches: 2 });
-      emit('dome', { position: spot, color: '#ff4a4a', size: 0.9, life: 0.35 });
-      emit('spr', { position: spot, n: 14, tile: TILE.glow, c: ['#ff6a6a', '#ffffff'], radius: 0.4, inward: true, speed: 1.6, size: 0.25, size2: 0.05, life: 0.3 });
+    emit('dome', { position: spot, color: '#ff4a4a', size: 0.9, life: 0.35 });
+    emit('spr', { position: spot, n: 16, tile: TILE.glow, c: ['#ff6a6a', '#ffffff'], radius: 0.6, inward: true, speed: 1.8, size: 0.25, size2: 0.05, life: BALL.absorb });
+    later(BALL.absorb * 1000, () => {
+      emit('ring', { position: ground(at), color: '#f6d889', size: 1.6, life: 0.5 });
       sfx('zap');
     });
-    BALL.shakes.forEach((t) => later(t * 1000, () => {
-      emit('spr', { position: ground(at), n: 4, tile: TILE.smoke, c: ['#e4ddd0'], add: false, speed: 0.8, up: 0.2, size: 0.2, size2: 0.5, life: 0.4, a: 0.4, drag: 2 });
+    BALL.shakes.forEach((t) => later((t + BALL.shake * 0.25) * 1000, () => {
+      emit('spr', { position: ground(at), n: 3, tile: TILE.smoke, c: ['#e4ddd0'], add: false, speed: 0.6, up: 0.2, size: 0.18, size2: 0.45, life: 0.4, a: 0.35, drag: 2 });
       sfx('clack');
     }));
     later(BALL.click * 1000, () => {
-      emit('spr', { position: off(rest, 0, 0.35), n: 9, tile: TILE.star, c: ['#ffe94d', '#ffffff', '#ffb3b3'], sphere: true, speed: 1.8, size: 0.35, size2: 0.1, life: 0.8, drag: 1.5, rotv: 5 });
+      emit('ring', { position: ground(at), color: '#82ffc0', size: 2.3, life: 0.6 });
+      emit('spr', { position: off(spot, 0, 0.25), n: 12, tile: TILE.star, c: ['#ffe5a1', '#ffffff', '#82ffc0'], sphere: true, speed: 1.8, size: 0.35, size2: 0.1, life: 0.8, drag: 1.5, rotv: 5 });
       sfx('ping');
     });
-    later(BALL.pop * 1000, () => emit('spr', { position: rest, n: 10, tile: TILE.smoke, c: ['#ffffff', '#ffd9d9'], add: false, speed: 1.2, up: 0.4, size: 0.3, size2: 0.9, life: 0.5, a: 0.7, drag: 2 }));
   },
 
   police: (emit, { at }) => {

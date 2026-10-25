@@ -13,7 +13,8 @@ import { makeFxBus } from './fx';
 import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
 import * as THREE from 'three';
-import { MARBLE_GEO, victimPlan } from './Marbles';
+import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
+import { ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { SingularityAura } from './Gravity';
 import { ITEMS } from '../game/catalog';
@@ -122,7 +123,9 @@ function FxPreview({ itemId, seat, replay }) {
     const h = t > START ? Math.min(HOPS, (t - START) / HOP_TIME) : 0;
     const i = Math.min(HOPS - 1, Math.floor(h));
     const e = h >= HOPS ? 1 : h - i;
-    attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e));
+    const rock = fired.current && skinKey(itemId) === 'wild' ? ballRock(t - START - HOPS * HOP_TIME) : 0;
+    attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e) - rock);
+    attacker.current.rotation.x = -rock / MARBLE_R;
     if (flight.current) {
       const at = flightAt(flight.current, t - flight.current.at);
       if (at) {

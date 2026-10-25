@@ -8,6 +8,7 @@ import { itemsForSlot, skinKey } from '../game/catalog';
 import DefuseProps from './DefuseProps';
 import PicnicProps from './PicnicProps';
 import MinecraftProps from './MinecraftProps';
+import WildProps from './WildProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -160,7 +161,7 @@ function NameTag({ name, color, position }) {
 const mixHex = (a, b, t) => `#${[1, 3, 5].map((i) => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('')}`;
 const seatColor = (c, active) => (active ? c.main : mixHex(c.main, '#4a3a2c', 0.74));
 
-function Dish({ seat, color = SEAT_COLORS[seat], geometry, material, active, isTurn, name, layout }) {
+function Dish({ seat, color = SEAT_COLORS[seat], geometry, material, side, active, isTurn, name, layout }) {
   const rimRef = useRef();
   const [r, c] = layout.BASE_TRAY[seat];
   const dishR = layout.spec.dishR;
@@ -171,7 +172,7 @@ function Dish({ seat, color = SEAT_COLORS[seat], geometry, material, active, isT
   return (
     <group>
       <group position={[c, 0, r]}>
-        <mesh geometry={geometry} material={material} castShadow receiveShadow />
+        <mesh geometry={geometry} material={side ? [material, side] : material} castShadow receiveShadow />
         <mesh ref={rimRef} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
           <ringGeometry args={[dishR - 0.2, dishR - 0.04, 64]} />
           <meshStandardMaterial color={seatColor(color, active)} emissive={color.main} emissiveIntensity={0} roughness={0.4} polygonOffset polygonOffsetFactor={-2} />
@@ -234,7 +235,7 @@ function Table({ materials }) {
 }
 
 // Boards that dress the table around them, not just the board itself
-const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps, minecraft: MinecraftProps };
+const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps, minecraft: MinecraftProps, wild: WildProps };
 export const hasBoardProps = (id) => !!BOARD_PROPS[skinKey(id)];
 
 const SWAP_MS = 150;
@@ -471,7 +472,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
               <meshStandardMaterial color={seatColor(col, seated)} roughness={0.5} polygonOffset polygonOffsetFactor={-1} />
             </mesh>
             <Ring at={layout.RING[entryIdx(s, layout)]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.09} color={seatColor(col, seated)} />
-            <Dish seat={s} color={col} geometry={dishGeometries[s]} material={materials.dishes[s]} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
+            <Dish seat={s} color={col} geometry={dishGeometries[s]} material={materials.dishes[s]} side={materials.dishSide} active={seated} isTurn={turn === s} name={showNames ? names[s] : null} layout={layout} />
           </group>
         );
       })}
