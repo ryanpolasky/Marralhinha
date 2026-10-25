@@ -156,6 +156,13 @@ const makeAtlas = () => {
     g.arc(0, 0, 21, 0, Math.PI * 2);
     g.stroke();
   });
+  tile(13, () => {
+    g.fillStyle = white;
+    g.beginPath();
+    g.ellipse(0, -9, 10, 15, 0, 0, Math.PI * 2);
+    g.ellipse(0, 17, 8, 9, 0, 0, Math.PI * 2);
+    g.fill();
+  });
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;

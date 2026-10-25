@@ -10,6 +10,7 @@ import { SolCorona } from './Corona';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
+import { ANVIL } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
@@ -90,6 +91,31 @@ export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(s
       { to: spot.clone(), dur: 0.44, height: 0, ...start },
       { to: spot.clone().addScaledVector(across, 9).setY(spot.y + 0.15), dur: 0.32, height: 0.1 },
       { to: home, dur: 0.9, height: 2.6, final: true },
+    ];
+  }
+  if (kind === 'anvil') {
+    const flat = spot.clone().setY(0.1);
+    const squash = [1.45, 0.22, 1.45];
+    return [
+      { to: spot.clone(), dur: ANVIL.drop, height: 0, quiet: true, ...start },
+      { to: flat, dur: 0.06, height: 0, scale: squash, quiet: true },
+      { to: flat.clone(), dur: ANVIL.hold + ANVIL.lift - 0.06, height: 0, scale: squash, quiet: true },
+      { to: spot.clone(), dur: 0.22, height: 0.6, scale: [1, 1, 1], quiet: true },
+      { to: home, dur: 0.9, height: 3.4, final: true },
+    ];
+  }
+  if (kind === 'claw') {
+    const up = (y, dx = 0) => spot.clone().add(new THREE.Vector3(dx, y, 0));
+    return [
+      { to: spot.clone(), dur: 0.65, height: 0, quiet: true, ...start },
+      { to: up(2.2), dur: 0.5, height: 0, quiet: true },
+      { to: up(2.2, 0.15), dur: 0.15, height: 0, quiet: true },
+      { to: up(2.2, -0.15), dur: 0.15, height: 0, quiet: true },
+      { to: up(2.2), dur: 0.1, height: 0, quiet: true },
+      { to: spot.clone(), dur: 0.3, height: 0, quiet: true },
+      { to: spot.clone(), dur: 0.7, height: 0, quiet: true },
+      { to: up(6.5), dur: 0.6, height: 0, quiet: true },
+      { to: home, dur: 0.9, height: 1.2, final: true },
     ];
   }
   return [{ to: home, dur: 0.9, height: 3.4, ...start, final: true }];
@@ -228,6 +254,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       if (seg.start === null) {
         seg.start = now + (seg.delay || 0);
         seg.from = a.pos.clone();
+        seg.fromScale = body.current.scale.toArray();
       }
       const t = (now - seg.start) / seg.dur;
       if (t >= 0 && !seg.begun) {
@@ -240,18 +267,21 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       if (t >= 1) {
         a.pos.copy(seg.to);
         a.segs.shift();
+        if (seg.scale) body.current.scale.fromArray(seg.scale);
         if (seg.final) sfx.land();
         else if (seg.tap) sfx.clack();
-        else sfx.hop();
+        else if (!seg.quiet) sfx.hop();
         if (seg.burst) fx.emit('burst', { position: [seg.to.x, 0.3, seg.to.z], ...seg.burst });
       } else if (t >= 0) {
         const e = easeInOut(t);
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
         if (seg.puff) fx.emit('spr', { position: [a.pos.x, a.pos.y, a.pos.z], tile: 1, c: ['#f2f4f5', '#dfe5e8'], add: false, speed: 0.3, size: 0.18, size2: 0.5, life: 0.45, a: 0.55, drag: 2 });
-        else if (!seg.impact) dropTrail();
+        else if (!seg.impact && !seg.quiet) dropTrail();
+        if (seg.scale) body.current.scale.fromArray(seg.fromScale.map((v, j) => v + (seg.scale[j] - v) * e));
       }
     } else if (a.pos.distanceToSquared(target) > 1e-6) {
+      body.current.scale.set(1, 1, 1);
       a.trailAt = null;
       a.spin = 0;
       // Coming back from a bit can be clear across the board, so take it slower than a sync nudge

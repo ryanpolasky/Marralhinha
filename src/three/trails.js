@@ -186,6 +186,46 @@ const TRAILS = {
     emit('spr', { position: at, n: 3, px: true, add: false, tile: TILE.square, c: PIXEL, rot: 0, speed: 0.5, up: 0.7, uj: 0.5, size: 0.3, size2: 0.2, life: 0.7, grav: 0.8, drag: 0.5, jitter: 0.1 });
     if (n % 3 === 0) emit('spr', { position: at, px: true, add: false, tile: TILE.star, c: ['#ffe94d', '#ffffff'], rot: 0, size: 0.5, size2: 0.3, life: 0.6, up: 0.4 });
   },
+
+  // little sneaker prints, left then right
+  footprints: (emit, p, { prev, n, bumps = [] }) => {
+    const from = prev || p;
+    const dx = p[0] - from[0];
+    const dz = p[2] - from[2];
+    const len = Math.hypot(dx, dz) || 1;
+    const side = n % 2 ? 0.09 : -0.09;
+    const [x, z] = [p[0] - (dz / len) * side, p[2] + (dx / len) * side];
+    emit('spr', { position: [x, overBumps(x, z, bumps) + 0.01, z], tile: TILE.foot, c: ['#3b2f2a'], add: false, rot: Math.atan2(dx, -dz), size: 0.36, size2: 0.36, life: 2.4, fade: 1.2, jitter: 0, a: 0.8 });
+  },
+
+  // a red runner unrolls behind you while the cameras go off
+  carpet: (emit, p, { prev, n, bumps = [] }) => {
+    const from = prev || p;
+    const len = Math.hypot(p[0] - from[0], p[2] - from[2]) || 1;
+    const dx = (p[0] - from[0]) / len;
+    const dz = (p[2] - from[2]) / len;
+    const steps = Math.max(1, Math.round(len / 0.08));
+    for (let k = 0; k < steps; k++) {
+      const t = (k + 0.5) / steps;
+      [-0.2, -0.1, 0, 0.1, 0.2].forEach((side) => {
+        const edge = Math.abs(side) > 0.15;
+        const x = from[0] + (p[0] - from[0]) * t - dz * side;
+        const z = from[2] + (p[2] - from[2]) * t + dx * side;
+        emit('spr', { position: [x, overBumps(x, z, bumps) + 0.01, z], tile: TILE.square, c: [edge ? '#e8b64a' : '#c3122a'], add: false, rot: 0, size: edge ? 0.12 : 0.26, size2: edge ? 0.12 : 0.26, life: 2.6, fade: 0.8, jitter: 0 });
+      });
+    }
+    if (n % 2 === 0) {
+      const s = n % 4 ? 0.7 : -0.7;
+      emit('spr', { position: [p[0] - dz * s, p[1] + 0.45, p[2] + dx * s], tile: TILE.flare, c: ['#ffffff'], size: 0.2, size2: 1.1, life: 0.18 });
+    }
+  },
+
+  // bills fluttering down with a glint of gold
+  cash: (emit, p, { n }) => {
+    emit('spr', { position: [p[0], p[1] + 0.3, p[2]], n: 3, tile: TILE.square, c: ['#7ec86a', '#5fae52', '#a6dc8c'], add: false, speed: 1.1, up: 2, uj: 0.6, size: 0.5, size2: 0.42, life: 2, grav: 0.18, drag: 1.2, swirl: 2, rotv: 5, fade: 0.6 });
+    if (n % 3 === 0) emit('spr', { position: p, tile: TILE.star, c: ['#ffe38a', '#ffffff'], size: 0.3, size2: 0.02, life: 0.5, up: 0.4, flick: 20 });
+  },
+
 };
 
 export const playTrail = (itemId, pos, info = {}, { emit = fx.emit } = {}) => {

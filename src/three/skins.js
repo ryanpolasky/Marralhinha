@@ -1317,6 +1317,9 @@ const DICE = {
   minecraft: { bg: 'minecraft', pip: '#2fd8e8', one: '#22d36a', roughness: 0.85 },
   defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
+  sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
+  fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
+  disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
 };
 
 const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
@@ -1578,6 +1581,32 @@ function dieBackground(ctx, style, size, value) {
     g.addColorStop(1, '#a8741c');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
+  } else if (style === 'sugar') {
+    ctx.fillStyle = '#f6f2ea';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 1400; i++) {
+      const v = rand();
+      ctx.fillStyle = v < 0.5 ? 'rgba(255,255,255,0.9)' : v < 0.85 ? 'rgba(214,204,188,0.55)' : 'rgba(160,150,136,0.35)';
+      const w = 2 + rand() * 5;
+      ctx.fillRect(rand() * size, rand() * size, w, w * (0.6 + rand() * 0.6));
+    }
+  } else if (style === 'fuzzy') {
+    ctx.fillStyle = '#ff5aa8';
+    ctx.fillRect(0, 0, size, size);
+    fur(ctx, rand, size, ['#ff8cc4', '#e23f8e', '#ffb3d9']);
+  } else if (style === 'disco') {
+    const n = 12;
+    const cell = size / n;
+    ctx.fillStyle = '#2a2a32';
+    ctx.fillRect(0, 0, size, size);
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) {
+        const v = 120 + rand() * 135;
+        const tint = rand() < 0.08 ? [255, 120, 230] : rand() < 0.08 ? [120, 220, 255] : [v, v, v + 8];
+        ctx.fillStyle = `rgb(${tint.map((c) => Math.min(255, c | 0)).join(',')})`;
+        ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
+      }
+    }
   } else if (style === 'galaxy') {
     ctx.fillStyle = '#0b0820';
     ctx.fillRect(0, 0, size, size);
@@ -1587,6 +1616,57 @@ function dieBackground(ctx, style, size, value) {
     ctx.fillStyle = style;
     ctx.fillRect(0, 0, size, size);
   }
+}
+
+function fur(ctx, rand, size, colors, n = 2600) {
+  ctx.lineCap = 'round';
+  for (let i = 0; i < n; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const a = rand() * TAU;
+    const l = 4 + rand() * 7;
+    ctx.strokeStyle = colors[(rand() * colors.length) | 0];
+    ctx.lineWidth = 1.2 + rand();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    ctx.stroke();
+  }
+}
+
+
+function sugarPips(ctx, value, size, color) {
+  const r = value === 1 ? 30 : 21;
+  PIPS[value].forEach(([x, y]) => {
+    const cx = x * size;
+    const cy = y * size;
+    const g = ctx.createRadialGradient(cx + 5, cy + 6, 2, cx, cy, r);
+    g.addColorStop(0, mix(color, '#ffffff', 0.15));
+    g.addColorStop(0.7, color);
+    g.addColorStop(1, mix(color, '#000000', 0.55));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.fill();
+  });
+}
+
+function fuzzyPips(ctx, value, size, color) {
+  drawPips(ctx, value, size, color);
+  const rand = seeded(700 + value);
+  const r = value === 1 ? 30 : 21;
+  PIPS[value].forEach(([x, y]) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x * size, y * size, r + 6, 0, TAU);
+    ctx.clip();
+    fur(ctx, rand, size, ['rgba(23,19,26,0.9)', 'rgba(255,140,196,0.7)'], 900);
+    ctx.restore();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x * size, y * size, r - 6, 0, TAU);
+    ctx.fill();
+  });
 }
 
 function drawPips(ctx, value, size, color) {
@@ -1633,7 +1713,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1812,6 +1892,124 @@ function corkCanvas() {
     ctx.beginPath();
     ctx.ellipse(rand() * 1024, rand() * 1024, 2 + rand() * 9, 1.5 + rand() * 5, rand() * TAU, 0, TAU);
     ctx.fill();
+  }
+  return canvas;
+}
+
+function cardboardCanvas() {
+  const [canvas, ctx] = makeCanvas(1024, 1024);
+  const rand = seeded(41);
+  ctx.fillStyle = '#c39a62';
+  ctx.fillRect(0, 0, 1024, 1024);
+  for (let x = 0; x < 1024; x += 16) {
+    ctx.fillStyle = 'rgba(120,82,40,0.12)';
+    ctx.fillRect(x, 0, 6, 1024);
+  }
+  for (let i = 0; i < 5000; i++) {
+    ctx.fillStyle = rand() > 0.5 ? `rgba(110,72,32,${rand() * 0.2})` : `rgba(235,205,150,${rand() * 0.18})`;
+    ctx.fillRect(rand() * 1024, rand() * 1024, 1 + rand() * 3, 4 + rand() * 12);
+  }
+  ctx.fillStyle = 'rgba(214,190,140,0.72)';
+  ctx.fillRect(0, 430, 1024, 150);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(0, 440, 1024, 10);
+  ctx.save();
+  ctx.translate(250, 220);
+  ctx.rotate(-0.12);
+  ctx.strokeStyle = 'rgba(190,40,36,0.85)';
+  ctx.fillStyle = 'rgba(190,40,36,0.85)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(-190, -60, 380, 120);
+  ctx.font = '900 92px Impact, "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('FRAGILE', 0, 6);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(760, 820);
+  ctx.fillStyle = 'rgba(40,30,22,0.75)';
+  [-70, 70].forEach((x) => {
+    ctx.beginPath();
+    ctx.moveTo(x, -80);
+    ctx.lineTo(x + 46, -20);
+    ctx.lineTo(x + 16, -20);
+    ctx.lineTo(x + 16, 60);
+    ctx.lineTo(x - 16, 60);
+    ctx.lineTo(x - 16, -20);
+    ctx.lineTo(x - 46, -20);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.fillRect(-120, 80, 240, 12);
+  ctx.font = '700 34px "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('THIS SIDE UP', 0, 130);
+  ctx.restore();
+  return canvas;
+}
+
+function notebookCanvas() {
+  const [canvas, ctx] = makeCanvas(1024, 1024);
+  const rand = seeded(57);
+  ctx.fillStyle = '#fbf8ef';
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.fillStyle = 'rgba(70,130,200,0.45)';
+  for (let y = 24; y < 1024; y += 48) ctx.fillRect(0, y, 1024, 3);
+  ctx.fillStyle = 'rgba(220,70,80,0.55)';
+  ctx.fillRect(150, 0, 3, 1024);
+  ctx.fillRect(158, 0, 2, 1024);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const pen = (color, w) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+  };
+  const wob = (v) => v + (rand() - 0.5) * 4;
+  pen('#2a4fa8', 5);
+  ctx.beginPath();
+  for (let k = 0; k <= 5; k++) {
+    const a = -Math.PI / 2 + (k * 4 * Math.PI) / 5;
+    ctx[k ? 'lineTo' : 'moveTo'](wob(330 + Math.cos(a) * 60), wob(170 + Math.sin(a) * 60));
+  }
+  ctx.stroke();
+  pen('#2a4fa8', 5);
+  ctx.beginPath();
+  ctx.arc(760, 260, 58, 0, TAU);
+  ctx.moveTo(738, 245);
+  ctx.arc(738, 245, 4, 0, TAU);
+  ctx.moveTo(782, 245);
+  ctx.arc(782, 245, 4, 0, TAU);
+  ctx.moveTo(726, 280);
+  ctx.quadraticCurveTo(760, 312, 794, 280);
+  ctx.stroke();
+  pen('#c23048', 5);
+  ctx.beginPath();
+  ctx.moveTo(560, 640);
+  ctx.bezierCurveTo(520, 590, 470, 640, 560, 710);
+  ctx.bezierCurveTo(650, 640, 600, 590, 560, 640);
+  ctx.stroke();
+  pen('#2a4fa8', 4);
+  ctx.beginPath();
+  ctx.moveTo(250, 820);
+  for (let x = 250; x < 470; x += 22) ctx.lineTo(x + 11, 790 + (x % 44 ? 0 : 0) - ((x / 22) % 2) * 0 - 18 * ((x / 22) % 2 ? 1 : -1) + 18);
+  ctx.stroke();
+  ctx.font = 'italic 600 44px "Comic Sans MS", "Segoe Print", cursive';
+  ctx.fillStyle = 'rgba(42,79,168,0.9)';
+  ctx.fillText('gg ez', 760, 520);
+  ctx.save();
+  ctx.translate(320, 470);
+  ctx.rotate(-0.08);
+  ctx.fillText('6 = go again', 0, 0);
+  ctx.restore();
+  pen('#2a4fa8', 4);
+  [[820, 760], [860, 840], [780, 880]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 18, 0, TAU);
+    ctx.stroke();
+  });
+  for (let i = 0; i < 1500; i++) {
+    ctx.fillStyle = `rgba(150,130,90,${rand() * 0.05})`;
+    ctx.fillRect(rand() * 1024, rand() * 1024, 2, 2);
   }
   return canvas;
 }
@@ -4496,7 +4694,6 @@ export function basketCanvas(cell = 32) {
   return canvas;
 }
 
-// The serving board everyone actually used: knife scars, wine rings, crumbs, and a sign the ants ignored
 function picnicBoardCanvas(layout) {
   const S = 1024;
   const k = BOARD_R * S;
@@ -4699,6 +4896,8 @@ const SPECIAL_BOARDS = {
     const [base, glow] = neonCanvases();
     return { canvas: base, glowCanvas: glow, repeat: 0.06, roughness: 0.35, dish: '#1a0f33', felt: '#07061a', cup: '#05030c', accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 1.4, roughness: 0.3 } };
   },
+  cardboard: () => ({ canvas: cardboardCanvas(), repeat: 0.07, roughness: 0.92, dish: '#a07a48', felt: '#5b4128', cup: '#3a2816', side: '#b08850' }),
+  notebook: () => ({ canvas: notebookCanvas(), repeat: 0.06, roughness: 0.8, dish: '#f1ede2', felt: '#6b5444', cup: '#1d2a44', side: '#f4f0e6', accent: { color: '#b8bcc4', metalness: 1, roughness: 0.3 } }),
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
   terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#2b2e32', felt: '#2b3a44', cup: '#141618', accent: { color: '#d9d4ca', metalness: 0.3, roughness: 0.4 } }),

@@ -123,15 +123,20 @@ test('mythic chest hits grant whole sets, fill gaps, refund pieces you had, and 
   assert.equal(first.duplicate, false);
   assert.ok(first.items.every((item) => accounts.owns(id, item)));
 
-  assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, SETS[1].key, 'completed sets are skipped');
-  assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, SETS[2].key);
-  const before = accounts.getUser(id).coins;
-  const full = economy.openBox(id, 'box.gold', mythicRoll);
+  for (const set of SETS.slice(1)) assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, set.key, 'completed sets are skipped');
+  const collector = accounts.createUser({ name: 'B' }).id;
+  economy.credit(collector, gold.price, 'test');
+  SETS.flatMap((set) => set.items).forEach((item) => accounts.grantItem(collector, item));
+  const before = accounts.getUser(collector).coins;
+  const full = economy.openBox(collector, 'box.gold', mythicRoll);
   assert.equal(full.duplicate, true);
-  assert.equal(full.refund, SETS[0].items.length * dupe);
-  assert.equal(accounts.getUser(id).coins, before - gold.price + full.refund);
+  assert.equal(full.refund, full.items.length * dupe);
+  assert.equal(accounts.getUser(collector).coins, before - gold.price + full.refund);
 
-  const pity = economy.openBox(id, 'box.gold', mythicRoll);
+  const unlucky = accounts.createUser({ name: 'C' }).id;
+  economy.credit(unlucky, gold.price * gold.pity.epic, 'test');
+  for (let i = 1; i < gold.pity.epic; i++) economy.openBox(unlucky, 'box.gold', mythicRoll);
+  const pity = economy.openBox(unlucky, 'box.gold', mythicRoll);
   assert.equal(pity.rarity, 'legendary', 'set pulls do not reset pity, and pity never lands on mythic');
   assert.ok(pity.item);
 });

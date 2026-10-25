@@ -3,6 +3,7 @@ import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 import { videoFor } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
+import { ANVIL } from './Props';
 
 const col = (s) => SEAT_COLORS[s];
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
@@ -11,7 +12,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const off = (at, dx = 0, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
 const ground = (at, dx = 0, dz = 0) => [at[0] + dx, 0.1, at[2] + dz];
 const lerp3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12 };
+export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12, foot: 13 };
 
 // Timers ride the bus clock so they pause with the frame loop and die with the scene
 const timeline = (bus) => {
@@ -389,6 +390,45 @@ const KILL_FX = {
   },
 
   // Janky green screen cop car crash, chroma keyed over the table
+  // Confetti and curly streamers out of a party popper
+  popper: (emit, { at, by, sfx }) => {
+    const hues = ['#ff5f8f', '#ffd23f', '#3fd8ff', '#7bf1a8', '#b36bff', col(by).light];
+    emit('spr', { position: at, tile: TILE.glow, c: ['#ffffff'], size: 0.4, size2: 1.6, life: 0.15 });
+    emit('spr', { position: at, n: 70, tile: TILE.square, c: hues, add: false, speed: 2.8, up: 4.6, uj: 1.5, size: 0.26, size2: 0.2, life: 1.8, grav: 0.55, drag: 1.2, swirl: 2, rotv: 9, land: true, fade: 0.5 });
+    emit('spr', { position: at, n: 14, tile: TILE.streak, c: hues, add: false, speed: 3, up: 3.8, size: 0.7, size2: 0.55, life: 1.2, grav: 0.4, drag: 1.4, rotv: 6, swirl: 3 });
+    emit('shake', { amount: 0.1 });
+    sfx('pop');
+  },
+
+  // An anvil drops out of the sky, pancakes the victim, then hauls itself back up
+  anvil: (emit, { at, sfx, later }) => {
+    const base = ground(at);
+    emit('anvil', { position: base });
+    later(ANVIL.drop * 1000, () => {
+      emit('spr', { position: off(base, 0, 0.1), n: 16, tile: TILE.smoke, c: ['#e4ddd0', '#c9c0b0'], add: false, radius: 0.4, speed: 2.2, up: 0.3, size: 0.4, size2: 1.1, life: 0.8, a: 0.7, drag: 2.4 });
+      emit('ring', { position: base, color: '#ffffff', size: 2.2, life: 0.35 });
+      emit('decal', { position: base, kind: 'cracks', size: 1.8, life: 1.6, grow: 0.6 });
+      emit('spr', { position: off(base, 0, 0.95), n: 5, tile: TILE.star, c: ['#ffe27a', '#ffffff'], radius: 0.4, speed: 0.2, size: 0.3, size2: 0.25, life: 1.1, swirl: 6, rotv: 4 });
+      emit('shake', { amount: 0.45 });
+      sfx('thud');
+    });
+    later((ANVIL.drop + ANVIL.hold + ANVIL.lift) * 1000 + 30, () => sfx('boing'));
+  },
+
+  // The claw grabs, wobbles, drops the marble once for show, then grabs it for real
+  claw: (emit, { at, sfx, later }) => {
+    const base = ground(at);
+    emit('claw', { position: [at[0], 0.07, at[2]] });
+    sfx('servo');
+    later(650, () => sfx('clack'));
+    later(1550, () => sfx('squeak'));
+    later(1850, () => {
+      emit('spr', { position: base, n: 8, tile: TILE.smoke, c: ['#e4ddd0'], add: false, speed: 1.2, up: 0.3, size: 0.25, size2: 0.7, life: 0.5, a: 0.5, drag: 2 });
+      sfx('clack');
+    });
+    later(2550, () => sfx('servo'));
+  },
+
   police: (emit, { at }) => {
     emit('video', { src: '/fx/police-crash.mp4', position: off(at, 0, -0.3), size: 2.8, rate: 1.4, from: 0.5, trim: 0.25 });
     emit('shake', { amount: 0.15 });
