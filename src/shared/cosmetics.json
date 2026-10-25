@@ -358,7 +358,8 @@
       { "key": "strut", "img": "/emotes/groovin/strut.gif", "hint": "Strut" },
       { "key": "shuffle", "img": "/emotes/groovin/shuffle.gif", "hint": "Shuffle" },
       { "key": "skeleton", "img": "/emotes/groovin/skeleton.gif", "hint": "Spooky groove" },
-      { "key": "vibin", "img": "/emotes/groovin/vibin.gif", "hint": "Vibin" }
+      { "key": "vibin", "img": "/emotes/groovin/vibin.gif", "hint": "Vibin" },
+      { "key": "penguin", "img": "/emotes/groovin/penguin.gif", "hint": "Waddle" }
     ] }
   ],
   "boxes": [
