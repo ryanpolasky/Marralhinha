@@ -223,7 +223,6 @@
     {"id": "trail.footprints", "slot": "trail", "name": "Footprints", "rarity": "common", "desc": "Somebody was here. Small shoes."},
     {"id": "trail.carpet", "slot": "trail", "name": "Red Carpet", "rarity": "legendary", "desc": "No photos, please."},
     {"id": "trail.cash", "slot": "trail", "name": "Make It Rain", "rarity": "legendary", "desc": "Throwing it around like you mean it."},
-    {"id": "trail.slime", "slot": "trail", "name": "Slime", "rarity": "legendary", "desc": "Leaves a little of itself everywhere."},
     {"id": "trail.wild", "slot": "trail", "name": "Tall Grass", "rarity": "mythic", "set": "wild", "desc": "Something is rustling."},
 
     { "id": "emotes.starter", "slot": "emotes", "name": "Table Talkers", "rarity": "default", "desc": "The six faces every marble player needs.", "emotes": [

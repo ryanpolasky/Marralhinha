@@ -226,13 +226,6 @@ const TRAILS = {
     if (n % 3 === 0) emit('spr', { position: p, tile: TILE.star, c: ['#ffe38a', '#ffffff'], size: 0.3, size2: 0.02, life: 0.5, up: 0.4, flick: 20 });
   },
 
-  // goo drips off you and pools on the board
-  slime: (emit, p, { n, bumps = [] }) => {
-    emit('spr', { position: p, n: 2, tile: TILE.drop, c: ['#7dff5a', '#4fe03a', '#b6ff8a'], add: false, speed: 0.3, up: 0.6, size: 0.24, size2: 0.16, life: 0.8, grav: 1.1, land: true, a: 0.95 });
-    emit('spr', { position: [p[0], overBumps(p[0], p[2], bumps) + 0.01, p[2]], tile: TILE.glow, c: ['#5ff03f'], add: false, rot: 0, size: 0.55, size2: 0.7, life: 2.4, fade: 1.2, jitter: 0.04, a: 0.95 });
-    if (n % 3 === 0) emit('spr', { position: p, tile: TILE.bubble, c: ['#c8ffb0'], add: false, speed: 0.2, up: 0.6, size: 0.12, size2: 0.22, life: 0.9, grav: -0.1, a: 0.8 });
-  },
-
   // grass tufts shake as you push through, and every so often something notices
   wild: (emit, p, { n, bumps = [] }) => {
     const [x, z] = [p[0] + rand(-0.15, 0.15), p[2] + rand(-0.15, 0.15)];
