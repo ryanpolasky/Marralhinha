@@ -564,29 +564,6 @@ const MARBLES = {
       animate: (m, t) => (tex.offset.x = (t * 0.07 + seat * 0.25) % 1),
     };
   },
-  wild: (c) => {
-    const [canvas, ctx] = makeCanvas(512, 256);
-    ctx.fillStyle = c.main;
-    ctx.fillRect(0, 0, 512, 128);
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.fillRect(0, 26, 512, 14);
-    ctx.fillStyle = '#f6f4ef';
-    ctx.fillRect(0, 128, 512, 128);
-    ctx.fillStyle = '#1a1a1e';
-    ctx.fillRect(0, 118, 512, 20);
-    [128, 384].forEach((x) => {
-      ctx.beginPath();
-      ctx.arc(x, 128, 30, 0, TAU);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#ffffff';
-    [128, 384].forEach((x) => {
-      ctx.beginPath();
-      ctx.arc(x, 128, 18, 0, TAU);
-      ctx.fill();
-    });
-    return { map: finishMarble(canvas), roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 };
-  },
   dots: (c) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     ctx.fillStyle = c.main;
@@ -1343,7 +1320,6 @@ const DICE = {
   sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
-  wild: { bg: 'wild', pip: '#e8331c', one: '#e8331c', roughness: 0.22, clearcoat: 1 },
 };
 
 const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft'];
@@ -1631,12 +1607,6 @@ function dieBackground(ctx, style, size, value) {
         ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
       }
     }
-  } else if (style === 'wild') {
-    ctx.fillStyle = '#f6f4ef';
-    ctx.fillRect(0, 0, size, size);
-    ctx.strokeStyle = '#1a1a1e';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, size - 10, size - 10);
   } else if (style === 'galaxy') {
     ctx.fillStyle = '#0b0820';
     ctx.fillRect(0, 0, size, size);
@@ -1699,34 +1669,6 @@ function fuzzyPips(ctx, value, size, color) {
   });
 }
 
-function ballPips(ctx, value, size, color) {
-  const r = value === 1 ? 34 : 24;
-  PIPS[value].forEach(([x, y]) => {
-    const cx = x * size;
-    const cy = y * size;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, Math.PI, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI);
-    ctx.fill();
-    ctx.strokeStyle = '#1a1a1e';
-    ctx.lineWidth = r * 0.16;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, TAU);
-    ctx.moveTo(cx - r, cy);
-    ctx.lineTo(cx + r, cy);
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.3, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-  });
-}
-
 function drawPips(ctx, value, size, color) {
   const r = value === 1 ? 30 : 21;
   PIPS[value].forEach(([x, y]) => {
@@ -1771,7 +1713,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -4752,58 +4694,6 @@ export function basketCanvas(cell = 32) {
   return canvas;
 }
 
-// The serving board everyone actually used: knife scars, wine rings, crumbs, and a sign the ants ignored
-function routeBoardCanvas(layout) {
-  const S = 1024;
-  const k = BOARD_R * S;
-  const C = S / 2;
-  const [canvas, ctx] = makeCanvas(S, S);
-  ctx.fillStyle = '#6cbf4a';
-  ctx.fillRect(0, 0, S, S);
-  const rand = seeded(151);
-  for (let i = 0; i < 9000; i++) {
-    ctx.fillStyle = rand() > 0.5 ? `rgba(40,110,30,${rand() * 0.25})` : `rgba(170,230,120,${rand() * 0.2})`;
-    ctx.fillRect(rand() * S, rand() * S, 2, 3 + rand() * 4);
-  }
-  const { halfWidth: W, halfLength: L } = layout.spec;
-  ctx.setTransform(k, 0, 0, k, C, C);
-  ctx.lineJoin = 'round';
-  [['#c9a46a', 1.25], ['#e2c48c', 0.95]].forEach(([color, width]) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    roundedCross(W - 0.55, L - 0.55, 0.5).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.closePath();
-    ctx.stroke();
-  });
-  for (let i = 0; i < 260; i++) {
-    const t = rand();
-    const long = rand() < 0.5;
-    const x = (rand() - 0.5) * 2 * (long ? W * 0.55 : L);
-    const y = (rand() - 0.5) * 2 * (long ? L : W * 0.55);
-    const [px, py] = t < 0.5 ? [x, y] : [y, x];
-    const blades = 4 + ((rand() * 4) | 0);
-    for (let b = 0; b < blades; b++) {
-      const bx = px + (b - blades / 2) * 0.05;
-      ctx.fillStyle = b % 2 ? '#2f7d2a' : '#3f9634';
-      ctx.beginPath();
-      ctx.moveTo(bx - 0.03, py + 0.1);
-      ctx.quadraticCurveTo(bx + 0.02, py - 0.05, bx + (rand() - 0.5) * 0.12, py - 0.2);
-      ctx.quadraticCurveTo(bx + 0.02, py, bx + 0.03, py + 0.1);
-      ctx.fill();
-    }
-  }
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  return canvas;
-}
-
-const ROUTE_SHADER = `{
-  float grass = smoothstep(0.04, 0.14, diffuseColor.g - diffuseColor.r) * step(0.5, vSkinTop);
-  float wind = sin(vSkinPos.x * 0.9 + vSkinPos.z * 0.6 - uSkinTime * 1.7) * sin(vSkinPos.x * 0.37 - vSkinPos.z * 0.51 - uSkinTime * 0.6);
-  diffuseColor.rgb *= 1.0 + grass * (0.14 * wind + 0.04);
-  totalEmissiveRadiance += diffuseColor.rgb * grass * max(wind, 0.0) * 0.08;
-}`;
-
 function picnicBoardCanvas(layout) {
   const S = 1024;
   const k = BOARD_R * S;
@@ -5088,12 +4978,6 @@ const SPECIAL_BOARDS = {
       },
     };
   },
-  wild: (layout) => ({
-    canvas: routeBoardCanvas(layout), repeat: BOARD_R, roughness: 0.78,
-    dish: '#4f9a3a', feltCanvas: grassCanvas(), cup: '#24401b', core: '#e8331c', side: '#c9a46a',
-    accent: { color: '#f6f4ef', metalness: 0.1, roughness: 0.35 },
-    shader: ROUTE_SHADER,
-  }),
   picnic: (layout) => ({
     canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
     dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
@@ -5103,7 +4987,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

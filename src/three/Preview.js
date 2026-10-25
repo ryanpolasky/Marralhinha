@@ -75,7 +75,7 @@ const HOP_TIME = 0.2;
 const START = 0.9;
 const PERIOD = 5.5;
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw', 'wild'];
+const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw'];
 const VICTIM_AT = new THREE.Vector3(0, 0.07, 0);
 const ACROSS = new THREE.Vector3(0, 0, -1);
 
