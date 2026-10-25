@@ -6275,6 +6275,61 @@ img.emote-glyph {
   animation: plate-flow 2.6s linear infinite alternate;
 }
 
+.plate-toxic {
+  --plate-ink: #10230a;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #2f6b12, #9dff3a 30%, #dcff6a 50%, #9dff3a 70%, #2f6b12) !important;
+  background-size: 300% 100% !important;
+  border-color: #c8ff5a !important;
+  box-shadow: 0 0 18px rgba(150, 255, 60, 0.6), inset 0 0 8px rgba(30, 80, 0, 0.5);
+  animation: plate-flow 2.2s linear infinite alternate, plate-toxic-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes plate-toxic-pulse {
+  50% {
+    box-shadow: 0 0 30px rgba(150, 255, 60, 0.9), inset 0 0 8px rgba(30, 80, 0, 0.5);
+  }
+}
+
+.plate-rosegold {
+  --plate-ink: #4a2220;
+  --flow-to: 150% 0;
+  background-image: linear-gradient(120deg, #c98a7c, #f8d9cf 22%, #b56e60 42%, #f3c9bb 60%, #d49a8b 80%, #c98a7c) !important;
+  background-size: 300% 100% !important;
+  border-color: #fde6de !important;
+  box-shadow: 0 0 16px rgba(240, 170, 150, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: plate-flow 3.4s linear infinite;
+}
+
+.plate-wild {
+  --plate-ink: #1c1c22;
+  background: #f8f6ee !important;
+  border: 3px solid #2a2a32 !important;
+  box-shadow: 4px 4px 0 #2a2a32, inset 0 0 0 2px #d8d2bd;
+  padding-bottom: 9px !important;
+}
+
+.plate-wild::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--hp, #3ed05a) var(--hp-w, 100%), #3a3a40 0);
+  animation: plate-hp 7s steps(1, end) infinite;
+}
+
+@keyframes plate-hp {
+  0%, 55% { --hp-w: 100%; --hp: #3ed05a; }
+  60% { --hp-w: 70%; --hp: #3ed05a; }
+  68% { --hp-w: 42%; --hp: #f2c43a; }
+  76% { --hp-w: 16%; --hp: #e8442e; }
+  88% { --hp-w: 16%; --hp: #e8442e; }
+  94% { --hp-w: 100%; --hp: #3ed05a; }
+}
+
 .plate-diamond {
   --plate-ink: #1a2a3a;
   --flow-to: 150% 0;
@@ -11383,4 +11438,79 @@ body {
   .analytics-cols {
     grid-template-columns: 1fr;
   }
+}
+
+.thumb-marble.skin-wild {
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85) 0 6%, transparent 14%), radial-gradient(circle at 50% 50%, #ffffff 0 8%, #1a1a1e 9% 15%, transparent 16%),
+    linear-gradient(180deg, var(--seat) 0 45%, #1a1a1e 45% 55%, #f6f4ef 55%);
+}
+.thumb-board.skin-cardboard {
+  background: linear-gradient(180deg, transparent 42%, rgba(214, 190, 140, 0.75) 42% 58%, transparent 58%), repeating-linear-gradient(90deg, transparent 0 4px, rgba(120, 82, 40, 0.14) 4px 6px), #c39a62;
+}
+.thumb-board.skin-notebook {
+  background: linear-gradient(90deg, transparent 18%, rgba(220, 70, 80, 0.6) 18% 20%, transparent 20%), repeating-linear-gradient(180deg, #fbf8ef 0 7px, rgba(70, 130, 200, 0.5) 7px 8px);
+}
+.thumb-board.skin-wild {
+  background: linear-gradient(90deg, transparent 38%, #e2c48c 38% 62%, transparent 62%), linear-gradient(180deg, transparent 38%, #e2c48c 38% 62%, transparent 62%),
+    repeating-linear-gradient(100deg, #3f9634 0 2px, #6cbf4a 2px 6px);
+}
+.thumb-dice.skin-sugar {
+  --face: radial-gradient(circle, rgba(214, 204, 188, 0.6) 0 1px, transparent 1.5px) 0 0 / 5px 5px, #f6f2ea;
+  --pip: #b8641c;
+}
+.thumb-dice.skin-fuzzy {
+  --face: repeating-linear-gradient(35deg, #ff8cc4 0 1px, transparent 1px 3px), repeating-linear-gradient(-50deg, #e23f8e 0 1px, transparent 1px 4px), #ff5aa8;
+  --pip: #17131a;
+}
+.thumb-dice.skin-disco {
+  --face: linear-gradient(90deg, #2a2a32 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(180deg, #2a2a32 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(135deg, #f4f4f8, #8a8a94 50%, #e0e0e8);
+  --pip: #ff4fd8;
+}
+.thumb-dice.skin-wild {
+  --face: #f6f4ef;
+  --pip: #e8331c;
+}
+.thumb-fx.skin-popper {
+  --fx: #ff5f8f;
+  --fx2: #ffd23f;
+}
+.thumb-fx.skin-anvil {
+  --fx: #3a3e45;
+  --fx2: #e4ddd0;
+}
+.thumb-fx.skin-claw {
+  --fx: #d9dee4;
+  --fx2: #e0283a;
+}
+.thumb-fx.skin-wild {
+  --fx: #e8331c;
+  --fx2: #f6f4ef;
+}
+.thumb-trail.skin-footprints {
+  --t1: #3b2f2a;
+  --t2: #6b5444;
+}
+.thumb-trail.skin-footprints::before {
+  height: 6px;
+  background: radial-gradient(ellipse 3px 2px, #3b2f2a 0 90%, transparent) 0 0 / 10px 6px;
+}
+.thumb-trail.skin-carpet {
+  --t1: #c3122a;
+  --t2: #e8b64a;
+}
+.thumb-trail.skin-carpet::before {
+  height: 9px;
+  background: linear-gradient(180deg, #e8b64a 0 2px, #c3122a 2px 7px, #e8b64a 7px);
+}
+.thumb-trail.skin-cash {
+  --t1: #7ec86a;
+  --t2: #ffe38a;
+}
+.thumb-trail.skin-slime {
+  --t1: #5ff03f;
+  --t2: #b6ff8a;
+}
+.thumb-trail.skin-wild {
+  --t1: #3f9634;
+  --t2: #7bd85a;
 }

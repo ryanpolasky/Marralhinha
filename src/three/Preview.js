@@ -75,22 +75,25 @@ const HOP_TIME = 0.2;
 const START = 0.9;
 const PERIOD = 5.5;
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-const FLIGHTS = ['deflate', 'stage'];
+const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw', 'wild'];
 const VICTIM_AT = new THREE.Vector3(0, 0.07, 0);
 const ACROSS = new THREE.Vector3(0, 0, -1);
 
 function flightAt({ segs }, t) {
   let from = VICTIM_AT;
+  let scale = [1, 1, 1];
   for (const seg of segs) {
+    const to = seg.scale || scale;
     if (t < seg.dur) {
       const k = Math.max(0, t) / seg.dur;
       const e = easeInOut(k);
       const p = from.clone().lerp(seg.to, e);
       p.y = from.y + (seg.to.y - from.y) * e + Math.sin(Math.PI * k) * seg.height;
-      return { p, seg };
+      return { p, seg, scale: scale.map((v, j) => v + (to[j] - v) * e) };
     }
     t -= seg.dur;
     from = seg.to;
+    scale = to;
   }
   return null;
 }
@@ -124,6 +127,7 @@ function FxPreview({ itemId, seat, replay }) {
       const at = flightAt(flight.current, t - flight.current.at);
       if (at) {
         target.current.position.copy(at.p);
+        target.current.scale.fromArray(at.scale);
         if (at.seg.puff) bus.emit('spr', { position: at.p.toArray(), tile: 1, c: ['#f2f4f5', '#dfe5e8'], add: false, speed: 0.3, size: 0.18, size2: 0.5, life: 0.45, a: 0.55, drag: 2 });
       } else {
         target.current.visible = false;
@@ -134,6 +138,7 @@ function FxPreview({ itemId, seat, replay }) {
       fired.current = false;
       flight.current = null;
       target.current.position.copy(VICTIM_AT);
+      target.current.scale.set(1, 1, 1);
       target.current.visible = true;
     } else if (h >= HOPS && !fired.current) {
       fired.current = true;

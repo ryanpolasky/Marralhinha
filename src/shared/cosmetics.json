@@ -37,7 +37,8 @@
   "sets": {
     "arcade": { "name": "Arcade" },
     "voxel": { "name": "Voxel" },
-    "bombsite": { "name": "Bombsite" }
+    "bombsite": { "name": "Bombsite" },
+    "wild": { "name": "Wild Encounter" }
   },
   "items": [
     { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
@@ -69,6 +70,7 @@
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
     { "id": "marble.lucky", "slot": "marble", "name": "Molten", "rarity": "exclusive", "tag": "lucky", "desc": "Rivers of molten gold flowing through your color of glass. Part of the Luckiest set." },
+    {"id": "marble.wild", "slot": "marble", "name": "Gotcha Ball", "rarity": "mythic", "set": "wild", "desc": "Snap the button, hear the click. Fits in your pocket."},
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
     { "id": "board.pine", "slot": "board", "name": "Pine", "rarity": "common", "desc": "Light and knotty." },
@@ -98,6 +100,9 @@
     { "id": "board.supporter", "slot": "board", "name": "Moonwake", "rarity": "exclusive", "tag": "supporter", "desc": "A moonlit sea inlaid in silver. A lighthouse beam sweeps the water, and a moon fills beside every home row as your marbles go deeper." },
     { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "ants", "unobtainable": true, "desc": "Ants (ants)", "note": "A custom request from the first person to buy the Supporter Pack." },
     { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer under a gold art-deco sunburst that pulses with light. Part of the Luckiest set." },
+    {"id": "board.cardboard", "slot": "board", "name": "Cardboard", "rarity": "rare", "desc": "Fragile. This side up. Probably."},
+    {"id": "board.notebook", "slot": "board", "name": "Notebook", "rarity": "legendary", "desc": "Doodled during third period."},
+    {"id": "board.wild", "slot": "board", "name": "Route 1", "rarity": "mythic", "set": "wild", "desc": "Tall grass everywhere. Stay on the path."},
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
     { "id": "dice.ebony", "slot": "dice", "name": "Ebony", "rarity": "common", "desc": "Black with white pips." },
@@ -125,6 +130,10 @@
     { "id": "dice.dev", "slot": "dice", "name": "Overclock", "rarity": "exclusive", "tag": "dev", "desc": "Runs hot. Pips glow to prove it." },
     { "id": "dice.supporter", "slot": "dice", "name": "Beacon", "rarity": "exclusive", "tag": "supporter", "desc": "Brushed midnight metal with luminous porcelain faces and crisp turquoise pips. Just as fair as every other die." },
     { "id": "dice.lucky", "slot": "dice", "name": "Golden Die", "rarity": "exclusive", "tag": "lucky", "desc": "Glittering gold with emerald pips. Part of the Luckiest set." },
+    {"id": "dice.sugar", "slot": "dice", "name": "Sugar Cube", "rarity": "rare", "desc": "One lump or two?"},
+    {"id": "dice.fuzzy", "slot": "dice", "name": "Fuzzy Dice", "rarity": "epic", "desc": "Straight off the rearview mirror."},
+    {"id": "dice.disco", "slot": "dice", "name": "Disco Ball", "rarity": "legendary", "desc": "Saturday night roll."},
+    {"id": "dice.wild", "slot": "dice", "name": "Critical Hit", "rarity": "mythic", "set": "wild", "desc": "Every pip a tiny ball. It's super effective."},
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },
@@ -154,6 +163,9 @@
     { "id": "plate.dev", "slot": "nameplate", "name": "Root", "rarity": "exclusive", "tag": "dev", "desc": "sudo win the game" },
     { "id": "plate.supporter", "slot": "nameplate", "name": "Keepsake", "rarity": "exclusive", "tag": "supporter", "desc": "A quiet midnight enamel plate with a glimmering sea-glass rim. A small thank-you beside your name." },
     { "id": "plate.lucky", "slot": "nameplate", "name": "Gilt", "rarity": "exclusive", "tag": "lucky", "desc": "Deep emerald framed in polished gold, with a glint that never sits still. Part of the Luckiest set." },
+    {"id": "plate.toxic", "slot": "nameplate", "name": "Toxic", "rarity": "epic", "desc": "Glows a little. Don't lick it."},
+    {"id": "plate.rosegold", "slot": "nameplate", "name": "Rose Gold", "rarity": "legendary", "desc": "Brushed, polished, a little smug."},
+    {"id": "plate.wild", "slot": "nameplate", "name": "Full HP", "rarity": "mythic", "set": "wild", "desc": "A battle box with your level on it. The bar drains when it feels like it."},
 
     { "id": "fx.pop", "slot": "fx", "name": "Pop", "rarity": "default", "desc": "The classic send-off." },
     { "id": "fx.fountain", "slot": "fx", "name": "Fountain", "rarity": "common", "desc": "Up, up and away." },
@@ -179,6 +191,10 @@
     { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },
     { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." },
     { "id": "fx.lucky", "slot": "fx", "name": "Jackpot", "rarity": "exclusive", "tag": "lucky", "desc": "Pays out in gold coins. Part of the Luckiest set." },
+    {"id": "fx.popper", "slot": "fx", "name": "Party Popper", "rarity": "common", "desc": "Congrats on going home!"},
+    {"id": "fx.anvil", "slot": "fx", "name": "Anvil", "rarity": "legendary", "desc": "Falls out of nowhere. Every single time."},
+    {"id": "fx.claw", "slot": "fx", "name": "Claw Machine", "rarity": "legendary", "desc": "Rigged, obviously. It drops you once for show."},
+    {"id": "fx.wild", "slot": "fx", "name": "Gotcha!", "rarity": "mythic", "set": "wild", "desc": "Shake... shake... shake... click."},
 
     { "id": "trail.dust", "slot": "trail", "name": "Dust", "rarity": "default", "desc": "Kicks up a little something." },
     { "id": "trail.sparkle", "slot": "trail", "name": "Stardust", "rarity": "common", "desc": "Glitter in your wake." },
@@ -204,6 +220,11 @@
     { "id": "trail.halloween", "slot": "trail", "name": "Haunting", "rarity": "exclusive", "tag": "halloween", "desc": "Something follows behind." },
     { "id": "trail.beta", "slot": "trail", "name": "Wireframe", "rarity": "exclusive", "tag": "beta", "desc": "Now with rendering issues." },
     { "id": "trail.dev", "slot": "trail", "name": "Accretion", "rarity": "exclusive", "tag": "dev", "desc": "Whatever you pass falls in behind you." },
+    {"id": "trail.footprints", "slot": "trail", "name": "Footprints", "rarity": "common", "desc": "Somebody was here. Small shoes."},
+    {"id": "trail.carpet", "slot": "trail", "name": "Red Carpet", "rarity": "legendary", "desc": "No photos, please."},
+    {"id": "trail.cash", "slot": "trail", "name": "Make It Rain", "rarity": "legendary", "desc": "Throwing it around like you mean it."},
+    {"id": "trail.slime", "slot": "trail", "name": "Slime", "rarity": "legendary", "desc": "Leaves a little of itself everywhere."},
+    {"id": "trail.wild", "slot": "trail", "name": "Tall Grass", "rarity": "mythic", "set": "wild", "desc": "Something is rustling."},
 
     { "id": "emotes.starter", "slot": "emotes", "name": "Table Talkers", "rarity": "default", "desc": "The six faces every marble player needs.", "emotes": [
       { "key": "grin", "emoji": "😄", "hint": "Grinning" },
@@ -324,6 +345,22 @@
       { "key": "angry", "img": "/emotes/clash/king-angry.gif", "hint": "Royal rage" },
       { "key": "thumbsup", "img": "/emotes/clash/king-thumbs-up.gif", "hint": "Good game" },
       { "key": "chicken", "img": "/emotes/clash/royale-chicken.gif", "hint": "Chicken!" }
+    ] },
+    { "id": "emotes.party", "slot": "emotes", "name": "Party", "rarity": "common", "desc": "Somebody brought the parrots.", "emotes": [
+      { "key": "parrot", "img": "/emotes/party/parrot.gif", "hint": "Party" },
+      { "key": "rareparrot", "img": "/emotes/party/rareparrot.gif", "hint": "Rare" },
+      { "key": "clap", "img": "/emotes/party/clap.gif", "hint": "Clap" },
+      { "key": "petpet", "img": "/emotes/party/petpet.gif", "hint": "Pet pet" },
+      { "key": "alien", "img": "/emotes/party/alien.gif", "hint": "Dance" },
+      { "key": "steer", "img": "/emotes/party/steer.gif", "hint": "Steering" }
+    ] },
+    { "id": "emotes.time", "slot": "emotes", "name": "Time", "rarity": "legendary", "desc": "Tea time, piano time, any time but your turn.", "emotes": [
+      { "key": "tea", "img": "/emotes/time/tea.gif", "hint": "Tea time" },
+      { "key": "piano", "img": "/emotes/time/piano.gif", "hint": "Piano time" },
+      { "key": "rain", "img": "/emotes/time/rain.gif", "hint": "Rain time" },
+      { "key": "guitar", "img": "/emotes/time/guitar.gif", "hint": "Guitar time" },
+      { "key": "wine", "img": "/emotes/time/wine.gif", "hint": "Wine time" },
+      { "key": "crayon", "img": "/emotes/time/crayon.gif", "hint": "Crayon time" }
     ] }
   ],
   "boxes": [
