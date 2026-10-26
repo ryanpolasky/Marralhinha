@@ -37,7 +37,7 @@ test('tags are stored, normalized and drive the admin flag', () => {
 test('Supporter is ordered above Luckiest and cannot be granted as a stored tag', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Supporter' });
-  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky', 'halloween']);
+  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky', 'halloween', 'painter']);
   assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 6);
   accounts.setTags(id, ['supporter', 'lucky', 'beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
@@ -87,6 +87,11 @@ test('admin-granted packs unlock the tag and cosmetics without an entitlement', 
   accounts.setTags(id, ['beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta', 'supporter'], 'tag edits keep the pack');
   accounts.setPack(id, 'supporter', false);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
+  accounts.setPack(id, 'painter', true);
+  assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta', 'painter']);
+  assert.equal(accounts.adminView(accounts.getUser(id)).packs.painter, true);
+  accounts.setPack(id, 'painter', false);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);
   assert.throws(() => accounts.setPack(id, 'nope', true), /Unknown pack/);
 });

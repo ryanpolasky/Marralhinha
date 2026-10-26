@@ -130,6 +130,7 @@ const MIGRATIONS = [
   ['users', 'golden_die_unlocked_at', 'INTEGER'],
   ['users', 'supporter_entitlement_id', 'TEXT'],
   ['users', 'halloween_entitlement_id', 'TEXT'],
+  ['users', 'painter_entitlement_id', 'TEXT'],
   ['users', 'granted_packs', "TEXT NOT NULL DEFAULT '[]'"],
   ['users', 'featured_tag', 'TEXT'],
   ['users', 'shorthand_tags', "TEXT NOT NULL DEFAULT '[]'"],

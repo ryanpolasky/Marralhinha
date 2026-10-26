@@ -212,7 +212,7 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
     '/me/equip',
     auth,
     handle(async (req) => {
-      if (/\.(supporter|halloween)$/.test(String(req.body?.item))) await syncPurchases(req.user.id);
+      if (new RegExp(`\\.(${Object.keys(discord.PACKS).join('|')})$`).test(String(req.body?.item))) await syncPurchases(req.user.id);
       accounts.equip(req.user.id, req.body?.slot, req.body?.item);
       return { profile: changed(req.user.id) };
     })
@@ -240,24 +240,21 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
   );
 
   router.get('/shop', auth, handle(() => {
-    const { clientId, supporterSkuId, halloweenSkuId } = discord.config();
+    const config = discord.config();
+    const { clientId } = config;
     return {
       ...economy.shop(),
-      supporter: discord.supporterConfigured() ? { skuId: supporterSkuId, clientId } : null,
-      halloween: { open: discord.halloweenOpen(), ...(discord.halloweenConfigured() ? { skuId: halloweenSkuId, clientId } : {}) },
+      supporter: discord.packConfigured('supporter') ? { skuId: config[discord.PACKS.supporter.sku], clientId } : null,
+      halloween: { open: discord.halloweenOpen(), ...(discord.packConfigured('halloween') ? { skuId: config[discord.PACKS.halloween.sku], clientId } : {}) },
+      painter: discord.packConfigured('painter') ? { skuId: config[discord.PACKS.painter.sku], clientId } : null,
     };
   }));
 
-  router.post('/shop/supporter/refresh', auth, handle(async (req) => {
-    if (!discord.supporterConfigured()) throw new ApiError('Supporter checkout is not available yet');
-    if (!req.user.discord_id) throw new ApiError('Link a Discord account to support the game');
-    await syncPurchases(req.user.id);
-    return { profile: profileOf(req.user.id) };
-  }));
-
-  router.post('/shop/halloween/refresh', auth, handle(async (req) => {
-    if (!discord.halloweenConfigured()) throw new ApiError('Halloween checkout is not available yet');
-    if (!req.user.discord_id) throw new ApiError('Link a Discord account to get the Halloween Pack');
+  router.post('/shop/:kind/refresh', auth, handle(async (req) => {
+    const pack = discord.PACKS[req.params.kind];
+    if (!pack) throw new ApiError('Unknown pack');
+    if (!discord.packConfigured(req.params.kind)) throw new ApiError(`${pack.checkoutName} checkout is not available yet`);
+    if (!req.user.discord_id) throw new ApiError(`Link a Discord account ${pack.linkPrompt}`);
     await syncPurchases(req.user.id);
     return { profile: profileOf(req.user.id) };
   }));

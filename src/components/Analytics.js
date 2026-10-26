@@ -182,7 +182,7 @@ export default function Analytics() {
           <Stat label="live right now" value={live.playing + live.lobbies} sub={`${live.humans} seated · ${live.spectators} watching · ${live.lobbies} in lobby`} />
           <Stat label="games played" value={matches.total} sub={`${matches.day} today · ${matches.week} this week · ${matches.humans} seats filled`} />
           <Stat label={`${CURRENCY} out there`} value={economy.circulation} sub={`+${economy.grantedDay.toLocaleString()} in the last 24h`} />
-          <Stat label="packs" value={packs.supporter + packs.halloween} sub={`${packs.supporter} supporter · ${packs.halloween} halloween`} />
+          <Stat label="packs" value={packs.supporter + packs.halloween + packs.painter} sub={`${packs.supporter} supporter · ${packs.halloween} halloween · ${packs.painter} painter`} />
           <Stat label="open reports" value={reports.open} sub={`${users.banned} accounts banned`} />
         </div>
 

@@ -24,6 +24,9 @@ const COLOR_PALETTE = [
 ];
 
 const COLOR_BY_ID = Object.fromEntries(COLOR_PALETTE.map((c) => [c.id, c]));
+const CLASSIC_IDS = ['red', 'blue', 'yellow', 'green'];
+const MIN_LOBBY_DIST = 18;
+const GOOD_LOBBY_DIST = 25;
 
 const RAINBOW = { id: 'rainbow', name: 'Rainbow', main: '#e03a3e', light: '#ff8a8a', dark: '#8c1116', rainbow: true };
 
@@ -150,8 +153,143 @@ function resolveColorSpec(spec) {
   return null;
 }
 
+function tripletFromHex(hex, customName = null) {
+  const raw = hexToOklch(hex);
+  const L = clamp(raw.L, 0.46, 0.78);
+  const C = clamp(raw.C, 0.02, 0.27);
+  const h = raw.h;
+  const main = oklchToHex({ L, C, h });
+  const light = oklchToHex({ L: clamp(L + 0.19, 0.72, 0.91), C: C * 0.68, h });
+  const dark = oklchToHex({ L: clamp(L - 0.24, 0.22, 0.46), C: clamp(C * 0.88, 0.02, 0.22), h });
+  const nearest = nearestNamedColor(main);
+  const name = customName || (nearest.distance < 8 ? nearest.entry.name : `Custom ${nearest.entry.name}`);
+  return { id: `custom:${main}`, name, main, light, dark, custom: true, rawHex: hex };
+}
+
+function resolveSpecToTriplet(spec, seat = 0) {
+  if (!spec || spec === 'classic') return { ...SEAT_COLORS[seat], id: CLASSIC_IDS[seat], classicSeat: seat };
+  if (typeof spec === 'string') {
+    if (COLOR_BY_ID[spec]) return COLOR_BY_ID[spec];
+    if (spec.startsWith('#')) return rawTripletFromHex(spec);
+  }
+  if (typeof spec === 'object' && spec.main) {
+    if (spec.light && spec.dark) return spec;
+    return rawTripletFromHex(spec.main, spec.name);
+  }
+  return { ...SEAT_COLORS[seat], id: CLASSIC_IDS[seat], classicSeat: seat };
+}
+
+function paletteAvailability(seat, colors, minDist = MIN_LOBBY_DIST) {
+  const others = colors.map((c, idx) => ({ seat: idx, color: c })).filter((o) => o.seat !== seat);
+  return COLOR_PALETTE.map((swatch) => {
+    let closest = null;
+    for (const o of others) {
+      const dist = colorDistance(swatch.main, o.color.main);
+      if (!closest || dist < closest.dist) closest = { seat: o.seat, color: o.color, dist };
+    }
+    const exactSeat = others.find((o) => o.color.id === swatch.id || colorDistance(swatch.main, o.color.main) < 3);
+    const conflict = closest && closest.dist < minDist ? closest : null;
+    return {
+      swatch,
+      takenBy: exactSeat ? exactSeat.seat : null,
+      conflictSeat: conflict ? conflict.seat : null,
+      minDist: closest ? closest.dist : 100,
+      available: !conflict,
+    };
+  });
+}
+
+function nudgeColorToDistinct(hex, otherColors, minDist = MIN_LOBBY_DIST) {
+  const base = tripletFromHex(hex);
+  const distToAll = (candidateHex) => Math.min(100, ...otherColors.map((o) => colorDistance(candidateHex, o.main)));
+  if (distToAll(base.main) >= minDist) return { triplet: base, nudged: false, deltaE: 0 };
+
+  const start = hexToOklch(base.main);
+  let best = null;
+  const lOffsets = [0, 0.08, -0.08, 0.14, -0.14];
+  const cCandidates = [Math.max(start.C, 0.16), Math.max(start.C, 0.21)];
+  for (let step = 6; step <= 180; step += 6) {
+    for (const dir of [1, -1]) {
+      const h = (start.h + dir * step + 360) % 360;
+      for (const dL of lOffsets) {
+        for (const C of cCandidates) {
+          const L = clamp(start.L + dL, 0.48, 0.77);
+          const candidateHex = oklchToHex({ L, C, h });
+          const clear = distToAll(candidateHex);
+          if (clear >= minDist) {
+            const cost = colorDistance(base.main, candidateHex);
+            if (!best || cost < best.cost) best = { hex: candidateHex, cost };
+          }
+        }
+      }
+    }
+    if (best && best.cost < 18) break;
+  }
+  if (!best) {
+    const fallback = COLOR_PALETTE.map((p) => ({ p, clear: distToAll(p.main) })).sort((a, b) => b.clear - a.clear)[0].p;
+    return { triplet: fallback, nudged: true, deltaE: colorDistance(base.main, fallback.main) };
+  }
+  const triplet = tripletFromHex(best.hex);
+  return { triplet, nudged: true, deltaE: best.cost };
+}
+
+function resolveLobbyColors(requests, { priorityOrder = [0, 1, 2, 3], strategy = 'nudge', minDist = MIN_LOBBY_DIST } = {}) {
+  const resolved = new Array(4);
+  const report = new Array(4);
+  const locked = [];
+
+  for (const seat of priorityOrder) {
+    const wanted = resolveSpecToTriplet(requests[seat], seat);
+    let closest = null;
+    for (const prev of locked) {
+      const d = colorDistance(wanted.main, prev.color.main);
+      if (!closest || d < closest.dist) closest = { seat: prev.seat, color: prev.color, dist: d };
+    }
+    if (!closest || closest.dist >= minDist) {
+      resolved[seat] = wanted;
+      locked.push({ seat, color: wanted });
+      report[seat] = { seat, requested: wanted, final: wanted, status: 'kept', collidedWith: null, distBefore: closest ? closest.dist : 100, distAfter: closest ? closest.dist : 100 };
+      continue;
+    }
+
+    let final = wanted;
+    let status = 'nudged';
+    if (strategy === 'nudge') {
+      const nudged = nudgeColorToDistinct(wanted.main, locked.map((l) => l.color), minDist);
+      final = nudged.triplet;
+      status = 'nudged';
+    } else if (strategy === 'palette') {
+      const candidates = COLOR_PALETTE
+        .map((sw) => ({
+          sw,
+          clear: Math.min(...locked.map((l) => colorDistance(sw.main, l.color.main))),
+          drift: colorDistance(wanted.main, sw.main),
+        }))
+        .filter((c) => c.clear >= minDist)
+        .sort((a, b) => a.drift - b.drift);
+      final = candidates[0]?.sw || COLOR_PALETTE[seat];
+      status = 'swapped';
+    } else {
+      const classicCandidates = [seat, 0, 1, 2, 3]
+        .map((s) => COLOR_PALETTE[s])
+        .filter((sw) => Math.min(...locked.map((l) => colorDistance(sw.main, l.color.main))) >= minDist);
+      final = classicCandidates[0] || nudgeColorToDistinct(SEAT_COLORS[seat].main, locked.map((l) => l.color), minDist).triplet;
+      status = 'classic';
+    }
+    const distAfter = Math.min(...locked.map((l) => colorDistance(final.main, l.color.main)));
+    resolved[seat] = final;
+    locked.push({ seat, color: final });
+    report[seat] = { seat, requested: wanted, final, status, collidedWith: closest.seat, distBefore: closest.dist, distAfter };
+  }
+
+  return { colors: resolved, report };
+}
+
 module.exports = {
   SEAT_COLORS,
+  CLASSIC_IDS,
+  MIN_LOBBY_DIST,
+  GOOD_LOBBY_DIST,
   COLOR_PALETTE,
   COLOR_BY_ID,
   RAINBOW,
@@ -168,4 +306,9 @@ module.exports = {
   nearestNamedColor,
   rawTripletFromHex,
   resolveColorSpec,
+  tripletFromHex,
+  resolveSpecToTriplet,
+  paletteAvailability,
+  nudgeColorToDistinct,
+  resolveLobbyColors,
 };
