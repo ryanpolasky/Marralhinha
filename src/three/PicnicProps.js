@@ -33,7 +33,7 @@ const phys = (key, params) => mat(key, () => new THREE.MeshPhysicalMaterial(para
 const GEO = {};
 const geo = (key, make) => GEO[key] || (GEO[key] = make());
 
-function mergeGeometries(parts) {
+export function mergeGeometries(parts) {
   const out = new THREE.BufferGeometry();
   Object.entries(parts[0].attributes).forEach(([name, attr]) => out.setAttribute(name, new THREE.Float32BufferAttribute(parts.flatMap((p) => Array.from(p.attributes[name].array)), attr.itemSize)));
   let base = 0;

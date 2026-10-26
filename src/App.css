@@ -11466,6 +11466,11 @@ body {
   background: linear-gradient(90deg, transparent 38%, #e9d49c 38% 62%, transparent 62%), linear-gradient(180deg, transparent 38%, #e9d49c 38% 62%, transparent 62%),
     repeating-conic-gradient(#70ad60 0 25%, #78b567 0 50%) 0 0 / 12px 12px;
 }
+.thumb-board.skin-train {
+  background: linear-gradient(180deg, transparent 30%, #5c6166 30% 36%, transparent 36% 64%, #5c6166 64% 70%, transparent 70%) 50% 0 / 22% 100% no-repeat,
+    linear-gradient(90deg, #c69a64 0 14%, #80868c 14% 17%, transparent 17% 83%, #80868c 83% 86%, #c69a64 86%),
+    repeating-linear-gradient(90deg, #d4d8dc 0 2px, #a9aeb3 2px 4px);
+}
 .thumb-dice.skin-sugar {
   --face: radial-gradient(circle, rgba(214, 204, 188, 0.6) 0 1px, transparent 1.5px) 0 0 / 5px 5px, #f6f2ea;
   --pip: #b8641c;

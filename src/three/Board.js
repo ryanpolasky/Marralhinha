@@ -9,6 +9,7 @@ import DefuseProps from './DefuseProps';
 import PicnicProps from './PicnicProps';
 import MinecraftProps from './MinecraftProps';
 import WildProps from './WildProps';
+import TrainProps from './TrainProps';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -235,7 +236,7 @@ function Table({ materials }) {
 }
 
 // Boards that dress the table around them, not just the board itself
-const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps, minecraft: MinecraftProps, wild: WildProps };
+const BOARD_PROPS = { defuse: DefuseProps, picnic: PicnicProps, minecraft: MinecraftProps, wild: WildProps, train: TrainProps };
 export const hasBoardProps = (id) => !!BOARD_PROPS[skinKey(id)];
 
 const SWAP_MS = 150;
@@ -445,7 +446,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
 
   return (
     <group>
-      {table && <Table materials={materials} />}
+      {table && !materials.noTable && <Table materials={materials} />}
       {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
       {[...propKeys].map((key) => {
         const Props = BOARD_PROPS[key];

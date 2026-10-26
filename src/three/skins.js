@@ -5253,6 +5253,11 @@ const SPECIAL_BOARDS = {
     accent: { color: '#e5c985', metalness: 0.65, roughness: 0.35 },
     shader: ROUTE_SHADER,
   }),
+  train: () => ({
+    canvas: makeWoodCanvas({ base: '#8c6a48', grain: '60,38,22', seed: 53 }), repeat: 0.055, roughness: 0.7,
+    dish: '#6e5136', felt: '#3a3631', cup: '#2a1d12', noTable: true,
+    accent: { color: '#9aa0a6', metalness: 0.9, roughness: 0.35 },
+  }),
   picnic: (layout) => ({
     canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
     dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
@@ -5338,6 +5343,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
+      noTable: !!spec.noTable,
     };
     // Cups take the planks straight down in board space, so the deck runs on into each divot and darkens with depth
     if (spec.cupMap) {
