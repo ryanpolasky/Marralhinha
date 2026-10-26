@@ -7,6 +7,7 @@ import '@fontsource/fredoka/700.css';
 import './index.css';
 import App from './App';
 import { register } from './serviceWorkerRegistration';
+import { startPanelFit } from './fitPanels';
 // The gitignored local preview/promo pages load only when the files exist, so fresh checkouts still build
 const localModules = require.context('./', false, /^\.\/(Previews|Promo)\.js$/);
 const localPage = (name) => (localModules.keys().includes(`./${name}.js`) ? localModules(`./${name}.js`).default : null);
@@ -14,6 +15,7 @@ const Page = window.location.hash.startsWith('#promo') ? localPage('Promo') : wi
 const Analytics = lazy(() => import('./components/Analytics'));
 const isAnalytics = window.location.pathname.replace(/\/+$/, '') === '/analytics';
 
+startPanelFit();
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<React.StrictMode>{Page ? <Page /> : isAnalytics ? <Suspense fallback={null}><Analytics /></Suspense> : <App />}</React.StrictMode>);
 

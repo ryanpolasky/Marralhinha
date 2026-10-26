@@ -5,7 +5,6 @@ import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
 import { Chevron, Close } from './Icons';
-import { COLOR_PALETTE } from '../game/colors';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 import { IS_ACTIVITY } from '../net/config';
 
@@ -486,11 +485,17 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
 
               <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Painter Pack, 2 of 3" {...slideProps(1)}>
                 <section className="painter-shop" aria-label="Painter Pack">
-                  <div className="painter-art" aria-hidden="true">
-                    {COLOR_PALETTE.map((c, i) => (
-                      <span key={c.id} className="marble-dot" style={{ '--seat': c.main, '--seat-light': c.light, '--i': i }} />
-                    ))}
-                  </div>
+                  <picture>
+                    <source media="(prefers-reduced-motion: reduce)" srcSet="/painter-pack-still.png" />
+                    <img
+                      className="supporter-art"
+                      src="/painter-pack.gif"
+                      alt="Four marbles hopping on a pedestal, each repainted a new colour as it lands"
+                      width="680"
+                      height="240"
+                      loading="lazy"
+                    />
+                  </picture>
                   <div className="painter-shop-body">
                     <div className="painter-shop-head"><span className="painter-eyebrow">Bring your own paint</span><h3>Painter Pack</h3><span className="painter-price">$2.99 USD · one time</span></div>
                     <p>Sit at a table and everyone there gets to pick their own marble colour, kept far enough apart that nobody blends in. You also get any custom colour you like, can take a colour someone else is using, and wear a permanent Painter badge. Only the look changes; never the gameplay.</p>
