@@ -11471,6 +11471,39 @@ body {
     linear-gradient(90deg, #c69a64 0 14%, #80868c 14% 17%, transparent 17% 83%, #80868c 83% 86%, #c69a64 86%),
     repeating-linear-gradient(90deg, #d4d8dc 0 2px, #a9aeb3 2px 4px);
 }
+.thumb-marble.skin-train {
+  background: radial-gradient(ellipse at 32% 24%, #ffffffb0, transparent 30%), linear-gradient(90deg, transparent 0 18%, #eef0f2 18% 23%, #7d838a 23% 27%, transparent 27%),
+    repeating-radial-gradient(circle at 62% 50%, var(--seat) 0 5px, rgba(255, 255, 255, 0.35) 5px 6px), var(--seat);
+}
+.thumb-dice.skin-train {
+  --face: linear-gradient(180deg, transparent 6%, #c8352c 6% 13%, transparent 13% 87%, #c8352c 87% 94%, transparent 94%), #efe4c8;
+  --pip: #1b1712;
+}
+.thumb-fx.skin-train {
+  --fx: #c9ced3;
+  --fx2: #e0283a;
+}
+.thumb-trail.skin-train {
+  --t1: #f4f2ee;
+  --t2: #c9c5bf;
+}
+.plate-train {
+  --plate-ink: #ffd45a;
+  background: linear-gradient(180deg, transparent 49%, rgba(0, 0, 0, 0.7) 49% 53%, transparent 53%), repeating-linear-gradient(90deg, #1f2327 0 11px, #0b0d0f 11px 12px) !important;
+  border: 2px solid #4a5057 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 0 #050607;
+}
+.plate-train > span:not(.avatar),
+.plate-train .account-name,
+.plate-train .chip-name-text,
+.plate-train .seat-name-text {
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(255, 196, 64, 0.35);
+}
 .thumb-dice.skin-sugar {
   --face: radial-gradient(circle, rgba(214, 204, 188, 0.6) 0 1px, transparent 1.5px) 0 0 / 5px 5px, #f6f2ea;
   --pip: #b8641c;

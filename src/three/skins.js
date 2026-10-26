@@ -208,6 +208,47 @@ const GALAXY_PHASES = [
   { bg: '#02130c', accent: '#1fd491', deep: '#0a5c3d', star: '#c9ffe4', motif: 'band' },
 ];
 
+function railMarble(c, seat, key, params, color, emissive) {
+  const uniforms = { uTime: { value: 0 }, uMain: { value: new THREE.Color(c.main) }, uDark: { value: new THREE.Color(c.dark) }, uLight: { value: new THREE.Color(c.light) } };
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  return {
+    ...params,
+    customProgramCacheKey: () => key,
+    onBeforeCompile: (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRailPos = normalize(position);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;\nuniform float uTime;\nuniform vec3 uMain;\nuniform vec3 uDark;\nuniform vec3 uLight;')
+        .replace('#include <color_fragment>', `#include <color_fragment>\nvec3 p = vRailPos;\n${color}`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${emissive}`);
+    },
+    animate: (m, t) => (uniforms.uTime.value = still?.matches ? 0 : t + seat * 0.9),
+  };
+}
+
+function signalMarble(c, seat) {
+  return railMarble(c, seat, 'train-signal-lamp', { roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05 }, `
+    float hood = 1.0 - smoothstep(0.15, 0.165, abs(p.z));
+    float r = acos(clamp(abs(p.z), 0.0, 1.0)) / 1.42;
+    float ring = fract(r * 4.0);
+    float lens = 1.0 - hood;
+    vec3 glass = mix(uDark, uMain, 0.55 + 0.45 * smoothstep(0.0, 0.85, ring));
+    glass = mix(glass, uLight, (1.0 - smoothstep(0.0, 0.3, r)) * 0.9);
+    float a = atan(p.y, p.x);
+    vec3 hoodCol = vec3(0.86, 0.88, 0.9);
+    float rivet = (1.0 - smoothstep(0.035, 0.05, length(vec2(fract(a * 1.9099) - 0.5, p.z * 4.0)))) * hood;
+    diffuseColor.rgb = mix(glass, hoodCol, hood);
+    diffuseColor.rgb = mix(diffuseColor.rgb, hoodCol * 0.55, rivet);
+    float railGlow = lens * (0.45 + 0.55 * smoothstep(0.0, 0.85, ring) + (1.0 - smoothstep(0.0, 0.3, r))) * (0.8 + 0.2 * sin(uTime * 1.6));
+  `, `
+    totalEmissiveRadiance += mix(uMain, uLight, 0.25) * railGlow * 0.8;
+    metalnessFactor = mix(metalnessFactor, 1.0, hood);
+    roughnessFactor = mix(roughnessFactor, 0.14, hood);
+  `);
+}
+
 const MARBLES = {
   // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
   minecraft: (c, seat) => {
@@ -599,6 +640,7 @@ const MARBLES = {
       animate: (m, t) => { time.value = motion?.matches ? 0 : t; },
     };
   },
+  train: signalMarble,
   dots: (c) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     ctx.fillStyle = c.main;
@@ -1356,6 +1398,7 @@ const DICE = {
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
   wild: { bg: 'wild', pip: '#ed493d', one: '#ed493d', roughness: 0.26, metalness: 0.25, clearcoat: 1 },
+  train: { bg: 'train', pip: '#1b1712', one: '#1b1712', roughness: 0.75 },
 };
 
 const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
@@ -1643,6 +1686,19 @@ function dieBackground(ctx, style, size, value) {
         ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
       }
     }
+  } else if (style === 'train') {
+    ctx.fillStyle = '#efe4c8';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#c8352c';
+    ctx.fillRect(0, size * 0.05, size, size * 0.07);
+    ctx.fillRect(0, size * 0.88, size, size * 0.07);
+    ctx.fillStyle = '#b9ab8a';
+    for (let i = 0; i < 16; i++) {
+      ctx.beginPath();
+      ctx.arc(size * 0.045, (i + 0.5) * size / 16, 3.5, 0, TAU);
+      ctx.arc(size * 0.955, (i + 0.5) * size / 16, 3.5, 0, TAU);
+      ctx.fill();
+    }
   } else if (style === 'wild') {
     const enamel = ctx.createLinearGradient(0, 0, size, size);
     enamel.addColorStop(0, '#243d3c');
@@ -1724,6 +1780,25 @@ function fuzzyPips(ctx, value, size, color) {
   });
 }
 
+function punchedPips(ctx, value, size, color) {
+  const r = value === 1 ? 28 : 20;
+  PIPS[value].forEach(([x, y]) => {
+    const cx = x * size;
+    const cy = y * size;
+    ctx.fillStyle = '#fbf5e4';
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy + 2, r + 2, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#a8977a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
 function ballPips(ctx, value, size, color) {
   const r = value === 1 ? 34 : 24;
   PIPS[value].forEach(([x, y]) => {
@@ -1796,7 +1871,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips, train: punchedPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;

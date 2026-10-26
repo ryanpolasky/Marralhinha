@@ -735,6 +735,11 @@ export const sfx = {
     noise({ dur: 0.03, vol: 0.1, freq: 5000, q: 2 });
   },
   sizzle: () => noise({ dur: 0.7, vol: 0.1, freq: 3200, to: 1400, q: 1.5 }),
+  crossingBell: () => [0, 0.42, 0.84].forEach((d) => {
+    tone({ freq: 1180, type: 'triangle', dur: 0.38, vol: 0.09, delay: d });
+    tone({ freq: 2360, type: 'sine', dur: 0.22, vol: 0.03, delay: d });
+  }),
+  horn: () => [311, 370, 466].forEach((f) => tone({ freq: f, type: 'sawtooth', dur: 0.75, vol: 0.03, attack: 0.04 })),
   thud: () => {
     tone({ freq: 120, to: 42, type: 'sine', dur: 0.32, vol: 0.32 });
     noise({ dur: 0.08, vol: 0.18, freq: 260, q: 0.8 });

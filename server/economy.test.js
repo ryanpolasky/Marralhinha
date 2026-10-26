@@ -100,7 +100,7 @@ test('chests prefer unowned items: dupes only roll once a rarity is complete', (
 });
 
 test('mythic means a whole set: every set covers all six slots and nothing else is mythic', () => {
-  assert.deepEqual(SETS.map((s) => s.name), ['Arcade', 'Voxel', 'Bombsite', 'Wild Encounter']);
+  assert.deepEqual(SETS.map((s) => s.name), ['Arcade', 'Voxel', 'Bombsite', 'Wild Encounter', 'All Aboard']);
   for (const set of SETS) assert.deepEqual(set.items.map((id) => ITEMS.get(id).slot).sort(), ['board', 'dice', 'fx', 'marble', 'nameplate', 'trail']);
   assert.ok(catalog.items.filter((i) => i.rarity === 'mythic').every((i) => i.set));
   assert.ok(catalog.items.filter((i) => i.set).every((i) => i.rarity === 'mythic'));
@@ -123,7 +123,10 @@ test('mythic chest hits grant whole sets, fill gaps, refund pieces you had, and 
   assert.equal(first.duplicate, false);
   assert.ok(first.items.every((item) => accounts.owns(id, item)));
 
-  for (const set of SETS.slice(1)) assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, set.key, 'completed sets are skipped');
+  for (const set of SETS.slice(1)) {
+    economy.q.pity.run('{}', id);
+    assert.equal(economy.openBox(id, 'box.gold', mythicRoll).set, set.key, 'completed sets are skipped');
+  }
   const collector = accounts.createUser({ name: 'B' }).id;
   economy.credit(collector, gold.price, 'test');
   SETS.flatMap((set) => set.items).forEach((item) => accounts.grantItem(collector, item));

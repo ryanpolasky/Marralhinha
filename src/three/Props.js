@@ -5,6 +5,7 @@ import { fx } from './fx';
 
 export const ANVIL = { drop: 0.42, hold: 0.95, lift: 0.3 };
 export const CLAW = [[0, 6, 0, 1], [0.5, 0, 0, 1], [0.65, 0, 0, 0], [1.15, 2.2, 0, 0], [1.3, 2.2, 0.15, 0], [1.45, 2.2, -0.15, 0], [1.55, 2.2, 0, 1], [2.0, 2.2, 0, 1], [2.4, 0, 0, 1], [2.55, 0, 0, 0], [3.15, 6.5, 0, 0]];
+export const TRAIN = { wait: 0.7, run: 1.1 };
 export const BALL = { absorb: 0.35, shakes: [0.85, 1.45, 2.05], shake: 0.4, click: 2.6, pop: 2.9 };
 // Sideways rock of the capturing marble, t seconds after impact; it rolls in place so the wobble reads like a ball tipping
 export const ballRock = (t) => BALL.shakes.reduce((x, at) => {
@@ -18,7 +19,7 @@ const clamp01 = (k) => Math.min(1, Math.max(0, k));
 function useProp(bus, type) {
   const state = useRef({ alive: false, t: 0, at: [0, 0, 0] });
   useEffect(() => bus.on((kind, d) => {
-    if (kind === type) Object.assign(state.current, { alive: true, t: 0, at: d.position });
+    if (kind === type) Object.assign(state.current, { alive: true, t: 0, at: d.position, across: d.across });
   }), [bus, type]);
   return state;
 }
@@ -108,11 +109,59 @@ function Claw({ bus }) {
   );
 }
 
+const trainSilver = new THREE.MeshStandardMaterial({ color: '#c9ced3', metalness: 0.85, roughness: 0.3 });
+const trainDark = new THREE.MeshStandardMaterial({ color: '#1d2228', metalness: 0.4, roughness: 0.3 });
+const trainLamp = new THREE.MeshBasicMaterial({ color: '#fff3c4' });
+
+function Train({ bus }) {
+  const g = useRef();
+  const s = useProp(bus, 'train');
+  useFrame(({ clock }) => {
+    const st = s.current;
+    if (st.alive && !st.t) Object.assign(st, { t: 1, t0: clock.elapsedTime });
+    const k = (clock.elapsedTime - st.t0 - TRAIN.wait) / TRAIN.run;
+    g.current.visible = st.alive && k >= 0 && k <= 1;
+    if (k > 1) st.alive = false;
+    const [dx, , dz] = st.across || [1, 0, 0];
+    g.current.position.set(st.at[0] + dx * (18 * k - 9), 0.05, st.at[2] + dz * (18 * k - 9));
+    g.current.rotation.y = Math.atan2(-dz, dx);
+  });
+  return (
+    <group ref={g} visible={false}>
+      {[0, -2.35].map((x) => (
+        <group key={x} position-x={x}>
+          <mesh material={trainSilver} position={[0, 0.36, 0]} castShadow>
+            <boxGeometry args={[2.2, 0.46, 0.54]} />
+          </mesh>
+          <mesh material={trainDark} position={[0, 0.44, 0]}>
+            <boxGeometry args={[2.0, 0.11, 0.56]} />
+          </mesh>
+          <mesh material={red} position={[0, 0.25, 0]}>
+            <boxGeometry args={[2.22, 0.06, 0.56]} />
+          </mesh>
+          {[-0.7, 0.7].map((b) => (
+            <mesh key={b} material={trainDark} position={[b, 0.09, 0]}>
+              <boxGeometry args={[0.5, 0.14, 0.42]} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      <mesh material={trainSilver} position={[1.1, 0.36, 0]} scale={[0.6, 0.23, 0.27]} castShadow>
+        <sphereGeometry args={[1, 24, 16, 0, Math.PI]} />
+      </mesh>
+      <mesh material={trainLamp} position={[1.62, 0.34, 0]}>
+        <sphereGeometry args={[0.06, 12, 8]} />
+      </mesh>
+    </group>
+  );
+}
+
 export default function Props({ bus = fx }) {
   return (
     <>
       <Anvil bus={bus} />
       <Claw bus={bus} />
+      <Train bus={bus} />
     </>
   );
 }
