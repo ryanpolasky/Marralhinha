@@ -103,7 +103,7 @@
     { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "ants", "unobtainable": true, "desc": "Ants (ants)", "note": "A custom request from the first person to buy the Supporter Pack." },
     { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer under a gold art-deco sunburst that pulses with light. Part of the Luckiest set." },
     {"id": "board.cardboard", "slot": "board", "name": "Cardboard", "rarity": "rare", "desc": "Fragile. This side up. Probably."},
-    {"id": "board.notebook", "slot": "board", "name": "Notebook", "rarity": "legendary", "desc": "Doodled during third period."},
+    {"id": "board.glass", "slot": "board", "name": "Stained Glass", "rarity": "legendary", "desc": "Sunday best. Mind the lead."},
     {"id": "board.train", "slot": "board", "name": "Express", "rarity": "mythic", "set": "train", "desc": "Terceira doesn't have a railway. Doesn't matter."},
     {"id": "board.wild", "slot": "board", "name": "Route 1", "rarity": "mythic", "set": "wild", "desc": "Tall grass everywhere. Stay on the path."},
 

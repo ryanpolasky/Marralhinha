@@ -21,7 +21,7 @@ import LocalLobby from './components/LocalLobby';
 import { LocalRoom, loadLocal, savedGameExists, savedGameAt, discardSavedGame } from './local/LocalRoom';
 import { applyUpdate } from './serviceWorkerRegistration';
 import { useWakeLock } from './game/wakeLock';
-import Game from './components/Game';
+import Game, { FLOAT_MS } from './components/Game';
 import AccountBar from './components/AccountBar';
 import Shop from './components/Shop';
 import Locker from './components/Locker';
@@ -112,6 +112,7 @@ const App = () => {
   const [, setInviteGone] = useState(0);
   const [toast, setToast] = useState(null);
   const [reactions, setReactions] = useState([]);
+  const [floaters, setFloaters] = useState([]);
   const [pings, setPings] = useState([]);
   const [pingMenu, setPingMenu] = useState(null);
   const [preview, setPreview] = useState(false);
@@ -192,6 +193,12 @@ const App = () => {
     };
     const onReaction = (reaction) => {
       const id = `${reaction.t}-${reaction.seat}-${Math.random()}`;
+      if (reaction.spectator) {
+        setFloaters((list) => [...list.slice(-23), { ...reaction, id, spread: list.length > 0 }]);
+        sfx.pop();
+        setTimeout(() => setFloaters((list) => list.filter((r) => r.id !== id)), FLOAT_MS);
+        return;
+      }
       setReactions((list) => [...list.filter((r) => r.seat !== reaction.seat), { ...reaction, id }]);
       sfx.pop();
       setTimeout(() => setReactions((list) => list.filter((r) => r.id !== id)), reaction.text ? 4500 : 2600);
@@ -241,6 +248,7 @@ const App = () => {
     const onTableEnded = ({ id, name }) => {
       setPings([]);
       setReactions([]);
+      setFloaters([]);
       setTeamLog({ code: null, entries: [] });
       notify(id === sessionRef.current?.playerId ? 'You ended the game. Back to lobby.' : `${name} ended the game. Back to lobby.`, 'good');
       sfx.pop();
@@ -662,6 +670,7 @@ const App = () => {
         room={view}
         playerId={sess.playerId}
         reactions={reactions}
+        floaters={floaters}
         teamLog={myTeamLog}
         isAdmin={!!account?.admin}
         rollPending={rollPending}
