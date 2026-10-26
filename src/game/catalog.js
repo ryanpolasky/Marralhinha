@@ -11,7 +11,7 @@ export const ITEMS = Object.fromEntries(catalog.items.map((item) => [item.id, it
 export const BOXES = catalog.boxes;
 export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slot, catalog.slots[slot].default]));
 export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
-const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'ants', 'beta', 'dev'];
+const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'painter', 'halloween', 'ants', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag && !item.unobtainable);
 export const SETS = Object.fromEntries(Object.entries(catalog.sets || {}).map(([key, set]) => [key, { ...set, key, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }]));
 export const unobtainable = (item, now = Date.now()) => item.unobtainable || ['dev', 'beta'].includes(item.tag) || (item.tag === 'halloween' && new Date(now).getUTCMonth() !== 9);

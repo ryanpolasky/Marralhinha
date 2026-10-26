@@ -9309,6 +9309,16 @@ textarea.report-text {
 
 .tag-halloween-icon { display: block; width: 1em; height: 1em; flex: none; }
 
+.tag-badge.tag-painter {
+  color: #1d1230;
+  --flow-to: 166.667% 0;
+  background: linear-gradient(115deg, #ff7a8a, #ffd166 25%, #7ee0b0 50%, #7ab8ff 75%, #c9adff 90%, #ff7a8a) 0 0 / 250% 100%;
+  border-color: #efe6ff;
+  animation: plate-flow 6s linear infinite;
+}
+
+.tag-painter-icon { display: block; width: 1em; height: 1em; flex: none; }
+
 .item-card.tag-halloween:not(.locked) { box-shadow: 0 0 20px rgba(255, 154, 60, 0.4); }
 .rarity-tag.tag-halloween { color: #2b1100; background: linear-gradient(115deg, #e8821f, #ffe3b8 45%, #c58bff); }
 
@@ -9572,6 +9582,7 @@ textarea.report-text {
   .thumb-board.skin-picnic::before,
   .thumb-dice.skin-halloween,
   .tag-badge.tag-halloween,
+  .tag-badge.tag-painter,
   .plate-halloween,
   .plate-halloween::after { animation: none !important; }
   .carousel-track { transition: none; }
@@ -10873,6 +10884,10 @@ body {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   display: grid;
   gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .paint-pop { width: calc(100vw - 16px); }
 }
 
 .paint-pop-head {
