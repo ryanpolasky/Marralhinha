@@ -710,7 +710,7 @@ function SpectatorFloaters({ floaters }) {
         <Floater key={f.id} floater={f} />
       ))}
     </div>,
-    document.body
+    document.querySelector('.app') || document.body
   );
 }
 
