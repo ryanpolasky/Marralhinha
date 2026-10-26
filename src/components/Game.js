@@ -677,6 +677,43 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
   );
 }
 
+export const FLOAT_MS = 3000;
+
+function Floater({ floater }) {
+  const [spot] = useState(() => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const eye = document.querySelector('.spectators-btn')?.getBoundingClientRect();
+    const minX = w * 0.75 + 28;
+    const maxX = w - 32;
+    const x = floater.spread || !eye ? minX + Math.random() * (maxX - minX) : eye.left + eye.width / 2;
+    const y = eye ? eye.top : h - 90;
+    return { x: Math.min(Math.max(x, minX), maxX), y, rise: Math.max(120, y - h * 0.5), sway: (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 10) };
+  });
+  const emote = emoteFor({ cosmetics: { emotes: floater.pack } }, floater.key);
+  if (!emote) return null;
+  return (
+    <div className="floater" style={{ left: spot.x, top: spot.y, '--rise': `${spot.rise}px`, '--sway': `${spot.sway}px`, '--float': `${FLOAT_MS}ms` }}>
+      <div className="floater-sway">
+        <EmoteGlyph emote={emote} />
+        <span className="floater-name">{floater.name}</span>
+      </div>
+    </div>
+  );
+}
+
+function SpectatorFloaters({ floaters }) {
+  if (!floaters.length) return null;
+  return createPortal(
+    <div className="floaters" aria-hidden="true">
+      {floaters.map((f) => (
+        <Floater key={f.id} floater={f} />
+      ))}
+    </div>,
+    document.body
+  );
+}
+
 // Eye with a count when anyone is watching; hover, focus or tap lists who
 function Spectators({ spectators, playerId }) {
   const [open, setOpen] = useState(false);
@@ -719,8 +756,8 @@ function RoomCode({ code }) {
   );
 }
 
-export function ReactionBar({ onReact, spam = false, emotes = [], inline = false, collapse = false }) {
-  const [panel, setPanel] = useState(inline ? 'chat' : null);
+export function ReactionBar({ onReact, spam = false, emotes = [], inline = false, collapse = false, emotesOnly = false }) {
+  const [panel, setPanel] = useState(inline ? (emotesOnly ? 'emotes' : 'chat') : null);
   const [cooling, setCooling] = useState(false);
   useEffect(() => {
     if (collapse && !inline) setPanel(null);
@@ -736,10 +773,12 @@ export function ReactionBar({ onReact, spam = false, emotes = [], inline = false
   return (
     <div className={`reactions${panel ? ' open' : ''}${inline ? ' inline' : ''}`}>
       <div className="reactions-toggles">
-        <button className={`icon-btn reactions-toggle${panel === 'chat' ? ' on' : ''}`} onClick={() => toggle('chat')} aria-label="Quick chat" title="Quick chat" aria-expanded={panel === 'chat'}>
-          <Chat />
-          {inline && <span>Quick chat</span>}
-        </button>
+        {!emotesOnly && (
+          <button className={`icon-btn reactions-toggle${panel === 'chat' ? ' on' : ''}`} onClick={() => toggle('chat')} aria-label="Quick chat" title="Quick chat" aria-expanded={panel === 'chat'}>
+            <Chat />
+            {inline && <span>Quick chat</span>}
+          </button>
+        )}
         <button className={`icon-btn reactions-toggle${panel === 'emotes' ? ' on' : ''}`} onClick={() => toggle('emotes')} aria-label="Emotes" title="Emotes" aria-expanded={panel === 'emotes'}>
           <Smiley />
           {inline && <span>Emotes</span>}
@@ -985,7 +1024,7 @@ export function Rewards({ reward, onRevealed }) {
   );
 }
 
-export default function Game({ room, playerId, reactions = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, stuck = false, handoff = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onReport, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
+export default function Game({ room, playerId, reactions = [], floaters = [], teamLog = [], isAdmin = false, cameraOff = false, rollPending = false, stuck = false, handoff = false, startPending = false, onDismissStart, onAction, onLeave, onResetView, onShop, onReport, onPlayerStats, coins = 0, viewSeat = 0, onViewSeat }) {
   const { game, seats } = room;
   const local = !!room.local;
   const mySeat = seats.findIndex((p) => p && p.id === playerId);
@@ -1244,7 +1283,9 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
   };
   const canEnd = room.activity && isHost && game.phase !== 'over';
   const canAway = !local && mySeat >= 0 && game.phase !== 'over';
-  const spam = isAdmin || (seats[mySeat]?.tags || []).some((tag) => tag === 'beta' || tag === 'dev');
+  const me = mySeat >= 0 ? seats[mySeat] : (room.spectators || []).find((p) => p.id === playerId);
+  const spam = isAdmin || (me?.tags || []).some((tag) => tag === 'beta' || tag === 'dev');
+  const watchEmotes = !local && mySeat < 0 && spam && game.phase !== 'over' && emotesOf(me).length > 0;
   const feed = (docked) => (
     <Feed
       entries={entries}
@@ -1397,11 +1438,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
               </button>
             )}
           </div>
-          {!local && mySeat >= 0 && (
+          {!local && (mySeat >= 0 || watchEmotes) && (
             <ReactionBar
               inline
               spam={spam}
-              emotes={emotesOf(seats[mySeat])}
+              emotesOnly={mySeat < 0}
+              emotes={emotesOf(me)}
               onReact={(key) => {
                 onAction('game:react', { key });
                 if (!spam) closeSheet();
@@ -1417,6 +1459,7 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
         </HudSheet>
 
         {endings}
+        <SpectatorFloaters floaters={floaters} />
       </div>
     );
   }
@@ -1460,10 +1503,12 @@ export default function Game({ room, playerId, reactions = [], teamLog = [], isA
             </button>
           )}
           {!local && mySeat >= 0 && <ReactionBar collapse={showOver} spam={spam} emotes={emotesOf(seats[mySeat])} onReact={(key) => onAction('game:react', { key })} />}
+          {watchEmotes && <ReactionBar spam emotesOnly emotes={emotesOf(me)} onReact={(key) => onAction('game:react', { key })} />}
         </div>
       </div>
 
       {endings}
+      <SpectatorFloaters floaters={floaters} />
     </div>
   );
 }

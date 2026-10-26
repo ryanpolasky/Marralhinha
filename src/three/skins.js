@@ -2086,90 +2086,157 @@ function cardboardCanvas(layout) {
   return canvas;
 }
 
-function notebookCanvas(layout) {
-  const { canvas, ctx, S, W, L, toWorld, label, mid, room } = boardSpace(layout);
-  const rand = seeded(57);
-  ctx.fillStyle = '#fbf8f0';
-  ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 5000; i++) {
-    ctx.fillStyle = `rgba(140,120,85,${rand() * 0.06})`;
-    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+const GLASS_JEWELS = ['#1d3f8f', '#8e1b2c', '#1f6b4a', '#c98a1a', '#4b2a7a', '#16607a'];
+const glassRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+function leadedGlass(S, k, seeds, extent) {
+  const [base, bctx] = makeCanvas(S, S);
+  const [glow, gctx] = makeCanvas(S, S);
+  const C = S / 2;
+  const cells = new Map();
+  const key = (i, j) => `${i},${j}`;
+  seeds.forEach((s) => {
+    const id = key(Math.floor(s.x), Math.floor(s.y));
+    if (!cells.has(id)) cells.set(id, []);
+    cells.get(id).push(s);
+  });
+  const near = (x, y) => {
+    let a = null;
+    let b = null;
+    let da = Infinity;
+    let db = Infinity;
+    const ci = Math.floor(x);
+    const cj = Math.floor(y);
+    for (let i = ci - 2; i <= ci + 2; i++) for (let j = cj - 2; j <= cj + 2; j++) {
+      for (const s of cells.get(key(i, j)) || []) {
+        const d = (s.x - x) ** 2 + (s.y - y) ** 2;
+        if (d < da) [b, db, a, da] = [a, da, s, d];
+        else if (d < db) [b, db] = [s, d];
+      }
+    }
+    return [a, b, da, db];
+  };
+  const bimg = bctx.createImageData(S, S);
+  const gimg = gctx.createImageData(S, S);
+  for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+    const x = (px + 0.5 - C) / k;
+    const y = (py + 0.5 - C) / k;
+    const o = (py * S + px) * 4;
+    bimg.data[o + 3] = gimg.data[o + 3] = 255;
+    if (Math.abs(x) > extent || Math.abs(y) > extent) continue;
+    const [a, b, da, db] = near(x, y);
+    if (!a) continue;
+    const edge = b ? (db - da) / (2 * Math.hypot(b.x - a.x, b.y - a.y)) : 1;
+    if (edge < 0.05) {
+      const v = 34 + 34 * (1 - edge / 0.05);
+      bimg.data.set([v, v, v + 6], o);
+      continue;
+    }
+    const streak = 0.9 + 0.1 * Math.sin((x * Math.cos(a.a) + y * Math.sin(a.a)) * 11 + a.p);
+    const shade = (0.72 + 0.28 * Math.min(1, (edge - 0.05) / 0.22)) * streak * a.tone;
+    for (let c = 0; c < 3; c++) {
+      bimg.data[o + c] = Math.min(255, a.rgb[c] * shade * 0.42);
+      gimg.data[o + c] = Math.min(255, a.rgb[c] * shade * a.glow);
+    }
   }
-  toWorld();
-  ctx.fillStyle = 'rgba(86,146,210,0.6)';
-  for (let z = -L + 0.3; z < L; z += 0.45) ctx.fillRect(-L, z, 2 * L, 0.035);
-  ctx.fillStyle = 'rgba(222,82,92,0.6)';
-  ctx.fillRect(-W + 0.18, -L, 0.035, 2 * L);
-  ctx.fillRect(-W + 0.26, -L, 0.02, 2 * L);
-  const blue = 'rgba(38,72,160,0.88)';
-  const red = 'rgba(196,46,72,0.85)';
-  const hand = (weight) => `${weight} 100px "Segoe Print", "Comic Sans MS", cursive`;
-  const ink = (color = blue, w = 0.06) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = w;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  };
-  const wob = (v) => v + (rand() - 0.5) * 0.03;
-  const scribble = (pts, passes = 2) => {
-    for (let p = 0; p < passes; p++) {
-      ctx.beginPath();
-      pts.forEach(([x, z], i) => ctx[i ? 'lineTo' : 'moveTo'](wob(x), wob(z)));
-      ctx.stroke();
-    }
-  };
-  ctx.fillStyle = 'rgba(255,232,40,0.5)';
-  ctx.fillRect(2.6, -1.58, room + 0.2, 0.34);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  softBlob(ctx, S / 2 + BOARD_R * S, S / 2 + mid * BOARD_R * S, 1.2 * BOARD_R * S, 'rgb(90,90,96)', 0.08);
-  toWorld();
-  ink('rgba(150,98,48,0.22)', 0.1);
-  scribble(circlePts(-(L - 1.5), 1, 0.62, 0.3, TAU - 0.2), 1);
-  ink('rgba(150,98,48,0.12)', 0.05);
-  scribble(circlePts(-(L - 1.52), 1.02, 0.55), 1);
-  ink();
-  layout.RING.filter((_, i) => i % 7 === 3).slice(0, 4).forEach(([r, c]) => {
-    const a = rand() * TAU;
-    scribble(circlePts(c, r, 0.5 + rand() * 0.05, a, a + TAU * 1.15), 1);
-  });
-  ink(red);
-  scribble([[-1.7, 1.05], [-1.2, 0.95], [-0.78, 0.68]], 1);
-  scribble([[-0.98, 0.62], [-0.78, 0.68], [-0.86, 0.88]], 1);
-  label('shortcut!', -1.55, 1.32, { rot: -0.25, size: 0.3, max: 1.2, font: hand(700), color: red });
-  ink();
-  label('6 = go again', -1, mid, { rot: -Math.PI / 2, size: 0.5, max: room - 0.4, font: `italic ${hand(700)}`, color: blue });
-  scribble(circlePts(1, -L + 1.6, 0.42));
-  ctx.fillStyle = blue;
-  [0.86, 1.14].forEach((x) => {
+  bctx.putImageData(bimg, 0, 0);
+  gctx.putImageData(gimg, 0, 0);
+  return [base, bctx, glow, gctx];
+}
+
+function glassSeed(x, y, color, rand, glow = 0.8) {
+  return { x, y, rgb: glassRgb(color), tone: 0.86 + rand() * 0.22, a: rand() * Math.PI, p: rand() * TAU, glow };
+}
+
+function leadRing(ctxs, x, y, r, width) {
+  ctxs.forEach((ctx, i) => {
+    ctx.strokeStyle = i ? '#000' : '#3a3a40';
+    ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.arc(x, -L + 1.5, 0.045, 0, TAU);
-    ctx.fill();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.stroke();
   });
-  scribble(circlePts(1, -L + 1.58, 0.22, 0.4, Math.PI - 0.4), 1);
-  label('gg ez', 1, -mid + 0.7, { rot: Math.PI / 2, size: 0.52, max: room - 1.4, font: `italic ${hand(700)}`, color: blue });
-  ink(red);
-  scribble(Array.from({ length: 17 }, (_, i) => {
-    const t = (i / 16) * TAU;
-    return [mid + 0.38 * Math.sin(t) ** 3, 1 - (0.38 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))) / 16];
-  }));
-  ink('rgba(60,60,66,0.7)', 0.035);
-  const g = 0.3;
-  const tx = -mid;
-  [-0.5, 0.5].forEach((o) => {
-    scribble([[tx - g * 1.5, -1 + g * o], [tx + g * 1.5, -1 + g * o]], 1);
-    scribble([[tx + g * o, -1 - g * 1.5], [tx + g * o, -1 + g * 1.5]], 1);
+}
+
+function glassCanvases(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const rand = seeded(131);
+  const { halfWidth: W, halfLength: L, arm } = layout.spec;
+  const owner = (x, y) => (Math.abs(y) > Math.abs(x) ? (y > 0 ? 0 : 2) : x > 0 ? 1 : 3);
+  const jewel = (x, y) => {
+    const seat = SEAT_COLORS[owner(x, y)];
+    const roll = rand();
+    return roll < 0.3 ? seat.main : roll < 0.45 ? seat.dark : GLASS_JEWELS[Math.floor(rand() * GLASS_JEWELS.length)];
+  };
+  const holes = [
+    ...layout.RING.map(([r, c], i) => glassSeed(c, r, i % 2 ? '#f2d58a' : '#e8c477', rand, 0.62)),
+    ...layout.HOME.flatMap((rows, seat) => rows.map(([r, c]) => glassSeed(c, r, SEAT_COLORS[seat].main, rand, 0.95))),
+  ];
+  const rose = [glassSeed(0, 0, '#f0bd3c', rand, 1)];
+  for (let i = 0; i < 8; i++) {
+    const t = (i / 8) * TAU + TAU / 16;
+    rose.push(glassSeed(Math.cos(t) * 0.95, Math.sin(t) * 0.95, i % 2 ? '#b0202e' : '#e09a1a', rand, 1));
+  }
+  for (let i = 0; i < 12; i++) {
+    const t = (i / 12) * TAU;
+    rose.push(glassSeed(Math.cos(t) * 1.75, Math.sin(t) * 1.75, i % 2 ? '#2450b8' : '#5a2f99', rand, 0.95));
+  }
+  const fixed = [...holes, ...rose];
+  const filler = [];
+  const step = 0.9;
+  for (let y = -L - 1; y <= L + 1; y += step) for (let x = -L - 1; x <= L + 1; x += step) {
+    const px = x + (rand() - 0.5) * step * 0.8;
+    const py = y + (rand() - 0.5) * step * 0.8;
+    if (fixed.some((s) => Math.hypot(s.x - px, s.y - py) < 0.66)) continue;
+    filler.push(glassSeed(px, py, jewel(px, py), rand, 0.9));
+  }
+  const [base, bctx, glow, gctx] = leadedGlass(S, k, [...fixed, ...filler], L + 1);
+  const ctxs = [bctx, gctx];
+  ctxs.forEach((ctx) => ctx.setTransform(k, 0, 0, k, S / 2, S / 2));
+  holes.forEach((s) => leadRing(ctxs, s.x, s.y, 0.42, 0.075));
+  leadRing(ctxs, 0, 0, 1.35, 0.09);
+  leadRing(ctxs, 0, 0, 2.15, 0.11);
+  ctxs.forEach((ctx, i) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.strokeStyle = i ? '#000' : '#3a3a40';
+    ctx.lineWidth = 0.22 * k;
+    ctx.lineJoin = 'round';
+    tracePath(ctx, roundedCross(W - 0.11, L - 0.11, 0.55), S, BOARD_R);
+    ctx.stroke();
   });
-  [[-1, -1, 'x'], [0, 0, 'o'], [1, 1, 'x'], [1, -1, 'o'], [-1, 1, 'x']].forEach(([i, j, m]) => {
-    const [x, z] = [tx + i * g, -1 + j * g];
-    if (m === 'o') scribble(circlePts(x, z, 0.09), 1);
-    else {
-      scribble([[x - 0.08, z - 0.08], [x + 0.08, z + 0.08]], 1);
-      scribble([[x + 0.08, z - 0.08], [x - 0.08, z + 0.08]], 1);
+  return [base, glow, arm];
+}
+
+function glassDishes(layout) {
+  const S = 512;
+  const { dishR, baseOffsets } = layout.spec;
+  const R = 0.5 / (dishR + 0.1);
+  const k = R * S;
+  return [0, 1, 2, 3].map((seat) => {
+    const rand = seeded(151 + seat);
+    const c = SEAT_COLORS[seat];
+    const holes = baseOffsets.map(([a, b]) => glassSeed(a, b, '#f2d58a', rand, 0.62));
+    const ring = [];
+    for (let i = 0; i < 16; i++) {
+      const t = (i / 16) * TAU;
+      ring.push(glassSeed(Math.cos(t) * (dishR - 0.38), Math.sin(t) * (dishR - 0.38), i % 2 ? c.main : i % 4 ? '#c98a1a' : c.dark, rand, 0.95));
     }
+    const filler = [];
+    for (let y = -dishR; y <= dishR; y += 0.7) for (let x = -dishR; x <= dishR; x += 0.7) {
+      const px = x + (rand() - 0.5) * 0.5;
+      const py = y + (rand() - 0.5) * 0.5;
+      if (Math.hypot(px, py) > dishR - 0.8 || [...holes, ...ring].some((s) => Math.hypot(s.x - px, s.y - py) < 0.55)) continue;
+      filler.push(glassSeed(px, py, rand() < 0.5 ? c.dark : GLASS_JEWELS[Math.floor(rand() * GLASS_JEWELS.length)], rand, 0.9));
+    }
+    const [base, bctx, glow, gctx] = leadedGlass(S, k, [...holes, ...ring, ...filler], dishR + 0.1);
+    const ctxs = [bctx, gctx];
+    ctxs.forEach((ctx) => ctx.setTransform(k, 0, 0, k, S / 2, S / 2));
+    holes.forEach((s) => leadRing(ctxs, s.x, s.y, 0.42, 0.075));
+    leadRing(ctxs, 0, 0, dishR - 0.75, 0.09);
+    leadRing(ctxs, 0, 0, dishR - 0.06, 0.16);
+    return [base, glow, R];
   });
-  scribble([[tx - g * 1.4, -1 - g * 1.4], [tx + g * 1.4, -1 + g * 1.4]], 1);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  return canvas;
 }
 
 function terrazzoCanvas() {
@@ -5164,7 +5231,16 @@ const SPECIAL_BOARDS = {
     return { canvas: base, glowCanvas: glow, repeat: 0.06, roughness: 0.35, dish: '#1a0f33', felt: '#07061a', cup: '#05030c', accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 1.4, roughness: 0.3 } };
   },
   cardboard: (layout) => ({ canvas: cardboardCanvas(layout), repeat: BOARD_R, roughness: 0.92, dish: '#b38a55', felt: '#5b4128', cup: '#4a3320', side: '#a37b48', accent: { color: '#d4b07a', metalness: 0, roughness: 0.85 } }),
-  notebook: (layout) => ({ canvas: notebookCanvas(layout), repeat: BOARD_R, roughness: 0.82, dish: '#f3efe4', felt: '#4d5a6e', cup: '#22304d', side: '#ece6d6', accent: { color: '#c3c7cf', metalness: 1, roughness: 0.28 } }),
+  glass: (layout) => {
+    const [base, glow] = glassCanvases(layout);
+    const dishes = glassDishes(layout);
+    return {
+      canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: BOARD_R, roughness: 0.22, clearcoat: 0.4, params: { specularIntensity: 0.25, clearcoatRoughness: 0.3 },
+      dishCanvases: dishes.map((d) => d[0]), dishGlowCanvases: dishes.map((d) => d[1]), dishRepeat: dishes[0][2],
+      dish: '#2a2a30', felt: '#20242c', cup: '#141418', side: '#2a2a30',
+      accent: { color: '#8a8d93', metalness: 0.9, roughness: 0.35 },
+    };
+  },
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
   terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#2b2e32', felt: '#2b3a44', cup: '#141618', accent: { color: '#d9d4ca', metalness: 0.3, roughness: 0.4 } }),
@@ -5262,7 +5338,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'notebook']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'glass']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
