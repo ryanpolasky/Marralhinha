@@ -10979,6 +10979,7 @@ body {
 }
 
 .painter-shop {
+  container-type: inline-size;
   overflow: hidden;
   border: 1px solid rgba(201, 173, 255, 0.5);
   background: #221a33;
@@ -10988,19 +10989,15 @@ body {
 .painter-art {
   aspect-ratio: 680 / 240;
   display: grid;
-  grid-template-columns: repeat(9, auto);
+  grid-template-columns: repeat(6, auto);
   place-content: center;
-  gap: 4cqw 3.2cqw;
+  gap: 2.4cqw 3cqw;
   background: #2c2440;
   border-radius: 0 0 24px 24px;
 }
 
 .painter-art .marble-dot {
-  --size: 7.4cqw;
-}
-
-.painter-art .marble-dot:nth-child(n + 10) {
-  translate: 5.3cqw 0;
+  --size: 6cqw;
 }
 
 .painter-shop-body { padding: 20px 24px 22px; }
