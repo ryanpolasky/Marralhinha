@@ -1,12 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import useFitPanel from './useFitPanel';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
-import { COLOR_PALETTE, COLOR_BY_ID, TABLE_PALETTES } from '../game/colors';
+import { COLOR_PALETTE, COLOR_BY_ID, TABLE_PALETTES, MIN_LOBBY_DIST, colorDistance } from '../game/colors';
 import { useRainbow } from '../game/rainbow';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
 import RulesButton from './Rules';
-import { Bug, Copy, Crown } from './Icons';
+import { Bug, Copy, Crown, Lock } from './Icons';
 import { Nameplate, TagBadges } from './Economy';
 import { Credit } from './About';
 import { ask } from './Dialog';
@@ -75,62 +76,119 @@ function TurnTimer({ seconds, isHost, onChange }) {
   );
 }
 
-export function SeatColorDrawer({ seat, colors, onPick, admin = false }) {
-  const current = colors?.[seat] || SEAT_COLORS[seat];
-  const isCustom = current.rainbow || current.main !== SEAT_COLORS[seat].main;
-  return (
-    <div className="seat-color-drawer" onClick={(e) => e.stopPropagation()}>
-      <div className="seat-color-swatches" role="radiogroup" aria-label="Pick seat colour">
+function useAnchoredPop(anchor, onClose) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = ref.current;
+      if (!el || !anchor?.isConnected) return;
+      const a = anchor.getBoundingClientRect();
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const left = Math.max(8, Math.min(a.left, vw - w - 8));
+      const below = a.bottom + 6;
+      const top = below + h <= vh - 8 || a.top - h - 6 < 8 ? Math.min(below, vh - h - 8) : a.top - h - 6;
+      setPos({ left, top: Math.max(8, top) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [anchor]);
+  useEffect(() => {
+    const onDown = (e) => !ref.current?.contains(e.target) && !anchor?.contains(e.target) && onClose();
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [anchor, onClose]);
+  return [ref, pos];
+}
+
+export function SeatColorPopover({ seat, room, anchor, owner, dev, onPick, onClose }) {
+  const [ref, pos] = useAnchoredPop(anchor, onClose);
+  const [note, setNote] = useState(null);
+  const colors = SEATS.map((s) => room.colors?.[s] || room.seats[s]?.color || SEAT_COLORS[s]);
+  const current = colors[seat];
+  const classic = SEAT_COLORS[seat];
+  const isClassic = !current.rainbow && current.main.toLowerCase() === classic.main.toLowerCase();
+  const names = SEATS.map((s) => room.seats[s]?.name?.trim() || '');
+  const tag = (s) => (names.some((n, o) => o !== s && n && n[0]?.toUpperCase() === names[s][0]?.toUpperCase()) ? names[s].slice(0, 2) : names[s].slice(0, 1));
+  const others = SEATS.filter((s) => s !== seat && room.seats[s]).map((s) => ({ name: room.seats[s].name, tag: tag(s), color: colors[s] }));
+  const unlockedBy = (room.painter?.owners || []).map((s) => room.seats[s]?.name).filter(Boolean)[0];
+  const pick = async (spec, steal = false) => {
+    sfx.click();
+    setNote(null);
+    const res = await onPick(spec, steal);
+    if (res?.nudged) setNote(`Nudged to ${res.color?.main?.toUpperCase() || 'a nearby shade'} so it doesn't blend in`);
+    else if (res && (spec === null || !spec.startsWith('#'))) onClose();
+  };
+  return createPortal(
+    <div ref={ref} className="paint-pop" role="dialog" aria-label="Pick your colour" style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden' }}>
+      <div className="paint-pop-head">
+        <b>{dev ? `Paint ${room.seats[seat]?.name || classic.name}` : 'Your colour'}</b>
+        <span>{dev ? 'Dev' : owner ? 'Painter Pack' : unlockedBy ? `Thanks to ${unlockedBy}` : 'Painter Pack'}</span>
+      </div>
+      <div className="paint-grid" role="radiogroup" aria-label="Colours">
         {COLOR_PALETTE.map((swatch) => {
           const selected = !current.rainbow && current.main.toLowerCase() === swatch.main.toLowerCase();
+          const near = selected || dev ? null : others.map((o) => ({ ...o, d: colorDistance(swatch.main, o.color.main) })).filter((o) => o.d < MIN_LOBBY_DIST).sort((a, b) => a.d - b.d)[0];
+          const taken = near && near.color.main.toLowerCase() === swatch.main.toLowerCase();
+          const title = !near ? swatch.name : owner ? `${swatch.name}: take it from ${near.name}` : taken ? `${swatch.name}: ${near.name} has it` : `${swatch.name}: too close to ${near.name}'s ${near.color.name}`;
           return (
             <button
               key={swatch.id}
               type="button"
               role="radio"
               aria-checked={selected}
-              className={`seat-swatch${selected ? ' on' : ''}`}
+              className={`seat-swatch${selected ? ' on' : ''}${near ? ' clash' : ''}`}
               style={{ '--sw': swatch.main, '--sw-light': swatch.light, '--sw-dark': swatch.dark }}
-              title={swatch.name}
-              onClick={() => {
-                sfx.click();
-                onPick(swatch.id);
-              }}
-            />
+              title={title}
+              aria-label={title}
+              disabled={!!near && !owner}
+              onClick={() => pick(swatch.id, !!near)}
+            >
+              {taken ? <span className="seat-swatch-owner">{near.tag}</span> : near && <span className="seat-swatch-slash" />}
+            </button>
           );
         })}
-        {admin && (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={!!current.rainbow}
-            className={`seat-swatch rainbow${current.rainbow ? ' on' : ''}`}
-            title="Rainbow"
-            onClick={() => {
-              sfx.click();
-              onPick('rainbow');
-            }}
-          />
-        )}
-        <label className={`seat-custom-pill${current.custom ? ' on' : ''}`} title="Pick any custom hex colour">
-          <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />
-          <span>{current.custom ? current.name : '+ Hex'}</span>
-          <HexInput value={current.main} onCommit={onPick} aria-label="Custom colour hex" />
-        </label>
-        {isCustom && (
-          <button
-            type="button"
-            className="btn tiny ghost"
-            onClick={() => {
-              sfx.click();
-              onPick(null);
-            }}
-          >
-            Reset
+      </div>
+      <div className="paint-pop-foot">
+        <button type="button" className="paint-chip" disabled={isClassic} onClick={() => pick(null)}>
+          <span className="marble-dot mini" style={{ '--seat': classic.main, '--seat-light': classic.light }} />
+          {classic.name}
+        </button>
+        {dev && (
+          <button type="button" className={`paint-chip${current.rainbow ? ' on' : ''}`} onClick={() => pick('rainbow')}>
+            <span className="marble-dot mini rainbow" />
+            Rainbow
           </button>
         )}
+        {owner || dev ? (
+          <label className={`paint-chip hex${current.custom ? ' on' : ''}`} title="Pick any colour">
+            <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />
+            {current.custom ? current.main.toUpperCase() : 'Custom'}
+            <HexInput value={current.main} onCommit={(hex) => pick(hex)} aria-label="Custom colour" />
+          </label>
+        ) : (
+          <span className="paint-chip locked" title="Custom colours come with the Painter Pack">
+            <Lock />
+            Custom
+          </span>
+        )}
       </div>
-    </div>
+      {note && <p className="paint-note">{note}</p>}
+    </div>,
+    document.body
   );
 }
 
@@ -167,7 +225,8 @@ export function TablePaletteBar({ colors, onSelect }) {
 export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onReport, onPlayerStats }) {
   const [copied, setCopied] = useState(false);
   const [swapFrom, setSwapFrom] = useState(null);
-  const [colorSeat, setColorSeat] = useState(null);
+  const [paint, setPaint] = useState(null);
+  const closePaint = useCallback(() => setPaint(null), []);
   const [busy, setBusy] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [chatSeenAt, setChatSeenAt] = useState(() => Date.now());
@@ -264,21 +323,22 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
             const color = liveColors[s];
             const mine = p && p.id === playerId;
             const viewable = p && !p.isBot && p.userId && !mine && onPlayerStats;
-            const canPaint = !!(isAdmin || room.canPaint);
-            const drawerOpen = canPaint && colorSeat === s;
-            const toggleColor = () => {
+            const canPaint = isAdmin || (mine && !!room.painter?.on);
+            const drawerOpen = canPaint && paint?.seat === s;
+            const toggleColor = (e) => {
               sfx.click();
-              setColorSeat((cur) => (cur === s ? null : s));
+              const anchor = e.currentTarget.closest('.seat');
+              setPaint((cur) => (cur?.seat === s ? null : { seat: s, anchor }));
             };
             return (
               <div
                 key={s}
-                className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}${viewable ? ' viewable' : ''}${canPaint ? ' has-drawer' : ''}${drawerOpen ? ' color-open' : ''}`}
+                className={`seat${p ? ' filled' : ''}${mine ? ' mine' : ''}${viewable ? ' viewable' : ''}${canPaint ? ' paintable' : ''}${drawerOpen ? ' color-open' : ''}`}
                 style={{ '--seat': color.main, '--seat-light': color.light, ...(viewable ? { cursor: 'pointer' } : null) }}
                 onClick={viewable ? (e) => !e.target.closest('button') && onPlayerStats(p) : undefined}
               >
                 {canPaint ? (
-                  <button type="button" className="seat-dot seat-dot-btn" onClick={toggleColor} title={`Paint ${p?.name || SEAT_COLORS[s].name}'s seat`} aria-label={`Paint ${p?.name || SEAT_COLORS[s].name}'s seat`} aria-expanded={drawerOpen}>
+                  <button type="button" className="seat-dot seat-dot-btn" onClick={toggleColor} title={mine ? 'Pick your colour' : `Paint ${p?.name || SEAT_COLORS[s].name}'s seat`} aria-label={mine ? 'Pick your colour' : `Paint ${p?.name || SEAT_COLORS[s].name}'s seat`} aria-expanded={drawerOpen}>
                     <span className="marble-dot" />
                     {p && p.id === room.hostId && <Crown />}
                   </button>
@@ -359,11 +419,14 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
                   )}
                 </div>
                 {drawerOpen && (
-                  <SeatColorDrawer
+                  <SeatColorPopover
                     seat={s}
-                    colors={room.colors || SEAT_COLORS}
-                    admin={isAdmin}
-                    onPick={(nextColor) => onAction('game:setColor', { seat: s, color: nextColor })}
+                    room={room}
+                    anchor={paint.anchor}
+                    owner={!!room.painter?.owners?.includes(s)}
+                    dev={isAdmin && !mine}
+                    onClose={closePaint}
+                    onPick={(color, steal) => onAction(mine ? 'game:pickColor' : 'game:setColor', mine ? { color, steal } : { seat: s, color })}
                   />
                 )}
               </div>
@@ -371,7 +434,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
           })}
         </div>
 
-        {(isAdmin || room.canPaint) && (
+        {isAdmin && (
           <TablePaletteBar
             colors={room.colors || SEAT_COLORS}
             onSelect={(palette) => onAction('game:setColor', { palette })}

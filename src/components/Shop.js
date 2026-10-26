@@ -5,6 +5,7 @@ import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
 import { Chevron, Close } from './Icons';
+import { COLOR_PALETTE } from '../game/colors';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 import { IS_ACTIVITY } from '../net/config';
 
@@ -28,6 +29,10 @@ const PACKS = {
   supporter: {
     thanks: 'Thank you for supporting Marralhinha! Your set is ready in the locker.',
     missing: 'No Supporter purchase found yet. If you just bought it, wait a moment and try again.',
+  },
+  painter: {
+    thanks: 'The brush is yours! Sit at any table and tap your marble to paint.',
+    missing: 'No Painter purchase found yet. If you just bought it, wait a moment and try again.',
   },
   halloween: {
     thanks: 'Welcome to the séance! Your Haunted set is ready in the locker.',
@@ -254,7 +259,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const { peek } = peeker;
   const swipeStart = useRef(null);
   const refreshIn = useCountdown(shop?.refreshAt);
-  const slides = 2;
+  const slides = 3;
   const go = (next) => setSlide(Math.max(0, Math.min(slides - 1, next)));
 
   useEffect(() => {
@@ -334,9 +339,11 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
 
   const hasSupporter = account.tags.includes('supporter');
   const hasHalloween = account.tags.includes('halloween');
+  const hasPainter = account.tags.includes('painter');
   const halloweenOpen = shop?.halloween?.open;
   const supporterLabel = !shop?.supporter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support';
   const halloweenLabel = !shop ? 'Loading…' : !halloweenOpen ? 'Back next October' : !shop.halloween.skuId ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Halloween Pack' : 'Link Discord to get it';
+  const painterLabel = !shop?.painter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Painter Pack' : 'Link Discord to get it';
   const onCarouselKey = (e) => {
     if (e.key === 'ArrowLeft') go(slide - 1);
     else if (e.key === 'ArrowRight') go(slide + 1);
@@ -452,7 +459,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
         <div className="shop-carousel" role="group" aria-roledescription="carousel" aria-label="Packs" onKeyDown={onCarouselKey}>
           <div className="carousel-viewport" onTouchStart={(e) => (swipeStart.current = e.touches[0].clientX)} onTouchEnd={onSwipeEnd}>
             <div className="carousel-track" style={{ transform: `translateX(-${slide * 100}%)` }}>
-              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Supporter Pack, 1 of 2" {...slideProps(0)}>
+              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Supporter Pack, 1 of 3" {...slideProps(0)}>
                 <section className="supporter-shop" aria-label="Support the game">
                   <picture>
                     <source media="(prefers-reduced-motion: reduce)" srcSet="/supporter-pack-still.png" />
@@ -477,7 +484,28 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                 </section>
               </div>
 
-              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Halloween Pack, 2 of 2" {...slideProps(1)}>
+              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Painter Pack, 2 of 3" {...slideProps(1)}>
+                <section className="painter-shop" aria-label="Painter Pack">
+                  <div className="painter-art" aria-hidden="true">
+                    {COLOR_PALETTE.map((c, i) => (
+                      <span key={c.id} className="marble-dot" style={{ '--seat': c.main, '--seat-light': c.light, '--i': i }} />
+                    ))}
+                  </div>
+                  <div className="painter-shop-body">
+                    <div className="painter-shop-head"><span className="painter-eyebrow">Bring your own paint</span><h3>Painter Pack</h3><span className="painter-price">$2.99 USD · one time</span></div>
+                    <p>Sit at a table and everyone there gets to pick their own marble colour, kept far enough apart that nobody blends in. You also get any custom colour you like, can take a colour someone else is using, and wear a permanent Painter badge. Only the look changes; never the gameplay.</p>
+                    <div className="painter-actions">
+                      {hasPainter ? <span className="painter-owned">The brush is yours. Sit at any table and tap your marble.</span> : (
+                        <button className="btn primary" disabled={!shop?.painter || !!syncing} onClick={() => purchasePack('painter')}>{painterLabel}</button>
+                      )}
+                      {shop?.painter && account.discordLinked && !hasPainter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('painter')}>{syncing === 'painter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                    </div>
+                    <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+                  </div>
+                </section>
+              </div>
+
+              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Halloween Pack, 3 of 3" {...slideProps(2)}>
                 <section className="halloween-shop" aria-label="Halloween Pack">
                   <div className="halloween-art-wrap">
                     <picture>
@@ -507,7 +535,8 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
           <button type="button" className="carousel-arrow next" aria-label="Next pack" disabled={slide === slides - 1} onClick={() => go(slide + 1)}><Chevron /></button>
           <div className="carousel-dots">
             <button type="button" className={`carousel-dot sp${slide === 0 ? ' on' : ''}`} aria-label="Show the Supporter Pack" aria-current={slide === 0 || undefined} onClick={() => go(0)}>Supporter</button>
-            <button type="button" className={`carousel-dot hw${slide === 1 ? ' on' : ''}`} aria-label="Show the Halloween Pack" aria-current={slide === 1 || undefined} onClick={() => go(1)}>Halloween</button>
+            <button type="button" className={`carousel-dot pt${slide === 1 ? ' on' : ''}`} aria-label="Show the Painter Pack" aria-current={slide === 1 || undefined} onClick={() => go(1)}>Painter</button>
+            <button type="button" className={`carousel-dot hw${slide === 2 ? ' on' : ''}`} aria-label="Show the Halloween Pack" aria-current={slide === 2 || undefined} onClick={() => go(2)}>Halloween</button>
           </div>
         </div>
       </div>
