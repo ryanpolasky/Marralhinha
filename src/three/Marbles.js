@@ -37,6 +37,14 @@ const UP = new THREE.Vector3(0, 1, 0);
 const _sway = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _turn = new THREE.Quaternion();
+const _cam = new THREE.Vector3();
+const _side = new THREE.Vector3();
+const _basis = new THREE.Matrix4();
+const UPRIGHT_S = 0.3;
+const KEEL = 1.2;
+const _up = new THREE.Vector3();
+const _keel = new THREE.Vector3();
+const _fix = new THREE.Quaternion();
 
 const CLASSIC_LAYOUT = layoutFor('classic');
 export const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
@@ -206,7 +214,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, tint, down, pickable, onPick, stunt, star, knock, seed, layout }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, tint, down, pickable, onPick, stunt, star, knock, seed, layout, keel }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -267,6 +275,12 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         seg.start = now + (seg.delay || 0);
         seg.from = a.pos.clone();
         seg.fromScale = body.current.scale.toArray();
+        if (seg.rock) {
+          group.current.parent.worldToLocal(_cam.copy(state.camera.position)).sub(a.pos).setY(0).normalize();
+          _side.crossVectors(UP, _cam);
+          seg.tilt = body.current.quaternion.clone();
+          seg.upright = new THREE.Quaternion().setFromRotationMatrix(_basis.makeBasis(_side, UP, _cam));
+        }
       }
       const t = (now - seg.start) / seg.dur;
       if (t >= 0 && !seg.begun) {
@@ -289,6 +303,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         a.pos.lerpVectors(seg.from, seg.to, e);
         a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
         if (seg.rock) {
+          body.current.quaternion.slerpQuaternions(seg.tilt, seg.upright, easeInOut(Math.min(1, (t * seg.dur) / UPRIGHT_S)));
           group.current.parent.getWorldQuaternion(_turn).invert();
           _right.setFromMatrixColumn(state.camera.matrixWorld, 0).applyQuaternion(_turn).setY(0).normalize();
           a.pos.addScaledVector(_right, ballRock(t * seg.dur));
@@ -337,6 +352,16 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     if (dist > 1e-5 && !pose && !knocked) {
       axis.set(dz, 0, -dx).normalize();
       body.current.quaternion.premultiply(spin.setFromAxisAngle(axis, dist / MARBLE_R));
+    }
+    // Gotcha Ball keeps its seat-colored top half up: free to wobble, never flipped
+    if (keel && !knocked?.tumble && !ufo?.spin) {
+      _up.copy(UP).applyQuaternion(body.current.quaternion);
+      if (_up.y < Math.cos(KEEL)) {
+        _keel.set(_up.x, 0, _up.z);
+        if (_keel.lengthSq() < 1e-8) _keel.set(1, 0, 0);
+        _keel.normalize().multiplyScalar(Math.sin(KEEL)).setY(Math.cos(KEEL));
+        body.current.quaternion.premultiply(_fix.setFromUnitVectors(_up, _keel));
+      }
     }
     if (aura) {
       const travelling = !down && (a.segs.length > 0 || a.returning);
@@ -531,6 +556,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               planKey={planKey}
               material={materials[seat].material}
               aura={materials[seat].aura}
+              keel={skinKey(skins[seat]) === 'wild'}
               movable={movable}
               selected={!!selected && selected.seat === seat && selected.marble === marble}
               hovered={!!hovered && hovered.seat === seat && hovered.marble === marble}
