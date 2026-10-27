@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { updateSettings, useSettings } from '../game/settings';
+import { saveCustomColor, updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
 import { SEAT_COLORS } from '../game/geometry';
 import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff, DiscordMark } from './Icons';
@@ -81,7 +81,7 @@ export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
         <div className="settings-group">
           <h3>Gameplay</h3>
           <FavoriteColor />
-          {onPainterColor && account?.tags?.some((t) => t === 'painter' || t === 'dev') && <PainterColor saved={account.painterColor} onPick={onPainterColor} />}
+          {onPainterColor && account?.tags?.includes('painter') && <PainterColor saved={account.painterColor} onPick={onPainterColor} />}
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -151,39 +151,67 @@ function FavoriteColor() {
 }
 
 function PainterColor({ saved, onPick }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const { painterCustoms = [] } = useSettings();
   const hex = saved?.startsWith('#');
   const current = saved ? (hex ? rawTripletFromHex(saved) : COLOR_BY_ID[saved]) : null;
+  const on = (spec) => saved?.toLowerCase() === spec.toLowerCase();
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+  const choose = (spec) => {
+    setOpen(false);
+    if (spec === null ? saved : !on(spec)) onPick(spec);
+  };
+  const swatch = (spec, sw, label) => (
+    <button key={spec} type="button" role="radio" aria-checked={on(spec)} className={`seat-swatch${on(spec) ? ' on' : ''}`} style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }} title={label} aria-label={label} onClick={() => choose(spec)} />
+  );
   return (
-    <div className="setting painter-color">
+    <div className="setting painter-color" ref={ref}>
       <div className="setting-head">
         <span className="setting-label">Painter colour</span>
-        <span className="setting-hint">used at Painter tables</span>
-      </div>
-      <div className="paint-grid" role="radiogroup" aria-label="Painter colour">
-        {COLOR_PALETTE.map((sw) => (
-          <button
-            key={sw.id}
-            type="button"
-            role="radio"
-            aria-checked={saved === sw.id}
-            className={`seat-swatch${saved === sw.id ? ' on' : ''}`}
-            style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }}
-            title={sw.name}
-            aria-label={sw.name}
-            onClick={() => onPick(saved === sw.id ? null : sw.id)}
-          />
-        ))}
-      </div>
-      <div className="paint-pop-foot">
-        <button type="button" className={`paint-chip${saved ? '' : ' on'}`} disabled={!saved} onClick={() => onPick(null)}>
-          Seat colour
+        <button type="button" className="paint-select" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {current && <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />}
+          {current ? (hex ? saved.toUpperCase() : current.name) : 'Seat colour'}
+          <span className="paint-select-caret" aria-hidden="true" />
         </button>
-        <label className={`paint-chip hex${hex ? ' on' : ''}`} title="Pick any colour">
-          <span className="marble-dot mini" style={hex ? { '--seat': current.main, '--seat-light': current.light } : undefined} />
-          {hex ? saved.toUpperCase() : 'Custom'}
-          <HexInput value={current?.main || '#8a5cf6'} onCommit={(value) => onPick(value)} aria-label="Custom Painter colour" />
-        </label>
       </div>
+      {open && (
+        <div className="paint-select-menu" role="radiogroup" aria-label="Painter colour">
+          <div className="paint-grid">{COLOR_PALETTE.map((sw) => swatch(sw.id, sw, sw.name))}</div>
+          {painterCustoms.length > 0 && <div className="paint-grid paint-saved">{painterCustoms.map((h) => swatch(h, rawTripletFromHex(h), `Saved ${h.toUpperCase()}`))}</div>}
+          <div className="paint-pop-foot">
+            <button type="button" className="paint-chip" disabled={!saved} onClick={() => choose(null)}>
+              Seat colour
+            </button>
+            <label className={`paint-chip hex${hex ? ' on' : ''}`} title="Pick any colour">
+              <span className="marble-dot mini" style={hex ? { '--seat': current.main, '--seat-light': current.light } : undefined} />
+              Custom
+              <HexInput
+                value={current?.main || '#8a5cf6'}
+                onCommit={(value) => {
+                  saveCustomColor(value);
+                  choose(value.toLowerCase());
+                }}
+                aria-label="Custom Painter colour"
+              />
+            </label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

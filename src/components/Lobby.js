@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import useFitPanel from './useFitPanel';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
-import { COLOR_PALETTE, MIN_LOBBY_DIST, colorDistance } from '../game/colors';
+import { COLOR_PALETTE, MIN_LOBBY_DIST, colorDistance, rawTripletFromHex } from '../game/colors';
+import { saveCustomColor, useSettings } from '../game/settings';
 import { useRainbow } from '../game/rainbow';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
@@ -117,6 +118,7 @@ function useAnchoredPop(anchor, onClose) {
 export function SeatColorPopover({ seat, room, anchor, owner, dev, onPick, onClose }) {
   const [ref, pos] = useAnchoredPop(anchor, onClose);
   const [note, setNote] = useState(null);
+  const { painterCustoms } = useSettings();
   const colors = SEATS.map((s) => room.colors?.[s] || room.seats[s]?.color || SEAT_COLORS[s]);
   const current = colors[seat];
   const classic = SEAT_COLORS[seat];
@@ -128,6 +130,7 @@ export function SeatColorPopover({ seat, room, anchor, owner, dev, onPick, onClo
   const pick = async (spec, steal = false) => {
     sfx.click();
     setNote(null);
+    if (spec?.startsWith?.('#')) saveCustomColor(spec);
     const res = await onPick(spec, steal);
     if (res?.nudged) setNote(`Nudged to ${res.color?.main?.toUpperCase() || 'a nearby shade'} so it doesn't blend in`);
     else if (res && (spec === null || !spec.startsWith('#'))) onClose();
@@ -162,6 +165,17 @@ export function SeatColorPopover({ seat, room, anchor, owner, dev, onPick, onClo
           );
         })}
       </div>
+      {(owner || dev) && painterCustoms?.length > 0 && (
+        <div className="paint-grid paint-saved" aria-label="Saved colours">
+          {painterCustoms.map((hex) => {
+            const sw = rawTripletFromHex(hex);
+            const selected = current.main.toLowerCase() === hex;
+            return (
+              <button key={hex} type="button" className={`seat-swatch${selected ? ' on' : ''}`} style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }} title={hex.toUpperCase()} aria-label={`Saved ${hex.toUpperCase()}`} onClick={() => pick(hex)} />
+            );
+          })}
+        </div>
+      )}
       <div className="paint-pop-foot">
         <button type="button" className="paint-chip" disabled={isClassic} onClick={() => pick(null)}>
           <span className="marble-dot mini" style={{ '--seat': classic.main, '--seat-light': classic.light }} />
