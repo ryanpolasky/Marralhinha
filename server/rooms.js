@@ -1035,15 +1035,23 @@ class Room {
   }
 
   react(userId, key) {
-    const { seat, player } = this.require(userId);
-    const pack = ITEMS.get(player.cosmetics?.emotes || DEFAULTS.emotes);
+    const found = this.findByUser(userId);
+    const spectator = !found && this.spectators.get(userId);
+    const player = found?.player || spectator;
+    if (!player) throw new UserError('You are not in this room');
+    const tester = (player.tags || []).some((tag) => TESTER_TAGS.includes(tag));
+    if (spectator && !tester) throw new UserError('Only players can react');
+    if (spectator && !this.game) throw new UserError('Emotes open once the game starts');
+    const packId = player.cosmetics?.emotes || DEFAULTS.emotes;
+    const pack = ITEMS.get(packId);
     const emote = pack?.slot === 'emotes' && (pack.emotes || []).some((e) => e.key === key);
-    if (!REACTION_KEYS.includes(key) && !emote) throw new UserError('Unknown reaction');
+    if (!emote && (spectator || !REACTION_KEYS.includes(key))) throw new UserError('Unknown reaction');
     const now = Date.now();
-    const cooldown = (player.tags || []).some((tag) => TESTER_TAGS.includes(tag)) ? TESTER_REACTION_COOLDOWN_MS : REACTION_COOLDOWN_MS;
+    const cooldown = tester ? TESTER_REACTION_COOLDOWN_MS : REACTION_COOLDOWN_MS;
     if (now - (player.lastReaction || 0) < cooldown) return;
     player.lastReaction = now;
-    this.hooks.onReaction?.(this, { seat, key, t: now });
+    if (spectator) this.hooks.onReaction?.(this, { spectator: true, from: player.id, name: player.name, pack: packId, key, t: now });
+    else this.hooks.onReaction?.(this, { seat: found.seat, key, t: now });
   }
 
   // Seated players and spectators can both chat; only seated players get a bubble under their nameplate.
@@ -1317,7 +1325,7 @@ class Room {
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       paused: this.paused,
       pauseEndsIn: this.paused ? Math.max(0, this.pausedAt + PAUSE_TTL_MS - Date.now()) : null,
-      spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+      spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected, cosmetics: p.cosmetics, tags: p.tags || [] })),
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       chat: this.chatLog,

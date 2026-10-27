@@ -39,7 +39,8 @@
     "arcade": { "name": "Arcade" },
     "voxel": { "name": "Voxel" },
     "bombsite": { "name": "Bombsite" },
-    "wild": { "name": "Wild Encounter" }
+    "wild": { "name": "Wild Encounter" },
+    "train": { "name": "All Aboard" }
   },
   "items": [
     { "id": "marble.classic", "slot": "marble", "name": "Cat's Eye", "rarity": "default", "desc": "The classic swirl." },
@@ -71,6 +72,7 @@
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
     { "id": "marble.lucky", "slot": "marble", "name": "Molten", "rarity": "exclusive", "tag": "lucky", "desc": "Rivers of molten gold flowing through your color of glass. Part of the Luckiest set." },
+    {"id": "marble.train", "slot": "marble", "name": "Signal Lamp", "rarity": "mythic", "set": "train", "desc": "Your color, lit from inside and set in chrome. Proceed."},
     {"id": "marble.wild", "slot": "marble", "name": "Gotcha Ball", "rarity": "mythic", "set": "wild", "desc": "Snap the button, hear the click. Fits in your pocket."},
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },
@@ -102,7 +104,8 @@
     { "id": "board.picnic", "slot": "board", "name": "Ants", "rarity": "ants", "unobtainable": true, "desc": "Ants (ants)", "note": "A custom request from the first person to buy the Supporter Pack." },
     { "id": "board.lucky", "slot": "board", "name": "High Roller", "rarity": "exclusive", "tag": "lucky", "desc": "Emerald lacquer under a gold art-deco sunburst that pulses with light. Part of the Luckiest set." },
     {"id": "board.cardboard", "slot": "board", "name": "Cardboard", "rarity": "rare", "desc": "Fragile. This side up. Probably."},
-    {"id": "board.notebook", "slot": "board", "name": "Notebook", "rarity": "legendary", "desc": "Doodled during third period."},
+    {"id": "board.glass", "slot": "board", "name": "Stained Glass", "rarity": "legendary", "desc": "Sunday best. Mind the lead."},
+    {"id": "board.train", "slot": "board", "name": "Express", "rarity": "mythic", "set": "train", "desc": "Terceira doesn't have a railway. Doesn't matter."},
     {"id": "board.wild", "slot": "board", "name": "Route 1", "rarity": "mythic", "set": "wild", "desc": "Tall grass everywhere. Stay on the path."},
 
     { "id": "dice.ivory", "slot": "dice", "name": "Ivory", "rarity": "default", "desc": "A trusty old die." },
@@ -134,7 +137,8 @@
     {"id": "dice.sugar", "slot": "dice", "name": "Sugar Cube", "rarity": "rare", "desc": "One lump or two?"},
     {"id": "dice.fuzzy", "slot": "dice", "name": "Fuzzy Dice", "rarity": "epic", "desc": "Straight off the rearview mirror."},
     {"id": "dice.disco", "slot": "dice", "name": "Disco Ball", "rarity": "legendary", "desc": "Saturday night roll."},
-    {"id": "dice.wild", "slot": "dice", "name": "Critical Hit", "rarity": "mythic", "set": "wild", "desc": "Every pip a tiny ball. It's super effective."},
+    {"id": "dice.wild", "slot": "dice", "name": "Critical Hit", "rarity": "mythic", "set": "wild", "desc": "Scans every roll. Still no idea what's in the tall grass."},
+    {"id": "dice.train", "slot": "dice", "name": "Wig-Wag", "rarity": "mythic", "set": "train", "desc": "Two lamps, one rule: stop. Just as fair as every other die."},
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },
@@ -167,6 +171,7 @@
     {"id": "plate.toxic", "slot": "nameplate", "name": "Toxic", "rarity": "epic", "desc": "Glows a little. Don't lick it."},
     {"id": "plate.rosegold", "slot": "nameplate", "name": "Rose Gold", "rarity": "legendary", "desc": "Brushed, polished, a little smug."},
     {"id": "plate.wild", "slot": "nameplate", "name": "Full HP", "rarity": "mythic", "set": "wild", "desc": "A battle box with your level on it. The bar drains when it feels like it."},
+    {"id": "plate.train", "slot": "nameplate", "name": "Now Boarding", "rarity": "mythic", "set": "train", "desc": "Your name on the departures board. On time, for once."},
 
     { "id": "fx.pop", "slot": "fx", "name": "Pop", "rarity": "default", "desc": "The classic send-off." },
     { "id": "fx.fountain", "slot": "fx", "name": "Fountain", "rarity": "common", "desc": "Up, up and away." },
@@ -196,6 +201,7 @@
     {"id": "fx.anvil", "slot": "fx", "name": "Anvil", "rarity": "legendary", "desc": "Falls out of nowhere. Every single time."},
     {"id": "fx.claw", "slot": "fx", "name": "Claw Machine", "rarity": "legendary", "desc": "Rigged, obviously. It drops you once for show."},
     {"id": "fx.wild", "slot": "fx", "name": "Gotcha!", "rarity": "mythic", "set": "wild", "desc": "Shake... shake... shake... click."},
+    {"id": "fx.train", "slot": "fx", "name": "Wrong Track", "rarity": "mythic", "set": "train", "desc": "Ding, ding, ding. Should have looked both ways."},
 
     { "id": "trail.dust", "slot": "trail", "name": "Dust", "rarity": "default", "desc": "Kicks up a little something." },
     { "id": "trail.sparkle", "slot": "trail", "name": "Stardust", "rarity": "common", "desc": "Glitter in your wake." },
@@ -225,6 +231,7 @@
     {"id": "trail.carpet", "slot": "trail", "name": "Red Carpet", "rarity": "legendary", "desc": "No photos, please."},
     {"id": "trail.cash", "slot": "trail", "name": "Make It Rain", "rarity": "legendary", "desc": "Throwing it around like you mean it."},
     {"id": "trail.wild", "slot": "trail", "name": "Tall Grass", "rarity": "mythic", "set": "wild", "desc": "Something is rustling."},
+    {"id": "trail.train", "slot": "trail", "name": "Full Steam", "rarity": "mythic", "set": "train", "desc": "Chuff, chuff, chuff. Somebody is running late."},
 
     { "id": "emotes.starter", "slot": "emotes", "name": "Table Talkers", "rarity": "default", "desc": "The six faces every marble player needs.", "emotes": [
       { "key": "grin", "emoji": "😄", "hint": "Grinning" },

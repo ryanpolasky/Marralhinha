@@ -28,7 +28,7 @@ test('Wild Encounter has six mythic pieces without an entitlement requirement', 
   expect(items.every((item) => item.rarity === 'mythic' && !item.tag)).toBe(true);
 });
 
-test('capture enamel, die rails and route wind respect reduced motion on both board sizes', () => {
+test('capture enamel, die screen and route wind respect reduced motion on both board sizes', () => {
   const gradient = { addColorStop: () => {} };
   const ctx = new Proxy({ createLinearGradient: () => gradient, createRadialGradient: () => gradient }, { get: (target, key) => target[key] || (() => {}) });
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
@@ -49,7 +49,7 @@ test('capture enamel, die rails and route wind respect reduced motion on both bo
     expect(dice).toHaveLength(6);
     const dieShader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
     dice[0].onBeforeCompile(dieShader);
-    expect(dieShader.fragmentShader).toContain('float rail');
+    expect(dieShader.fragmentShader).toContain('float screen');
     animateDiceSkin(dice);
     expect(dice[0].userData.skinTime.value).toBeGreaterThan(0);
     const boards = ['classic', 'blitz'].map((variant) => boardSkin('board.wild', layoutFor(variant)));

@@ -1167,6 +1167,18 @@ test('emotes only fire from the pack a player has equipped', (t) => {
   assert.throws(() => room.react('u2', 'salt'), UserError, 'hype pack cannot borrow from the salt pack');
 });
 
+test('beta and dev spectators can fire emotes from their own pack; other spectators cannot', (t) => {
+  const { room, reactions } = startedRoom();
+  t.after(() => room.dispose());
+  room.join({ userId: 'w1', name: 'Watcher', tags: ['beta'], cosmetics: { emotes: 'emotes.hype' } });
+  room.join({ userId: 'w2', name: 'Lurker' });
+  room.react('w1', 'fire');
+  assert.deepStrictEqual(reactions.at(-1), { spectator: true, from: room.spectators.get('w1').id, name: 'Watcher', pack: 'emotes.hype', key: 'fire', t: reactions.at(-1).t });
+  assert.throws(() => room.react('w1', 'gg'), UserError, 'spectators only get emotes, not quick chat');
+  assert.throws(() => room.react('w2', 'fire'), /Only players/);
+  assert.deepStrictEqual(room.view().spectators.find((p) => p.name === 'Watcher').tags, ['beta']);
+});
+
 test('seat colours can be set in lobby or mid-game with unrestricted hexes and reset', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());

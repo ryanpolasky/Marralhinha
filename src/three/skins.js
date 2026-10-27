@@ -208,6 +208,47 @@ const GALAXY_PHASES = [
   { bg: '#02130c', accent: '#1fd491', deep: '#0a5c3d', star: '#c9ffe4', motif: 'band' },
 ];
 
+function railMarble(c, seat, key, params, color, emissive) {
+  const uniforms = { uTime: { value: 0 }, uMain: { value: new THREE.Color(c.main) }, uDark: { value: new THREE.Color(c.dark) }, uLight: { value: new THREE.Color(c.light) } };
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  return {
+    ...params,
+    customProgramCacheKey: () => key,
+    onBeforeCompile: (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRailPos = normalize(position);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;\nuniform float uTime;\nuniform vec3 uMain;\nuniform vec3 uDark;\nuniform vec3 uLight;')
+        .replace('#include <color_fragment>', `#include <color_fragment>\nvec3 p = vRailPos;\n${color}`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${emissive}`);
+    },
+    animate: (m, t) => (uniforms.uTime.value = still?.matches ? 0 : t + seat * 0.9),
+  };
+}
+
+function signalMarble(c, seat) {
+  return railMarble(c, seat, 'train-signal-lamp', { roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05 }, `
+    float hood = 1.0 - smoothstep(0.15, 0.165, abs(p.z));
+    float r = acos(clamp(abs(p.z), 0.0, 1.0)) / 1.42;
+    float ring = fract(r * 4.0);
+    float lens = 1.0 - hood;
+    vec3 glass = mix(uDark, uMain, 0.55 + 0.45 * smoothstep(0.0, 0.85, ring));
+    glass = mix(glass, uLight, (1.0 - smoothstep(0.0, 0.3, r)) * 0.9);
+    float a = atan(p.y, p.x);
+    vec3 hoodCol = vec3(0.86, 0.88, 0.9);
+    float rivet = (1.0 - smoothstep(0.035, 0.05, length(vec2(fract(a * 1.9099) - 0.5, p.z * 4.0)))) * hood;
+    diffuseColor.rgb = mix(glass, hoodCol, hood);
+    diffuseColor.rgb = mix(diffuseColor.rgb, hoodCol * 0.55, rivet);
+    float railGlow = lens * (0.45 + 0.55 * smoothstep(0.0, 0.85, ring) + (1.0 - smoothstep(0.0, 0.3, r))) * (0.8 + 0.2 * sin(uTime * 1.6));
+  `, `
+    totalEmissiveRadiance += mix(uMain, uLight, 0.25) * railGlow * 0.8;
+    metalnessFactor = mix(metalnessFactor, 1.0, hood);
+    roughnessFactor = mix(roughnessFactor, 0.14, hood);
+  `);
+}
+
 const MARBLES = {
   // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
   minecraft: (c, seat) => {
@@ -599,6 +640,7 @@ const MARBLES = {
       animate: (m, t) => { time.value = motion?.matches ? 0 : t; },
     };
   },
+  train: signalMarble,
   dots: (c) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     ctx.fillStyle = c.main;
@@ -1355,11 +1397,13 @@ const DICE = {
   sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
-  wild: { bg: 'wild', pip: '#ed493d', one: '#ed493d', roughness: 0.26, metalness: 0.25, clearcoat: 1 },
+  wild: { bg: 'scanner', pip: '#16201c', one: '#16201c', roughness: 0.35, clearcoat: 0.8 },
+  train: { bg: 'crossing', pip: '#4a0c09', one: '#4a0c09', roughness: 0.35, clearcoat: 0.6 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
+const SCANNER_LEDS = [['#7a1010', 85, 0.19], ['#7a6a10', 170, 0.25], ['#1a6a20', 255, 0.31]];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 
 const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
@@ -1477,6 +1521,19 @@ function dieBackground(ctx, style, size, value) {
     }
   } else if (style === 'minecraft') {
     workbenchFace(ctx, size, value);
+    const p = size / 32;
+    ctx.fillStyle = '#c99d5e';
+    ctx.fillRect(p * 2, p * 2, size - p * 4, p * 0.6);
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+      const x = (2 + col * 10) * p;
+      const y = (2 + row * 10) * p;
+      ctx.fillStyle = '#3e2810';
+      ctx.fillRect(x, y, p * 8, p);
+      ctx.fillRect(x, y, p, p * 8);
+      ctx.fillStyle = '#dcb676';
+      ctx.fillRect(x + p, y + p * 7, p * 7, p);
+      ctx.fillRect(x + p * 7, y + p, p, p * 7);
+    }
   } else if (style === 'arcade') {
     const px = size / 32;
     for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
@@ -1643,23 +1700,41 @@ function dieBackground(ctx, style, size, value) {
         ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
       }
     }
-  } else if (style === 'wild') {
-    const enamel = ctx.createLinearGradient(0, 0, size, size);
-    enamel.addColorStop(0, '#243d3c');
-    enamel.addColorStop(0.5, '#112625');
-    enamel.addColorStop(1, '#091a1c');
-    ctx.fillStyle = enamel;
+  } else if (style === 'crossing') {
+    ctx.fillStyle = '#17191b';
     ctx.fillRect(0, 0, size, size);
-    ctx.strokeStyle = '#c9a86c';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(16, 16, size - 32, size - 32);
-    ctx.strokeStyle = '#47635b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(23, 23, size - 46, size - 46);
-    ctx.fillStyle = '#d9be80';
-    [[32, 32], [size - 32, 32], [32, size - 32], [size - 32, size - 32]].forEach(([x, y]) => {
+    ctx.strokeStyle = '#ece8dc';
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.strokeStyle = '#c8352c';
+    ctx.setLineDash([18, 18]);
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.setLineDash([]);
+  } else if (style === 'scanner') {
+    const shell = ctx.createLinearGradient(0, 0, size, size);
+    shell.addColorStop(0, '#e8313f');
+    shell.addColorStop(1, '#a01020');
+    ctx.fillStyle = shell;
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#ececea';
+    ctx.fillRect(size * 0.15, size * 0.15, size * 0.72, size * 0.72);
+    ctx.fillStyle = '#1b1b1d';
+    ctx.fillRect(size * 0.16, size * 0.16, size * 0.7, size * 0.7);
+    ctx.fillStyle = '#93b3a3';
+    ctx.fillRect(size * 0.17, size * 0.17, size * 0.68, size * 0.68);
+    ctx.fillStyle = '#f4f4f2';
+    ctx.beginPath();
+    ctx.arc(size * 0.075, size * 0.075, size * 0.055, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#2a7fd4';
+    ctx.beginPath();
+    ctx.arc(size * 0.075, size * 0.075, size * 0.04, 0, TAU);
+    ctx.fill();
+    SCANNER_LEDS.forEach(([c, , x]) => {
+      ctx.fillStyle = c;
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0, TAU);
+      ctx.arc(size * x, size * 0.07, size * 0.018, 0, TAU);
       ctx.fill();
     });
   } else if (style === 'galaxy') {
@@ -1724,31 +1799,42 @@ function fuzzyPips(ctx, value, size, color) {
   });
 }
 
-function ballPips(ctx, value, size, color) {
-  const r = value === 1 ? 34 : 24;
+function visorPips(ctx, value, size, color) {
+  const r = value === 1 ? 26 : 18;
   PIPS[value].forEach(([x, y]) => {
     const cx = x * size;
     const cy = y * size;
+    ctx.fillStyle = '#050506';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 7, 0, TAU);
+    ctx.fill();
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, Math.PI, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI);
-    ctx.fill();
-    ctx.strokeStyle = '#1a1a1e';
-    ctx.lineWidth = r * 0.16;
-    ctx.beginPath();
     ctx.arc(cx, cy, r, 0, TAU);
-    ctx.moveTo(cx - r, cy);
-    ctx.lineTo(cx + r, cy);
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.3, 0, TAU);
     ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, r * 0.25, 0, TAU);
+    ctx.fill();
+  });
+}
+
+function scannerMask(ctx, value, size) {
+  ctx.fillStyle = 'rgb(255,0,0)';
+  PIPS[value].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
+    ctx.fill();
+  });
+  ctx.fillStyle = 'rgb(0,255,0)';
+  ctx.beginPath();
+  ctx.arc(size * 0.075, size * 0.075, size * 0.04, 0, TAU);
+  ctx.fill();
+  SCANNER_LEDS.forEach(([, b, x]) => {
+    ctx.fillStyle = `rgb(0,0,${b})`;
+    ctx.beginPath();
+    ctx.arc(size * x, size * 0.07, size * 0.018, 0, TAU);
+    ctx.fill();
   });
 }
 
@@ -1796,7 +1882,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1818,6 +1904,7 @@ export function diceSkin(itemId) {
         mctx.fillStyle = '#fff';
         if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
         else if (key === 'minecraft') gemPips(mctx, value, size, '#fff');
+        else if (key === 'wild') scannerMask(mctx, value, size);
         else PIPS[value].forEach(([x, y]) => {
           mctx.beginPath();
           mctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
@@ -1840,18 +1927,44 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'wild' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'train' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
-              float edge = max(abs(uv.x - 0.5), abs(uv.y - 0.5));
-              float rail = 1.0 - smoothstep(0.003, 0.009, abs(edge - 0.4375));
-              float sweep = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 5.0 - uSkinTime * 1.6 + uFacePhase), 18.0);
-              totalEmissiveRadiance = vec3(0.38, 0.95, 0.68) * rail * (0.12 + sweep * 0.75) * (1.0 - pip);
+              float wag = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(uSkinTime * 5.0 + uFacePhase));
+              float mid = 1.0 - step(0.12, abs(uv.x - 0.5));
+              float lit = mix(mix(1.0 - wag, wag, step(0.5, uv.x)), wag, mid);
+              float d = length(fract(uv * 4.0 + 0.5) - 0.5);
+              totalEmissiveRadiance = vec3(1.0, 0.1, 0.04) * pip * (0.05 + lit * (2.4 - d * 2.0));
+            }` : key === 'wild' ? `{
+              vec2 uv = vEmissiveMapUv;
+              vec3 mk = texture2D(emissiveMap, uv).rgb;
+              vec2 c = vec2(uv.x, 1.0 - uv.y);
+              vec2 q = abs(c - 0.51);
+              float screen = step(max(q.x, q.y), 0.34);
+              float roll = smoothstep(0.08, 0.0, abs(fract(c.y * 0.8 - uSkinTime * 0.35 + uFacePhase) - 0.5));
+              float lines = 0.75 + 0.25 * step(0.5, fract(c.y * 64.0));
+              float pulse = 0.5 + 0.5 * sin(uSkinTime * 2.6 + uFacePhase);
+              float idx = floor(mk.b * 3.0 + 0.5);
+              float on = step(abs(mod(floor(uSkinTime * 3.0 + uFacePhase * 2.0), 3.0) + 1.0 - idx), 0.1);
+              vec3 ledc = idx < 1.5 ? vec3(1.0, 0.12, 0.08) : idx < 2.5 ? vec3(1.0, 0.8, 0.1) : vec3(0.2, 1.0, 0.3);
+              totalEmissiveRadiance = vec3(0.55, 0.95, 0.8) * screen * (1.0 - mk.r) * lines * (0.1 + roll * 0.55)
+                + vec3(0.25, 0.65, 1.0) * mk.g * (0.6 + pulse * 2.2) + ledc * step(0.1, mk.b) * on * 2.6;
             }` : key === 'minecraft' ? `{
               vec2 uv = vEmissiveMapUv;
               float gem = texture2D(emissiveMap, uv).r;
               float glint = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 7.0 - uSkinTime * 2.2 + uFacePhase), 14.0);
-              totalEmissiveRadiance = vec3(0.55, 1.0, 0.95) * gem * (0.12 + glint * 0.9);
+              vec2 px = floor(vec2(uv.x, 1.0 - uv.y) * 32.0);
+              vec2 slot = floor((px - 2.0) / 10.0);
+              vec2 l = px - 2.0 - slot * 10.0;
+              float has = texture2D(emissiveMap, vec2((slot.x * 10.0 + 6.0) / 32.0, 1.0 - (slot.y * 10.0 + 6.0) / 32.0)).r;
+              float star = step(abs(l.x - 6.0) + abs(l.y - 1.0), 1.0);
+              float h = fract(sin(dot(slot + uFacePhase, vec2(12.9898, 78.233))) * 43758.5453);
+              float tw = pow(max(sin(uSkinTime * 1.7 + h * 6.283), 0.0), 10.0);
+              vec2 g = floor(uv * 32.0) / 32.0;
+              float s1 = fract((g.x * 0.5 + g.y) * 0.8 - uSkinTime * 0.3 + uFacePhase * 0.37);
+              float s2 = fract((g.y * 0.5 - g.x) * 0.9 - uSkinTime * 0.22 + uFacePhase * 0.53);
+              float band = smoothstep(0.0, 0.12, s1) * (1.0 - smoothstep(0.12, 0.38, s1)) + 0.6 * smoothstep(0.0, 0.1, s2) * (1.0 - smoothstep(0.1, 0.3, s2));
+              totalEmissiveRadiance = vec3(0.55, 1.0, 0.95) * gem * (0.12 + glint * 0.9 + tw * 0.5) + vec3(1.0) * star * has * tw * 2.5 + vec3(0.5, 0.22, 1.0) * band * 0.45;
             }` : key === 'defuse' ? `{
               vec3 lcd = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               float cyc = mod(uSkinTime + uFacePhase * 3.0, 6.0);
@@ -2086,90 +2199,157 @@ function cardboardCanvas(layout) {
   return canvas;
 }
 
-function notebookCanvas(layout) {
-  const { canvas, ctx, S, W, L, toWorld, label, mid, room } = boardSpace(layout);
-  const rand = seeded(57);
-  ctx.fillStyle = '#fbf8f0';
-  ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 5000; i++) {
-    ctx.fillStyle = `rgba(140,120,85,${rand() * 0.06})`;
-    ctx.fillRect(rand() * S, rand() * S, 1 + rand() * 2, 1 + rand() * 2);
+const GLASS_JEWELS = ['#1d3f8f', '#8e1b2c', '#1f6b4a', '#c98a1a', '#4b2a7a', '#16607a'];
+const glassRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+function leadedGlass(S, k, seeds, extent) {
+  const [base, bctx] = makeCanvas(S, S);
+  const [glow, gctx] = makeCanvas(S, S);
+  const C = S / 2;
+  const cells = new Map();
+  const key = (i, j) => `${i},${j}`;
+  seeds.forEach((s) => {
+    const id = key(Math.floor(s.x), Math.floor(s.y));
+    if (!cells.has(id)) cells.set(id, []);
+    cells.get(id).push(s);
+  });
+  const near = (x, y) => {
+    let a = null;
+    let b = null;
+    let da = Infinity;
+    let db = Infinity;
+    const ci = Math.floor(x);
+    const cj = Math.floor(y);
+    for (let i = ci - 2; i <= ci + 2; i++) for (let j = cj - 2; j <= cj + 2; j++) {
+      for (const s of cells.get(key(i, j)) || []) {
+        const d = (s.x - x) ** 2 + (s.y - y) ** 2;
+        if (d < da) [b, db, a, da] = [a, da, s, d];
+        else if (d < db) [b, db] = [s, d];
+      }
+    }
+    return [a, b, da, db];
+  };
+  const bimg = bctx.createImageData(S, S);
+  const gimg = gctx.createImageData(S, S);
+  for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+    const x = (px + 0.5 - C) / k;
+    const y = (py + 0.5 - C) / k;
+    const o = (py * S + px) * 4;
+    bimg.data[o + 3] = gimg.data[o + 3] = 255;
+    if (Math.abs(x) > extent || Math.abs(y) > extent) continue;
+    const [a, b, da, db] = near(x, y);
+    if (!a) continue;
+    const edge = b ? (db - da) / (2 * Math.hypot(b.x - a.x, b.y - a.y)) : 1;
+    if (edge < 0.05) {
+      const v = 34 + 34 * (1 - edge / 0.05);
+      bimg.data.set([v, v, v + 6], o);
+      continue;
+    }
+    const streak = 0.9 + 0.1 * Math.sin((x * Math.cos(a.a) + y * Math.sin(a.a)) * 11 + a.p);
+    const shade = (0.72 + 0.28 * Math.min(1, (edge - 0.05) / 0.22)) * streak * a.tone;
+    for (let c = 0; c < 3; c++) {
+      bimg.data[o + c] = Math.min(255, a.rgb[c] * shade * 0.42);
+      gimg.data[o + c] = Math.min(255, a.rgb[c] * shade * a.glow);
+    }
   }
-  toWorld();
-  ctx.fillStyle = 'rgba(86,146,210,0.6)';
-  for (let z = -L + 0.3; z < L; z += 0.45) ctx.fillRect(-L, z, 2 * L, 0.035);
-  ctx.fillStyle = 'rgba(222,82,92,0.6)';
-  ctx.fillRect(-W + 0.18, -L, 0.035, 2 * L);
-  ctx.fillRect(-W + 0.26, -L, 0.02, 2 * L);
-  const blue = 'rgba(38,72,160,0.88)';
-  const red = 'rgba(196,46,72,0.85)';
-  const hand = (weight) => `${weight} 100px "Segoe Print", "Comic Sans MS", cursive`;
-  const ink = (color = blue, w = 0.06) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = w;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  };
-  const wob = (v) => v + (rand() - 0.5) * 0.03;
-  const scribble = (pts, passes = 2) => {
-    for (let p = 0; p < passes; p++) {
-      ctx.beginPath();
-      pts.forEach(([x, z], i) => ctx[i ? 'lineTo' : 'moveTo'](wob(x), wob(z)));
-      ctx.stroke();
-    }
-  };
-  ctx.fillStyle = 'rgba(255,232,40,0.5)';
-  ctx.fillRect(2.6, -1.58, room + 0.2, 0.34);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  softBlob(ctx, S / 2 + BOARD_R * S, S / 2 + mid * BOARD_R * S, 1.2 * BOARD_R * S, 'rgb(90,90,96)', 0.08);
-  toWorld();
-  ink('rgba(150,98,48,0.22)', 0.1);
-  scribble(circlePts(-(L - 1.5), 1, 0.62, 0.3, TAU - 0.2), 1);
-  ink('rgba(150,98,48,0.12)', 0.05);
-  scribble(circlePts(-(L - 1.52), 1.02, 0.55), 1);
-  ink();
-  layout.RING.filter((_, i) => i % 7 === 3).slice(0, 4).forEach(([r, c]) => {
-    const a = rand() * TAU;
-    scribble(circlePts(c, r, 0.5 + rand() * 0.05, a, a + TAU * 1.15), 1);
-  });
-  ink(red);
-  scribble([[-1.7, 1.05], [-1.2, 0.95], [-0.78, 0.68]], 1);
-  scribble([[-0.98, 0.62], [-0.78, 0.68], [-0.86, 0.88]], 1);
-  label('shortcut!', -1.55, 1.32, { rot: -0.25, size: 0.3, max: 1.2, font: hand(700), color: red });
-  ink();
-  label('6 = go again', -1, mid, { rot: -Math.PI / 2, size: 0.5, max: room - 0.4, font: `italic ${hand(700)}`, color: blue });
-  scribble(circlePts(1, -L + 1.6, 0.42));
-  ctx.fillStyle = blue;
-  [0.86, 1.14].forEach((x) => {
+  bctx.putImageData(bimg, 0, 0);
+  gctx.putImageData(gimg, 0, 0);
+  return [base, bctx, glow, gctx];
+}
+
+function glassSeed(x, y, color, rand, glow = 0.8) {
+  return { x, y, rgb: glassRgb(color), tone: 0.86 + rand() * 0.22, a: rand() * Math.PI, p: rand() * TAU, glow };
+}
+
+function leadRing(ctxs, x, y, r, width) {
+  ctxs.forEach((ctx, i) => {
+    ctx.strokeStyle = i ? '#000' : '#3a3a40';
+    ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.arc(x, -L + 1.5, 0.045, 0, TAU);
-    ctx.fill();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.stroke();
   });
-  scribble(circlePts(1, -L + 1.58, 0.22, 0.4, Math.PI - 0.4), 1);
-  label('gg ez', 1, -mid + 0.7, { rot: Math.PI / 2, size: 0.52, max: room - 1.4, font: `italic ${hand(700)}`, color: blue });
-  ink(red);
-  scribble(Array.from({ length: 17 }, (_, i) => {
-    const t = (i / 16) * TAU;
-    return [mid + 0.38 * Math.sin(t) ** 3, 1 - (0.38 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))) / 16];
-  }));
-  ink('rgba(60,60,66,0.7)', 0.035);
-  const g = 0.3;
-  const tx = -mid;
-  [-0.5, 0.5].forEach((o) => {
-    scribble([[tx - g * 1.5, -1 + g * o], [tx + g * 1.5, -1 + g * o]], 1);
-    scribble([[tx + g * o, -1 - g * 1.5], [tx + g * o, -1 + g * 1.5]], 1);
+}
+
+function glassCanvases(layout) {
+  const S = 1024;
+  const k = BOARD_R * S;
+  const rand = seeded(131);
+  const { halfWidth: W, halfLength: L, arm } = layout.spec;
+  const owner = (x, y) => (Math.abs(y) > Math.abs(x) ? (y > 0 ? 0 : 2) : x > 0 ? 1 : 3);
+  const jewel = (x, y) => {
+    const seat = SEAT_COLORS[owner(x, y)];
+    const roll = rand();
+    return roll < 0.3 ? seat.main : roll < 0.45 ? seat.dark : GLASS_JEWELS[Math.floor(rand() * GLASS_JEWELS.length)];
+  };
+  const holes = [
+    ...layout.RING.map(([r, c], i) => glassSeed(c, r, i % 2 ? '#f2d58a' : '#e8c477', rand, 0.62)),
+    ...layout.HOME.flatMap((rows, seat) => rows.map(([r, c]) => glassSeed(c, r, SEAT_COLORS[seat].main, rand, 0.95))),
+  ];
+  const rose = [glassSeed(0, 0, '#f0bd3c', rand, 1)];
+  for (let i = 0; i < 8; i++) {
+    const t = (i / 8) * TAU + TAU / 16;
+    rose.push(glassSeed(Math.cos(t) * 0.95, Math.sin(t) * 0.95, i % 2 ? '#b0202e' : '#e09a1a', rand, 1));
+  }
+  for (let i = 0; i < 12; i++) {
+    const t = (i / 12) * TAU;
+    rose.push(glassSeed(Math.cos(t) * 1.75, Math.sin(t) * 1.75, i % 2 ? '#2450b8' : '#5a2f99', rand, 0.95));
+  }
+  const fixed = [...holes, ...rose];
+  const filler = [];
+  const step = 0.9;
+  for (let y = -L - 1; y <= L + 1; y += step) for (let x = -L - 1; x <= L + 1; x += step) {
+    const px = x + (rand() - 0.5) * step * 0.8;
+    const py = y + (rand() - 0.5) * step * 0.8;
+    if (fixed.some((s) => Math.hypot(s.x - px, s.y - py) < 0.66)) continue;
+    filler.push(glassSeed(px, py, jewel(px, py), rand, 0.9));
+  }
+  const [base, bctx, glow, gctx] = leadedGlass(S, k, [...fixed, ...filler], L + 1);
+  const ctxs = [bctx, gctx];
+  ctxs.forEach((ctx) => ctx.setTransform(k, 0, 0, k, S / 2, S / 2));
+  holes.forEach((s) => leadRing(ctxs, s.x, s.y, 0.42, 0.075));
+  leadRing(ctxs, 0, 0, 1.35, 0.09);
+  leadRing(ctxs, 0, 0, 2.15, 0.11);
+  ctxs.forEach((ctx, i) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.strokeStyle = i ? '#000' : '#3a3a40';
+    ctx.lineWidth = 0.22 * k;
+    ctx.lineJoin = 'round';
+    tracePath(ctx, roundedCross(W - 0.11, L - 0.11, 0.55), S, BOARD_R);
+    ctx.stroke();
   });
-  [[-1, -1, 'x'], [0, 0, 'o'], [1, 1, 'x'], [1, -1, 'o'], [-1, 1, 'x']].forEach(([i, j, m]) => {
-    const [x, z] = [tx + i * g, -1 + j * g];
-    if (m === 'o') scribble(circlePts(x, z, 0.09), 1);
-    else {
-      scribble([[x - 0.08, z - 0.08], [x + 0.08, z + 0.08]], 1);
-      scribble([[x + 0.08, z - 0.08], [x - 0.08, z + 0.08]], 1);
+  return [base, glow, arm];
+}
+
+function glassDishes(layout) {
+  const S = 512;
+  const { dishR, baseOffsets } = layout.spec;
+  const R = 0.5 / (dishR + 0.1);
+  const k = R * S;
+  return [0, 1, 2, 3].map((seat) => {
+    const rand = seeded(151 + seat);
+    const c = SEAT_COLORS[seat];
+    const holes = baseOffsets.map(([a, b]) => glassSeed(a, b, '#f2d58a', rand, 0.62));
+    const ring = [];
+    for (let i = 0; i < 16; i++) {
+      const t = (i / 16) * TAU;
+      ring.push(glassSeed(Math.cos(t) * (dishR - 0.38), Math.sin(t) * (dishR - 0.38), i % 2 ? c.main : i % 4 ? '#c98a1a' : c.dark, rand, 0.95));
     }
+    const filler = [];
+    for (let y = -dishR; y <= dishR; y += 0.7) for (let x = -dishR; x <= dishR; x += 0.7) {
+      const px = x + (rand() - 0.5) * 0.5;
+      const py = y + (rand() - 0.5) * 0.5;
+      if (Math.hypot(px, py) > dishR - 0.8 || [...holes, ...ring].some((s) => Math.hypot(s.x - px, s.y - py) < 0.55)) continue;
+      filler.push(glassSeed(px, py, rand() < 0.5 ? c.dark : GLASS_JEWELS[Math.floor(rand() * GLASS_JEWELS.length)], rand, 0.9));
+    }
+    const [base, bctx, glow, gctx] = leadedGlass(S, k, [...holes, ...ring, ...filler], dishR + 0.1);
+    const ctxs = [bctx, gctx];
+    ctxs.forEach((ctx) => ctx.setTransform(k, 0, 0, k, S / 2, S / 2));
+    holes.forEach((s) => leadRing(ctxs, s.x, s.y, 0.42, 0.075));
+    leadRing(ctxs, 0, 0, dishR - 0.75, 0.09);
+    leadRing(ctxs, 0, 0, dishR - 0.06, 0.16);
+    return [base, glow, R];
   });
-  scribble([[tx - g * 1.4, -1 - g * 1.4], [tx + g * 1.4, -1 + g * 1.4]], 1);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  return canvas;
 }
 
 function terrazzoCanvas() {
@@ -5164,7 +5344,16 @@ const SPECIAL_BOARDS = {
     return { canvas: base, glowCanvas: glow, repeat: 0.06, roughness: 0.35, dish: '#1a0f33', felt: '#07061a', cup: '#05030c', accent: { color: '#2fe6ff', emissive: '#2fe6ff', emissiveIntensity: 1.4, roughness: 0.3 } };
   },
   cardboard: (layout) => ({ canvas: cardboardCanvas(layout), repeat: BOARD_R, roughness: 0.92, dish: '#b38a55', felt: '#5b4128', cup: '#4a3320', side: '#a37b48', accent: { color: '#d4b07a', metalness: 0, roughness: 0.85 } }),
-  notebook: (layout) => ({ canvas: notebookCanvas(layout), repeat: BOARD_R, roughness: 0.82, dish: '#f3efe4', felt: '#4d5a6e', cup: '#22304d', side: '#ece6d6', accent: { color: '#c3c7cf', metalness: 1, roughness: 0.28 } }),
+  glass: (layout) => {
+    const [base, glow] = glassCanvases(layout);
+    const dishes = glassDishes(layout);
+    return {
+      canvas: base, glowCanvas: glow, glowIntensity: 0.9, repeat: BOARD_R, roughness: 0.22, clearcoat: 0.4, params: { specularIntensity: 0.25, clearcoatRoughness: 0.3 },
+      dishCanvases: dishes.map((d) => d[0]), dishGlowCanvases: dishes.map((d) => d[1]), dishRepeat: dishes[0][2],
+      dish: '#2a2a30', felt: '#20242c', cup: '#141418', side: '#2a2a30',
+      accent: { color: '#8a8d93', metalness: 0.9, roughness: 0.35 },
+    };
+  },
   cork: () => ({ canvas: corkCanvas(), repeat: 0.08, roughness: 0.85, dish: '#a8834f', felt: '#2b4a3a', cup: '#4a3418' }),
   slate: () => ({ canvas: stoneCanvas({ base: '#3a3f47', vein: '#7d8794', count: 12, seed: 33, dots: 300 }), repeat: 0.06, roughness: 0.9, dish: '#2e333a', felt: '#1f2a24', cup: '#15181c', accent: { color: '#e8edf2', metalness: 0.2, roughness: 0.6 } }),
   terrazzo: () => ({ canvas: terrazzoCanvas(), repeat: 0.07, roughness: 0.48, clearcoat: 0.16, dish: '#2b2e32', felt: '#2b3a44', cup: '#141618', accent: { color: '#d9d4ca', metalness: 0.3, roughness: 0.4 } }),
@@ -5253,6 +5442,11 @@ const SPECIAL_BOARDS = {
     accent: { color: '#e5c985', metalness: 0.65, roughness: 0.35 },
     shader: ROUTE_SHADER,
   }),
+  train: () => ({
+    canvas: makeWoodCanvas({ base: '#8c6a48', grain: '60,38,22', seed: 53 }), repeat: 0.055, roughness: 0.7,
+    dish: '#6e5136', felt: '#3a3631', cup: '#2a1d12', noTable: true,
+    accent: { color: '#9aa0a6', metalness: 0.9, roughness: 0.35 },
+  }),
   picnic: (layout) => ({
     canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
     dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
@@ -5262,7 +5456,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'notebook']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'glass']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };
@@ -5338,6 +5532,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
+      noTable: !!spec.noTable,
     };
     // Cups take the planks straight down in board space, so the deck runs on into each divot and darkens with depth
     if (spec.cupMap) {
