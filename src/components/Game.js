@@ -365,7 +365,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
       <div className="chip-body">
         <div className="chip-name">
           <Marquee className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</Marquee>
-          <TagBadges tags={player?.tags} small />
+          <TagBadges tags={player?.tags} badges={player?.badges} small />
           {player?.isBot && <span className="badge">bot</span>}
           {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
         </div>
@@ -828,7 +828,7 @@ export function Standings({ game, seats, mySeat, onPlayerStats }) {
             <span className="win-player-main">
               <span className="win-player-head">
                 <span className="win-player-name">{s === mySeat ? 'You' : p?.name || col.name}</span>
-                <TagBadges tags={p?.tags} small />
+                <TagBadges tags={p?.tags} badges={p?.badges} small />
                 {p?.isBot && <span className="badge">bot</span>}
               </span>
               {mine.length > 0 && (

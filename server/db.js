@@ -135,6 +135,7 @@ const MIGRATIONS = [
   ['users', 'granted_packs', "TEXT NOT NULL DEFAULT '[]'"],
   ['users', 'featured_tag', 'TEXT'],
   ['users', 'shorthand_tags', "TEXT NOT NULL DEFAULT '[]'"],
+  ['users', 'tag_loadout_set', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'banned_at', 'INTEGER'],
   ['users', 'ban_reason', 'TEXT'],
   ['users', 'last_ip', 'TEXT'],

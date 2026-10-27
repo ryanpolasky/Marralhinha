@@ -216,12 +216,12 @@ class Room {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
-      Object.assign(existing.player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
+      Object.assign(existing.player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, badges: info.badges, painterColor: info.painterColor });
       return existing.player;
     }
     const spectator = this.spectators.get(info.userId);
     if (spectator) {
-      Object.assign(spectator, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
+      Object.assign(spectator, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, badges: info.badges, painterColor: info.painterColor });
       return spectator;
     }
     const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
@@ -239,7 +239,7 @@ class Room {
   updateUser(info) {
     const player = this.findViewer(info.userId);
     if (!player) return;
-    Object.assign(player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
+    Object.assign(player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, badges: info.badges, painterColor: info.painterColor });
     this.changed();
   }
 
@@ -1324,12 +1324,13 @@ class Room {
         ...(effectiveColors?.[s] ? { color: effectiveColors[s] } : {}),
         level: p.level,
         tags: p.tags || [],
+        badges: p.badges || [],
       }),
       // Relative, so client clock skew doesn't matter
       turnEndsIn: this.turnDeadline ? Math.max(0, this.turnDeadline - Date.now()) : null,
       paused: this.paused,
       pauseEndsIn: this.paused ? Math.max(0, this.pausedAt + PAUSE_TTL_MS - Date.now()) : null,
-      spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected, cosmetics: p.cosmetics, tags: p.tags || [] })),
+      spectators: [...this.spectators.values()].map((p) => ({ id: p.id, name: p.name, connected: p.connected, cosmetics: p.cosmetics, tags: p.tags || [], badges: p.badges || [] })),
       swapOffers: this.swapOffers,
       rematch: this.game?.phase === 'over' ? this.rematchStatus() : null,
       chat: this.chatLog,

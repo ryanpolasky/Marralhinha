@@ -111,7 +111,7 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
           <span className="account-info">
             <span className="account-name-row">
               <span className="account-name">{account.name}</span>
-              <TagBadges tags={account.tags} small />
+              <TagBadges tags={account.tags} badges={account.badges} small />
             </span>
             <span className="xp-bar" title={`${account.into} / ${account.need} XP`}>
               <span style={{ width: `${pct}%` }} />

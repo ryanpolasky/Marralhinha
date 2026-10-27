@@ -36,6 +36,11 @@ export function saveCustomColor(hex) {
   updateSettings({ painterCustoms: [value, ...prev.filter((h) => h !== value)].slice(0, 6) });
 }
 
+export function removeCustomColor(hex) {
+  const prev = Array.isArray(settings.painterCustoms) ? settings.painterCustoms : [];
+  updateSettings({ painterCustoms: prev.filter((h) => h !== String(hex).toLowerCase()) });
+}
+
 export function onSettingsChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);

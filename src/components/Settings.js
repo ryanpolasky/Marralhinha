@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { saveCustomColor, updateSettings, useSettings } from '../game/settings';
+import { removeCustomColor, saveCustomColor, updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
 import { SEAT_COLORS } from '../game/geometry';
 import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff, DiscordMark } from './Icons';
@@ -80,7 +80,7 @@ export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
         </div>
         <div className="settings-group">
           <h3>Gameplay</h3>
-          {onPainterColor && account?.tags?.includes('painter') ? <PainterColor saved={account.painterColor} onPick={onPainterColor} /> : <FavoriteColor />}
+          {onPainterColor && (account?.tags?.includes('painter') || account?.tags?.includes('dev')) ? <PainterColor saved={account.painterColor} onPick={onPainterColor} /> : <FavoriteColor />}
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -213,6 +213,12 @@ function PainterColor({ saved, onPick }) {
                 aria-label="Custom Painter colour"
               />
             </label>
+            {hex && painterCustoms.includes(saved.toLowerCase()) && (
+              <button type="button" className="paint-chip forget" title={`Remove ${saved.toUpperCase()} from saved colours`} onClick={() => removeCustomColor(saved)}>
+                <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />
+                Forget
+              </button>
+            )}
           </div>
         </div>
       )}

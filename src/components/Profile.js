@@ -45,7 +45,7 @@ export default function Profile({ account, onClose, onLocker, onReport, onClaimL
           <span className="account-info">
             <span className="account-name-row">
               <span className="account-name">{account.name}</span>
-              <TagBadges tags={account.tags} small />
+              <TagBadges tags={account.tags} badges={account.badges} small />
             </span>
             <span className="xp-bar" title={`${account.into} / ${account.need} XP`}>
               <span style={{ width: `${Math.min(100, (account.into / account.need) * 100)}%` }} />

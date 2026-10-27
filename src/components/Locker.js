@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SLOTS, SLOT_KEYS, ITEMS, TAGS, TAG_KEYS, itemsForSlot, canUse, collectible, unobtainable, SETS } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
-import { ItemCard, PreviewStage, RarityTag, TagBadge, visibleTags, shownTags } from './Economy';
+import { ItemCard, PreviewStage, RarityTag, TagBadge, visibleTags } from './Economy';
 import { warmBoardSkin } from '../game/skinWarm';
 import { Close } from './Icons';
 
@@ -163,10 +163,8 @@ function TagsPane({ account, ownedTags, onTagLoadout }) {
   const isDev = (account.tags || []).includes('dev');
   const held = (tag) => isDev || (account.tags || []).includes(tag);
   const hidden = (tag) => isDev && tag === 'beta';
-  const featured = ownedTags[0];
-  const shown = shownTags(account.tags);
   const { main, shorthands } = account.tagLoadout || { main: null, shorthands: [] };
-  const roleOf = (tag) => (featured === tag ? 'Main' : shorthands.includes(tag) ? 'Shorthand' : tag === 'lucky' && shown.includes(tag) ? 'Always shown' : shown.includes(tag) ? 'Showing' : held(tag) ? 'Owned' : 'Locked');
+  const roleOf = (tag) => (main === tag ? 'Main' : shorthands.includes(tag) ? 'Shorthand' : tag === 'lucky' && (account.tags || []).includes(tag) ? 'Always shown' : held(tag) ? 'Owned' : 'Locked');
   const full = shorthands.length >= MAX_SHORTHANDS;
   const info = TAGS[selected];
   return (
@@ -184,10 +182,10 @@ function TagsPane({ account, ownedTags, onTagLoadout }) {
           ) : (
             held(selected) && (
               <>
-                <button className="btn primary block" disabled={main === selected} onClick={() => onTagLoadout(selected, shorthands.filter((t) => t !== selected))}>
-                  {main === selected ? 'Main tag' : 'Make main tag'}
+                <button className={`btn ${main === selected ? 'secondary' : 'primary'} block`} onClick={() => (main === selected ? onTagLoadout(null, shorthands) : onTagLoadout(selected, shorthands.filter((t) => t !== selected)))}>
+                  {main === selected ? 'Remove main tag' : 'Make main tag'}
                 </button>
-                {featured !== selected && (
+                {main !== selected && (
                   <button className="btn secondary block" disabled={full && !shorthands.includes(selected)} onClick={() => onTagLoadout(main, shorthands.includes(selected) ? shorthands.filter((t) => t !== selected) : [...shorthands, selected])}>
                     {shorthands.includes(selected) ? 'Remove shorthand' : full ? `Shorthands full (${MAX_SHORTHANDS}/${MAX_SHORTHANDS})` : 'Add as shorthand'}
                   </button>
@@ -200,7 +198,7 @@ function TagsPane({ account, ownedTags, onTagLoadout }) {
       </div>
       <div className="item-grid">
         {[...TAG_KEYS].reverse().map((tag) => (
-          <button key={tag} className={`item-card tag-card${held(tag) ? '' : ' locked'}${selected === tag ? ' selected' : ''}${featured === tag ? ' equipped' : ''}`} style={{ '--rarity': TAGS[tag].color }} onClick={() => setSelected(tag)}>
+          <button key={tag} className={`item-card tag-card${held(tag) ? '' : ' locked'}${selected === tag ? ' selected' : ''}${main === tag ? ' equipped' : ''}`} style={{ '--rarity': TAGS[tag].color }} onClick={() => setSelected(tag)}>
             <TagBadge tag={tag} />
             <span className="item-name">{TAGS[tag].label}</span>
             <span className="muted tag-card-state">{roleOf(tag)}</span>

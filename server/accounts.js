@@ -88,7 +88,7 @@ class Accounts {
       rename: db.prepare('UPDATE users SET name = ? WHERE id = ?'),
       setEquipped: db.prepare('UPDATE users SET equipped = ? WHERE id = ?'),
       setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
-      setTagLoadout: db.prepare('UPDATE users SET featured_tag = ?, shorthand_tags = ? WHERE id = ?'),
+      setTagLoadout: db.prepare('UPDATE users SET featured_tag = ?, shorthand_tags = ?, tag_loadout_set = 1 WHERE id = ?'),
       setPackEntitlement: Object.fromEntries(PACKS.map((pack) => [pack, db.prepare(`UPDATE users SET ${pack}_entitlement_id = ? WHERE id = ?`)])),
       setPacks: db.prepare('UPDATE users SET granted_packs = ? WHERE id = ?'),
       setPainterColor: db.prepare('UPDATE users SET painter_color = ? WHERE id = ?'),
@@ -194,21 +194,36 @@ class Accounts {
     return this.q.inventory.all(userId).map((row) => row.item_id);
   }
 
-  tags(user) {
+  heldTags(user) {
     const stored = storableTags(parse(user.tags, []));
     const entitlements = PACKS.filter((pack) => user[`${pack}_entitlement_id`] && discord.packConfigured(pack));
-    const all = normalizeTags([...stored, ...this.grantedPacks(user), ...entitlements, ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+    return normalizeTags([...stored, ...this.grantedPacks(user), ...entitlements, ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+  }
+
+  tags(user) {
+    const all = this.heldTags(user);
     const { main, shorthands } = this.tagLoadout(user, all);
     const shown = all.includes('dev') ? normalizeTags([...all, main, ...shorthands]) : all;
     const lead = main || shown.find((t) => !shorthands.includes(t));
     return [...new Set([lead, ...shorthands, ...shown].filter(Boolean))];
   }
 
-  tagLoadout(user, held = this.tags(user)) {
+  tagLoadout(user, held = this.heldTags(user)) {
     const pick = pickableTags(held);
+    if (!user.tag_loadout_set && !user.featured_tag && parse(user.shorthand_tags, []).length === 0) {
+      const auto = held.includes('dev') ? ['dev'] : held.filter((t) => t !== 'lucky');
+      return { main: auto[0] || null, shorthands: auto.slice(1, 1 + MAX_SHORTHANDS) };
+    }
     const main = pick.includes(user.featured_tag) ? user.featured_tag : null;
     const shorthands = [...new Set(parse(user.shorthand_tags, []))].filter((t) => t !== main && pick.includes(t)).slice(0, MAX_SHORTHANDS);
     return { main, shorthands };
+  }
+
+  // What nameplates show: exactly the loadout, plus Lucky while it's held
+  badges(user) {
+    const held = this.heldTags(user);
+    const { main, shorthands } = this.tagLoadout(user, held);
+    return [...new Set([main, ...shorthands, ...(held.includes('lucky') ? ['lucky'] : [])].filter(Boolean))];
   }
 
   setTagLoadout(userId, main, shorthands) {
@@ -584,6 +599,7 @@ class Accounts {
       equipped: this.equipped(user),
       inventory: this.inventory(user.id),
       tags: this.tags(user),
+      badges: this.badges(user),
       tagLoadout: this.tagLoadout(user),
       painterColor: this.painterColor(user),
       admin: this.isAdmin(user),
@@ -642,6 +658,7 @@ class Accounts {
       equipped: this.equipped(user),
       level: levelInfo(user.xp).level,
       tags: this.tags(user),
+      badges: this.badges(user),
       stats: this.statLine(user),
       lucky: this.luckyStatus(user),
       createdAt: user.created_at,
@@ -649,7 +666,7 @@ class Accounts {
   }
 
   publicInfo(user) {
-    return { userId: user.id, name: user.name, avatar: avatarUrl(user), cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user), painterColor: this.painterColor(user) };
+    return { userId: user.id, name: user.name, avatar: avatarUrl(user), cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user), badges: this.badges(user), painterColor: this.painterColor(user) };
   }
 }
 

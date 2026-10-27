@@ -93,8 +93,8 @@ export const shownTags = (tags) => {
   return all.includes('lucky') && !head.includes('lucky') ? [...head, 'lucky'] : head;
 };
 
-export const TagBadges = ({ tags, small, full = false }) =>
-  (full ? visibleTags(tags) : shownTags(tags)).map((tag, i) => <TagBadge key={tag} tag={tag} small={small} icon={!full && i > 0} />);
+export const TagBadges = ({ tags, badges, small, full = false }) =>
+  (full ? visibleTags(tags) : badges ? visibleTags(badges) : shownTags(tags)).map((tag, i) => <TagBadge key={tag} tag={tag} small={small} icon={!full && i > 0} />);
 
 export function EmoteGlyph({ emote }) {
   if (!emote) return null;
