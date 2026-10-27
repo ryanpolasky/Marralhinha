@@ -146,7 +146,7 @@ function PackItems({ kind, peek }) {
           return (available - k * gap) / (k + 0.5);
         });
         const valid = candidates.filter((width) => width >= 72 && width <= 110);
-        const source = (valid.length ? valid : candidates).sort((a, b) => Math.abs(a - baseWidth) - Math.abs(b - baseWidth))[0];
+        const source = valid.length ? valid[valid.length - 1] : [...candidates].sort((a, b) => Math.abs(a - baseWidth) - Math.abs(b - baseWidth))[0];
         const width = Math.max(72, Math.min(110, source));
         row.style.setProperty('--pack-item-w', `${Math.round(width * 100) / 100}px`);
       }
