@@ -98,6 +98,7 @@ class Matches {
       name: u.name,
       level: levelInfo(u.xp).level,
       tags: this.accounts.tags(u),
+      badges: this.accounts.badges(u),
       wins: u.wins,
       games: u.games,
       captures: u.captures,

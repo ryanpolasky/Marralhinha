@@ -348,7 +348,7 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
                     <Nameplate plate={p.cosmetics?.nameplate} className="seat-name">
                       {p.level && <span className="level-badge small">{p.level}</span>}
                       <Marquee className="seat-name-text">{p.name}</Marquee>
-                      <TagBadges tags={p.tags} small />
+                      <TagBadges tags={p.tags} badges={p.badges} small />
                       {p.isBot && <span className="badge">bot</span>}
                       {!p.isBot && !p.connected && <span className="badge warn">away</span>}
                     </Nameplate>

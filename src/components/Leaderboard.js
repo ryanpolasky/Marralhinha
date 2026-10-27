@@ -74,7 +74,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
               <span className={`board-rank${i < 3 ? ` top${i + 1}` : ''}`}>{i + 1}</span>
               <span className="board-name">
                 {u.id === meId ? 'You' : u.name}
-                <TagBadges tags={u.tags} small />
+                <TagBadges tags={u.tags} badges={u.badges} small />
               </span>
               <span className="board-detail muted">{board[3](u)}</span>
               <b className="board-value">{board[2](u)}</b>

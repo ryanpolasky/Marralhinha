@@ -532,3 +532,26 @@ test('DEV_DISCORD_IDS bootstraps the dev tag on discord login', () => {
     else process.env.DEV_DISCORD_IDS = previous;
   }
 });
+
+test('badges auto-show held tags until the loadout is touched, then show exactly the loadout', () => {
+  const { accounts } = setup();
+  const { id } = accounts.createUser({ name: 'Ryan' });
+  accounts.setTags(id, ['dev']);
+  accounts.setPack(id, 'painter', true);
+  accounts.setPack(id, 'supporter', true);
+  const badges = () => accounts.badges(accounts.getUser(id));
+  assert.deepEqual(badges(), ['dev'], 'dev auto-shows alone');
+  accounts.setTagLoadout(id, 'dev', ['painter']);
+  assert.deepEqual(badges(), ['dev', 'painter']);
+  accounts.setTagLoadout(id, 'dev', []);
+  assert.deepEqual(badges(), ['dev']);
+  accounts.setTagLoadout(id, null, []);
+  assert.deepEqual(badges(), []);
+  assert.ok(accounts.tags(accounts.getUser(id)).includes('painter'), 'unequipping keeps ownership');
+
+  const { id: solo } = accounts.createUser({ name: 'Solo' });
+  accounts.setPack(solo, 'supporter', true);
+  assert.deepEqual(accounts.badges(accounts.getUser(solo)), ['supporter']);
+  accounts.setTagLoadout(solo, null, []);
+  assert.deepEqual(accounts.badges(accounts.getUser(solo)), []);
+});

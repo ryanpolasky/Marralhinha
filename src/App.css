@@ -11752,6 +11752,16 @@ body {
   height: 30px;
 }
 
+.paint-select-menu .paint-pop-foot {
+  flex-wrap: nowrap;
+}
+
+.paint-chip.forget {
+  color: #ff8a8a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .paint-saved {
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);

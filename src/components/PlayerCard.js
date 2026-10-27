@@ -47,7 +47,7 @@ export default function PlayerCard({ userId, hint, data, onClose }) {
               <span className="account-info">
                 <span className="account-name-row">
                   <span className="account-name">{player.name}</span>
-                  <TagBadges tags={player.tags} small />
+                  <TagBadges tags={player.tags} badges={player.badges} small />
                 </span>
               </span>
             </Nameplate>
