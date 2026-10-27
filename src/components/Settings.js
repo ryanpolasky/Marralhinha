@@ -80,8 +80,7 @@ export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
         </div>
         <div className="settings-group">
           <h3>Gameplay</h3>
-          <FavoriteColor />
-          {onPainterColor && account?.tags?.includes('painter') && <PainterColor saved={account.painterColor} onPick={onPainterColor} />}
+          {onPainterColor && account?.tags?.includes('painter') ? <PainterColor saved={account.painterColor} onPick={onPainterColor} /> : <FavoriteColor />}
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -150,13 +149,16 @@ function FavoriteColor() {
   );
 }
 
+const CLASSIC_IDS = ['red', 'blue', 'yellow', 'green'];
+
 function PainterColor({ saved, onPick }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const { painterCustoms = [] } = useSettings();
+  const { painterCustoms = [], favoriteSeat } = useSettings();
   const hex = saved?.startsWith('#');
-  const current = saved ? (hex ? rawTripletFromHex(saved) : COLOR_BY_ID[saved]) : null;
-  const on = (spec) => saved?.toLowerCase() === spec.toLowerCase();
+  const seatId = favoriteSeat === null ? null : CLASSIC_IDS[favoriteSeat];
+  const current = saved ? (hex ? rawTripletFromHex(saved) : COLOR_BY_ID[saved]) : seatId ? COLOR_BY_ID[seatId] : null;
+  const on = (spec) => (saved || seatId || '').toLowerCase() === spec.toLowerCase();
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
@@ -174,7 +176,9 @@ function PainterColor({ saved, onPick }) {
   }, [open]);
   const choose = (spec) => {
     setOpen(false);
-    if (spec === null ? saved : !on(spec)) onPick(spec);
+    const seat = CLASSIC_IDS.indexOf(spec);
+    updateSettings({ favoriteSeat: seat < 0 ? null : seat });
+    if (spec === null ? saved : saved?.toLowerCase() !== spec.toLowerCase()) onPick(spec);
   };
   const swatch = (spec, sw, label) => (
     <button key={spec} type="button" role="radio" aria-checked={on(spec)} className={`seat-swatch${on(spec) ? ' on' : ''}`} style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }} title={label} aria-label={label} onClick={() => choose(spec)} />
@@ -182,20 +186,20 @@ function PainterColor({ saved, onPick }) {
   return (
     <div className="setting painter-color" ref={ref}>
       <div className="setting-head">
-        <span className="setting-label">Painter colour</span>
+        <span className="setting-label">Favourite colour</span>
         <button type="button" className="paint-select" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {current && <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />}
-          {current ? (hex ? saved.toUpperCase() : current.name) : 'Seat colour'}
+          {current ? (hex ? saved.toUpperCase() : current.name) : 'Any'}
           <span className="paint-select-caret" aria-hidden="true" />
         </button>
       </div>
       {open && (
-        <div className="paint-select-menu" role="radiogroup" aria-label="Painter colour">
+        <div className="paint-select-menu" role="radiogroup" aria-label="Favourite colour">
           <div className="paint-grid">{COLOR_PALETTE.map((sw) => swatch(sw.id, sw, sw.name))}</div>
           {painterCustoms.length > 0 && <div className="paint-grid paint-saved">{painterCustoms.map((h) => swatch(h, rawTripletFromHex(h), `Saved ${h.toUpperCase()}`))}</div>}
           <div className="paint-pop-foot">
-            <button type="button" className="paint-chip" disabled={!saved} onClick={() => choose(null)}>
-              Seat colour
+            <button type="button" className={`paint-chip${current ? '' : ' on'}`} disabled={!current} onClick={() => choose(null)}>
+              Any
             </button>
             <label className={`paint-chip hex${hex ? ' on' : ''}`} title="Pick any colour">
               <span className="marble-dot mini" style={hex ? { '--seat': current.main, '--seat-light': current.light } : undefined} />
