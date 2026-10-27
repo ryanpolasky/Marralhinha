@@ -9588,7 +9588,7 @@ textarea.report-text {
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 56px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 56px), transparent 100%);
 }
-.pack-item { flex-shrink: 0; width: var(--pack-item-w, auto); min-width: var(--pack-item-w, 96px); padding: 0; border: 0; background: none; font-family: inherit; line-height: inherit; cursor: default; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; overflow: hidden; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; overflow-wrap: anywhere; }
+.pack-item { flex-shrink: 0; width: var(--pack-item-w, auto); min-width: var(--pack-item-w, 96px); padding: 0; border: 0; background: none; font-family: inherit; line-height: inherit; cursor: default; display: grid; grid-template-rows: 64px auto auto; justify-items: center; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #ffe2b8; text-align: center; overflow-wrap: anywhere; }
 .pack-item small { color: #c9a8ea; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
 .pack-sheet.sp .pack-item { color: #d6fff3; }
 .pack-sheet.sp .pack-item small { color: #9fd9cb; }
