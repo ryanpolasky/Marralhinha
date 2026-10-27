@@ -110,8 +110,63 @@ function PeekPop({ peek, children }) {
 }
 
 function PackItems({ kind, peek }) {
+  const rowRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+
+    const updateFades = () => {
+      const maxScroll = row.scrollWidth - row.clientWidth;
+      if (maxScroll <= 2) {
+        delete row.dataset.fadeL;
+        delete row.dataset.fadeR;
+        return;
+      }
+      if (row.scrollLeft > 2) row.dataset.fadeL = '';
+      else delete row.dataset.fadeL;
+      if (row.scrollLeft < maxScroll - 2) row.dataset.fadeR = '';
+      else delete row.dataset.fadeR;
+    };
+
+    const measure = () => {
+      const style = getComputedStyle(row);
+      const paddingLeft = parseFloat(style.paddingLeft) || 0;
+      const paddingRight = parseFloat(style.paddingRight) || 0;
+      const gap = parseFloat(style.columnGap) || 0;
+      const count = row.children.length;
+      const available = row.clientWidth - paddingLeft;
+      const baseWidth = 96;
+      const fits = count * baseWidth + (count - 1) * gap <= available - paddingRight;
+      if (fits) {
+        row.style.removeProperty('--pack-item-w');
+      } else {
+        const candidates = Array.from({ length: Math.max(1, count - 1) }, (_, i) => {
+          const k = i + 1;
+          return (available - k * gap) / (k + 0.5);
+        });
+        const valid = candidates.filter((width) => width >= 72 && width <= 110);
+        const source = (valid.length ? valid : candidates).sort((a, b) => Math.abs(a - baseWidth) - Math.abs(b - baseWidth))[0];
+        const width = Math.max(72, Math.min(110, source));
+        row.style.setProperty('--pack-item-w', `${Math.round(width * 100) / 100}px`);
+      }
+      updateFades();
+    };
+
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(row);
+    row.addEventListener('scroll', updateFades, { passive: true });
+    window.addEventListener('resize', measure);
+    measure();
+    return () => {
+      observer?.disconnect();
+      row.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
   return (
-    <div className="pack-items">
+    <div ref={rowRef} className="pack-items">
       {PACK_SLOTS.map((slot) => {
         const item = ITEMS[`${slot}.${kind}`];
         return (
