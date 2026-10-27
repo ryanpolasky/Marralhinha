@@ -11022,49 +11022,6 @@ body {
 .painter-price { margin-left: auto; color: #ddcfff; font-weight: 700; }
 .painter-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px 0 10px; }
 .painter-owned { color: #dccbff; font-weight: 700; }
-.table-palette-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.palette-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px 5px 7px;
-  border-radius: 99px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.palette-chip:hover {
-  background: rgba(255, 255, 255, 0.11);
-}
-
-.palette-chip.on {
-  border-color: var(--gold);
-  background: rgba(246, 195, 67, 0.16);
-}
-
-.palette-chip-dots {
-  display: inline-flex;
-  gap: 2px;
-}
-
-.palette-chip-dots i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
 .dev-hex-picker {
   position: relative;
   display: flex;

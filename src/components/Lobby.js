@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import useFitPanel from './useFitPanel';
 import { SEATS, SEAT_COLORS } from '../game/geometry';
-import { COLOR_PALETTE, COLOR_BY_ID, TABLE_PALETTES, MIN_LOBBY_DIST, colorDistance } from '../game/colors';
+import { COLOR_PALETTE, MIN_LOBBY_DIST, colorDistance } from '../game/colors';
 import { useRainbow } from '../game/rainbow';
 import { TURN_SECONDS } from '../game/moves';
 import { sfx } from '../game/sound';
@@ -189,36 +189,6 @@ export function SeatColorPopover({ seat, room, anchor, owner, dev, onPick, onClo
       {note && <p className="paint-note">{note}</p>}
     </div>,
     document.body
-  );
-}
-
-export function TablePaletteBar({ colors, onSelect }) {
-  return (
-    <div className="table-palette-bar" role="group" aria-label="Table colour palettes">
-      {TABLE_PALETTES.map((pal) => {
-        const dots = pal.colors.map((id, s) => (id && COLOR_BY_ID[id]) || SEAT_COLORS[s]);
-        const active = dots.every((d, s) => (colors?.[s] || SEAT_COLORS[s]).main.toLowerCase() === d.main.toLowerCase());
-        return (
-          <button
-            key={pal.id}
-            type="button"
-            className={`palette-chip${active ? ' on' : ''}`}
-            title={`${pal.name}: ${pal.desc}`}
-            onClick={() => {
-              sfx.click();
-              onSelect(pal.id === 'classic' ? null : pal.id);
-            }}
-          >
-            <span className="palette-chip-dots">
-              {dots.map((d, s) => (
-                <i key={s} style={{ background: d.main }} />
-              ))}
-            </span>
-            <span>{pal.name}</span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -433,13 +403,6 @@ export default function Lobby({ room, playerId, isAdmin, onAction, onLeave, onRe
             );
           })}
         </div>
-
-        {isAdmin && (
-          <TablePaletteBar
-            colors={room.colors || SEAT_COLORS}
-            onSelect={(palette) => onAction('game:setColor', { palette })}
-          />
-        )}
 
         {!!room.spectators?.length && <p className="lobby-spectators">Spectating: {room.spectators.map((p) => p.name).join(', ')}</p>}
         </div>

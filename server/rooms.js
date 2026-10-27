@@ -9,7 +9,6 @@ const {
   COLOR_BY_ID,
   MIN_LOBBY_DIST,
   SEAT_COLORS,
-  TABLE_PALETTE_BY_ID,
   colorDistance,
   normalizeHex,
   nudgeColorToDistinct,
@@ -496,23 +495,9 @@ class Room {
     this.changed();
   }
 
-  // Dev-only now, host table palettes later: recolor one seat (swatch id or #hex) or all four via a table palette
-  setColor(userId, { seat, color, palette } = {}) {
+  // Dev-only (checked by the caller): recolor one seat
+  setColor(userId, { seat, color } = {}) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
-    if (palette !== undefined) {
-      if (palette === null || palette === 'classic') {
-        this.seatColors = [null, null, null, null];
-        if (this.game) rules.addLog(this.game, 'The table is back to classic colours', null);
-        this.changed();
-        return;
-      }
-      const entry = TABLE_PALETTE_BY_ID[palette];
-      if (!entry) throw new UserError('Unknown table palette');
-      this.seatColors = entry.colors.map((c) => resolveColorSpec(c));
-      if (this.game) rules.addLog(this.game, `The table is now painted in ${entry.name}`, null);
-      this.changed();
-      return;
-    }
     if (!Number.isInteger(seat) || seat < 0 || seat > 3) throw new UserError('Pick a seat');
     const resolved = resolveColorSpec(color);
     if (color !== null && color !== undefined && color !== 'classic' && !resolved) throw new UserError('Unknown colour');

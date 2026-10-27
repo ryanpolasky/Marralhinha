@@ -329,9 +329,9 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can restyle the table');
     current().setSkin(userId, { seat, slot, item: typeof item === 'string' ? item : null });
   });
-  handle('game:setColor', ({ seat, color, palette } = {}) => {
+  handle('game:setColor', ({ seat, color } = {}) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can recolor the table');
-    current().setColor(userId, { seat, color, palette });
+    current().setColor(userId, { seat, color });
   });
   handle('game:pickColor', ({ color, steal } = {}) => current().pickColor(userId, { color, steal: steal === true }));
   handle('game:shoot', (shot) => {

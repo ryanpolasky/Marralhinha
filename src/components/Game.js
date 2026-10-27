@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
 import { COLOR_PALETTE } from '../game/colors';
 import { useRainbow, useRainbowColor } from '../game/rainbow';
-import { TablePaletteBar } from './Lobby';
 import HexInput from './HexInput';
 import { coverFor, coveringTurn, handoffMs, homeCount, NO_MOVES_HOLD_MS, partnerOf, ROLL_REVEAL_MS, START_WHEEL_SPIN_MS } from '../game/moves';
 import { sfx } from '../game/sound';
@@ -633,12 +632,6 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
                 )}
                 {tab === 'dress' && !edit && (
                   <div className="troll-list">
-                    {onColor && (
-                      <TablePaletteBar
-                        colors={[0, 1, 2, 3].map(seatColor)}
-                        onSelect={(palette) => onColor({ palette })}
-                      />
-                    )}
                     {seats.map((p, s) =>
                       p ? (
                         <div className="troll-row" key={s} style={{ '--seat': seatColor(s).main }}>

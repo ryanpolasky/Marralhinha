@@ -30,16 +30,6 @@ const GOOD_LOBBY_DIST = 25;
 
 const RAINBOW = { id: 'rainbow', name: 'Rainbow', main: '#e03a3e', light: '#ff8a8a', dark: '#8c1116', rainbow: true };
 
-const TABLE_PALETTES = [
-  { id: 'classic', name: 'Classic', desc: 'Red, Blue, Yellow & Green', colors: [null, null, null, null] },
-  { id: 'neon', name: 'Neon', desc: 'Orchid, Sky, Lime & Tangerine', colors: ['magenta', 'cyan', 'lime', 'orange'] },
-  { id: 'candy', name: 'Candy', desc: 'Bubblegum, Indigo, Honey & Mint', colors: ['pink', 'indigo', 'gold', 'mint'] },
-  { id: 'dusk', name: 'Dusk', desc: 'Violet, Coral, Mint & Obsidian', colors: ['violet', 'coral', 'mint', 'obsidian'] },
-  { id: 'eclipse', name: 'Eclipse', desc: 'Obsidian, Tangerine, Ghost & Indigo', colors: ['obsidian', 'orange', 'ghost', 'indigo'] },
-];
-
-const TABLE_PALETTE_BY_ID = Object.fromEntries(TABLE_PALETTES.map((p) => [p.id, p]));
-
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 function normalizeHex(hex) {
@@ -293,8 +283,6 @@ module.exports = {
   COLOR_PALETTE,
   COLOR_BY_ID,
   RAINBOW,
-  TABLE_PALETTES,
-  TABLE_PALETTE_BY_ID,
   normalizeHex,
   hexToRgb,
   rgbToHex,
