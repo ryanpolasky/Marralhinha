@@ -11594,8 +11594,9 @@ body {
     repeating-linear-gradient(90deg, #d4d8dc 0 2px, #a9aeb3 2px 4px);
 }
 .thumb-marble.skin-train {
-  background: radial-gradient(ellipse at 32% 24%, #ffffffb0, transparent 30%), linear-gradient(90deg, transparent 0 18%, #eef0f2 18% 23%, #7d838a 23% 27%, transparent 27%),
-    repeating-radial-gradient(circle at 62% 50%, var(--seat) 0 5px, rgba(255, 255, 255, 0.35) 5px 6px), var(--seat);
+  background: radial-gradient(ellipse at 36% 26%, #ffffff90, transparent 32%),
+    repeating-radial-gradient(circle at 50% 52%, var(--seat) 0 5px, rgba(255, 255, 255, 0.3) 5px 6px),
+    linear-gradient(90deg, transparent 0 9%, #eef0f2 9% 14%, #565d64 14% 17%, transparent 17%), var(--seat);
 }
 .thumb-dice.skin-train {
   --face: #17191b;
