@@ -10,7 +10,7 @@ import { SolCorona } from './Corona';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
-import { ANVIL, BALL, ballRock } from './Props';
+import { ANVIL, BALL, TRAIN, ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
@@ -113,6 +113,16 @@ export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(s
       { to: flat.clone(), dur: ANVIL.hold + ANVIL.lift - 0.06, height: 0, scale: squash, quiet: true },
       { to: spot.clone(), dur: 0.22, height: 0.6, scale: [1, 1, 1], quiet: true },
       { to: home, dur: 0.9, height: 3.4, final: true },
+    ];
+  }
+  if (kind === 'train') {
+    const flat = spot.clone().setY(0.1);
+    const squash = [1.5, 0.2, 1.5];
+    return [
+      { to: spot.clone(), dur: TRAIN.wait + TRAIN.run / 2, height: 0, quiet: true, ...start },
+      { to: flat, dur: 0.05, height: 0, scale: squash, quiet: true },
+      { to: flat.clone(), dur: 0.6, height: 0, scale: squash, quiet: true },
+      { to: home, dur: 0.9, height: 3.4, scale: [1, 1, 1], final: true },
     ];
   }
   if (kind === 'claw') {

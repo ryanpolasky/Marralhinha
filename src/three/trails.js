@@ -226,6 +226,10 @@ const TRAILS = {
     if (n % 3 === 0) emit('spr', { position: p, tile: TILE.star, c: ['#ffe38a', '#ffffff'], size: 0.3, size2: 0.02, life: 0.5, up: 0.4, flick: 20 });
   },
 
+  train: (emit, p, { n }) => {
+    emit('spr', { position: [p[0], p[1] + 0.25, p[2]], n: n % 2 ? 1 : 2, tile: TILE.smoke, c: ['#ffffff', '#eeeeec', '#dcdad6'], add: false, speed: 0.35, up: 1.1, uj: 0.4, size: n % 2 ? 0.3 : 0.5, size2: 1.3, life: 1.3, a: 0.85, drag: 1.4 });
+  },
+
   // tidy tufts part on alternating sides, and hopping onto another marble startles it
   wild: (emit, p, { n, prev, bumps = [] }) => {
     const from = prev || p;

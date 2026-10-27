@@ -3,7 +3,7 @@ import { skinKey } from '../game/catalog';
 import { fx } from './fx';
 import { videoFor } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
-import { ANVIL, BALL } from './Props';
+import { ANVIL, BALL, TRAIN } from './Props';
 
 const col = (s) => SEAT_COLORS[s];
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
@@ -413,6 +413,20 @@ const KILL_FX = {
       sfx('thud');
     });
     later((ANVIL.drop + ANVIL.hold + ANVIL.lift) * 1000 + 30, () => sfx('boing'));
+  },
+
+  // A crossing bell, a streamliner out of nowhere, and the victim left flat as a penny on the rails
+  train: (emit, { at, across = [1, 0, 0], sfx, later }) => {
+    const base = ground(at);
+    emit('train', { position: base, across });
+    sfx('crossingBell');
+    later(TRAIN.wait * 1000 - 250, () => sfx('horn'));
+    later((TRAIN.wait + TRAIN.run / 2) * 1000, () => {
+      emit('spr', { position: off(base, 0, 0.2), n: 14, tile: TILE.smoke, c: ['#e4ddd0', '#c9c0b0'], add: false, radius: 0.3, speed: 2, up: 0.4, size: 0.35, size2: 1, life: 0.8, a: 0.6, drag: 2.4 });
+      emit('spr', { position: off(base, 0, 0.15), n: 10, tile: TILE.flare, c: ['#ffe9a8', '#ffffff'], speed: 3, up: 0.6, size: 0.18, size2: 0.04, life: 0.4 });
+      emit('shake', { amount: 0.35 });
+      sfx('thud');
+    });
   },
 
   // The claw grabs, wobbles, drops the marble once for show, then grabs it for real

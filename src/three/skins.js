@@ -208,6 +208,47 @@ const GALAXY_PHASES = [
   { bg: '#02130c', accent: '#1fd491', deep: '#0a5c3d', star: '#c9ffe4', motif: 'band' },
 ];
 
+function railMarble(c, seat, key, params, color, emissive) {
+  const uniforms = { uTime: { value: 0 }, uMain: { value: new THREE.Color(c.main) }, uDark: { value: new THREE.Color(c.dark) }, uLight: { value: new THREE.Color(c.light) } };
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  return {
+    ...params,
+    customProgramCacheKey: () => key,
+    onBeforeCompile: (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRailPos = normalize(position);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRailPos;\nuniform float uTime;\nuniform vec3 uMain;\nuniform vec3 uDark;\nuniform vec3 uLight;')
+        .replace('#include <color_fragment>', `#include <color_fragment>\nvec3 p = vRailPos;\n${color}`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${emissive}`);
+    },
+    animate: (m, t) => (uniforms.uTime.value = still?.matches ? 0 : t + seat * 0.9),
+  };
+}
+
+function signalMarble(c, seat) {
+  return railMarble(c, seat, 'train-signal-lamp', { roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05 }, `
+    float hood = 1.0 - smoothstep(0.15, 0.165, abs(p.z));
+    float r = acos(clamp(abs(p.z), 0.0, 1.0)) / 1.42;
+    float ring = fract(r * 4.0);
+    float lens = 1.0 - hood;
+    vec3 glass = mix(uDark, uMain, 0.55 + 0.45 * smoothstep(0.0, 0.85, ring));
+    glass = mix(glass, uLight, (1.0 - smoothstep(0.0, 0.3, r)) * 0.9);
+    float a = atan(p.y, p.x);
+    vec3 hoodCol = vec3(0.86, 0.88, 0.9);
+    float rivet = (1.0 - smoothstep(0.035, 0.05, length(vec2(fract(a * 1.9099) - 0.5, p.z * 4.0)))) * hood;
+    diffuseColor.rgb = mix(glass, hoodCol, hood);
+    diffuseColor.rgb = mix(diffuseColor.rgb, hoodCol * 0.55, rivet);
+    float railGlow = lens * (0.45 + 0.55 * smoothstep(0.0, 0.85, ring) + (1.0 - smoothstep(0.0, 0.3, r))) * (0.8 + 0.2 * sin(uTime * 1.6));
+  `, `
+    totalEmissiveRadiance += mix(uMain, uLight, 0.25) * railGlow * 0.8;
+    metalnessFactor = mix(metalnessFactor, 1.0, hood);
+    roughnessFactor = mix(roughnessFactor, 0.14, hood);
+  `);
+}
+
 const MARBLES = {
   // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
   minecraft: (c, seat) => {
@@ -599,6 +640,7 @@ const MARBLES = {
       animate: (m, t) => { time.value = motion?.matches ? 0 : t; },
     };
   },
+  train: signalMarble,
   dots: (c) => {
     const [canvas, ctx] = makeCanvas(512, 256);
     ctx.fillStyle = c.main;
@@ -1356,11 +1398,12 @@ const DICE = {
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
   wild: { bg: 'scanner', pip: '#16201c', one: '#16201c', roughness: 0.35, clearcoat: 0.8 },
+  train: { bg: 'crossing', pip: '#4a0c09', one: '#4a0c09', roughness: 0.35, clearcoat: 0.6 },
 };
 
 const SCANNER_LEDS = [['#7a1010', 85, 0.19], ['#7a6a10', 170, 0.25], ['#1a6a20', 255, 0.31]];
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 
 const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
@@ -1657,6 +1700,17 @@ function dieBackground(ctx, style, size, value) {
         ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
       }
     }
+  } else if (style === 'crossing') {
+    ctx.fillStyle = '#17191b';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = '#ece8dc';
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.strokeStyle = '#c8352c';
+    ctx.setLineDash([18, 18]);
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.setLineDash([]);
   } else if (style === 'scanner') {
     const shell = ctx.createLinearGradient(0, 0, size, size);
     shell.addColorStop(0, '#e8313f');
@@ -1745,6 +1799,26 @@ function fuzzyPips(ctx, value, size, color) {
   });
 }
 
+function visorPips(ctx, value, size, color) {
+  const r = value === 1 ? 26 : 18;
+  PIPS[value].forEach(([x, y]) => {
+    const cx = x * size;
+    const cy = y * size;
+    ctx.fillStyle = '#050506';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 7, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, r * 0.25, 0, TAU);
+    ctx.fill();
+  });
+}
+
 function scannerMask(ctx, value, size) {
   ctx.fillStyle = 'rgb(255,0,0)';
   PIPS[value].forEach(([x, y]) => {
@@ -1808,7 +1882,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1853,7 +1927,15 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'wild' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'train' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              float wag = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(uSkinTime * 5.0 + uFacePhase));
+              float mid = 1.0 - step(0.12, abs(uv.x - 0.5));
+              float lit = mix(mix(1.0 - wag, wag, step(0.5, uv.x)), wag, mid);
+              float d = length(fract(uv * 4.0 + 0.5) - 0.5);
+              totalEmissiveRadiance = vec3(1.0, 0.1, 0.04) * pip * (0.05 + lit * (2.4 - d * 2.0));
+            }` : key === 'wild' ? `{
               vec2 uv = vEmissiveMapUv;
               vec3 mk = texture2D(emissiveMap, uv).rgb;
               vec2 c = vec2(uv.x, 1.0 - uv.y);
@@ -5360,6 +5442,11 @@ const SPECIAL_BOARDS = {
     accent: { color: '#e5c985', metalness: 0.65, roughness: 0.35 },
     shader: ROUTE_SHADER,
   }),
+  train: () => ({
+    canvas: makeWoodCanvas({ base: '#8c6a48', grain: '60,38,22', seed: 53 }), repeat: 0.055, roughness: 0.7,
+    dish: '#6e5136', felt: '#3a3631', cup: '#2a1d12', noTable: true,
+    accent: { color: '#9aa0a6', metalness: 0.9, roughness: 0.35 },
+  }),
   picnic: (layout) => ({
     canvas: picnicBoardCanvas(layout), repeat: BOARD_R, roughness: 0.5, clearcoat: 0.3,
     dishCanvas: basketCanvas(), dishRepeat: 0.5 / (layout.spec.dishR + 0.1),
@@ -5445,6 +5532,7 @@ export function boardSkin(itemId, layout = layoutFor('classic')) {
       cup: new THREE.MeshStandardMaterial({ color: spec.cup, roughness: 0.95, side: THREE.DoubleSide, ...(spec.cupGlow ? { emissive: spec.cupGlow } : {}), ...(spec.cupMap ? { map: spec.cupMap } : {}) }),
       brass: new THREE.MeshStandardMaterial({ color: '#e0b05a', metalness: 0.85, roughness: 0.28, polygonOffset: true, polygonOffsetFactor: -2, ...(spec.accent || {}) }),
       felt: spec.feltCanvas ? finish(spec.feltCanvas, 10) : makeFeltTexture(spec.felt),
+      noTable: !!spec.noTable,
     };
     // Cups take the planks straight down in board space, so the deck runs on into each divot and darkens with depth
     if (spec.cupMap) {
