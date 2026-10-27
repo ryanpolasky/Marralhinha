@@ -9531,7 +9531,11 @@ textarea.report-text {
 }
 
 @media (min-width: 640px) {
-  .pack-shelf { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pack-card { display: grid; grid-template-columns: minmax(0, 46%) 1fr; align-items: center; }
+  .pack-card-body { padding: 14px 24px; }
+  .pack-card h3 { font-size: 23px; }
+  .pack-card-price { font-size: 16px; }
+  .pack-card-blurb { margin-top: 6px; font-size: 15.5px; }
   .pack-sheet-backdrop { align-items: center; padding: 20px; }
   .pack-sheet { width: min(560px, 92vw); max-width: 560px; border-radius: 20px; padding-bottom: 18px; }
   .pack-sheet-art { display: block; }

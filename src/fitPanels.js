@@ -1,6 +1,6 @@
 const PANELS = '.screen > .panel, .modal-backdrop > .modal';
 const SHORT_LANDSCAPE = '(orientation: landscape) and (max-height: 540px)';
-const MIN_ZOOM = 0.3;
+const MIN_ZOOM = 0.28;
 
 // Rotated phones shrink menus to fit the screen instead of scrolling them
 export function startPanelFit() {
