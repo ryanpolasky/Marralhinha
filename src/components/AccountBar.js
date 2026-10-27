@@ -82,7 +82,7 @@ function OverflowMenu({ items, alert }) {
   );
 }
 
-export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin, onBoards, onReport, onMail }) {
+export default function AccountBar({ account, discordEnabled, onShop, onLocker, onProfile, onDaily, onDiscord, onSignOut, onAdmin, onBoards, onReport, onMail, onPainterColor }) {
   const ref = useRef(null);
   useBarHeight(ref);
   const daily = account?.daily;
@@ -143,7 +143,7 @@ export default function AccountBar({ account, discordEnabled, onShop, onLocker, 
             {it.count > 0 && <span className="mail-count">{it.count}</span>}
           </button>
         ))}
-        <SettingsButton className="bar-btn settings-btn" onReport={onReport} />
+        <SettingsButton className="bar-btn settings-btn" onReport={onReport} account={account} onPainterColor={onPainterColor} />
       </div>
     </div>
   );

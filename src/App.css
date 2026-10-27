@@ -11689,3 +11689,12 @@ body {
 }
 
 .pack-card-art .halloween-ribbon { display: none; }
+
+.painter-color .paint-grid {
+  margin: 8px 0;
+}
+
+.admin-painter-color {
+  align-items: center;
+  gap: 8px;
+}

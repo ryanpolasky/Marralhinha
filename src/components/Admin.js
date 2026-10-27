@@ -8,6 +8,7 @@ import { ask } from './Dialog';
 import { giftLabel, KIND_LABEL, PACK_LABEL, StatusPill } from './Reports';
 import { SEAT_COLORS } from '../game/geometry';
 import BOARDS from '../shared/boards.json';
+import { COLOR_BY_ID, rawTripletFromHex } from '../game/colors';
 
 const ago = (t) => {
   const s = Math.max(0, (Date.now() - t) / 1000);
@@ -313,6 +314,8 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
         </div>
         <p className="muted small-text">Same tag and cosmetics as buying it. Real purchases are unaffected.</p>
       </div>
+
+      {user.painterColor && <PainterColorRow user={user} busy={busy} act={act} />}
 
       <div className="admin-section">
         <h4>{CURRENCY}</h4>
@@ -691,6 +694,25 @@ function BanList({ notify }) {
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PainterColorRow({ user, busy, act }) {
+  const hex = user.painterColor.startsWith('#');
+  const color = hex ? rawTripletFromHex(user.painterColor) : COLOR_BY_ID[user.painterColor];
+  const active = user.tags.some((t) => t === 'painter' || t === 'dev');
+  return (
+    <div className="admin-section">
+      <h4>Painter colour</h4>
+      <div className="admin-row-inline admin-painter-color">
+        <span className="marble-dot mini" style={{ '--seat': color?.main, '--seat-light': color?.light }} />
+        <span>{hex ? user.painterColor.toUpperCase() : color?.name || user.painterColor}</span>
+        {!active && <span className="muted small-text">inactive, no Painter Pack</span>}
+        <button className="btn ghost" disabled={busy} onClick={() => act('/painter-color', { color: null }, `Cleared ${user.name}'s Painter colour`)}>
+          Clear
+        </button>
       </div>
     </div>
   );

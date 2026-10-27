@@ -112,3 +112,35 @@ test('Dev-tagged players count as seated Painter owners', (t) => {
   const picked = room.pickColor('other', { color: 'violet' });
   assert.equal(picked.color.id, 'violet');
 });
+
+test('saved painter colours auto-apply and the host wins a clash with a joiner', (t) => {
+  const room = makeRoom();
+  t.after(() => room.dispose());
+  room.join({ userId: 'joiner', name: 'joiner', tags: [], cosmetics: {}, level: 1, painterColor: 'violet' });
+  room.join({ userId: 'host', name: 'host', tags: ['painter'], cosmetics: {}, level: 1, painterColor: 'violet' });
+  room.hostId = room.seats.find((p) => p?.userId === 'host').id;
+  const hostSeat = room.seats.findIndex((p) => p?.userId === 'host');
+  const joinerSeat = room.seats.findIndex((p) => p?.userId === 'joiner');
+  const colors = effectiveColors(room);
+  assert.equal(colors[hostSeat].id, 'violet');
+  assert.notEqual(colors[joinerSeat].id, 'violet');
+  assert.ok(colorDistance(colors[hostSeat].main, colors[joinerSeat].main) >= MIN_LOBBY_DIST);
+});
+
+test('an explicit pick beats a non-host saved colour, and saved colours need a seated owner', (t) => {
+  const room = makeRoom();
+  t.after(() => room.dispose());
+  room.join({ userId: 'host', name: 'host', tags: ['painter'], cosmetics: {}, level: 1 });
+  room.join({ userId: 'saver', name: 'saver', tags: [], cosmetics: {}, level: 1, painterColor: 'teal' });
+  join(room, 'picker');
+  const saverSeat = room.seats.findIndex((p) => p?.userId === 'saver');
+  assert.equal(effectiveColors(room)[saverSeat].id, 'teal');
+  const pickerSeat = room.seats.findIndex((p) => p?.userId === 'picker');
+  room.pickColor('picker', { color: 'teal' });
+  const colors = effectiveColors(room);
+  assert.equal(colors[pickerSeat].id, 'teal');
+  assert.notEqual(colors[saverSeat].id, 'teal');
+
+  room.leave('host');
+  assert.equal(room.view().colors, undefined);
+});

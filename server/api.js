@@ -231,6 +231,15 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
   );
 
   router.post(
+    '/me/painter-color',
+    auth,
+    handle((req) => {
+      accounts.setPainterColor(req.user.id, req.body?.color ?? null);
+      return { profile: changed(req.user.id) };
+    })
+  );
+
+  router.post(
     '/daily',
     auth,
     handle((req) => {
@@ -435,6 +444,17 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
     handle((req) => {
       const user = target(req);
       accounts.setPack(user.id, String(req.body?.pack || ''), !!req.body?.granted);
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/painter-color',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.setPainterColor(user.id, req.body?.color ?? null, { admin: true });
       return adminResult(user);
     })
   );

@@ -6,6 +6,8 @@ import { SEAT_COLORS } from '../game/geometry';
 import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff, DiscordMark } from './Icons';
 import { DISCORD_INVITE, ExternalLink } from './About';
 import { IS_ACTIVITY } from '../net/config';
+import { COLOR_BY_ID, COLOR_PALETTE, rawTripletFromHex } from '../game/colors';
+import HexInput from './HexInput';
 
 const STEP = 0.05;
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
@@ -54,7 +56,7 @@ function VolumeSlider({ label, value, onChange, onRelease, icons: [On, Off], hin
   );
 }
 
-export function SettingsModal({ onClose, onReport }) {
+export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
   const settings = useSettings();
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -79,6 +81,7 @@ export function SettingsModal({ onClose, onReport }) {
         <div className="settings-group">
           <h3>Gameplay</h3>
           <FavoriteColor />
+          {onPainterColor && account?.tags?.some((t) => t === 'painter' || t === 'dev') && <PainterColor saved={account.painterColor} onPick={onPainterColor} />}
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -147,6 +150,44 @@ function FavoriteColor() {
   );
 }
 
+function PainterColor({ saved, onPick }) {
+  const hex = saved?.startsWith('#');
+  const current = saved ? (hex ? rawTripletFromHex(saved) : COLOR_BY_ID[saved]) : null;
+  return (
+    <div className="setting painter-color">
+      <div className="setting-head">
+        <span className="setting-label">Painter colour</span>
+        <span className="setting-hint">used at Painter tables</span>
+      </div>
+      <div className="paint-grid" role="radiogroup" aria-label="Painter colour">
+        {COLOR_PALETTE.map((sw) => (
+          <button
+            key={sw.id}
+            type="button"
+            role="radio"
+            aria-checked={saved === sw.id}
+            className={`seat-swatch${saved === sw.id ? ' on' : ''}`}
+            style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }}
+            title={sw.name}
+            aria-label={sw.name}
+            onClick={() => onPick(saved === sw.id ? null : sw.id)}
+          />
+        ))}
+      </div>
+      <div className="paint-pop-foot">
+        <button type="button" className={`paint-chip${saved ? '' : ' on'}`} disabled={!saved} onClick={() => onPick(null)}>
+          Seat colour
+        </button>
+        <label className={`paint-chip hex${hex ? ' on' : ''}`} title="Pick any colour">
+          <span className="marble-dot mini" style={hex ? { '--seat': current.main, '--seat-light': current.light } : undefined} />
+          {hex ? saved.toUpperCase() : 'Custom'}
+          <HexInput value={current?.main || '#8a5cf6'} onCommit={(value) => onPick(value)} aria-label="Custom Painter colour" />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export function AutoRollToggle() {
   const { autoRoll } = useSettings();
   return (
@@ -161,7 +202,7 @@ export function AutoRollToggle() {
   );
 }
 
-export function SettingsButton({ className = 'icon-btn', label = false, onReport }) {
+export function SettingsButton({ className = 'icon-btn', label = false, onReport, account, onPainterColor }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -169,7 +210,7 @@ export function SettingsButton({ className = 'icon-btn', label = false, onReport
         <Gear />
         {label && <span>Settings</span>}
       </button>
-      {open && <SettingsModal onClose={() => setOpen(false)} onReport={onReport} />}
+      {open && <SettingsModal onClose={() => setOpen(false)} onReport={onReport} account={account} onPainterColor={onPainterColor} />}
     </>
   );
 }

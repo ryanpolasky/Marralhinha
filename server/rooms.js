@@ -152,7 +152,7 @@ class Room {
     }
 
     const filled = this.seats.flatMap((player, seat) => (player ? [seat] : []));
-    if (!this.painterOn() || !this.seats.some((player) => player?.color)) {
+    if (!this.painterOn() || !this.seats.some((player) => player?.color || player?.painterColor)) {
       return this.seatColors.some(Boolean) ? this.seatColors.slice() : undefined;
     }
 
@@ -160,8 +160,11 @@ class Room {
     const pickedSeats = filled
       .filter((seat) => !this.seatColors[seat] && this.seats[seat].color)
       .sort((a, b) => this.seats[a].pickedAt - this.seats[b].pickedAt);
-    const priorityOrder = [...devSeats, ...pickedSeats, ...filled.filter((seat) => !devSeats.includes(seat) && !pickedSeats.includes(seat))];
-    const requests = SEAT_COLORS.map((_, seat) => this.seatColors[seat] || this.seats[seat]?.color || 'classic');
+    const hostSeat = filled.find((seat) => this.seats[seat].id === this.hostId && !devSeats.includes(seat));
+    const ranked = [...devSeats, ...(hostSeat === undefined ? [] : [hostSeat]), ...pickedSeats.filter((seat) => seat !== hostSeat)];
+    const defaultSeats = filled.filter((seat) => !ranked.includes(seat) && this.seats[seat].painterColor);
+    const priorityOrder = [...ranked, ...defaultSeats, ...filled.filter((seat) => !ranked.includes(seat) && !defaultSeats.includes(seat))];
+    const requests = SEAT_COLORS.map((_, seat) => this.seatColors[seat] || this.seats[seat]?.color || this.seats[seat]?.painterColor || 'classic');
     const resolved = resolveLobbyColors(requests, { strategy: 'nudge', priorityOrder }).colors;
     const effective = SEAT_COLORS.map((_, seat) => {
       const color = this.seatColors[seat] || resolved[seat];
@@ -213,12 +216,12 @@ class Room {
     this.touch();
     const existing = this.findByUser(info.userId);
     if (existing) {
-      Object.assign(existing.player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+      Object.assign(existing.player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
       return existing.player;
     }
     const spectator = this.spectators.get(info.userId);
     if (spectator) {
-      Object.assign(spectator, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+      Object.assign(spectator, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
       return spectator;
     }
     const favourite = SEAT_ORDER.includes(prefer) && !this.seats[prefer] ? prefer : undefined;
@@ -236,7 +239,7 @@ class Room {
   updateUser(info) {
     const player = this.findViewer(info.userId);
     if (!player) return;
-    Object.assign(player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags });
+    Object.assign(player, { name: info.name, avatar: info.avatar, cosmetics: info.cosmetics, level: info.level, tags: info.tags, painterColor: info.painterColor });
     this.changed();
   }
 
@@ -539,7 +542,8 @@ class Room {
         ? [{ seat: otherSeat, player: other, color: colors[otherSeat] || SEAT_COLORS[otherSeat] }]
         : []
     ));
-    const conflicts = others.filter(({ color: otherColor }) => colorDistance(resolved.main, otherColor.main) < MIN_LOBBY_DIST);
+    const holds = ({ seat: otherSeat, player: other }) => this.seatColors[otherSeat] || other.color || other.id === this.hostId || !other.painterColor;
+    const conflicts = others.filter((o) => holds(o) && colorDistance(resolved.main, o.color.main) < MIN_LOBBY_DIST);
     if (isHex && conflicts.length) {
       const adjusted = nudgeColorToDistinct(resolved.main, others.map(({ color: otherColor }) => otherColor));
       if (adjusted.nudged) resolved = adjusted.triplet;
