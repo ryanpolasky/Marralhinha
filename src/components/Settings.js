@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { updateSettings, useSettings } from '../game/settings';
+import { saveCustomColor, updateSettings, useSettings } from '../game/settings';
 import { sfx } from '../game/sound';
 import { SEAT_COLORS } from '../game/geometry';
 import { Bug, Close, Gear, SoundOn, SoundOff, MusicNote, MusicOff, DiscordMark } from './Icons';
 import { DISCORD_INVITE, ExternalLink } from './About';
 import { IS_ACTIVITY } from '../net/config';
+import { COLOR_BY_ID, COLOR_PALETTE, rawTripletFromHex } from '../game/colors';
+import HexInput from './HexInput';
 
 const STEP = 0.05;
 const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
@@ -54,7 +56,7 @@ function VolumeSlider({ label, value, onChange, onRelease, icons: [On, Off], hin
   );
 }
 
-export function SettingsModal({ onClose, onReport }) {
+export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
   const settings = useSettings();
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -78,7 +80,7 @@ export function SettingsModal({ onClose, onReport }) {
         </div>
         <div className="settings-group">
           <h3>Gameplay</h3>
-          <FavoriteColor />
+          {onPainterColor && account?.tags?.includes('painter') ? <PainterColor saved={account.painterColor} onPick={onPainterColor} /> : <FavoriteColor />}
           <AutoRollToggle />
           <label className="switch-row" title="Show arrows other players drop on the board">
             <input type="checkbox" checked={settings.showPings} onChange={(e) => updateSettings({ showPings: e.target.checked })} />
@@ -147,6 +149,77 @@ function FavoriteColor() {
   );
 }
 
+const CLASSIC_IDS = ['red', 'blue', 'yellow', 'green'];
+
+function PainterColor({ saved, onPick }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const { painterCustoms = [], favoriteSeat } = useSettings();
+  const hex = saved?.startsWith('#');
+  const seatId = favoriteSeat === null ? null : CLASSIC_IDS[favoriteSeat];
+  const current = saved ? (hex ? rawTripletFromHex(saved) : COLOR_BY_ID[saved]) : seatId ? COLOR_BY_ID[seatId] : null;
+  const on = (spec) => (saved || seatId || '').toLowerCase() === spec.toLowerCase();
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+  const choose = (spec) => {
+    setOpen(false);
+    const seat = CLASSIC_IDS.indexOf(spec);
+    updateSettings({ favoriteSeat: seat < 0 ? null : seat });
+    if (spec === null ? saved : saved?.toLowerCase() !== spec.toLowerCase()) onPick(spec);
+  };
+  const swatch = (spec, sw, label) => (
+    <button key={spec} type="button" role="radio" aria-checked={on(spec)} className={`seat-swatch${on(spec) ? ' on' : ''}`} style={{ '--sw': sw.main, '--sw-light': sw.light, '--sw-dark': sw.dark }} title={label} aria-label={label} onClick={() => choose(spec)} />
+  );
+  return (
+    <div className="setting painter-color" ref={ref}>
+      <div className="setting-head">
+        <span className="setting-label">Favourite colour</span>
+        <button type="button" className="paint-select" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {current && <span className="marble-dot mini" style={{ '--seat': current.main, '--seat-light': current.light }} />}
+          {current ? (hex ? saved.toUpperCase() : current.name) : 'Any'}
+          <span className="paint-select-caret" aria-hidden="true" />
+        </button>
+      </div>
+      {open && (
+        <div className="paint-select-menu" role="radiogroup" aria-label="Favourite colour">
+          <div className="paint-grid">{COLOR_PALETTE.map((sw) => swatch(sw.id, sw, sw.name))}</div>
+          {painterCustoms.length > 0 && <div className="paint-grid paint-saved">{painterCustoms.map((h) => swatch(h, rawTripletFromHex(h), `Saved ${h.toUpperCase()}`))}</div>}
+          <div className="paint-pop-foot">
+            <button type="button" className={`paint-chip${current ? '' : ' on'}`} disabled={!current} onClick={() => choose(null)}>
+              Any
+            </button>
+            <label className={`paint-chip hex${hex ? ' on' : ''}`} title="Pick any colour">
+              <span className="marble-dot mini" style={hex ? { '--seat': current.main, '--seat-light': current.light } : undefined} />
+              Custom
+              <HexInput
+                value={current?.main || '#8a5cf6'}
+                onCommit={(value) => {
+                  saveCustomColor(value);
+                  choose(value.toLowerCase());
+                }}
+                aria-label="Custom Painter colour"
+              />
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AutoRollToggle() {
   const { autoRoll } = useSettings();
   return (
@@ -161,7 +234,7 @@ export function AutoRollToggle() {
   );
 }
 
-export function SettingsButton({ className = 'icon-btn', label = false, onReport }) {
+export function SettingsButton({ className = 'icon-btn', label = false, onReport, account, onPainterColor }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -169,7 +242,7 @@ export function SettingsButton({ className = 'icon-btn', label = false, onReport
         <Gear />
         {label && <span>Settings</span>}
       </button>
-      {open && <SettingsModal onClose={() => setOpen(false)} onReport={onReport} />}
+      {open && <SettingsModal onClose={() => setOpen(false)} onReport={onReport} account={account} onPainterColor={onPainterColor} />}
     </>
   );
 }

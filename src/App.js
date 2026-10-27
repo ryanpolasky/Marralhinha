@@ -407,6 +407,18 @@ const App = () => {
     [notify]
   );
 
+  const setPainterColor = useCallback(
+    async (color) => {
+      try {
+        setAccount((await post('/me/painter-color', { color })).profile);
+        sfx.pop();
+      } catch (err) {
+        notify(err.message);
+      }
+    },
+    [notify]
+  );
+
   const setTagLoadout = useCallback(
     async (main, shorthands) => {
       try {
@@ -592,6 +604,7 @@ const App = () => {
       onMail={account?.replies?.length ? () => setModal('replies') : undefined}
       onDaily={claimDaily}
       onReport={() => setModal('report')}
+      onPainterColor={setPainterColor}
       onDiscord={() => startDiscordLogin().catch((err) => notify(err.message))}
       onSignOut={async () => {
         const ok = await ask({ title: 'Sign out of Discord?', message: 'Your progress stays saved to your Discord account for next time.', confirm: 'Sign out' });

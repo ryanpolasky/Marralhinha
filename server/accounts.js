@@ -1,4 +1,5 @@
 const { randomBytes, createHash } = require('crypto');
+const { COLOR_BY_ID, normalizeHex } = require('../src/shared/colors');
 const { transaction } = require('./db');
 const discord = require('./discord');
 const { nameBlocked } = require('./namefilter');
@@ -90,6 +91,7 @@ class Accounts {
       setTagLoadout: db.prepare('UPDATE users SET featured_tag = ?, shorthand_tags = ? WHERE id = ?'),
       setPackEntitlement: Object.fromEntries(PACKS.map((pack) => [pack, db.prepare(`UPDATE users SET ${pack}_entitlement_id = ? WHERE id = ?`)])),
       setPacks: db.prepare('UPDATE users SET granted_packs = ? WHERE id = ?'),
+      setPainterColor: db.prepare('UPDATE users SET painter_color = ? WHERE id = ?'),
       purchaserAccounts: db.prepare(`SELECT id, discord_id FROM users WHERE (${ENTITLEMENT_COLUMNS.map((column) => `${column} IS NOT NULL`).join(' OR ')}) AND discord_id IS NOT NULL`),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
@@ -216,6 +218,25 @@ class Accounts {
     if ((main !== null && !held.includes(main)) || list.some((t) => !held.includes(t))) throw new AccountError("You don't have that tag");
     if (list.length > MAX_SHORTHANDS) throw new AccountError(`Pick up to ${MAX_SHORTHANDS} shorthand tags`);
     this.q.setTagLoadout.run(main, JSON.stringify(list.filter((t) => t !== main)), userId);
+  }
+
+  ownsPainter(user) {
+    return this.tags(user).some((t) => t === 'painter' || t === 'dev');
+  }
+
+  painterColor(user) {
+    return user.painter_color && this.ownsPainter(user) ? user.painter_color : null;
+  }
+
+  setPainterColor(userId, color, { admin = false } = {}) {
+    const user = this.requireUser(userId);
+    if (!admin && !this.ownsPainter(user)) throw new AccountError('Saved colours come with the Painter Pack');
+    let spec = null;
+    if (color !== null && color !== undefined && color !== 'classic') {
+      spec = typeof color === 'string' && color.startsWith('#') ? normalizeHex(color) : typeof color === 'string' && Object.hasOwn(COLOR_BY_ID, color) && color !== 'rainbow' ? color : null;
+      if (!spec) throw new AccountError('Unknown colour');
+    }
+    this.q.setPainterColor.run(spec, userId);
   }
 
   grantedPacks(user) {
@@ -564,6 +585,7 @@ class Accounts {
       inventory: this.inventory(user.id),
       tags: this.tags(user),
       tagLoadout: this.tagLoadout(user),
+      painterColor: this.painterColor(user),
       admin: this.isAdmin(user),
       pity: parse(user.pity, {}),
       stats: this.statLine(user),
@@ -600,6 +622,7 @@ class Accounts {
       items: this.inventory(user.id).length,
       owned: [...new Set([...this.inventory(user.id), ...(user.golden_die_unlocked ? [LUCKY_ITEM] : [])])],
       luckyPicks: user.lucky_picks || 0,
+      painterColor: user.painter_color || null,
       stats: this.statLine(user),
       createdAt: user.created_at,
       lastSeen: user.last_seen,
@@ -626,7 +649,7 @@ class Accounts {
   }
 
   publicInfo(user) {
-    return { userId: user.id, name: user.name, avatar: avatarUrl(user), cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user) };
+    return { userId: user.id, name: user.name, avatar: avatarUrl(user), cosmetics: this.equipped(user), level: levelInfo(user.xp).level, tags: this.tags(user), painterColor: this.painterColor(user) };
   }
 }
 

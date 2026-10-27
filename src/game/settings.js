@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 const KEY = 'marralhinha:settings';
 const LEGACY_MUTE_KEY = 'marralhinha:muted';
 // favoriteSeat: 0-3 (Red, Blue, Yellow, Green) or null for no preference
-const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false, showPings: true, favoriteSeat: null, showLogs: false };
+const DEFAULTS = { sound: 0.5, music: 0.5, autoRoll: false, showPings: true, favoriteSeat: null, showLogs: false, painterCustoms: [] };
 
 function load() {
   let stored = {};
@@ -27,6 +27,13 @@ export function updateSettings(patch) {
     localStorage.setItem(KEY, JSON.stringify(settings));
   } catch {}
   listeners.forEach((fn) => fn(settings));
+}
+
+export function saveCustomColor(hex) {
+  const value = String(hex || '').toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(value)) return;
+  const prev = Array.isArray(settings.painterCustoms) ? settings.painterCustoms : [];
+  updateSettings({ painterCustoms: [value, ...prev.filter((h) => h !== value)].slice(0, 6) });
 }
 
 export function onSettingsChange(fn) {
