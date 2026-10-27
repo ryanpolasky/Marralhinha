@@ -133,7 +133,7 @@
     {"id": "dice.sugar", "slot": "dice", "name": "Sugar Cube", "rarity": "rare", "desc": "One lump or two?"},
     {"id": "dice.fuzzy", "slot": "dice", "name": "Fuzzy Dice", "rarity": "epic", "desc": "Straight off the rearview mirror."},
     {"id": "dice.disco", "slot": "dice", "name": "Disco Ball", "rarity": "legendary", "desc": "Saturday night roll."},
-    {"id": "dice.wild", "slot": "dice", "name": "Critical Hit", "rarity": "mythic", "set": "wild", "desc": "Every pip a tiny ball. It's super effective."},
+    {"id": "dice.wild", "slot": "dice", "name": "Critical Hit", "rarity": "mythic", "set": "wild", "desc": "Scans every roll. Still no idea what's in the tall grass."},
 
     { "id": "plate.basic", "slot": "nameplate", "name": "Basic", "rarity": "default", "desc": "Clean and simple." },
     { "id": "plate.sunset", "slot": "nameplate", "name": "Sunset", "rarity": "common", "desc": "Evening over Angra." },

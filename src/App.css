@@ -11556,8 +11556,9 @@ body {
   --pip: #ff4fd8;
 }
 .thumb-dice.skin-wild {
-  --face: linear-gradient(135deg, #345849, #102625);
-  --pip: #f0cf87;
+  --face: linear-gradient(#93b3a3 0 0) 50% 52% / 70% 70% no-repeat, linear-gradient(135deg, #e8313f, #a01020);
+  --pip: #16201c;
+  box-shadow: inset 0 0 0 1px #a01020;
 }
 .thumb-fx.skin-popper {
   --fx: #ff5f8f;
