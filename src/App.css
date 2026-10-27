@@ -11553,8 +11553,11 @@ body {
     repeating-radial-gradient(circle at 62% 50%, var(--seat) 0 5px, rgba(255, 255, 255, 0.35) 5px 6px), var(--seat);
 }
 .thumb-dice.skin-train {
-  --face: linear-gradient(180deg, transparent 6%, #c8352c 6% 13%, transparent 13% 87%, #c8352c 87% 94%, transparent 94%), #efe4c8;
-  --pip: #1b1712;
+  --face: #17191b;
+  --pip: #ff4a2e;
+  outline: 2px dashed #c8352c;
+  outline-offset: -5px;
+  box-shadow: inset 0 0 0 3px #ece8dc;
 }
 .thumb-fx.skin-train {
   --fx: #c9ced3;

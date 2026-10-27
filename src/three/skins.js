@@ -1398,11 +1398,11 @@ const DICE = {
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
   wild: { bg: 'wild', pip: '#ed493d', one: '#ed493d', roughness: 0.26, metalness: 0.25, clearcoat: 1 },
-  train: { bg: 'train', pip: '#1b1712', one: '#1b1712', roughness: 0.75 },
+  train: { bg: 'crossing', pip: '#4a0c09', one: '#4a0c09', roughness: 0.35, clearcoat: 0.6 },
 };
 
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 
 const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
@@ -1686,19 +1686,17 @@ function dieBackground(ctx, style, size, value) {
         ctx.fillRect(x * cell + 1.5, y * cell + 1.5, cell - 3, cell - 3);
       }
     }
-  } else if (style === 'train') {
-    ctx.fillStyle = '#efe4c8';
+  } else if (style === 'crossing') {
+    ctx.fillStyle = '#17191b';
     ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#c8352c';
-    ctx.fillRect(0, size * 0.05, size, size * 0.07);
-    ctx.fillRect(0, size * 0.88, size, size * 0.07);
-    ctx.fillStyle = '#b9ab8a';
-    for (let i = 0; i < 16; i++) {
-      ctx.beginPath();
-      ctx.arc(size * 0.045, (i + 0.5) * size / 16, 3.5, 0, TAU);
-      ctx.arc(size * 0.955, (i + 0.5) * size / 16, 3.5, 0, TAU);
-      ctx.fill();
-    }
+    ctx.strokeStyle = '#ece8dc';
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.strokeStyle = '#c8352c';
+    ctx.setLineDash([18, 18]);
+    ctx.lineWidth = 7;
+    ctx.strokeRect(15, 15, size - 30, size - 30);
+    ctx.setLineDash([]);
   } else if (style === 'wild') {
     const enamel = ctx.createLinearGradient(0, 0, size, size);
     enamel.addColorStop(0, '#243d3c');
@@ -1780,22 +1778,23 @@ function fuzzyPips(ctx, value, size, color) {
   });
 }
 
-function punchedPips(ctx, value, size, color) {
-  const r = value === 1 ? 28 : 20;
+function visorPips(ctx, value, size, color) {
+  const r = value === 1 ? 26 : 18;
   PIPS[value].forEach(([x, y]) => {
     const cx = x * size;
     const cy = y * size;
-    ctx.fillStyle = '#fbf5e4';
+    ctx.fillStyle = '#050506';
     ctx.beginPath();
-    ctx.arc(cx + 2, cy + 2, r + 2, 0, TAU);
+    ctx.arc(cx, cy, r + 7, 0, TAU);
     ctx.fill();
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = '#a8977a';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, r * 0.25, 0, TAU);
+    ctx.fill();
   });
 }
 
@@ -1871,7 +1870,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips, train: punchedPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1915,7 +1914,15 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'wild' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'train' ? `{
+              vec2 uv = vEmissiveMapUv;
+              float pip = texture2D(emissiveMap, uv).r;
+              float wag = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(uSkinTime * 5.0 + uFacePhase));
+              float mid = 1.0 - step(0.12, abs(uv.x - 0.5));
+              float lit = mix(mix(1.0 - wag, wag, step(0.5, uv.x)), wag, mid);
+              float d = length(fract(uv * 4.0 + 0.5) - 0.5);
+              totalEmissiveRadiance = vec3(1.0, 0.1, 0.04) * pip * (0.05 + lit * (2.4 - d * 2.0));
+            }` : key === 'wild' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               float edge = max(abs(uv.x - 0.5), abs(uv.y - 0.5));
