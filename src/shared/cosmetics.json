@@ -23,7 +23,8 @@
       "source": "Earned by holding this month's best single-game six rate.",
       "unlock": "Win a month as Luckiest to pick a piece of the Luckiest set. One pick per month won."
     },
-    "halloween": { "label": "Haunted", "color": "#ff9a3c", "admin": false, "auto": true, "blurb": "Sat in on the séance.", "source": "Earned by purchasing the Halloween Pack.", "unlock": "The Halloween Pack is a one-time $3.99 purchase through Discord, sold only in October. Once it's yours, it's yours for good." }
+    "halloween": { "label": "Haunted", "color": "#ff9a3c", "admin": false, "auto": true, "blurb": "Sat in on the séance.", "source": "Earned by purchasing the Halloween Pack.", "unlock": "The Halloween Pack is a one-time $3.99 purchase through Discord, sold only in October. Once it's yours, it's yours for good." },
+    "painter": { "label": "Painter", "color": "#c9adff", "admin": false, "auto": true, "blurb": "Brought the paint.", "source": "Earned by purchasing the Painter Pack.", "unlock": "The Painter Pack is a one-time $2.99 purchase through Discord. While you're seated, everyone at the table can pick their own colour, and you can use any custom hex or take a colour someone else is using." }
   },
   "slots": {
     "marble": { "label": "Marbles", "default": "marble.classic" },

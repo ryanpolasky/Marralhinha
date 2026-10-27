@@ -1,4 +1,5 @@
 const { THROWAWAY } = require('./accounts');
+const { PACKS } = require('./discord');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,7 +27,7 @@ class Analytics {
       flow: db.prepare('SELECT COALESCE(SUM(CASE WHEN delta > 0 THEN delta END), 0) AS earned, COALESCE(SUM(CASE WHEN delta < 0 THEN -delta END), 0) AS spent FROM ledger'),
       grantedSince: db.prepare('SELECT COALESCE(SUM(delta), 0) AS n FROM ledger WHERE delta > 0 AND created_at >= ?'),
       openReports: db.prepare("SELECT COUNT(*) AS n FROM reports WHERE status = 'open'"),
-      purchasers: db.prepare('SELECT SUM(supporter_entitlement_id IS NOT NULL) AS supporter, SUM(halloween_entitlement_id IS NOT NULL) AS halloween FROM users'),
+      purchasers: db.prepare(`SELECT ${Object.keys(PACKS).map((pack) => `SUM(${pack}_entitlement_id IS NOT NULL) AS ${pack}`).join(', ')} FROM users`),
       recentReal: db.prepare(`SELECT * FROM users WHERE NOT ${THROWAWAY} ORDER BY created_at DESC LIMIT 8`),
       // Organic players: played at least once, never beta or dev tagged, never shared a table with the admin
       strangerCount: db.prepare(
@@ -109,7 +110,7 @@ class Analytics {
         grantedDay: this.q.grantedSince.get(dayAgo).n,
         reasons,
       },
-      packs: { supporter: this.q.purchasers.get().supporter || 0, halloween: this.q.purchasers.get().halloween || 0 },
+      packs: Object.fromEntries(Object.keys(PACKS).map((pack) => [pack, this.q.purchasers.get()[pack] || 0])),
       reports: { open: this.q.openReports.get().n },
       recent: this.q.recentReal.all().map((u) => this.accounts.adminView(u)),
       strangers: { total: this.q.strangerCount.get(meId, meId).n, list: this.q.strangers.all(meId, meId).map((u) => this.accounts.adminView(u)) },

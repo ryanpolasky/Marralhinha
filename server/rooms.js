@@ -4,7 +4,18 @@ const { chooseMove } = require('../src/shared/bot');
 const { animationMs, START_WHEEL_SPIN_MS, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
 const { REACTION_KEYS } = require('../src/shared/reactions');
 const { STUNT_KINDS, rockyPath, rollStuntDice, nudgeStuntDice, stuntSeconds, stuntHoldMs } = require('../src/shared/stunts');
-const { SEAT_COLORS, TABLE_PALETTE_BY_ID, resolveColorSpec } = require('../src/shared/colors');
+const {
+  CLASSIC_IDS,
+  COLOR_BY_ID,
+  MIN_LOBBY_DIST,
+  SEAT_COLORS,
+  colorDistance,
+  normalizeHex,
+  nudgeColorToDistinct,
+  rawTripletFromHex,
+  resolveColorSpec,
+  resolveLobbyColors,
+} = require('../src/shared/colors');
 const { botCosmetics } = require('./economy');
 const { ITEMS, DEFAULTS } = require('./catalog');
 
@@ -120,6 +131,44 @@ class Room {
 
   requireLobby() {
     if (this.game) throw new UserError('The game has already started');
+  }
+
+  painterOwner(player) {
+    return !!player && !player.isBot && (player.tags || []).some((tag) => tag === 'painter' || tag === 'dev');
+  }
+
+  painterOn() {
+    return this.seats.some((player) => this.painterOwner(player));
+  }
+
+  paintColors() {
+    if (this.game) {
+      const frozen = this.game.colors;
+      if (!frozen && !this.seatColors.some(Boolean)) return undefined;
+      return SEAT_COLORS.map((classic, seat) => {
+        const color = this.seatColors[seat] || frozen?.[seat] || classic;
+        return this.seatColors[seat] || color.id !== CLASSIC_IDS[seat] ? color : null;
+      });
+    }
+
+    const filled = this.seats.flatMap((player, seat) => (player ? [seat] : []));
+    if (!this.painterOn() || !this.seats.some((player) => player?.color)) {
+      return this.seatColors.some(Boolean) ? this.seatColors.slice() : undefined;
+    }
+
+    const devSeats = filled.filter((seat) => this.seatColors[seat]);
+    const pickedSeats = filled
+      .filter((seat) => !this.seatColors[seat] && this.seats[seat].color)
+      .sort((a, b) => this.seats[a].pickedAt - this.seats[b].pickedAt);
+    const priorityOrder = [...devSeats, ...pickedSeats, ...filled.filter((seat) => !devSeats.includes(seat) && !pickedSeats.includes(seat))];
+    const requests = SEAT_COLORS.map((_, seat) => this.seatColors[seat] || this.seats[seat]?.color || 'classic');
+    const resolved = resolveLobbyColors(requests, { strategy: 'nudge', priorityOrder }).colors;
+    const effective = SEAT_COLORS.map((_, seat) => {
+      const color = this.seatColors[seat] || resolved[seat];
+      if (!this.seats[seat] && !this.seatColors[seat]) return null;
+      return color?.id === CLASSIC_IDS[seat] ? null : color || null;
+    });
+    return effective.some(Boolean) ? effective : undefined;
   }
 
   // Lobby and results both let people sit down or get up; only mid-game locks the seats
@@ -280,12 +329,18 @@ class Room {
   }
 
   leave(userId) {
-    if (this.spectators.delete(userId)) {
+    const spectator = this.spectators.get(userId);
+    if (spectator) {
+      spectator.color = null;
+      spectator.pickedAt = null;
+      this.spectators.delete(userId);
       this.checkWarm();
       this.changed();
       return;
     }
     const { seat, player } = this.require(userId);
+    player.color = null;
+    player.pickedAt = null;
     const diceStunt = this.liveDiceStunt();
     if (diceStunt && (diceStunt.seat === seat || diceStunt.byUserId === userId)) {
       diceStunt.cutAt = Date.now();
@@ -323,6 +378,8 @@ class Room {
   unseat(userId) {
     this.requireSeatable();
     const { seat, player } = this.require(userId);
+    player.color = null;
+    player.pickedAt = null;
     this.rematchVotes.delete(player.id);
     this.swapOffers = this.swapOffers.filter((offer) => offer.fromId !== player.id && offer.toId !== player.id);
     this.seats[seat] = null;
@@ -438,23 +495,9 @@ class Room {
     this.changed();
   }
 
-  // Dev-only now, host table palettes later: recolor one seat (swatch id or #hex) or all four via a table palette
-  setColor(userId, { seat, color, palette } = {}) {
+  // Dev-only (checked by the caller): recolor one seat
+  setColor(userId, { seat, color } = {}) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
-    if (palette !== undefined) {
-      if (palette === null || palette === 'classic') {
-        this.seatColors = [null, null, null, null];
-        if (this.game) rules.addLog(this.game, 'The table is back to classic colours', null);
-        this.changed();
-        return;
-      }
-      const entry = TABLE_PALETTE_BY_ID[palette];
-      if (!entry) throw new UserError('Unknown table palette');
-      this.seatColors = entry.colors.map((c) => resolveColorSpec(c));
-      if (this.game) rules.addLog(this.game, `The table is now painted in ${entry.name}`, null);
-      this.changed();
-      return;
-    }
     if (!Number.isInteger(seat) || seat < 0 || seat > 3) throw new UserError('Pick a seat');
     const resolved = resolveColorSpec(color);
     if (color !== null && color !== undefined && color !== 'classic' && !resolved) throw new UserError('Unknown colour');
@@ -462,6 +505,61 @@ class Room {
     const who = this.seats[seat]?.name || SEAT_COLORS[seat].name;
     if (this.game) rules.addLog(this.game, resolved ? `Dev painted ${who} ${resolved.name}` : `${who} is back to ${SEAT_COLORS[seat].name}`, null);
     this.changed();
+  }
+
+  pickColor(userId, { color, steal = false } = {}) {
+    this.requireLobby();
+    const { seat, player } = this.require(userId);
+    if (!this.painterOn()) throw new UserError('Nobody here has the Painter Pack');
+    if (color === null || color === 'classic' || color === CLASSIC_IDS[seat]) {
+      player.color = null;
+      player.pickedAt = null;
+      this.changed();
+      return { color: null, nudged: false };
+    }
+
+    let resolved;
+    let nudged = false;
+    let isHex = typeof color === 'string' && color.startsWith('#');
+    if (isHex) {
+      if (!this.painterOwner(player)) throw new UserError('Only the Painter Pack owner can use a custom colour');
+      const hex = normalizeHex(color);
+      if (!hex) throw new UserError('Unknown colour');
+      resolved = rawTripletFromHex(hex);
+    } else {
+      if (typeof color !== 'string' || !Object.hasOwn(COLOR_BY_ID, color) || color === 'rainbow') {
+        throw new UserError('Unknown colour');
+      }
+      resolved = resolveColorSpec(color);
+    }
+
+    const colors = this.paintColors() || SEAT_COLORS;
+    const others = this.seats.flatMap((other, otherSeat) => (
+      other && otherSeat !== seat
+        ? [{ seat: otherSeat, player: other, color: colors[otherSeat] || SEAT_COLORS[otherSeat] }]
+        : []
+    ));
+    const conflicts = others.filter(({ color: otherColor }) => colorDistance(resolved.main, otherColor.main) < MIN_LOBBY_DIST);
+    if (isHex && conflicts.length) {
+      const adjusted = nudgeColorToDistinct(resolved.main, others.map(({ color: otherColor }) => otherColor));
+      if (adjusted.nudged) resolved = adjusted.triplet;
+      nudged = adjusted.nudged;
+    } else if (!isHex && conflicts.length) {
+      if (!steal) {
+        const { player: other, color: otherColor } = conflicts[0];
+        throw new UserError(`Too close to ${other.name}'s ${otherColor.name}`);
+      }
+      if (!this.painterOwner(player)) throw new UserError('Only the Painter Pack owner can take a colour in use');
+      conflicts.forEach(({ player: other }) => {
+        other.color = null;
+        other.pickedAt = null;
+      });
+    }
+
+    player.color = resolved;
+    player.pickedAt = Date.now();
+    this.changed();
+    return { color: resolved, nudged };
   }
 
   // Dev-only (checked by the caller): one marble "shoots" another. Pure theatre, the marbles never actually move
@@ -722,6 +820,7 @@ class Room {
 
   // start() without the host check: a unanimous vote goes straight to the next round
   beginGame() {
+    const colors = this.paintColors();
     const humans = [0, 1, 2, 3].filter((seat) => this.seats[seat] && !this.seats[seat].isBot);
     humans.forEach((seat) => Object.assign(this.seats[seat], { missed: 0, idle: false, away: false }));
     this.swapOffers = [];
@@ -729,6 +828,7 @@ class Room {
     this.rematchVotes.clear();
     this.diceSnapshot = null;
     this.game = rules.createGame(this.seats, { rng: secureDie, teams: this.teams, starter: this.pickStarter(), boardSeat: humans.length === 1 ? humans[0] : null, variant: this.variant });
+    if (colors) this.game.colors = colors.map((color, seat) => color || SEAT_COLORS[seat]);
     // Who actually took each seat's turns: rolls = all turns, botRolls = the bot played them (timeouts, away,
     // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
     this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
@@ -1047,6 +1147,14 @@ class Room {
   }
 
   changed() {
+    if (!this.game && !this.painterOn()) {
+      [...this.seats, ...this.spectators.values()].forEach((player) => {
+        if (player) {
+          player.color = null;
+          player.pickedAt = null;
+        }
+      });
+    }
     this.touch();
     this.maybeFireDiceStorm();
     this.updatePause();
@@ -1154,8 +1262,8 @@ class Room {
 
   view() {
     const now = Date.now();
-    const hasColors = this.seatColors.some(Boolean);
-    const colors = hasColors ? this.seatColors.map((c, s) => c || SEAT_COLORS[s]) : undefined;
+    const effectiveColors = this.paintColors();
+    const colors = effectiveColors ? effectiveColors.map((color, seat) => color || SEAT_COLORS[seat]) : undefined;
     const gameView =
       this.game && (this.game.hits || this.game.stunts || colors)
         ? {
@@ -1191,6 +1299,10 @@ class Room {
       variant: this.game?.variant || this.variant,
       turnSeconds: this.turnSeconds,
       ...(colors ? { colors } : {}),
+      painter: {
+        on: this.painterOn(),
+        owners: this.seats.flatMap((player, seat) => (this.painterOwner(player) ? [seat] : [])),
+      },
       seats: this.seats.map((p, s) => p && {
         id: p.id,
         name: p.name,
@@ -1205,7 +1317,7 @@ class Room {
         coveredBy: p.coveredBy ?? null,
         devices: p.sockets?.size || 0,
         cosmetics: p.troll ? { ...p.cosmetics, ...p.troll } : p.cosmetics,
-        ...(this.seatColors[s] ? { color: this.seatColors[s] } : {}),
+        ...(effectiveColors?.[s] ? { color: effectiveColors[s] } : {}),
         level: p.level,
         tags: p.tags || [],
       }),

@@ -39,7 +39,8 @@ const parse = (json, fallback) => {
 };
 // Discord user ids that get the dev tag automatically when they log in (comma-separated env var)
 const devDiscordIds = () => new Set(String(process.env.DEV_DISCORD_IDS || '').split(',').map((s) => s.trim()).filter(Boolean));
-const PACKS = ['supporter', 'halloween'];
+const PACKS = Object.keys(discord.PACKS);
+const ENTITLEMENT_COLUMNS = PACKS.map((pack) => `${pack}_entitlement_id`);
 const MAX_SHORTHANDS = 2;
 const normalizeTags = (tags) => TAG_KEYS.filter((key) => Array.isArray(tags) && tags.includes(key));
 const pickableTags = (held) => (held.includes('dev') ? TAG_KEYS : held);
@@ -87,10 +88,9 @@ class Accounts {
       setEquipped: db.prepare('UPDATE users SET equipped = ? WHERE id = ?'),
       setTags: db.prepare('UPDATE users SET tags = ? WHERE id = ?'),
       setTagLoadout: db.prepare('UPDATE users SET featured_tag = ?, shorthand_tags = ? WHERE id = ?'),
-      setSupporter: db.prepare('UPDATE users SET supporter_entitlement_id = ? WHERE id = ?'),
-      setHalloween: db.prepare('UPDATE users SET halloween_entitlement_id = ? WHERE id = ?'),
+      setPackEntitlement: Object.fromEntries(PACKS.map((pack) => [pack, db.prepare(`UPDATE users SET ${pack}_entitlement_id = ? WHERE id = ?`)])),
       setPacks: db.prepare('UPDATE users SET granted_packs = ? WHERE id = ?'),
-      purchaserAccounts: db.prepare('SELECT id, discord_id FROM users WHERE (supporter_entitlement_id IS NOT NULL OR halloween_entitlement_id IS NOT NULL) AND discord_id IS NOT NULL'),
+      purchaserAccounts: db.prepare(`SELECT id, discord_id FROM users WHERE (${ENTITLEMENT_COLUMNS.map((column) => `${column} IS NOT NULL`).join(' OR ')}) AND discord_id IS NOT NULL`),
       linkDiscord: db.prepare('UPDATE users SET discord_id = ?, avatar = ? WHERE id = ?'),
       updateAvatar: db.prepare('UPDATE users SET avatar = ? WHERE id = ?'),
       mergeInto: db.prepare(
@@ -194,7 +194,8 @@ class Accounts {
 
   tags(user) {
     const stored = storableTags(parse(user.tags, []));
-    const all = normalizeTags([...stored, ...this.grantedPacks(user), ...(user.supporter_entitlement_id && discord.supporterConfigured() ? ['supporter'] : []), ...(user.halloween_entitlement_id && discord.halloweenConfigured() ? ['halloween'] : []), ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+    const entitlements = PACKS.filter((pack) => user[`${pack}_entitlement_id`] && discord.packConfigured(pack));
+    const all = normalizeTags([...stored, ...this.grantedPacks(user), ...entitlements, ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
     const { main, shorthands } = this.tagLoadout(user, all);
     const shown = all.includes('dev') ? normalizeTags([...all, main, ...shorthands]) : all;
     const lead = main || shown.find((t) => !shorthands.includes(t));
@@ -428,21 +429,18 @@ class Accounts {
     return clean;
   }
 
-  setSupporter(userId, entitlementId) {
+  setPackEntitlement(userId, pack, entitlementId) {
+    if (!PACKS.includes(pack)) throw new AccountError('Unknown pack');
     const user = this.requireUser(userId);
     const verified = entitlementId || null;
-    if (user.supporter_entitlement_id === verified) return false;
-    this.q.setSupporter.run(verified, userId);
+    if (user[`${pack}_entitlement_id`] === verified) return false;
+    this.q.setPackEntitlement[pack].run(verified, userId);
     return true;
   }
 
-  setHalloween(userId, entitlementId) {
-    const user = this.requireUser(userId);
-    const verified = entitlementId || null;
-    if (user.halloween_entitlement_id === verified) return false;
-    this.q.setHalloween.run(verified, userId);
-    return true;
-  }
+  setSupporter(userId, entitlementId) { return this.setPackEntitlement(userId, 'supporter', entitlementId); }
+
+  setHalloween(userId, entitlementId) { return this.setPackEntitlement(userId, 'halloween', entitlementId); }
 
   addTag(userId, tag) {
     const user = this.requireUser(userId);

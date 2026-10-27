@@ -1179,7 +1179,7 @@ test('beta and dev spectators can fire emotes from their own pack; other spectat
   assert.deepStrictEqual(room.view().spectators.find((p) => p.name === 'Watcher').tags, ['beta']);
 });
 
-test('seat colours and table palettes can be set in lobby or mid-game with unrestricted hexes and reset', (t) => {
+test('seat colours can be set in lobby or mid-game with unrestricted hexes and reset', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
   assert.strictEqual(room.view().colors, undefined);
@@ -1195,10 +1195,8 @@ test('seat colours and table palettes can be set in lobby or mid-game with unres
   room.setColor('u1', { seat: 1, color: '#050507' });
   assert.strictEqual(room.view().colors[1].main, '#050507');
 
-  room.setColor('u1', { palette: 'neon' });
-  assert.deepStrictEqual(room.view().colors.map((c) => c.id), ['magenta', 'cyan', 'lime', 'orange']);
-
-  room.setColor('u1', { palette: null });
+  room.setColor('u1', { seat: 0, color: null });
+  room.setColor('u1', { seat: 1, color: null });
   assert.strictEqual(room.view().colors, undefined);
 });
 

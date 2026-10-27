@@ -6,6 +6,7 @@ const config = () => ({
   botToken: process.env.DISCORD_BOT_TOKEN || '',
   supporterSkuId: process.env.DISCORD_SUPPORTER_SKU_ID || '',
   halloweenSkuId: process.env.DISCORD_HALLOWEEN_SKU_ID || '',
+  painterSkuId: process.env.DISCORD_PAINTER_SKU_ID || '',
   publicUrl: (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, ''),
   clientUrl: (process.env.CLIENT_URL || process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, ''),
 });
@@ -50,11 +51,19 @@ const skuConfigured = (skuId) => {
   const { clientId, botToken } = config();
   return Boolean(/^\d{17,20}$/.test(clientId) && botToken && /^\d{17,20}$/.test(skuId));
 };
-const supporterConfigured = () => skuConfigured(config().supporterSkuId);
-const halloweenConfigured = () => skuConfigured(config().halloweenSkuId);
-
 // The Halloween Pack can only be bought during October (UTC); owners keep it forever
 const halloweenOpen = (now = Date.now()) => new Date(now).getUTCMonth() === 9;
+
+const PACKS = {
+  supporter: { sku: 'supporterSkuId', name: 'Supporter', checkoutName: 'Supporter', linkPrompt: 'to support the game' },
+  halloween: { sku: 'halloweenSkuId', name: 'Halloween', checkoutName: 'Halloween', linkPrompt: 'to get the Halloween Pack', open: halloweenOpen },
+  painter: { sku: 'painterSkuId', name: 'Painter', checkoutName: 'Painter Pack', linkPrompt: 'to get the Painter Pack' },
+};
+
+const packConfigured = (kind) => {
+  const pack = PACKS[kind];
+  return !!pack && skuConfigured(config()[pack.sku]);
+};
 
 const activeEntitlement = (entitlement, discordId, now = Date.now(), skuId = config().supporterSkuId) =>
   entitlement.application_id === config().clientId && entitlement.sku_id === skuId &&
@@ -83,8 +92,15 @@ async function skuEntitlement(discordId, skuId, name) {
   return null;
 }
 
-const supporterEntitlement = (discordId) => skuEntitlement(discordId, config().supporterSkuId, 'Supporter');
-const halloweenEntitlement = (discordId) => skuEntitlement(discordId, config().halloweenSkuId, 'Halloween');
+const packEntitlement = (kind, discordId) => {
+  const pack = PACKS[kind];
+  if (!pack) throw new Error('Unknown pack');
+  return skuEntitlement(discordId, config()[pack.sku], pack.name);
+};
+const supporterConfigured = () => packConfigured('supporter');
+const supporterEntitlement = (discordId) => packEntitlement('supporter', discordId);
+const halloweenConfigured = () => packConfigured('halloween');
+const halloweenEntitlement = (discordId) => packEntitlement('halloween', discordId);
 
 // Boolean metadata values are sent as '1'/'0'; Discord rejects 'true'/'false' silently
 async function updateRoleConnection(accessToken, { username, supporter }) {
@@ -96,4 +112,4 @@ async function updateRoleConnection(accessToken, { username, supporter }) {
   if (!res.ok) throw new Error(`Role connection update failed (${res.status})`);
 }
 
-module.exports = { config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement };
+module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement };

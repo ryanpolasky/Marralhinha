@@ -4,7 +4,7 @@ import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse } from '../game
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
-import { Chevron, Close } from './Icons';
+import { Close } from './Icons';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 import { IS_ACTIVITY } from '../net/config';
 
@@ -28,6 +28,10 @@ const PACKS = {
   supporter: {
     thanks: 'Thank you for supporting Marralhinha! Your set is ready in the locker.',
     missing: 'No Supporter purchase found yet. If you just bought it, wait a moment and try again.',
+  },
+  painter: {
+    thanks: 'The brush is yours! Sit at any table and tap your marble to paint.',
+    missing: 'No Painter purchase found yet. If you just bought it, wait a moment and try again.',
   },
   halloween: {
     thanks: 'Welcome to the séance! Your Haunted set is ready in the locker.',
@@ -106,8 +110,63 @@ function PeekPop({ peek, children }) {
 }
 
 function PackItems({ kind, peek }) {
+  const rowRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+
+    const updateFades = () => {
+      const maxScroll = row.scrollWidth - row.clientWidth;
+      if (maxScroll <= 2) {
+        delete row.dataset.fadeL;
+        delete row.dataset.fadeR;
+        return;
+      }
+      if (row.scrollLeft > 2) row.dataset.fadeL = '';
+      else delete row.dataset.fadeL;
+      if (row.scrollLeft < maxScroll - 2) row.dataset.fadeR = '';
+      else delete row.dataset.fadeR;
+    };
+
+    const measure = () => {
+      const style = getComputedStyle(row);
+      const paddingLeft = parseFloat(style.paddingLeft) || 0;
+      const paddingRight = parseFloat(style.paddingRight) || 0;
+      const gap = parseFloat(style.columnGap) || 0;
+      const count = row.children.length;
+      const available = row.clientWidth - paddingLeft;
+      const baseWidth = 96;
+      const fits = count * baseWidth + (count - 1) * gap <= available - paddingRight;
+      if (fits) {
+        row.style.removeProperty('--pack-item-w');
+      } else {
+        const candidates = Array.from({ length: Math.max(1, count - 1) }, (_, i) => {
+          const k = i + 1;
+          return (available - k * gap) / (k + 0.5);
+        });
+        const valid = candidates.filter((width) => width >= 72 && width <= 110);
+        const source = valid.length ? valid[valid.length - 1] : [...candidates].sort((a, b) => Math.abs(a - baseWidth) - Math.abs(b - baseWidth))[0];
+        const width = Math.max(72, Math.min(110, source));
+        row.style.setProperty('--pack-item-w', `${Math.round(width * 100) / 100}px`);
+      }
+      updateFades();
+    };
+
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(row);
+    row.addEventListener('scroll', updateFades, { passive: true });
+    window.addEventListener('resize', measure);
+    measure();
+    return () => {
+      observer?.disconnect();
+      row.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
   return (
-    <div className="pack-items">
+    <div ref={rowRef} className="pack-items">
       {PACK_SLOTS.map((slot) => {
         const item = ITEMS[`${slot}.${kind}`];
         return (
@@ -118,6 +177,38 @@ function PackItems({ kind, peek }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function PackArtwork({ kind, shop, className }) {
+  const artwork = {
+    supporter: {
+      still: '/supporter-pack-still.png',
+      animated: '/supporter-pack.gif',
+      alt: 'The Tideglass marble and Beacon die floating above a moonlit table',
+    },
+    painter: {
+      still: '/painter-pack-still.png',
+      animated: '/painter-pack.gif',
+      alt: 'Four marbles hopping on a pedestal, each repainted a new colour as it lands',
+    },
+    halloween: {
+      still: '/halloween-pack-still.png',
+      animated: '/halloween-pack.gif',
+      alt: 'A crystal ball and a candlelit die on a séance table under a crescent moon',
+    },
+  }[kind];
+  const lazy = kind === 'supporter' ? {} : { loading: 'lazy' };
+  const halloweenClosed = shop && !shop.halloween?.open;
+
+  return (
+    <div className={`pack-art ${className}`}>
+      <picture>
+        <source media="(prefers-reduced-motion: reduce)" srcSet={artwork.still} />
+        <img className="pack-hero" src={artwork.animated} alt={artwork.alt} width="680" height="240" {...lazy} />
+      </picture>
+      {kind === 'halloween' && <span className={`halloween-ribbon${halloweenClosed ? ' closed' : ''}`}>{halloweenClosed ? 'Gone until next October' : 'Only available in October!'}</span>}
     </div>
   );
 }
@@ -249,13 +340,12 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const [showRates, setShowRates] = useState({});
   const [buying, setBuying] = useState(null);
   const [syncing, setSyncing] = useState(null);
-  const [slide, setSlide] = useState(0);
+  const [pack, setPack] = useState(null);
   const peeker = usePeek();
   const { peek } = peeker;
-  const swipeStart = useRef(null);
+  const packTrigger = useRef(null);
+  const packSheetRef = useRef(null);
   const refreshIn = useCountdown(shop?.refreshAt);
-  const slides = 2;
-  const go = (next) => setSlide(Math.max(0, Math.min(slides - 1, next)));
 
   useEffect(() => {
     preloadEmoteImages();
@@ -268,10 +358,28 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   }, [notify]);
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && !opening && onClose();
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (pack) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setPack(null);
+      } else if (!opening) {
+        onClose();
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, opening]);
+  }, [onClose, opening, pack]);
+
+  useEffect(() => {
+    if (!pack) return undefined;
+    packSheetRef.current?.focus();
+    return () => {
+      if (packTrigger.current?.isConnected) packTrigger.current.focus();
+      packTrigger.current = null;
+    };
+  }, [pack]);
 
   const openBox = async (box) => {
     if (account.coins < box.price) return notify(`You need ${box.price - account.coins} more ${CURRENCY}`);
@@ -334,20 +442,20 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
 
   const hasSupporter = account.tags.includes('supporter');
   const hasHalloween = account.tags.includes('halloween');
+  const hasPainter = account.tags.includes('painter');
   const halloweenOpen = shop?.halloween?.open;
   const supporterLabel = !shop?.supporter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support';
   const halloweenLabel = !shop ? 'Loading…' : !halloweenOpen ? 'Back next October' : !shop.halloween.skuId ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Halloween Pack' : 'Link Discord to get it';
-  const onCarouselKey = (e) => {
-    if (e.key === 'ArrowLeft') go(slide - 1);
-    else if (e.key === 'ArrowRight') go(slide + 1);
+  const painterLabel = !shop?.painter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Painter Pack' : 'Link Discord to get it';
+  const openPack = (kind, e) => {
+    packTrigger.current = e.currentTarget;
+    setPack(kind);
   };
-  const onSwipeEnd = (e) => {
-    if (swipeStart.current === null) return;
-    const dx = e.changedTouches[0].clientX - swipeStart.current;
-    if (Math.abs(dx) > 50) go(slide + (dx < 0 ? 1 : -1));
-    swipeStart.current = null;
+  const closePack = (e) => {
+    e?.stopPropagation();
+    setPack(null);
   };
-  const slideProps = (i) => (i === slide ? {} : { 'aria-hidden': true, inert: '' });
+  const packNames = { supporter: 'Supporter', painter: 'Painter', halloween: 'Halloween' };
 
   return (
     <div className="modal-backdrop shop-backdrop" onClick={opening ? undefined : onClose}>
@@ -449,68 +557,101 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
         )}
         <p className="muted small-text center">Featured items and chests use {CURRENCY} earned by playing. No pay-to-win.</p>
 
-        <div className="shop-carousel" role="group" aria-roledescription="carousel" aria-label="Packs" onKeyDown={onCarouselKey}>
-          <div className="carousel-viewport" onTouchStart={(e) => (swipeStart.current = e.touches[0].clientX)} onTouchEnd={onSwipeEnd}>
-            <div className="carousel-track" style={{ transform: `translateX(-${slide * 100}%)` }}>
-              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Supporter Pack, 1 of 2" {...slideProps(0)}>
-                <section className="supporter-shop" aria-label="Support the game">
-                  <picture>
-                    <source media="(prefers-reduced-motion: reduce)" srcSet="/supporter-pack-still.png" />
-                    <img className="supporter-art" src="/supporter-pack.gif" alt="The Tideglass marble and Beacon die floating above a moonlit table" width="680" height="240" />
-                  </picture>
-                  <div className="supporter-shop-body">
-                    <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
-                    <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, Riptide kill effect, Wake trail, and more to come! Only the look changes; never the gameplay.</p>
-                    <PackItems kind="supporter" peek={peeker} />
-                    <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
-                    <div className="supporter-actions">
-                      {hasSupporter ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
-                        <button className="btn primary" disabled={!shop?.supporter || !!syncing} onClick={() => purchasePack('supporter')}>
-                          {supporterLabel}
-                        </button>
-                      )}
-                      {shop?.supporter && account.discordLinked && !hasSupporter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('supporter')}>{syncing === 'supporter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
-                      <span className="supporter-signature">- Ryan :)</span>
-                    </div>
-                    <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
-                  </div>
-                </section>
-              </div>
-
-              <div className="carousel-slide" role="group" aria-roledescription="slide" aria-label="Halloween Pack, 2 of 2" {...slideProps(1)}>
-                <section className="halloween-shop" aria-label="Halloween Pack">
-                  <div className="halloween-art-wrap">
-                    <picture>
-                      <source media="(prefers-reduced-motion: reduce)" srcSet="/halloween-pack-still.png" />
-                      <img className="halloween-art" src="/halloween-pack.gif" alt="A crystal ball and a candlelit die on a séance table under a crescent moon" width="680" height="240" loading="lazy" />
-                    </picture>
-                    <span className={`halloween-ribbon${shop && !halloweenOpen ? ' closed' : ''}`}>{shop && !halloweenOpen ? 'Gone until next October' : 'Only available in October!'}</span>
-                  </div>
-                  <div className="halloween-shop-body">
-                    <div className="halloween-shop-head"><span className="halloween-eyebrow">Pull up a chair</span><h3>Halloween Pack</h3><span className="halloween-price">$3.99 USD · one time</span></div>
-                    <p>The spirits gather round the table, and so do you. A permanent Haunted badge and six candlelit cosmetics, kill effect included. Only the look changes; never the gameplay.</p>
-                    <PackItems kind="halloween" peek={peeker} />
-                    <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
-                    <div className="halloween-actions">
-                      {hasHalloween ? <span className="halloween-owned">Your Haunted set is waiting in the locker. Welcome to the séance.</span> : (
-                        <button className="btn primary" disabled={!shop || !halloweenOpen || !shop.halloween.skuId || !!syncing} onClick={() => purchasePack('halloween')}>{halloweenLabel}</button>
-                      )}
-                      {shop?.halloween?.skuId && account.discordLinked && !hasHalloween && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('halloween')}>{syncing === 'halloween' ? 'Checking…' : 'Already purchased? Check access'}</button>}
-                    </div>
-                    <span className="small-text halloween-fine">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
-                  </div>
-                </section>
-              </div>
+        <div className="pack-shelf" aria-label="Packs">
+          <button type="button" className="pack-card sp" aria-label={`Supporter Pack, ${hasSupporter ? 'owned' : '$5.99'}`} onClick={(e) => openPack('supporter', e)}>
+            <PackArtwork kind="supporter" shop={shop} className="pack-card-art" />
+            <div className="pack-card-body">
+              <div className="pack-card-row"><h3>Supporter Pack</h3><span className="pack-card-price">{hasSupporter ? 'Owned' : '$5.99'}</span></div>
+              <span className="pack-card-blurb">A badge and 6 Tideglass cosmetics. Keeps the lights on.</span>
             </div>
-          </div>
-          <button type="button" className="carousel-arrow prev" aria-label="Previous pack" disabled={slide === 0} onClick={() => go(slide - 1)}><Chevron dir="left" /></button>
-          <button type="button" className="carousel-arrow next" aria-label="Next pack" disabled={slide === slides - 1} onClick={() => go(slide + 1)}><Chevron /></button>
-          <div className="carousel-dots">
-            <button type="button" className={`carousel-dot sp${slide === 0 ? ' on' : ''}`} aria-label="Show the Supporter Pack" aria-current={slide === 0 || undefined} onClick={() => go(0)}>Supporter</button>
-            <button type="button" className={`carousel-dot hw${slide === 1 ? ' on' : ''}`} aria-label="Show the Halloween Pack" aria-current={slide === 1 || undefined} onClick={() => go(1)}>Halloween</button>
-          </div>
+          </button>
+          <button type="button" className="pack-card pt" aria-label={`Painter Pack, ${hasPainter ? 'owned' : '$2.99'}`} onClick={(e) => openPack('painter', e)}>
+            <PackArtwork kind="painter" shop={shop} className="pack-card-art" />
+            <div className="pack-card-body">
+              <div className="pack-card-row"><h3>Painter Pack</h3><span className="pack-card-price">{hasPainter ? 'Owned' : '$2.99'}</span></div>
+              <span className="pack-card-blurb">Everyone at your table picks their own colour.</span>
+            </div>
+          </button>
+          <button type="button" className="pack-card hw" aria-label={`Halloween Pack, ${hasHalloween ? 'owned' : '$3.99'}`} onClick={(e) => openPack('halloween', e)}>
+            <PackArtwork kind="halloween" shop={shop} className="pack-card-art" />
+            <div className="pack-card-body">
+              <div className="pack-card-row"><h3>Halloween Pack</h3><span className="pack-card-price">{hasHalloween ? 'Owned' : '$3.99'}</span></div>
+              <span className="pack-card-blurb">Haunted badge and 6 candlelit cosmetics. October only.</span>
+            </div>
+          </button>
         </div>
       </div>
+
+      {pack && createPortal(
+        <div className="modal-backdrop pack-sheet-backdrop" onClick={closePack}>
+          <div
+            ref={packSheetRef}
+            className={`panel modal pack-sheet ${pack === 'supporter' ? 'sp' : pack === 'painter' ? 'pt' : 'hw'}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${packNames[pack]} Pack`}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pack-sheet-grab" aria-hidden="true" />
+            <button type="button" className="icon-close pack-sheet-close" aria-label="Close" onClick={closePack}>
+              <Close />
+            </button>
+            <PackArtwork kind={pack} shop={shop} className="pack-sheet-art" />
+            {pack === 'supporter' && (
+              <div className="supporter-shop-body pack-sheet-body">
+                <div className="supporter-shop-head"><span className="supporter-eyebrow">A little light for the table</span><h3>Supporter Pack</h3><span className="supporter-price">$5.99 USD · one time</span></div>
+                <p>A permanent Supporter badge and exclusive cosmetics: the Tideglass marble, Moonwake board, Beacon die, Keepsake nameplate, Riptide kill effect, Wake trail, and more to come! Only the look changes; never the gameplay.</p>
+                <PackItems kind="supporter" peek={peeker} />
+                <p className="supporter-thanks">From the bottom of my heart: thank you for choosing to support this tiny game. Every person who sits down at this table makes it feel more alive. Your help means I get to keep building this game for more to enjoy, and it genuinely means the world to me. Love ya!</p>
+                <div className="supporter-actions">
+                  {hasSupporter ? <span className="supporter-owned">Your Supporter set is waiting in the locker. Thank you.</span> : (
+                    <button className="btn primary" disabled={!shop?.supporter || !!syncing} onClick={() => purchasePack('supporter')}>
+                      {supporterLabel}
+                    </button>
+                  )}
+                  {shop?.supporter && account.discordLinked && !hasSupporter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('supporter')}>{syncing === 'supporter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                  <span className="supporter-signature">- Ryan :)</span>
+                </div>
+                <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+              </div>
+            )}
+            {pack === 'painter' && (
+              <div className="painter-shop-body pack-sheet-body">
+                <div className="painter-shop-head"><span className="painter-eyebrow">Bring your own paint</span><h3>Painter Pack</h3><span className="painter-price">$2.99 USD · one time</span></div>
+                <ul className="pack-perks">
+                  <li><i aria-hidden="true" style={{ background: '#7ab8ff' }} />Everyone seated picks a colour from 18, kept far enough apart that nobody blends in</li>
+                  <li><i aria-hidden="true" style={{ background: '#ff7a8a' }} />You get any custom hex, and can take a colour someone else is using</li>
+                  <li><i aria-hidden="true" style={{ background: '#c9adff' }} />Permanent Painter badge</li>
+                </ul>
+                <div className="painter-actions">
+                  {hasPainter ? <span className="painter-owned">The brush is yours. Sit at any table and tap your marble.</span> : (
+                    <button className="btn primary" disabled={!shop?.painter || !!syncing} onClick={() => purchasePack('painter')}>{painterLabel}</button>
+                  )}
+                  {shop?.painter && account.discordLinked && !hasPainter && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('painter')}>{syncing === 'painter' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                </div>
+                <span className="muted small-text">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+              </div>
+            )}
+            {pack === 'halloween' && (
+              <div className="halloween-shop-body pack-sheet-body">
+                <div className="halloween-shop-head"><span className="halloween-eyebrow">Pull up a chair</span><h3>Halloween Pack</h3><span className="halloween-price">$3.99 USD · one time</span></div>
+                <p>The spirits gather round the table, and so do you. A permanent Haunted badge and six candlelit cosmetics, kill effect included. Only the look changes; never the gameplay.</p>
+                <PackItems kind="halloween" peek={peeker} />
+                <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
+                <div className="halloween-actions">
+                  {hasHalloween ? <span className="halloween-owned">Your Haunted set is waiting in the locker. Welcome to the séance.</span> : (
+                    <button className="btn primary" disabled={!shop || !halloweenOpen || !shop.halloween.skuId || !!syncing} onClick={() => purchasePack('halloween')}>{halloweenLabel}</button>
+                  )}
+                  {shop?.halloween?.skuId && account.discordLinked && !hasHalloween && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('halloween')}>{syncing === 'halloween' ? 'Checking…' : 'Already purchased? Check access'}</button>}
+                </div>
+                <span className="small-text halloween-fine">Checkout and payment are handled by Discord. Access is granted only after Discord confirms the purchase.</span>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {opening && (
         <BoxOpening

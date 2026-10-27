@@ -53,10 +53,11 @@ const pushProfile = (userId) => {
 const syncPurchases = async (userId) => {
   const user = accounts.getUser(userId);
   if (!user?.discord_id) return false;
-  const results = await Promise.allSettled([
-    discord.supporterConfigured() && discord.supporterEntitlement(user.discord_id).then((id) => accounts.setSupporter(userId, id)),
-    discord.halloweenConfigured() && discord.halloweenEntitlement(user.discord_id).then((id) => accounts.setHalloween(userId, id)),
-  ]);
+  const results = await Promise.allSettled(Object.keys(discord.PACKS).map((pack) => (
+    discord.packConfigured(pack)
+      ? discord.packEntitlement(pack, user.discord_id).then((id) => accounts.setPackEntitlement(userId, pack, id))
+      : false
+  )));
   const changed = results.some((result) => result.value === true);
   if (changed) pushProfile(userId);
   const failed = results.find((result) => result.status === 'rejected');
@@ -136,7 +137,7 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 setInterval(() => {
-  if (!discord.supporterConfigured() && !discord.halloweenConfigured()) return;
+  if (!Object.keys(discord.PACKS).some((pack) => discord.packConfigured(pack))) return;
   accounts.q.purchaserAccounts.all().forEach(({ id }) => syncPurchases(id).catch((err) => console.error('[purchases]', err)));
 }, 10 * 60 * 1000).unref();
 
@@ -328,10 +329,11 @@ io.on('connection', (socket) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can restyle the table');
     current().setSkin(userId, { seat, slot, item: typeof item === 'string' ? item : null });
   });
-  handle('game:setColor', ({ seat, color, palette } = {}) => {
+  handle('game:setColor', ({ seat, color } = {}) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can recolor the table');
-    current().setColor(userId, { seat, color, palette });
+    current().setColor(userId, { seat, color });
   });
+  handle('game:pickColor', ({ color, steal } = {}) => current().pickColor(userId, { color, steal: steal === true }));
   handle('game:shoot', (shot) => {
     if (!accounts.isAdmin(accounts.getUser(userId) || {})) throw new UserError('Only a Dev can pull the trigger');
     current().shoot(userId, shot);

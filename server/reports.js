@@ -1,4 +1,5 @@
 const { ITEMS, BOXES } = require('./catalog');
+const discord = require('./discord');
 
 class ReportError extends Error {}
 
@@ -7,7 +8,7 @@ const MAX_LEN = 600;
 // An open-report cap per player so one person can't bury the queue
 const MAX_OPEN = 8;
 const MAX_COIN_GIFT = 100000;
-const PACKS = ['supporter', 'halloween'];
+const PACKS = Object.keys(discord.PACKS);
 
 const cleanText = (text) =>
   String(text ?? '')

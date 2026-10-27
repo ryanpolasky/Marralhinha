@@ -8,7 +8,7 @@ import { ago } from './Stats';
 
 export const KIND_LABEL = { bug: 'Bug report', idea: 'Feature idea' };
 
-export const PACK_LABEL = { supporter: 'Supporter Pack', halloween: 'Halloween Pack' };
+export const PACK_LABEL = { supporter: 'Supporter Pack', halloween: 'Halloween Pack', painter: 'Painter Pack' };
 
 // Human-readable label for a resolution gift
 export const giftLabel = (gift) => {
