@@ -1397,10 +1397,11 @@ const DICE = {
   sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
-  wild: { bg: 'wild', pip: '#ed493d', one: '#ed493d', roughness: 0.26, metalness: 0.25, clearcoat: 1 },
+  wild: { bg: 'scanner', pip: '#16201c', one: '#16201c', roughness: 0.35, clearcoat: 0.8 },
   train: { bg: 'crossing', pip: '#4a0c09', one: '#4a0c09', roughness: 0.35, clearcoat: 0.6 },
 };
 
+const SCANNER_LEDS = [['#7a1010', 85, 0.19], ['#7a6a10', 170, 0.25], ['#1a6a20', 255, 0.31]];
 const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 
@@ -1520,6 +1521,19 @@ function dieBackground(ctx, style, size, value) {
     }
   } else if (style === 'minecraft') {
     workbenchFace(ctx, size, value);
+    const p = size / 32;
+    ctx.fillStyle = '#c99d5e';
+    ctx.fillRect(p * 2, p * 2, size - p * 4, p * 0.6);
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+      const x = (2 + col * 10) * p;
+      const y = (2 + row * 10) * p;
+      ctx.fillStyle = '#3e2810';
+      ctx.fillRect(x, y, p * 8, p);
+      ctx.fillRect(x, y, p, p * 8);
+      ctx.fillStyle = '#dcb676';
+      ctx.fillRect(x + p, y + p * 7, p * 7, p);
+      ctx.fillRect(x + p * 7, y + p, p, p * 7);
+    }
   } else if (style === 'arcade') {
     const px = size / 32;
     for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
@@ -1697,23 +1711,30 @@ function dieBackground(ctx, style, size, value) {
     ctx.lineWidth = 7;
     ctx.strokeRect(15, 15, size - 30, size - 30);
     ctx.setLineDash([]);
-  } else if (style === 'wild') {
-    const enamel = ctx.createLinearGradient(0, 0, size, size);
-    enamel.addColorStop(0, '#243d3c');
-    enamel.addColorStop(0.5, '#112625');
-    enamel.addColorStop(1, '#091a1c');
-    ctx.fillStyle = enamel;
+  } else if (style === 'scanner') {
+    const shell = ctx.createLinearGradient(0, 0, size, size);
+    shell.addColorStop(0, '#e8313f');
+    shell.addColorStop(1, '#a01020');
+    ctx.fillStyle = shell;
     ctx.fillRect(0, 0, size, size);
-    ctx.strokeStyle = '#c9a86c';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(16, 16, size - 32, size - 32);
-    ctx.strokeStyle = '#47635b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(23, 23, size - 46, size - 46);
-    ctx.fillStyle = '#d9be80';
-    [[32, 32], [size - 32, 32], [32, size - 32], [size - 32, size - 32]].forEach(([x, y]) => {
+    ctx.fillStyle = '#ececea';
+    ctx.fillRect(size * 0.15, size * 0.15, size * 0.72, size * 0.72);
+    ctx.fillStyle = '#1b1b1d';
+    ctx.fillRect(size * 0.16, size * 0.16, size * 0.7, size * 0.7);
+    ctx.fillStyle = '#93b3a3';
+    ctx.fillRect(size * 0.17, size * 0.17, size * 0.68, size * 0.68);
+    ctx.fillStyle = '#f4f4f2';
+    ctx.beginPath();
+    ctx.arc(size * 0.075, size * 0.075, size * 0.055, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#2a7fd4';
+    ctx.beginPath();
+    ctx.arc(size * 0.075, size * 0.075, size * 0.04, 0, TAU);
+    ctx.fill();
+    SCANNER_LEDS.forEach(([c, , x]) => {
+      ctx.fillStyle = c;
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0, TAU);
+      ctx.arc(size * x, size * 0.07, size * 0.018, 0, TAU);
       ctx.fill();
     });
   } else if (style === 'galaxy') {
@@ -1798,31 +1819,22 @@ function visorPips(ctx, value, size, color) {
   });
 }
 
-function ballPips(ctx, value, size, color) {
-  const r = value === 1 ? 34 : 24;
+function scannerMask(ctx, value, size) {
+  ctx.fillStyle = 'rgb(255,0,0)';
   PIPS[value].forEach(([x, y]) => {
-    const cx = x * size;
-    const cy = y * size;
-    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, Math.PI, TAU);
+    ctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
+  });
+  ctx.fillStyle = 'rgb(0,255,0)';
+  ctx.beginPath();
+  ctx.arc(size * 0.075, size * 0.075, size * 0.04, 0, TAU);
+  ctx.fill();
+  SCANNER_LEDS.forEach(([, b, x]) => {
+    ctx.fillStyle = `rgb(0,0,${b})`;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI);
+    ctx.arc(size * x, size * 0.07, size * 0.018, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = '#1a1a1e';
-    ctx.lineWidth = r * 0.16;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, TAU);
-    ctx.moveTo(cx - r, cy);
-    ctx.lineTo(cx + r, cy);
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.3, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
   });
 }
 
@@ -1870,7 +1882,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, wild: ballPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1892,6 +1904,7 @@ export function diceSkin(itemId) {
         mctx.fillStyle = '#fff';
         if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
         else if (key === 'minecraft') gemPips(mctx, value, size, '#fff');
+        else if (key === 'wild') scannerMask(mctx, value, size);
         else PIPS[value].forEach(([x, y]) => {
           mctx.beginPath();
           mctx.arc(x * size, y * size, value === 1 ? 30 : 21, 0, TAU);
@@ -1924,16 +1937,34 @@ export function diceSkin(itemId) {
               totalEmissiveRadiance = vec3(1.0, 0.1, 0.04) * pip * (0.05 + lit * (2.4 - d * 2.0));
             }` : key === 'wild' ? `{
               vec2 uv = vEmissiveMapUv;
-              float pip = texture2D(emissiveMap, uv).r;
-              float edge = max(abs(uv.x - 0.5), abs(uv.y - 0.5));
-              float rail = 1.0 - smoothstep(0.003, 0.009, abs(edge - 0.4375));
-              float sweep = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 5.0 - uSkinTime * 1.6 + uFacePhase), 18.0);
-              totalEmissiveRadiance = vec3(0.38, 0.95, 0.68) * rail * (0.12 + sweep * 0.75) * (1.0 - pip);
+              vec3 mk = texture2D(emissiveMap, uv).rgb;
+              vec2 c = vec2(uv.x, 1.0 - uv.y);
+              vec2 q = abs(c - 0.51);
+              float screen = step(max(q.x, q.y), 0.34);
+              float roll = smoothstep(0.08, 0.0, abs(fract(c.y * 0.8 - uSkinTime * 0.35 + uFacePhase) - 0.5));
+              float lines = 0.75 + 0.25 * step(0.5, fract(c.y * 64.0));
+              float pulse = 0.5 + 0.5 * sin(uSkinTime * 2.6 + uFacePhase);
+              float idx = floor(mk.b * 3.0 + 0.5);
+              float on = step(abs(mod(floor(uSkinTime * 3.0 + uFacePhase * 2.0), 3.0) + 1.0 - idx), 0.1);
+              vec3 ledc = idx < 1.5 ? vec3(1.0, 0.12, 0.08) : idx < 2.5 ? vec3(1.0, 0.8, 0.1) : vec3(0.2, 1.0, 0.3);
+              totalEmissiveRadiance = vec3(0.55, 0.95, 0.8) * screen * (1.0 - mk.r) * lines * (0.1 + roll * 0.55)
+                + vec3(0.25, 0.65, 1.0) * mk.g * (0.6 + pulse * 2.2) + ledc * step(0.1, mk.b) * on * 2.6;
             }` : key === 'minecraft' ? `{
               vec2 uv = vEmissiveMapUv;
               float gem = texture2D(emissiveMap, uv).r;
               float glint = pow(0.5 + 0.5 * sin((uv.x + uv.y) * 7.0 - uSkinTime * 2.2 + uFacePhase), 14.0);
-              totalEmissiveRadiance = vec3(0.55, 1.0, 0.95) * gem * (0.12 + glint * 0.9);
+              vec2 px = floor(vec2(uv.x, 1.0 - uv.y) * 32.0);
+              vec2 slot = floor((px - 2.0) / 10.0);
+              vec2 l = px - 2.0 - slot * 10.0;
+              float has = texture2D(emissiveMap, vec2((slot.x * 10.0 + 6.0) / 32.0, 1.0 - (slot.y * 10.0 + 6.0) / 32.0)).r;
+              float star = step(abs(l.x - 6.0) + abs(l.y - 1.0), 1.0);
+              float h = fract(sin(dot(slot + uFacePhase, vec2(12.9898, 78.233))) * 43758.5453);
+              float tw = pow(max(sin(uSkinTime * 1.7 + h * 6.283), 0.0), 10.0);
+              vec2 g = floor(uv * 32.0) / 32.0;
+              float s1 = fract((g.x * 0.5 + g.y) * 0.8 - uSkinTime * 0.3 + uFacePhase * 0.37);
+              float s2 = fract((g.y * 0.5 - g.x) * 0.9 - uSkinTime * 0.22 + uFacePhase * 0.53);
+              float band = smoothstep(0.0, 0.12, s1) * (1.0 - smoothstep(0.12, 0.38, s1)) + 0.6 * smoothstep(0.0, 0.1, s2) * (1.0 - smoothstep(0.1, 0.3, s2));
+              totalEmissiveRadiance = vec3(0.55, 1.0, 0.95) * gem * (0.12 + glint * 0.9 + tw * 0.5) + vec3(1.0) * star * has * tw * 2.5 + vec3(0.5, 0.22, 1.0) * band * 0.45;
             }` : key === 'defuse' ? `{
               vec3 lcd = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               float cyc = mod(uSkinTime + uFacePhase * 3.0, 6.0);
