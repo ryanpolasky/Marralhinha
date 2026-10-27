@@ -153,14 +153,22 @@ function PackItems({ kind, peek }) {
       updateFades();
     };
 
+    const onWheel = (e) => {
+      if (row.scrollWidth <= row.clientWidth || !e.deltaY) return;
+      e.preventDefault();
+      row.scrollLeft += e.deltaY;
+    };
+
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     observer?.observe(row);
     row.addEventListener('scroll', updateFades, { passive: true });
+    row.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('resize', measure);
     measure();
     return () => {
       observer?.disconnect();
       row.removeEventListener('scroll', updateFades);
+      row.removeEventListener('wheel', onWheel);
       window.removeEventListener('resize', measure);
     };
   }, []);
