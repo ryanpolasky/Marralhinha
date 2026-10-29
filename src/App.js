@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { socket, request } from './net/socket';
+import { mergeRoomState } from './net/roomState';
 import { api, post, setToken } from './net/api';
 import { bootstrapAuth, startDiscordLogin, logout, onPreviewMode } from './net/auth';
 import { IS_ACTIVITY } from './net/config';
@@ -258,7 +259,7 @@ const App = () => {
       disconnect: onDisconnect,
       connect_error: onConnectError,
       'room:joined': enter,
-      'room:state': setRoom,
+      'room:state': (next) => setRoom((prev) => mergeRoomState(prev, next)),
       'room:reaction': onReaction,
       'room:ping': onPing,
       'room:teamChat': onTeamChat,

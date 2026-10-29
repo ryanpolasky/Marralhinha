@@ -9549,8 +9549,6 @@ textarea.report-text {
 .pack-card:focus-visible { outline: 3px solid var(--gold, #ffd166); outline-offset: 3px; }
 .pack-card-art,
 .pack-sheet-art { position: relative; line-height: 0; }
-.pack-card-art picture,
-.pack-sheet-art picture { display: block; width: 100%; }
 .pack-hero { display: block; width: 100%; height: auto; aspect-ratio: 680 / 240; object-fit: cover; }
 .pack-card-body { display: block; padding: 10px 12px 12px; }
 .pack-card-row { display: flex; align-items: baseline; gap: 8px; }
