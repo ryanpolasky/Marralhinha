@@ -108,6 +108,15 @@ class Room {
     this.lastActive = Date.now();
   }
 
+  logRev() {
+    const json = JSON.stringify(this.game?.log || []);
+    if (json !== this.lastLogJson) {
+      this.lastLogJson = json;
+      this.logRevN = (this.logRevN || 0) + 1;
+    }
+    return this.logRevN;
+  }
+
   findByUser(userId) {
     const seat = this.seats.findIndex((p) => p && !p.isBot && p.userId === userId);
     return seat === -1 ? null : { seat, player: this.seats[seat] };

@@ -17,6 +17,34 @@ function startedRoom() {
   return { room, reactions };
 }
 
+test('log revision only changes when the log content changes', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const rev = room.logRev();
+  assert.strictEqual(room.logRev(), rev);
+  rules.pushLog(room.game, { text: 'A turn happened', seat: 0, t: Date.now() });
+  assert.strictEqual(room.logRev(), rev + 1);
+  assert.strictEqual(room.logRev(), rev + 1);
+});
+
+test('log revision changes when a held entry timestamp changes in place', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const rev = room.logRev();
+  const held = room.game.log.find((entry) => entry.hold);
+  held.t += 1;
+  assert.strictEqual(room.logRev(), rev + 1);
+});
+
+test('log revision changes when a new game replaces the log with an empty one', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  room.game = { log: [{ text: 'Previous round' }] };
+  const rev = room.logRev();
+  room.game = { log: [] };
+  assert.strictEqual(room.logRev(), rev + 1);
+});
+
 test('chat messages land in the room feed and pop a bubble for the sender', (t) => {
   const { room, reactions } = startedRoom();
   t.after(() => room.dispose());

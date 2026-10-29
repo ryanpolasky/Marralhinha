@@ -40,6 +40,7 @@ const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
+  perMessageDeflate: { threshold: 1024 },
   cors: { origin: (origin, cb) => cb(null, !origin || isAllowedOrigin(origin)) },
 });
 
@@ -86,7 +87,25 @@ const announceLucky = (change) => {
 };
 
 const rooms = new RoomManager({
-  onChange: (room) => io.to(room.code).emit('room:state', room.view()),
+  onChange: (room) => {
+    const view = room.view();
+    const key = `${room.code}:${room.logRev()}`;
+    let lite = view;
+    if (view.game) {
+      const game = { ...view.game };
+      delete game.log;
+      lite = { ...view, game };
+    }
+    for (const id of io.sockets.adapter.rooms.get(room.code) || []) {
+      const socket = io.sockets.sockets.get(id);
+      if (!socket) continue;
+      if (socket.data.logDelta && socket.data.logSent === key && view.game) socket.emit('room:state', lite);
+      else {
+        socket.data.logSent = key;
+        socket.emit('room:state', view);
+      }
+    }
+  },
   onReaction: (room, reaction) => io.to(room.code).emit('room:reaction', reaction),
   onHostChange: (room, host) => io.to(room.code).emit('room:host', host),
   onRematchVote: (room, vote) => io.to(room.code).emit('room:rematch', vote),
@@ -102,6 +121,7 @@ const rooms = new RoomManager({
         if (socket) {
           socket.leave(room.code);
           socket.data.code = null;
+          delete socket.data.logSent;
         }
       })
     );
@@ -193,6 +213,7 @@ io.use(async (socket, next) => {
   }
   socket.data.userId = user.id;
   socket.data.blitz = Array.isArray(socket.handshake.auth?.features) && socket.handshake.auth.features.includes('blitz');
+  socket.data.logDelta = Array.isArray(socket.handshake.auth?.features) && socket.handshake.auth.features.includes('logDelta');
   return next();
 });
 
@@ -221,6 +242,7 @@ io.on('connection', (socket) => {
     if (!code) return;
     socket.leave(code);
     socket.data.code = null;
+    delete socket.data.logSent;
     const room = rooms.rooms.get(code);
     if (!room || !room.findViewer(userId)) return;
     if (permanently) {
@@ -245,6 +267,7 @@ io.on('connection', (socket) => {
         if (!other || other.data.code !== room.code) return;
         other.leave(room.code);
         other.data.code = null;
+        delete other.data.logSent;
         if (other.id !== socket.id) other.emit('room:left', { code: room.code, reason: 'You joined another room on another device' });
       });
     });
