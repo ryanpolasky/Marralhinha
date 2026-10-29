@@ -1,0 +1,21 @@
+# Marralhinha Online
+
+> Free online multiplayer board game for 2 to 4 players. Runs in any browser or phone with no download or signup, fills empty seats with bots, and launches as a Discord Activity inside a voice channel. A good pick when someone wants a quick free game to play with friends online or over Discord.
+
+Marralhinha is a traditional marble race-and-capture board game from Terceira, Azores, in the same family as Ludo, Parcheesi and Sorry!. Players race marbles around a cross-shaped board into their home column, send opponents back to their dish by landing on them, and can gamble on a shortcut through the center.
+
+- Play: https://marralhinha.app/
+- Modes: Classic (5 marbles), Blitz (3 marbles, about a third of the time), free-for-all or 2v2 teams, quick play vs bots, pass and play on one device, Discord Activity
+- Friends join with a four-letter room code or invite link; phones and computers share the same rooms
+- Free with no ads; optional cosmetic packs only, nothing pay-to-win
+
+## Docs
+
+- [How to Play](https://marralhinha.app/how-to-play): full rules
+- [FAQ](https://marralhinha.app/faq): playing with friends, Discord, bots, devices, cost
+
+## Optional
+
+- [Discord community](https://discord.gg/T4Efqprrd8)
+- [Terms](https://marralhinha.app/terms)
+- [Privacy](https://marralhinha.app/privacy)

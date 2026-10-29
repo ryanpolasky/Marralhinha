@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { markdownToHtml } = require('./legal');
+const { markdownToHtml, faqEntries } = require('./legal');
 
 test('renders the Markdown the legal docs use', () => {
   const html = markdownToHtml('# Title\n**Bold**\nSecond line\n\n## Section\n- one [link](https://example.com)\n- two `code`\n\nSee the [Privacy Policy](PRIVACY.md).');
@@ -18,9 +18,14 @@ test('escapes HTML so the docs cannot inject markup', () => {
 });
 
 test('both real legal docs render with their headings', () => {
-  for (const file of ['TERMS.md', 'PRIVACY.md', 'RULES.md']) {
+  for (const file of ['TERMS.md', 'PRIVACY.md', 'RULES.md', 'FAQ.md']) {
     const html = markdownToHtml(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'));
     assert.match(html, /<h1>/);
-    assert.ok((html.match(/<h2>/g) || []).length >= 5, `${file} has its sections`);
+    assert.ok((html.match(/<h[23]>/g) || []).length >= 5, `${file} has its sections`);
   }
+});
+
+test('FAQ questions become FAQPage entries without leaking section headings', () => {
+  const entries = faqEntries('# FAQ\n\n## Group\n\n### Q one?\n\nFirst [answer](RULES.md).\n\n## Next group\n\n### Q two?\n\nSecond answer.');
+  assert.deepEqual(entries.map((e) => [e.name, e.acceptedAnswer.text]), [['Q one?', 'First answer.'], ['Q two?', 'Second answer.']]);
 });

@@ -16,6 +16,7 @@ function logoFontUrl() {
 const SITE = 'https://marralhinha.app';
 const PAGES = {
   '/how-to-play': { file: 'RULES.md', title: 'How to Play Marralhinha', description: 'Learn the rules of Marralhinha, the traditional marble board game from Terceira, Açores: leaving your dish, capturing, the center shortcut, the home stretch, Blitz, 2v2 teams, and pass and play.' },
+  '/faq': { file: 'FAQ.md', title: 'Marralhinha FAQ', description: 'A free online board game to play with friends: no download, no signup, 2 to 4 players, bots for empty seats, and it runs inside Discord. Answers to common questions about Marralhinha Online.', faq: true },
   '/terms': { file: 'TERMS.md', title: 'Terms of Service', description: 'The terms of service for Marralhinha Online, the free marble board game from the Açores.' },
   '/privacy': { file: 'PRIVACY.md', title: 'Privacy Policy', description: 'What Marralhinha Online collects, why, and what you can do about it. No ads and no trackers.' },
 };
@@ -67,15 +68,23 @@ function markdownToHtml(markdown) {
 
 const logo = [...'Marralhinha!'].map((ch, i) => `<span style="--c:${LOGO_COLORS[i % 4]};--d:${(i * 0.07).toFixed(2)}s">${ch}</span>`).join('');
 
-const jsonLd = (route, title, description) => ({
+function faqEntries(markdown) {
+  return markdown.split(/^### /m).slice(1).map((chunk) => {
+    const [question, ...rest] = chunk.split(/^#{1,2} /m)[0].split(/\r?\n/);
+    const answer = rest.join(' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim();
+    return { '@type': 'Question', name: question.trim(), acceptedAnswer: { '@type': 'Answer', text: answer } };
+  });
+}
+
+const jsonLd = (route, title, description, faq) => ({
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'WebPage', '@id': `${SITE}${route}#page`, url: `${SITE}${route}`, name: title, description, inLanguage: 'en', isPartOf: { '@id': `${SITE}/#website` }, about: { '@id': `${SITE}/#game` }, author: { '@id': 'https://ryanpolasky.com/#person' } },
+    { '@type': faq ? ['WebPage', 'FAQPage'] : 'WebPage', ...(faq && { mainEntity: faq }), '@id': `${SITE}${route}#page`, url: `${SITE}${route}`, name: title, description, inLanguage: 'en', isPartOf: { '@id': `${SITE}/#website` }, about: { '@id': `${SITE}/#game` }, author: { '@id': 'https://ryanpolasky.com/#person' } },
     { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Marralhinha Online', item: `${SITE}/` }, { '@type': 'ListItem', position: 2, name: title, item: `${SITE}${route}` }] },
   ],
 });
 
-const page = (route, title, description, body, links, fontUrl) => `<!DOCTYPE html>
+const page = (route, title, description, body, links, fontUrl, faq) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -93,7 +102,7 @@ const page = (route, title, description, body, links, fontUrl) => `<!DOCTYPE htm
 <meta property="og:image" content="${SITE}/og-image.jpg" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="${SITE}/og-image.jpg" />
-<script type="application/ld+json">${JSON.stringify(jsonLd(route, title, description)).replace(/</g, '\\u003c')}</script>
+<script type="application/ld+json">${JSON.stringify(jsonLd(route, title, description, faq)).replace(/</g, '\\u003c')}</script>
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <style>
@@ -145,15 +154,15 @@ ${body}
 </html>`;
 
 function legalRoutes(app) {
-  Object.entries(PAGES).forEach(([route, { file, title, description }]) => {
+  Object.entries(PAGES).forEach(([route, { file, title, description, faq }]) => {
     const links = Object.entries(PAGES).filter(([r]) => r !== route).map(([r, p]) => `<a href="${r}">${p.title}</a>`).join('');
     app.get(route, (req, res, next) => {
       fs.readFile(path.join(ROOT, file), 'utf8', (err, markdown) => {
         if (err) return next();
-        res.type('html').set('Cache-Control', 'public, max-age=300').send(page(route, title, description, markdownToHtml(markdown), links, logoFontUrl()));
+        res.type('html').set('Cache-Control', 'public, max-age=300').send(page(route, title, description, markdownToHtml(markdown), links, logoFontUrl(), faq && faqEntries(markdown)));
       });
     });
   });
 }
 
-module.exports = { legalRoutes, markdownToHtml };
+module.exports = { legalRoutes, markdownToHtml, faqEntries };
