@@ -17,32 +17,58 @@ function startedRoom() {
   return { room, reactions };
 }
 
-test('log revision only changes when the log content changes', (t) => {
+test('log state includes a patch for a pushed entry and stays stable when unchanged', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
-  const rev = room.logRev();
-  assert.strictEqual(room.logRev(), rev);
-  rules.pushLog(room.game, { text: 'A turn happened', seat: 0, t: Date.now() });
-  assert.strictEqual(room.logRev(), rev + 1);
-  assert.strictEqual(room.logRev(), rev + 1);
+  const before = room.logState();
+  const entry = { text: 'A turn happened', seat: 0, t: Date.now() };
+  rules.pushLog(room.game, entry);
+  const changed = room.logState();
+  assert.strictEqual(changed.rev, before.rev + 1);
+  assert.deepStrictEqual(changed.patch, { base: before.rev, drop: 0, add: [entry] });
+  const unchanged = room.logState();
+  assert.strictEqual(unchanged.rev, changed.rev);
+  assert.strictEqual(unchanged.patch, changed.patch);
 });
 
-test('log revision changes when a held entry timestamp changes in place', (t) => {
+test('log patch drops the oldest entry when a push exceeds the log limit', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
-  const rev = room.logRev();
+  room.game.log = Array.from({ length: 100 }, (_, i) => ({ text: `Entry ${i}`, seat: 0, t: i }));
+  const previous = room.game.log.slice();
+  const before = room.logState();
+  const entry = { text: 'A new entry', seat: 0, t: 100 };
+  rules.pushLog(room.game, entry);
+  const changed = room.logState();
+  assert.strictEqual(changed.patch.base, before.rev);
+  assert.strictEqual(changed.patch.drop, 1);
+  assert.deepStrictEqual(changed.patch.add, [entry]);
+  assert.deepStrictEqual(previous.slice(changed.patch.drop).concat(changed.patch.add), room.game.log);
+});
+
+test('log patch replaces the full log when a held entry timestamp changes in place', (t) => {
+  const { room } = startedRoom();
+  t.after(() => room.dispose());
+  const before = room.logState();
+  const previous = room.game.log.slice();
   const held = room.game.log.find((entry) => entry.hold);
   held.t += 1;
-  assert.strictEqual(room.logRev(), rev + 1);
+  const changed = room.logState();
+  assert.strictEqual(changed.rev, before.rev + 1);
+  assert.strictEqual(changed.patch.drop, previous.length);
+  assert.deepStrictEqual(changed.patch.add, room.game.log);
+  assert.deepStrictEqual(previous.slice(changed.patch.drop).concat(changed.patch.add), room.game.log);
 });
 
 test('log revision changes when a new game replaces the log with an empty one', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
   room.game = { log: [{ text: 'Previous round' }] };
-  const rev = room.logRev();
+  const before = room.logState();
   room.game = { log: [] };
-  assert.strictEqual(room.logRev(), rev + 1);
+  const changed = room.logState();
+  assert.strictEqual(changed.rev, before.rev + 1);
+  assert.deepStrictEqual(changed.patch, { base: before.rev, drop: 1, add: [] });
 });
 
 test('chat messages land in the room feed and pop a bubble for the sender', (t) => {

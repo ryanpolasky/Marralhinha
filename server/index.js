@@ -89,18 +89,24 @@ const announceLucky = (change) => {
 const rooms = new RoomManager({
   onChange: (room) => {
     const view = room.view();
-    const key = `${room.code}:${room.logRev()}`;
+    const { rev, patch } = room.logState();
+    const key = `${room.code}:${rev}`;
     let lite = view;
     if (view.game) {
       const game = { ...view.game };
       delete game.log;
+      delete game.logPatch;
       lite = { ...view, game };
     }
     for (const id of io.sockets.adapter.rooms.get(room.code) || []) {
       const socket = io.sockets.sockets.get(id);
       if (!socket) continue;
-      if (socket.data.logDelta && socket.data.logSent === key && view.game) socket.emit('room:state', lite);
-      else {
+      if (socket.data.logDelta && view.game && socket.data.logSent === key) socket.emit('room:state', lite);
+      else if (socket.data.logDelta && view.game && patch && socket.data.logSent === `${room.code}:${patch.base}`) {
+        const game = { ...lite.game, logPatch: { drop: patch.drop, add: patch.add } };
+        socket.emit('room:state', { ...lite, game });
+        socket.data.logSent = key;
+      } else {
         socket.data.logSent = key;
         socket.emit('room:state', view);
       }

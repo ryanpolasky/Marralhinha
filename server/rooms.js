@@ -108,13 +108,27 @@ class Room {
     this.lastActive = Date.now();
   }
 
-  logRev() {
-    const json = JSON.stringify(this.game?.log || []);
-    if (json !== this.lastLogJson) {
-      this.lastLogJson = json;
-      this.logRevN = (this.logRevN || 0) + 1;
+  logState() {
+    const log = this.game?.log || [];
+    const cur = log.map((entry) => JSON.stringify(entry));
+    const prev = this.lastLogEntries || [];
+    if (cur.join('\n') !== prev.join('\n')) {
+      const base = this.logRevN || 0;
+      let drop = prev.length;
+      for (let candidate = 0; candidate <= prev.length; candidate += 1) {
+        if (candidate !== prev.length && cur[0] !== prev[candidate]) continue;
+        const suffixLength = prev.length - candidate;
+        if (suffixLength > cur.length) continue;
+        if (prev.slice(candidate).every((entry, i) => entry === cur[i])) {
+          drop = candidate;
+          break;
+        }
+      }
+      this.logRevN = base + 1;
+      this.lastLogEntries = cur;
+      this.logPatch = { base, drop, add: log.slice(prev.length - drop) };
     }
-    return this.logRevN;
+    return { rev: this.logRevN || 0, patch: this.logPatch };
   }
 
   findByUser(userId) {
