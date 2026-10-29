@@ -8,6 +8,7 @@ export const AUTHOR = {
   name: 'Ryan Polasky',
   linkedin: 'https://www.linkedin.com/in/ryan-polasky',
   github: 'https://github.com/ryanpolasky',
+  website: 'https://ryanpolasky.com',
   email: 'ryan@polasky.net',
 };
 
@@ -92,7 +93,11 @@ export function AboutModal({ onClose }) {
         <div className="about-body">
           <div className="about-story">
             <p>
-              Hi, I'm <b>{AUTHOR.name}</b>! I played Marralhinha a ton with my mom, who was born in the Açores. It's the kind of game that turns a quiet evening
+              Hi, I'm{' '}
+              <ExternalLink href={AUTHOR.website}>
+                <b>{AUTHOR.name}</b>
+              </ExternalLink>
+              ! I played Marralhinha a ton with my mom, who was born in the Açores. It's the kind of game that turns a quiet evening
               into hours of lucky sixes, groans, and marbles getting sent back home.
             </p>
             <p>

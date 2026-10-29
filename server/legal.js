@@ -148,7 +148,7 @@ ${body}
 <footer>
   <a href="/">Back to the game</a>
   ${links}
-  <span>Made with ♥ by Ryan Polasky</span>
+  <span>Made with ♥ by <a href="https://ryanpolasky.com">Ryan Polasky</a></span>
 </footer>
 </body>
 </html>`;
