@@ -8,7 +8,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 clientsClaim();
 precacheAndRoute(self.__WB_MANIFEST);
 
-const SERVER_PATHS = /^\/(api|socket\.io|health|terms|privacy|how-to-play|sitemap\.xml|robots\.txt)(\/|$)/;
+const SERVER_PATHS = /^\/(api|socket\.io|health|terms|privacy|how-to-play|faq|sitemap\.xml|robots\.txt|llms\.txt)(\/|$)/;
 const HAS_EXTENSION = /[^/?]+\.[^/]+$/;
 
 registerRoute(({ request, url }) => request.mode === 'navigate' && !SERVER_PATHS.test(url.pathname) && !HAS_EXTENSION.test(url.pathname), createHandlerBoundToURL('/index.html'));
