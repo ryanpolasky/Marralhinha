@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
-import { Coins, ItemCard, ItemThumb, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
+import { Coins, ItemCard, ItemThumb, PreviewLoader, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
 import { Close } from './Icons';
 import { purchaseDiscordSku, startDiscordLogin } from '../net/auth';
 import { IS_ACTIVITY } from '../net/config';
@@ -192,6 +192,8 @@ function PackItems({ kind, peek }) {
 function PackArtwork({ kind, shop, className }) {
   const reduced = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
   const videoRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [loaderGone, setLoaderGone] = useState(false);
   const artwork = {
     supporter: {
       still: '/supporter-pack-still.png',
@@ -212,7 +214,7 @@ function PackArtwork({ kind, shop, className }) {
   const lazy = kind === 'supporter' ? {} : { loading: 'lazy' };
   const halloweenClosed = shop && !shop.halloween?.open;
   useEffect(() => {
-    videoRef.current?.play()?.catch(() => {});
+    videoRef.current?.play()?.catch(() => setPlaying(true));
   }, []);
 
   return (
@@ -220,7 +222,10 @@ function PackArtwork({ kind, shop, className }) {
       {reduced ? (
         <img className="pack-hero" src={artwork.still} alt={artwork.alt} width="680" height="240" {...lazy} />
       ) : (
-        <video ref={videoRef} className="pack-hero" src={artwork.animated} poster={artwork.still} width="680" height="240" autoPlay muted loop playsInline preload="auto" aria-label={artwork.alt} />
+        <>
+          {!loaderGone && <PreviewLoader />}
+          <video ref={videoRef} className={`pack-hero pack-video${playing ? ' in' : ''}`} src={artwork.animated} poster={artwork.still} width="680" height="240" autoPlay muted loop playsInline preload="auto" aria-label={artwork.alt} onPlaying={() => setPlaying(true)} onError={() => setPlaying(true)} onTransitionEnd={() => setLoaderGone(true)} />
+        </>
       )}
       {kind === 'halloween' && <span className={`halloween-ribbon${halloweenClosed ? ' closed' : ''}`}>{halloweenClosed ? 'Gone until next October' : 'Only available in October!'}</span>}
     </div>

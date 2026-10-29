@@ -9550,6 +9550,10 @@ textarea.report-text {
 .pack-card-art,
 .pack-sheet-art { position: relative; line-height: 0; }
 .pack-hero { display: block; width: 100%; height: auto; aspect-ratio: 680 / 240; object-fit: cover; }
+.pack-video { position: relative; opacity: 0; transition: opacity 0.2s ease; }
+.pack-video.in { opacity: 1; }
+.pack-art > .preview-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: pack-loader-in 0.15s ease 0.18s both; }
+@keyframes pack-loader-in { from { opacity: 0; } }
 .pack-card-body { display: block; padding: 10px 12px 12px; }
 .pack-card-row { display: flex; align-items: baseline; gap: 8px; }
 .pack-card h3 { margin: 0; font-size: 18px; line-height: 1.15; }
