@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse } from '../game/catalog';
 import { api, post } from '../net/api';
@@ -190,32 +190,38 @@ function PackItems({ kind, peek }) {
 }
 
 function PackArtwork({ kind, shop, className }) {
+  const reduced = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
+  const videoRef = useRef(null);
   const artwork = {
     supporter: {
       still: '/supporter-pack-still.png',
-      animated: '/supporter-pack.gif',
+      animated: '/supporter-pack.mp4',
       alt: 'The Tideglass marble and Beacon die floating above a moonlit table',
     },
     painter: {
       still: '/painter-pack-still.png',
-      animated: '/painter-pack.gif',
+      animated: '/painter-pack.mp4',
       alt: 'Four marbles hopping on a pedestal, each repainted a new colour as it lands',
     },
     halloween: {
       still: '/halloween-pack-still.png',
-      animated: '/halloween-pack.gif',
+      animated: '/halloween-pack.mp4',
       alt: 'A crystal ball and a candlelit die on a séance table under a crescent moon',
     },
   }[kind];
   const lazy = kind === 'supporter' ? {} : { loading: 'lazy' };
   const halloweenClosed = shop && !shop.halloween?.open;
+  useEffect(() => {
+    videoRef.current?.play()?.catch(() => {});
+  }, []);
 
   return (
     <div className={`pack-art ${className}`}>
-      <picture>
-        <source media="(prefers-reduced-motion: reduce)" srcSet={artwork.still} />
-        <img className="pack-hero" src={artwork.animated} alt={artwork.alt} width="680" height="240" {...lazy} />
-      </picture>
+      {reduced ? (
+        <img className="pack-hero" src={artwork.still} alt={artwork.alt} width="680" height="240" {...lazy} />
+      ) : (
+        <video ref={videoRef} className="pack-hero" src={artwork.animated} poster={artwork.still} width="680" height="240" autoPlay muted loop playsInline preload="auto" aria-label={artwork.alt} />
+      )}
       {kind === 'halloween' && <span className={`halloween-ribbon${halloweenClosed ? ' closed' : ''}`}>{halloweenClosed ? 'Gone until next October' : 'Only available in October!'}</span>}
     </div>
   );
