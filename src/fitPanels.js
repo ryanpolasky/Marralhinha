@@ -18,7 +18,7 @@ export function startPanelFit() {
     const zoom = parseFloat(el.style.zoom) || 1;
     if (!el.dataset.fitW) el.dataset.fitW = getComputedStyle(el).width;
     const modal = el.classList.contains('modal');
-    const natural = (modal ? el.scrollHeight : el.offsetHeight) || 1;
+    const natural = (modal ? Math.max(el.scrollHeight, el.offsetHeight) : el.offsetHeight) || 1;
     const box = el.parentElement;
     const css = box && getComputedStyle(box);
     const avail = (box?.clientHeight || window.innerHeight) - (css ? parseFloat(css.paddingTop) + parseFloat(css.paddingBottom) : 24);
