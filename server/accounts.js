@@ -276,6 +276,12 @@ class Accounts {
     return row ? { ...row, rate: row.sixes / row.rolls } : null;
   }
 
+  monthLeader(now = Date.now()) {
+    const month = monthKey(now);
+    const best = this.monthBest(month);
+    return best && { ...best, month, monthName: monthName(month), endsAt: monthStart(shiftMonth(month, 1)) };
+  }
+
   luckyStatus(user, now = Date.now(), { self = false } = {}) {
     const month = monthKey(now);
     const leader = this.monthBest(month);
