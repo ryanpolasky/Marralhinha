@@ -257,7 +257,7 @@ void main() {
 const SPRITES = 900;
 const SPRITE_ATTRS = [['position', 3], ['aColor', 3], ['aSize', 1], ['aAlpha', 1], ['aTile', 1], ['aRot', 1]];
 
-function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false }) {
+function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false, timeScale = 1 }) {
   const { gl, camera, size } = useThree();
   const live = useRef(0);
   const cursor = useRef(0);
@@ -354,7 +354,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
   useFrame((_, rawDt) => {
     if (!live.current) return;
     let j = 0;
-    const dt = Math.min(rawDt, 0.05);
+    const dt = Math.min(rawDt, 0.05) * timeScale;
     material.uniforms.uScale.value = (size.height * gl.getPixelRatio()) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const pos = geo.attributes.position.array;
     const col = geo.attributes.aColor.array;
@@ -828,36 +828,52 @@ const DECALS = {
   }],
   puddle: [256, 256, (g, w) => {
     const c = w / 2;
-    g.fillStyle = 'rgba(120,200,255,0.4)';
+    const water = g.createRadialGradient(c * 0.45, c * 0.36, c * 0.08, c, c, c * 0.88);
+    water.addColorStop(0, 'rgba(12,22,31,0.9)');
+    water.addColorStop(0.68, 'rgba(17,29,39,0.82)');
+    water.addColorStop(0.91, 'rgba(26,42,54,0.75)');
+    water.addColorStop(1, 'rgba(26,42,54,0)');
+    g.fillStyle = water;
     g.beginPath();
     for (let i = 0; i <= 40; i++) {
       const a = (i / 40) * 6.28;
-      const r = c * 0.85 * (0.82 + Math.sin(a * 5) * 0.08 + Math.sin(a * 3 + 1) * 0.07);
+      const r = c * 0.88 * (0.82 + Math.sin(a * 5) * 0.08 + Math.sin(a * 3 + 1) * 0.07);
       g.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
     }
     g.fill();
-    g.strokeStyle = 'rgba(230,248,255,0.85)';
-    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(200,222,237,0.92)';
+    g.lineWidth = 5;
     g.stroke();
-    g.strokeStyle = 'rgba(230,248,255,0.4)';
+    g.strokeStyle = 'rgba(114,151,177,0.68)';
+    g.lineWidth = 2;
     g.beginPath();
-    g.arc(c, c, c * 0.45, 0, 6.28);
+    g.arc(c, c, c * 0.77, 0, 6.28);
+    g.stroke();
+    g.strokeStyle = 'rgba(219,237,248,0.76)';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.ellipse(c * 0.68, c * 0.43, c * 0.24, c * 0.08, -0.4, 0, 6.28);
     g.stroke();
   }],
   wet: [256, 256, (g, w) => {
     const c = w / 2;
-    const shade = g.createRadialGradient(c, c, 4, c, c, c);
-    shade.addColorStop(0, 'rgba(25,29,34,0.8)');
-    shade.addColorStop(0.62, 'rgba(30,35,40,0.52)');
+    const shade = g.createRadialGradient(c * 0.48, c * 0.4, 4, c, c, c);
+    shade.addColorStop(0, 'rgba(5,8,10,0.98)');
+    shade.addColorStop(0.62, 'rgba(12,17,21,0.88)');
+    shade.addColorStop(0.9, 'rgba(18,25,30,0.68)');
     shade.addColorStop(1, 'rgba(20,24,28,0)');
     g.fillStyle = shade;
     g.beginPath();
     g.ellipse(c, c, c * 0.94, c * 0.67, -0.2, 0, 6.28);
     g.fill();
-    g.strokeStyle = 'rgba(135,147,157,0.22)';
+    g.fillStyle = 'rgba(5,8,10,0.52)';
+    g.beginPath();
+    g.ellipse(c, c, c * 0.58, c * 0.37, -0.2, 0, 6.28);
+    g.fill();
+    g.strokeStyle = 'rgba(147,171,188,0.32)';
     g.lineWidth = 3;
     g.beginPath();
-    g.ellipse(c, c, c * 0.58, c * 0.38, -0.2, 0, 6.28);
+    g.ellipse(c, c, c * 0.84, c * 0.58, -0.2, 0, 6.28);
     g.stroke();
   }],
   ticket: [320, 192, (g, w, h) => {
@@ -873,14 +889,14 @@ const DECALS = {
       g.arc(w - 14, y, 3.2, 0, 6.28);
       g.fill();
     }
-    g.fillStyle = '#a52e2b';
-    g.font = '900 31px sans-serif';
+    g.fillStyle = '#bd6661';
+    g.font = '900 64px sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText('RAIN CHECK', w / 2, h / 2 + 2);
-    g.strokeStyle = 'rgba(165,46,43,0.6)';
+    g.fillText('RAIN CHECK', w / 2, h / 2 + 2, w - 32);
+    g.strokeStyle = 'rgba(205,119,112,0.62)';
     g.lineWidth = 2;
-    g.strokeRect(37, 39, w - 74, h - 78);
+    g.strokeRect(22, 30, w - 44, h - 60);
   }],
   rune: [256, 256, (g, w) => {
     const c = w / 2;
@@ -1059,7 +1075,7 @@ const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
 export const warmDecal = (kind) => decalTexture(kind);
 
-function Decals({ bus, clip = null }) {
+function Decals({ bus, clip = null, timeScale = 1 }) {
   const { camera } = useThree();
   const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const state = useMemo(() => Array.from({ length: DECAL_POOL }, () => ({ alive: false, t: 0, life: 1, size: 1, spin: 0, angle: 0, grow: 0.3, kind: 'scorch', billboard: false, base: 1, jitter: 0, home: [0, 0, 0] })), []);
@@ -1105,7 +1121,8 @@ function Decals({ bus, clip = null }) {
     [bus, state, mats]
   );
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
+    const dt = rawDt * timeScale;
     state.forEach((s, i) => {
       const mesh = meshes.current[i];
       if (!mesh) return;
@@ -1268,26 +1285,26 @@ export const useWarmup = () => {
 };
 
 // Everything the kill effects need beyond plain bursts: billboard sprites, domes, lightning, solid shards and floor decals
-export default function Spectacle({ bus = fx, clip = null }) {
+export default function Spectacle({ bus = fx, clip = null, timeScale = 1 }) {
   const { gl } = useThree();
   const atlas = sharedAtlas();
   const root = useWarmup();
   useEffect(() => {
     [atlas, ...Object.keys(DECALS).map(decalTexture)].forEach((t) => gl.initTexture(t));
   }, [gl, atlas]);
-  useFrame((_, dt) => bus.tick(Math.min(dt, 0.05)));
+  useFrame((_, dt) => bus.tick(Math.min(dt, 0.05) * timeScale));
   return (
     <group ref={root}>
-      <Decals bus={bus} clip={clip} />
+      <Decals bus={bus} clip={clip} timeScale={timeScale} />
       <Warps bus={bus} />
       <Holes bus={bus} />
       <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />
       <Bolts bus={bus} />
       <VideoClip bus={bus} />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} timeScale={timeScale} />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive timeScale={timeScale} />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel timeScale={timeScale} />
     </group>
   );
 }

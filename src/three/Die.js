@@ -81,9 +81,10 @@ function useDieAssets() {
   );
 }
 
-function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, assets, layout }) {
+function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, showRollLabel = true, assets, layout }) {
   const materials = diceSkin(skin);
   const ref = useRef();
+  const orientation = useRef();
   const glow = useRef();
   const label = useRef();
   const loaded = skinKey(skin) === 'loaded';
@@ -134,6 +135,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     const a = anim.current;
     const now = state.clock.elapsedTime;
     const mesh = ref.current;
+    const rotation = orientation.current;
     animateDiceSkin(materials, color);
 
     const wanted = active || !!a.roll || now - a.landedAt < LAND_HOLD;
@@ -167,7 +169,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
       if (t >= 1) {
         a.roll = null;
         a.landedAt = now;
-        if (skinKey(skin) === 'unlucky') fx.emit('decal', { position: [a.pos.x, TABLE_Y + 0.015, a.pos.z], kind: 'wet', size: 0.9, life: 3, grow: 0.28, opacity: 0.75 });
+        if (skinKey(skin) === 'unlucky') fx.emit('decal', { position: [a.pos.x, TABLE_Y + 0.015, a.pos.z], kind: 'wet', size: 1.1, life: 3, grow: 0.28, opacity: 0.95 });
         a.label.start = now;
         a.label.pos.copy(a.pos);
         label.current.material.map = assets.numbers[r.die - 1];
@@ -177,21 +179,21 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
         }
       }
       mesh.position.copy(a.pos);
-      mesh.quaternion.copy(a.quat);
+      rotation.quaternion.copy(a.quat);
     } else {
       const hover = canRoll ? 0.35 + Math.sin(now * 3.5) * 0.12 : 0;
       const shrink = 1 - Math.min(a.scale, 1);
       mesh.position.set(a.pos.x, a.pos.y + hover - shrink * (SIZE / 2), a.pos.z);
-      mesh.quaternion.copy(a.quat);
-      if (canRoll) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
-      if (shrink > 0) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
+      rotation.quaternion.copy(a.quat);
+      if (canRoll) rotation.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
+      if (shrink > 0) rotation.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
     }
     glow.current.visible = canRoll && !a.roll && a.scale > 0.6;
     glow.current.position.set(a.pos.x, TABLE_Y + 0.02, a.pos.z);
     glow.current.material.opacity = 0.4 + Math.sin(now * 5) * 0.3;
 
     const lt = now - a.label.start;
-    const showLabel = lt >= 0 && lt < 1.6;
+    const showLabel = showRollLabel && lt >= 0 && lt < 1.6;
     label.current.visible = showLabel;
     if (showLabel) {
       const pop = lt < 0.25 ? 0.4 + (lt / 0.25) * 0.9 : lt < 0.4 ? 1.3 - ((lt - 0.25) / 0.15) * 0.3 : 1;
@@ -220,9 +222,13 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
 
   return (
     <group>
-      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive}>
-        {loaded && <LeadSlug />}
-      </mesh>
+      <group ref={ref}>
+        <group ref={orientation}>
+          <mesh geometry={assets.geometry} material={materials} castShadow {...interactive}>
+            {loaded && <LeadSlug />}
+          </mesh>
+        </group>
+      </group>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, 0.95, 48]} />
         <meshBasicMaterial color="#ffd166" transparent toneMapped={false} depthWrite={false} />
@@ -430,7 +436,7 @@ function DiceStorm({ stunt, skin, color, assets, layout, onPickDie }) {
   );
 }
 
-export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, layout = layoutFor('classic') }) {
+export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, showRollLabel = true, layout = layoutFor('classic') }) {
   const palette = useRainbow(colors);
   const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const assets = useDieAssets();
@@ -466,6 +472,7 @@ export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRol
           canRoll={!stormLive && canRoll && d.seat === activeSeat}
           onRoll={onRoll}
           onGone={onGone}
+          showRollLabel={showRollLabel}
           assets={assets}
           layout={layout}
         />

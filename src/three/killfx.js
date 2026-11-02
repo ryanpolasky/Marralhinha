@@ -332,15 +332,16 @@ const KILL_FX = {
   unlucky: (emit, { at, sfx, later, seq }) => {
     const base = ground(at);
     const top = off(at, 0, 1.6);
-    emit('decal', { position: base, kind: 'puddle', color: '#59636c', size: 3, life: 2.4, grow: 0.12, drain: true });
-    seq(6, 55, () => emit('spr', { position: top, n: 5, tile: TILE.smoke, c: ['#5d6875', '#7d8894'], add: false, radius: 0.28, speed: 0.55, up: 0.18, size: 0.42, size2: 0.72, life: 0.36, a: 0.66, drag: 1.8 }));
-    seq(12, 72, (k, i) => {
+    emit('decal', { position: base, kind: 'puddle', color: '#465663', size: 3.2, life: 2.6, grow: 0.1, drain: true });
+    seq(7, 55, () => emit('spr', { position: top, n: 20, tile: TILE.smoke, c: ['#4a535e', '#6b7581'], add: false, radius: 0.58, speed: 0.3, up: 0.15, size: 1, size2: 1.3, life: 0.86, a: 0.98, drag: 1.8 }));
+    seq(18, 45, (k, i) => {
       const x = (i % 4 - 1.5) * 0.18;
       const z = (Math.floor(i / 4) - 1) * 0.16;
-      emit('spr', { position: off(top, x, -0.1, z), n: 2, tile: TILE.drop, c: ['#aebdca', '#e2edf4'], add: false, speed: 0.4, up: 0.1, size: 0.12, size2: 0.08, life: 0.7, grav: 1.2, land: true, drag: 0.45 });
-      if (i % 3 === 0) emit('ring', { position: ground(at, x, z), color: '#9daab4', size: 0.5, life: 0.38 });
+      emit('spr', { position: off(top, x, -0.1, z), n: 12, tile: TILE.streak, c: ['#cfdbe6', '#e5edf4'], add: false, radius: 0.18, speed: 0.3, up: -1.2, size: 1.3, size2: 0.045, life: 0.9, grav: 1.4, land: true, drag: 0.35, rot: Math.PI / 2, a: 0.98 });
+      emit('spr', { position: off(top, x, -0.1, z), n: 6, tile: TILE.drop, c: ['#cfdbe6', '#e5edf4'], add: false, radius: 0.18, speed: 0.14, up: -0.7, size: 0.4, size2: 0.12, life: 0.7, grav: 1.4, land: true, drag: 0.35, a: 0.98 });
+      if (i % 3 === 0) emit('ring', { position: ground(at, x, z), color: '#b8c9d6', size: 0.62, life: 0.44 });
     });
-    later(950, () => emit('decal', { position: [base[0], base[1] + 0.02, base[2]], kind: 'ticket', size: 1.7, life: 2, grow: 0.2, angle: -0.12 }));
+    later(1700, () => emit('decal', { position: [base[0], base[1] + 0.02, base[2]], kind: 'ticket', size: 2.2, life: 2, grow: 0.2, angle: Math.PI / 2 - 0.12 }));
     later(700, () => sfx('splash'));
   },
   lucky: (emit, { at, sfx, seq }) => {

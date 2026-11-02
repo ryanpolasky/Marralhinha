@@ -2192,13 +2192,13 @@ function boardSpace(layout, S = 1024) {
 }
 
 function parkingLotCanvas(layout) {
-  const { canvas, ctx, S, W, L, toWorld } = boardSpace(layout);
+  const { canvas, ctx, S, W, L, toWorld, label, mid } = boardSpace(layout);
   const rand = seeded(738);
-  ctx.fillStyle = '#2a2d32';
+  ctx.fillStyle = '#34383e';
   ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 18000; i++) {
+  for (let i = 0; i < 22000; i++) {
     const light = rand() > 0.48;
-    ctx.fillStyle = light ? `rgba(170,178,184,${0.04 + rand() * 0.12})` : `rgba(5,7,9,${0.08 + rand() * 0.2})`;
+    ctx.fillStyle = light ? `rgba(190,197,203,${0.08 + rand() * 0.14})` : `rgba(5,7,9,${0.1 + rand() * 0.22})`;
     const r = 0.5 + rand() * 1.8;
     ctx.beginPath();
     ctx.ellipse(rand() * S, rand() * S, r * 1.5, r, rand() * TAU, 0, TAU);
@@ -2208,38 +2208,52 @@ function parkingLotCanvas(layout) {
   for (let arm = 0; arm < 4; arm++) {
     ctx.save();
     ctx.rotate(arm * Math.PI / 2);
-    for (let z = 2.6; z < L - 0.75; z += 0.82) {
-      [-1, 1].forEach((side) => {
-        const x = side * (W - 0.58);
-        ctx.strokeStyle = `rgba(226,230,230,${0.24 + rand() * 0.17})`;
-        ctx.lineWidth = 0.045;
-        ctx.beginPath();
-        ctx.moveTo(x - 0.36, z);
-        ctx.lineTo(x + 0.36, z);
-        ctx.stroke();
-        if (rand() > 0.6) {
-          ctx.strokeStyle = 'rgba(35,38,42,0.65)';
-          ctx.lineWidth = 0.025;
-          ctx.beginPath();
-          ctx.moveTo(x - 0.24, z + 0.015);
-          ctx.lineTo(x + 0.1, z + 0.015);
-          ctx.stroke();
-        }
-      });
+    ctx.strokeStyle = 'rgba(229,231,224,0.9)';
+    ctx.lineWidth = 0.1;
+    ctx.lineCap = 'square';
+    for (let z = 2.75; z < L - 1.05; z += 0.9) {
+      if (Math.abs(z - mid) < 0.56) continue;
+      ctx.setLineDash([0.95, 0.055, 0.46, 0.07]);
+      ctx.lineDashOffset = rand() * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(-W + 0.38, z);
+      ctx.lineTo(W - 0.38, z);
+      ctx.stroke();
     }
+    ctx.setLineDash([]);
+    label('COMPACT', 1.05, mid, { rot: Math.PI / 2, size: 0.58, max: 2.65, font: '800 100px sans-serif', color: 'rgba(229,231,224,0.78)' });
     ctx.restore();
   }
   ctx.save();
+  ctx.beginPath();
+  roundedCross(W - 0.12, L - 0.12, 0.56).forEach(([x, z], i) => (i ? ctx.lineTo(x, z) : ctx.moveTo(x, z)));
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(206,174,63,0.88)';
+  ctx.lineWidth = 0.13;
+  ctx.setLineDash([2.4, 0.08, 1.1, 0.06]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(228,205,115,0.38)';
+  ctx.lineWidth = 0.025;
+  ctx.stroke();
+  ctx.restore();
+  ctx.save();
   ctx.translate(-1.55, L - 0.95);
   ctx.rotate(-0.35);
-  const oil = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 0.76);
-  oil.addColorStop(0, 'rgba(121,110,93,0.32)');
-  oil.addColorStop(0.45, 'rgba(105,100,104,0.2)');
-  oil.addColorStop(1, 'rgba(52,55,60,0)');
+  const oil = ctx.createRadialGradient(0, 0, 0.03, 0, 0, 0.37);
+  oil.addColorStop(0, 'rgba(12,16,20,0.78)');
+  oil.addColorStop(0.62, 'rgba(21,25,30,0.72)');
+  oil.addColorStop(0.86, 'rgba(30,34,37,0.5)');
+  oil.addColorStop(1, 'rgba(52,56,62,0)');
   ctx.fillStyle = oil;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 0.76, 0.38, 0.1, 0, TAU);
+  ctx.ellipse(0, 0, 0.37, 0.2, 0.1, 0, TAU);
   ctx.fill();
+  ctx.strokeStyle = 'rgba(188,205,201,0.62)';
+  ctx.lineWidth = 0.018;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.34, 0.18, 0.1, 0, TAU);
+  ctx.stroke();
   ctx.restore();
   return canvas;
 }
@@ -5378,19 +5392,22 @@ const LUCKY_SHADER = `{
 
 const UNLUCKY_BOARD_SHADER = `{
   vec2 p = vSkinPos.xz;
-  vec2 cell = floor(p * 1.7);
-  vec2 local = fract(p * 1.7) - 0.5;
+  vec2 cell = floor(p * 0.82);
+  vec2 local = fract(p * 0.82) - 0.5;
   float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
-  float phase = fract(uSkinTime * 0.22 + seed);
-  float ring = (1.0 - smoothstep(0.018, 0.045, abs(length(local) - phase * 0.62)))
-    * (1.0 - smoothstep(0.62, 1.0, phase)) * step(0.57, seed);
-  diffuseColor.rgb += vec3(0.045, 0.05, 0.055) * ring;
+  float phase = fract(uSkinTime * 0.72 + seed);
+  float radius = phase * 0.56;
+  float ring = (1.0 - smoothstep(0.012, 0.042, abs(length(local) - radius)))
+    * (1.0 - smoothstep(0.42, 0.62, phase)) * step(0.78, seed);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.94, 0.98), ring * 0.62);
   vec2 oilP = p - uOilCenter;
-  float oil = (1.0 - smoothstep(0.25, 0.82, length(oilP * vec2(0.85, 1.6))));
+  float oilDist = length(oilP * vec2(1.0, 1.7));
+  float oil = 1.0 - smoothstep(0.18, 0.34, oilDist);
+  float oilEdge = 1.0 - smoothstep(0.008, 0.032, abs(oilDist - 0.32));
   float viewAngle = 1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
-  float film = dot(oilP, oilP) * 4.0 + uSkinTime * 0.28 + viewAngle * 6.0;
-  vec3 rainbow = vec3(0.48 + 0.22 * sin(film), 0.46 + 0.19 * sin(film + 2.1), 0.48 + 0.21 * sin(film + 4.2));
-  diffuseColor.rgb = mix(diffuseColor.rgb, rainbow, oil * 0.34);
+  float film = dot(oilP, oilP) * 18.0 + uSkinTime * 0.32 + viewAngle * 6.0;
+  vec3 rainbow = vec3(0.42 + 0.38 * sin(film), 0.43 + 0.36 * sin(film + 2.1), 0.46 + 0.34 * sin(film + 4.2));
+  diffuseColor.rgb = mix(diffuseColor.rgb, rainbow, oil * 0.12 + oilEdge * 0.92);
 }`;
 
 const SPECIAL_BOARDS = {
@@ -5514,7 +5531,7 @@ const SPECIAL_BOARDS = {
   }),
   unlucky: (layout) => ({
     canvas: parkingLotCanvas(layout), repeat: BOARD_R, roughness: 0.34, clearcoat: 0.55,
-    params: { specularIntensity: 0.3, clearcoatRoughness: 0.3, color: '#90969b' },
+    params: { specularIntensity: 0.3, clearcoatRoughness: 0.3, color: '#c3c7cb' },
     dish: '#202328', felt: '#62696e', cup: '#101215', side: '#777d82',
     accent: { color: '#8a9096', metalness: 0.6, roughness: 0.5 },
     shaderCommon: 'uniform vec2 uOilCenter;',

@@ -9,7 +9,7 @@ const MAX_RINGS = 12;
 const MAX_BEAMS = 6;
 
 // Pooled expanding rings on the board surface and vertical light beams, fed by kill-effect events
-export default function Shockwaves({ bus = fx, clip = null }) {
+export default function Shockwaves({ bus = fx, clip = null, timeScale = 1 }) {
   const rings = useMemo(() => Array.from({ length: MAX_RINGS }, () => ({ alive: false, t: 0, life: 0.6, size: 2 })), []);
   const beams = useMemo(() => Array.from({ length: MAX_BEAMS }, () => ({ alive: false, t: 0, life: 0.35, size: 1, height: 4 })), []);
   const ringMeshes = useRef([]);
@@ -44,7 +44,8 @@ export default function Shockwaves({ bus = fx, clip = null }) {
     [rings, beams, bus]
   );
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
+    const dt = rawDt * timeScale;
     rings.forEach((p, i) => {
       const mesh = ringMeshes.current[i];
       if (!mesh) return;

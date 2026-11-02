@@ -104,7 +104,7 @@ function flightAt({ segs }, t) {
 }
 
 // A strip of the real board: one marble hops three cells onto another, then the kill effect plays. Private bus so nothing leaks into a live game
-function FxPreview({ itemId, seat, replay }) {
+function FxPreview({ itemId, seat, replay, timeScale }) {
   const bus = useMemo(() => makeFxBus(), [replay]); // eslint-disable-line react-hooks/exhaustive-deps
   const victim = (seat + 1) % 4;
   useMemo(() => warmKillFx(itemId), [itemId]);
@@ -121,15 +121,19 @@ function FxPreview({ itemId, seat, replay }) {
       fired.current = false;
       target.current.visible = true;
     }
-    attackerSkin.animate?.(clock.elapsedTime);
-    victimSkin.animate?.(clock.elapsedTime);
-    const t = (clock.elapsedTime - origin.current.at) % PERIOD;
+    const elapsed = (clock.elapsedTime - origin.current.at) * timeScale;
+    attackerSkin.animate?.(elapsed);
+    victimSkin.animate?.(elapsed);
+    const t = elapsed % PERIOD;
     const h = t > START ? Math.min(HOPS, (t - START) / HOP_TIME) : 0;
     const i = Math.min(HOPS - 1, Math.floor(h));
     const e = h >= HOPS ? 1 : h - i;
     const rock = fired.current && skinKey(itemId) === 'wild' ? ballRock(t - START - HOPS * HOP_TIME) : 0;
     attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e) - rock);
     attacker.current.rotation.x = -rock / MARBLE_R;
+    const afterImpact = t - START - HOPS * HOP_TIME;
+    attacker.current.visible = !(skinKey(itemId) === 'unlucky' && fired.current && afterImpact > 0.9);
+    target.current.visible = !(skinKey(itemId) === 'unlucky' && fired.current && afterImpact > 1.45);
     if (flight.current) {
       const at = flightAt(flight.current, t - flight.current.at);
       if (at) {
@@ -163,7 +167,7 @@ function FxPreview({ itemId, seat, replay }) {
       </group>
       <mesh ref={target} geometry={MARBLE_GEO} material={victimSkin.material} position={[0, 0.07, 0]} castShadow />
       <mesh ref={attacker} geometry={MARBLE_GEO} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow />
-      <KillFxLayer key={replay} bus={bus} layout={CLASSIC} origin={BOARD_ORIGIN} />
+      <KillFxLayer key={replay} bus={bus} layout={CLASSIC} origin={BOARD_ORIGIN} timeScale={timeScale} />
     </group>
   );
 }
@@ -177,17 +181,20 @@ const STACK_Y = 0.07 + 0.335 * 1.95;
 const BLOCKER = [[0, 1]];
 
 // Same lane as the kill fx stage, but the stand-in sits one cell into the path so the runner stacks onto it and hops off like a real over-jump
-function TrailPreview({ itemId, seat, replay }) {
+function TrailPreview({ itemId, seat, replay, timeScale }) {
   const bus = useMemo(() => makeFxBus(), [replay]); // eslint-disable-line react-hooks/exhaustive-deps
   const skin = marbleSkin('marble.classic', seat);
   const blockerSkin = marbleSkin('marble.classic', (seat + 1) % 4);
   const m = useRef();
   const last = useRef(null);
   const prevI = useRef(-1);
+  const origin = useRef(null);
   useFrame(({ clock }) => {
-    skin.animate?.(clock.elapsedTime);
-    blockerSkin.animate?.(clock.elapsedTime);
-    const t = clock.elapsedTime % RUN_PERIOD;
+    if (origin.current == null) origin.current = clock.elapsedTime;
+    const elapsed = (clock.elapsedTime - origin.current) * timeScale;
+    skin.animate?.(elapsed);
+    blockerSkin.animate?.(elapsed);
+    const t = elapsed % RUN_PERIOD;
     const leg = Math.floor(t / (RUN_LEG + RUN_PAUSE));
     const back = leg === 1;
     const u = t - leg * (RUN_LEG + RUN_PAUSE);
@@ -224,7 +231,7 @@ function TrailPreview({ itemId, seat, replay }) {
       </group>
       <mesh geometry={MARBLE_GEO} material={blockerSkin.material} position={[0, 0.07, 1]} castShadow />
       <mesh ref={m} geometry={MARBLE_GEO} material={skin.material} position={[0, 0.07, RUN]} castShadow />
-      <Spectacle key={replay} bus={bus} />
+      <Spectacle key={replay} bus={bus} timeScale={timeScale} />
     </group>
   );
 }
@@ -274,12 +281,12 @@ function CompileGate({ children, onReady }) {
   );
 }
 
-export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady }) {
+export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady, timeScale = 1 }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
   const cloudMarble = slot === 'marble' && skinKey(itemId) === 'unlucky';
   return (
-    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : cloudMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
+    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 3.8, 6.4] : cloudMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
         tuneRenderer(state);
         state.camera.lookAt(0, stage ? 0.9 : cloudMarble ? 0.7 : 0, 0);
       }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
@@ -289,8 +296,8 @@ export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0
         {slot === 'marble' && <MarblePreview itemId={itemId} seat={seat} color={color} />}
         {slot === 'dice' && <DicePreview itemId={itemId} />}
         {slot === 'board' && <BoardPreview itemId={itemId} />}
-        {slot === 'fx' && <FxPreview itemId={itemId} seat={seat} replay={replay} />}
-        {slot === 'trail' && <TrailPreview itemId={itemId} seat={seat} replay={replay} />}
+        {slot === 'fx' && <FxPreview itemId={itemId} seat={seat} replay={replay} timeScale={timeScale} />}
+        {slot === 'trail' && <TrailPreview itemId={itemId} seat={seat} replay={replay} timeScale={timeScale} />}
       </CompileGate>
     </Canvas>
   );
