@@ -259,6 +259,7 @@ test('Luckiest follows the month\'s best single-game six rate, with a minimum of
   assert.equal(change.holder, b.id);
   assert.equal(change.previous, a.id);
   assert.equal(accounts.luckyStatus(accounts.getUser(a.id), start + 5).leader.name, 'B');
+  assert.equal(accounts.monthLeader(start + 5).id, b.id, 'leaderboard shows who is poised to win the month');
   recordLuckyGame(matches, a, 45, 30, start + 6, { coveredRolls: 20, coveredSixes: 20 });
   assert.equal(accounts.refreshLucky(start + 6), null, 'bot-covered rolls do not count toward the minimum');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM luckiest_reigns').get().n, 2);

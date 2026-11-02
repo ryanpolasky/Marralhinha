@@ -107,7 +107,10 @@ class Matches {
       xp: u.xp,
       ...(u.lucky_months ? { luckyMonths: u.lucky_months, luckyLast: u.lucky_last } : {}),
     });
+    const lead = this.accounts.monthLeader();
+    const leadUser = lead && this.accounts.getUser(lead.id);
     return {
+      luckyNow: leadUser ? { ...mini(leadUser), rate: lead.rate, rolls: lead.rolls, sixes: lead.sixes, monthName: lead.monthName, endsAt: lead.endsAt } : null,
       wins: this.q.leadersWins.all(BOARD_MIN_GAMES, BOARD_SIZE).map(mini),
       winRate: this.q.leadersRate.all(BOARD_MIN_GAMES, BOARD_SIZE).map(mini),
       sixes: this.q.leadersSixes.all(BOARD_SIZE).map(mini),

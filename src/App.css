@@ -8710,6 +8710,27 @@ select.admin-input optgroup {
   border-color: var(--accent);
 }
 
+.board-poised {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  margin-bottom: 6px;
+  border-color: rgba(255, 209, 102, 0.55);
+  background: rgba(255, 209, 102, 0.08);
+}
+
+.board-poised:hover {
+  background: rgba(255, 209, 102, 0.14);
+}
+
+.board-poised-kicker {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
 .board-rank {
   width: 26px;
   flex: none;

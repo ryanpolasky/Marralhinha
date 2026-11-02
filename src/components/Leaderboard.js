@@ -38,6 +38,8 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
 
   const board = BOARDS.find(([key]) => key === tab);
   const rows = data?.[tab] || [];
+  const poised = tab === 'lucky' ? data?.luckyNow : null;
+  const daysLeft = poised && Math.max(1, Math.ceil((poised.endsAt - Date.now()) / 86400000));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -63,6 +65,24 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
         {!data && !error && <p className="muted center">Loading…</p>}
 
         <div className="board-list" role="tabpanel">
+          {poised && (
+            <button
+              type="button"
+              className={`board-row board-poised${poised.id === meId ? ' me' : ''}`}
+              onClick={() => onPlayer?.(poised)}
+              title={`See ${poised.name}'s stats`}
+            >
+              <span className="board-poised-kicker">Poised to win {poised.monthName.split(' ')[0]}</span>
+              <span className="board-name">
+                {poised.id === meId ? 'You' : poised.name}
+                <TagBadges tags={poised.tags} badges={poised.badges} small />
+              </span>
+              <span className="board-detail muted">
+                {poised.sixes}/{poised.rolls} sixes · {daysLeft} day{daysLeft === 1 ? '' : 's'} left
+              </span>
+              <b className="board-value">{Math.round(poised.rate * 100)}%</b>
+            </button>
+          )}
           {rows.map((u, i) => (
             <button
               key={u.id}
