@@ -97,21 +97,17 @@ export function SettingsModal({ onClose, onReport, account, onPainterColor }) {
             </span>
           </label>
         </div>
-        {(onReport || !IS_ACTIVITY) && (
-          <div className="settings-group">
-            <h3>Support</h3>
-            {onReport && (
-              <button className="btn secondary block" onClick={() => { onClose(); onReport(); }}>
-                <Bug /> Report & ideas
-              </button>
-            )}
-            {!IS_ACTIVITY && (
-              <ExternalLink className="btn secondary block" href={DISCORD_INVITE}>
-                <DiscordMark /> Join the official Discord
-              </ExternalLink>
-            )}
-          </div>
-        )}
+        <div className="settings-group">
+          <h3>Support</h3>
+          {onReport && (
+            <button className="btn secondary block" onClick={() => { onClose(); onReport(); }}>
+              <Bug /> Report & ideas
+            </button>
+          )}
+          <ExternalLink className="btn secondary block" href={DISCORD_INVITE}>
+            <DiscordMark /> {IS_ACTIVITY ? 'Join the Marralhinha server' : 'Join the official Discord'}
+          </ExternalLink>
+        </div>
       </div>
     </div>,
     document.body
