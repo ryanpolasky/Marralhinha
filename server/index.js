@@ -75,9 +75,11 @@ const emitToSeats = (room, seats, event, payload) => {
 const announceLucky = (change) => {
   if (!change) return;
   const { holder, previous, reclaimed, champions = [] } = change;
-  for (const { id, monthName } of champions) {
-    const name = accounts.getUser(id)?.name;
-    if (name) io.emit('luckiest:change', `${name} won Luckiest for ${monthName}!`);
+  for (const { id, monthName, rolls, sixes } of champions) {
+    const user = accounts.getUser(id);
+    if (!user?.name) continue;
+    io.emit('luckiest:change', `${user.name} won Luckiest for ${monthName}!`);
+    discord.announceLuckiest({ name: user.name, discordId: user.discord_id, monthName, rolls, sixes }).catch((err) => console.error('[luckiest webhook]', err));
   }
   if (holder !== previous && holder) {
     const name = accounts.getUser(holder)?.name;
