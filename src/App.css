@@ -11388,12 +11388,12 @@ body {
 .plate-unlucky .account-name,
 .plate-unlucky .chip-name-text,
 .plate-unlucky .seat-name-text {
-  -webkit-box-reflect: below 1px linear-gradient(transparent 38%, rgba(197, 220, 230, 0.26));
+  -webkit-box-reflect: below -1px linear-gradient(transparent 30%, rgba(197, 220, 230, 0.42));
   filter: url(#puddle-wave) blur(0.15px);
 }
 .plate-unlucky.mini .chip-name-text,
 .plate-unlucky .chip-name-text {
-  -webkit-box-reflect: below 0 linear-gradient(transparent 44%, rgba(197, 220, 230, 0.18));
+  -webkit-box-reflect: below -2px linear-gradient(transparent 30%, rgba(197, 220, 230, 0.42));
 }
 .puddle-filter-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 @keyframes puddle-breathe { 0%, 100% { transform: scaleX(0.93); opacity: 0.45; } 50% { transform: scaleX(1.06); opacity: 0.75; } }

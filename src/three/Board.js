@@ -526,7 +526,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
       {table && !materials.noTable && <Table materials={materials} />}
       {table && skinKey(shownSkin) === 'unlucky' && (
         <group position={[layout.spec.halfLength + 0.5, TABLE_Y, layout.spec.halfWidth + 0.5]}>
-          <BucketModel scale={0.88} />
+          <BucketModel scale={1.5} />
         </group>
       )}
       {table && skinKey(shownSkin) === 'unlucky' && <WaterDamageFX layout={layout} />}

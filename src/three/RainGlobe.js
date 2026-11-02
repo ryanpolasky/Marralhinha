@@ -3,102 +3,136 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 
 const _world = new THREE.Vector3();
+const LEVEL = -0.04;
+const DROPS = 7;
+const PUFFS = [[-0.2, 0, 0, 0.2], [0.02, 0.07, 0.02, 0.24], [0.22, 0.01, -0.02, 0.18], [-0.06, -0.02, 0.15, 0.17], [0.1, -0.03, -0.15, 0.16], [-0.18, -0.08, -0.08, 0.14], [0.2, -0.08, 0.08, 0.13]];
+
+const shellMaterial = () => {
+  const material = new THREE.MeshPhysicalMaterial({
+    color: '#ffffff', roughness: 0.02, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02,
+    envMapIntensity: 2.4, transparent: true, opacity: 0.06, depthWrite: false,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `float rim = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.6);
+       outgoingLight += vec3(0.75, 0.86, 0.97) * rim * 0.9;
+       diffuseColor.a = max(diffuseColor.a, rim * 0.55);
+       #include <opaque_fragment>`
+    );
+  };
+  material.customProgramCacheKey = () => 'unlucky-rain-globe-shell';
+  return material;
+};
+
+const waterMaterial = (color) => {
+  const surface = new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.28);
+  const material = new THREE.MeshPhysicalMaterial({
+    color, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, opacity: 0.92, side: THREE.DoubleSide,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uSurface = { value: surface };
+    shader.uniforms.uLevel = { value: LEVEL };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vLocalY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocalY = position.y;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vLocalY;\nuniform vec3 uSurface;\nuniform float uLevel;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vLocalY > uLevel) discard;')
+      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        if (!gl_FrontFacing) gl_FragColor = vec4(uSurface * 0.9, 0.96);`);
+  };
+  material.customProgramCacheKey = () => 'unlucky-rain-globe-water';
+  return material;
+};
 
 export default function RainGlobe({ anchor, color = '#d84040', size = 0.335 }) {
   const root = useRef();
   const contents = useRef();
+  const drops = useRef([]);
+  const rings = useRef([]);
   const state = useMemo(() => ({ x: 0, z: 0, vx: 0, vz: 0, initialized: false, last: new THREE.Vector3() }), []);
-  const waterColor = useMemo(() => new THREE.Color(color.main || color), [color]);
-  const shell = useMemo(() => {
-    const material = new THREE.MeshPhysicalMaterial({
-      color: '#f6fbff',
-      roughness: 0.035,
-      metalness: 0,
-      clearcoat: 1,
-      clearcoatRoughness: 0.025,
-      envMapIntensity: 2,
-      transparent: true,
-      opacity: 0.2,
-      depthWrite: false,
-      side: THREE.FrontSide,
-    });
-    material.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <output_fragment>',
-        `float globeFresnel = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.2);
-         float globeReflection = pow(max(dot(normalize(normal), normalize(vec3(-0.4, 0.65, 0.7))), 0.0), 22.0);
-         outgoingLight += vec3(0.68, 0.82, 0.96) * globeFresnel * 1.4 + vec3(0.82, 0.93, 1.0) * globeReflection * 0.8;
-         diffuseColor.a = max(diffuseColor.a, globeFresnel * 0.38);
-         #include <output_fragment>`
-      );
-    };
-    material.customProgramCacheKey = () => 'unlucky-rain-globe-shell';
-    return material;
-  }, []);
-  const water = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: waterColor,
-    transparent: true,
-    opacity: 0.88,
-    roughness: 0.12,
-    metalness: 0.02,
-    clearcoat: 1,
-    clearcoatRoughness: 0.06,
-    side: THREE.DoubleSide,
-  }), [waterColor]);
-  const cloud = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c9d0d5', roughness: 0.92 }), []);
-  const ripple = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#e7f4ff', roughness: 0.12, metalness: 0.08, transparent: true, opacity: 0.7, side: THREE.DoubleSide }), []);
-  const shellGeometry = useMemo(() => new THREE.SphereGeometry(size, 48, 32), [size]);
+  const seat = color.main || color;
+  const materials = useMemo(() => ({
+    shell: shellMaterial(),
+    water: waterMaterial(seat),
+    cloud: new THREE.MeshStandardMaterial({ color: '#d9dee2', roughness: 1 }),
+    cloudBelly: new THREE.MeshStandardMaterial({ color: '#8f99a3', roughness: 1 }),
+    drop: new THREE.MeshBasicMaterial({ color: '#e8f3fa', transparent: true, opacity: 0.9 }),
+    ring: new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }),
+  }), [seat]);
+  const seeds = useMemo(() => Array.from({ length: DROPS }, (_, i) => ({
+    x: (((i * 37) % 11) / 11 - 0.5) * 0.42,
+    z: (((i * 53) % 7) / 7 - 0.5) * 0.24,
+    o: i / DROPS,
+  })), []);
+  const top = 0.34;
+  const bottom = LEVEL + 0.01;
 
-  useFrame((_, dt) => {
+  useFrame(({ clock }, dt) => {
     const step = Math.min(dt, 0.05);
     if (anchor?.current && root.current) {
       anchor.current.getWorldPosition(_world);
       root.current.position.copy(_world);
-      root.current.rotation.set(0, 0, 0);
       if (step > 0) {
         if (!state.initialized) {
           state.last.copy(_world);
           state.initialized = true;
         } else {
-          const dx = (_world.x - state.last.x) / step;
-          const dz = (_world.z - state.last.z) / step;
-          state.vx += (-dx * 0.012 - state.x * 7 - state.vx * 4.2) * step;
-          state.vz += (-dz * 0.012 - state.z * 7 - state.vz * 4.2) * step;
+          const dx = (_world.x - state.last.x) / step / size;
+          const dz = (_world.z - state.last.z) / step / size;
+          state.vx += (dz * 0.05 - state.x * 60 - state.vx * 7) * step;
+          state.vz += (-dx * 0.05 - state.z * 60 - state.vz * 7) * step;
           state.x += state.vx * step;
           state.z += state.vz * step;
           state.last.copy(_world);
         }
       }
     }
-    if (contents.current) {
-      contents.current.rotation.set(THREE.MathUtils.clamp(state.x, -0.28, 0.28), 0, THREE.MathUtils.clamp(state.z, -0.28, 0.28));
-      contents.current.children[0].rotation.z = Math.sin(performance.now() * 0.0014) * 0.012;
-    }
+    if (contents.current) contents.current.rotation.set(THREE.MathUtils.clamp(state.x, -0.35, 0.35), 0, THREE.MathUtils.clamp(state.z, -0.35, 0.35));
+    const t = clock.elapsedTime * 1.6;
+    seeds.forEach((s, i) => {
+      const p = (t + s.o) % 1;
+      const drop = drops.current[i];
+      if (drop) drop.position.y = (top - (top - bottom) * Math.min(1, p / 0.7)) * size;
+      if (drop) drop.visible = p < 0.7;
+      const ring = rings.current[i];
+      if (ring) {
+        const k = Math.max(0, (p - 0.7) / 0.3);
+        ring.visible = p >= 0.7;
+        ring.scale.setScalar(size * (0.02 + k * 0.12));
+        ring.material.opacity = 0.7 * (1 - k);
+      }
+    });
   });
 
   return (
-    <group ref={root} renderOrder={1}>
+    <group ref={root}>
       <group ref={contents}>
-        <mesh position={[0, -size * 0.62, 0]} scale={[size * 0.92, size * 0.39, size * 0.92]} material={water}>
-          <sphereGeometry args={[1, 36, 24]} />
+        <mesh material={materials.water} scale={size * 0.95} renderOrder={1}>
+          <sphereGeometry args={[1, 48, 32]} />
         </mesh>
-        <group position={[0, size * 0.56, 0]}>
-          <mesh position={[-size * 0.1, 0, 0]} scale={[size * 0.27, size * 0.14, size * 0.2]} material={cloud}><sphereGeometry args={[1, 16, 12]} /></mesh>
-          <mesh position={[size * 0.1, size * 0.035, 0]} scale={[size * 0.2, size * 0.16, size * 0.2]} material={cloud}><sphereGeometry args={[1, 16, 12]} /></mesh>
-          <mesh position={[0, size * 0.02, size * 0.13]} scale={[size * 0.2, size * 0.13, size * 0.16]} material={cloud}><sphereGeometry args={[1, 16, 12]} /></mesh>
+        <group position={[0, size * 0.48, 0]}>
+          {PUFFS.map(([x, y, z, r], i) => (
+            <mesh key={i} position={[x * size, y * size, z * size]} scale={r * size} material={i < 5 ? materials.cloud : materials.cloudBelly}>
+              <sphereGeometry args={[1, 16, 12]} />
+            </mesh>
+          ))}
         </group>
-        {[0, 1, 2].map((i) => (
-          <mesh key={i} position={[(i - 1) * size * 0.11, -size * 0.035, 0]} material={cloud}>
-            <cylinderGeometry args={[size * 0.006, size * 0.009, size * 0.39, 6]} />
+        {seeds.map((s, i) => (
+          <mesh key={i} ref={(m) => { drops.current[i] = m; }} position={[s.x * size, 0, s.z * size]} material={materials.drop} scale={[size, size, size]}>
+            <cylinderGeometry args={[0.008, 0.008, 0.09, 4]} />
           </mesh>
         ))}
-        {[0, 1].map((i) => (
-          <mesh key={`r${i}`} position={[0, -size * 0.22, 0]} rotation-x={-Math.PI / 2} scale={[1 + i * 0.15, 1 + i * 0.15, 1]} material={ripple}>
-            <ringGeometry args={[size * (0.11 + i * 0.03), size * (0.125 + i * 0.03), 32]} />
+        {seeds.map((s, i) => (
+          <mesh key={`r${i}`} ref={(m) => { rings.current[i] = m; }} position={[s.x * size, (LEVEL + 0.005) * size * 0.95, s.z * size]} rotation-x={-Math.PI / 2} material={materials.ring.clone()} renderOrder={2}>
+            <ringGeometry args={[0.8, 1, 24]} />
           </mesh>
         ))}
       </group>
-      <mesh geometry={shellGeometry} material={shell} renderOrder={2} />
+      <mesh material={materials.shell} scale={size} renderOrder={3}>
+        <sphereGeometry args={[1, 48, 32]} />
+      </mesh>
     </group>
   );
 }

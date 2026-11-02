@@ -2137,74 +2137,106 @@ function boardSpace(layout, S = 1024) {
 function waterDamageCanvas(layout) {
   const { canvas, ctx, S, W, L, toWorld } = boardSpace(layout);
   const rand = seeded(1457);
-  ctx.fillStyle = '#aa9878';
+  ctx.fillStyle = '#a77a4b';
   ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 11000; i++) {
-    const x = rand() * S;
-    const y = rand() * S;
-    ctx.fillStyle = rand() > 0.5 ? 'rgba(61,47,33,0.055)' : 'rgba(238,222,188,0.055)';
-    ctx.fillRect(x, y, 2 + rand() * 22, 0.6 + rand() * 1.2);
+  for (let i = 0; i < 26; i++) softBlob(ctx, rand() * S, rand() * S, 80 + rand() * 200, i % 2 ? '#94683d' : '#b88a58', 0.3);
+  for (let i = 0; i < 420; i++) {
+    const y0 = rand() * S;
+    const amp = 2 + rand() * 6;
+    const freq = 0.004 + rand() * 0.01;
+    const ph = rand() * TAU;
+    ctx.strokeStyle = rand() > 0.45 ? `rgba(58,34,16,${0.08 + rand() * 0.16})` : `rgba(196,150,98,${0.06 + rand() * 0.1})`;
+    ctx.lineWidth = 0.6 + rand() * 1.8;
+    ctx.beginPath();
+    for (let x = 0; x <= S; x += 16) {
+      const y = y0 + Math.sin(x * freq + ph) * amp + Math.sin(x * freq * 3.1 + ph) * amp * 0.3;
+      if (!x) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let y = S / 8; y < S; y += S / 8) {
+    ctx.fillStyle = 'rgba(40,22,10,0.45)';
+    ctx.fillRect(0, y + (rand() - 0.5) * 6, S, 1.6);
   }
   toWorld();
-  for (let i = 0; i < 12; i++) {
-    const arm = Math.floor(rand() * 4);
-    const along = W + rand() * (L - W - 0.2);
-    const across = (rand() - 0.5) * W * 1.1;
-    const [x, z] = [[along, across], [-along, across], [across, along], [across, -along]][arm];
-    const rx = 0.6 + rand() * 0.8;
-    const rz = 0.4 + rand() * 0.6;
-    const stain = ctx.createRadialGradient(x, z, rx * 0.48, x, z, rx);
-    stain.addColorStop(0, 'rgba(105,68,43,0.38)');
-    stain.addColorStop(0.74, 'rgba(111,70,43,0.38)');
-    stain.addColorStop(0.84, 'rgba(70,42,30,0.72)');
-    stain.addColorStop(0.9, 'rgba(122,81,49,0.32)');
-    stain.addColorStop(1, 'rgba(122,81,49,0)');
-    ctx.save();
-    ctx.translate(x, z);
-    ctx.rotate(rand() * Math.PI);
-    ctx.scale(1, rz / rx);
-    ctx.fillStyle = stain;
+  const blob = (x, z, r, jag) => {
     ctx.beginPath();
-    for (let p = 0; p < 24; p++) {
-      const a = p / 24 * TAU;
-      const radius = rx * (0.83 + rand() * 0.27);
-      const px = Math.cos(a) * radius;
-      const py = Math.sin(a) * radius;
-      if (!p) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    for (let p = 0; p <= 64; p++) {
+      const a = (p / 64) * TAU;
+      const rr = r * (1 + Math.sin(a * 2 + jag) * 0.16 + Math.sin(a * 5 + jag * 1.7) * 0.08 + Math.sin(a * 11 + jag * 3.1) * 0.035);
+      const px = x + Math.cos(a) * rr;
+      const pz = z + Math.sin(a) * rr * 0.82;
+      if (!p) ctx.moveTo(px, pz); else ctx.lineTo(px, pz);
     }
     ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+  };
+  const stains = [[W * 0.56, L - 1.2, 2.3], [L - 1.2, -W * 0.56, 2.1], [-W * 0.56, -L + 1.2, 2.2], [-L + 1.6, W * 0.3, 1.5], [W * 0.3, -W * 0.5, 1.6], [-W * 0.6, L - 2.8, 1.2]];
+  stains.forEach(([x, z, r]) => {
+    const jag = rand() * TAU;
+    for (let k = 0; k < 10; k++) {
+      blob(x, z, r * (1.02 - k * 0.05), jag + k * 0.08);
+      ctx.fillStyle = 'rgba(92,56,22,0.06)';
+      ctx.fill();
+    }
+    blob(x, z, r, jag);
+    ctx.strokeStyle = 'rgba(66,34,10,0.7)';
+    ctx.lineWidth = 0.045;
+    ctx.stroke();
+    blob(x, z, r * 0.97, jag);
+    ctx.strokeStyle = 'rgba(122,78,34,0.45)';
+    ctx.lineWidth = 0.09;
+    ctx.stroke();
+    [0.62, 0.34].forEach((f, k) => {
+      blob(x + (rand() - 0.5) * 0.3, z + (rand() - 0.5) * 0.3, r * f, jag + 1.3 + k);
+      ctx.strokeStyle = `rgba(74,40,12,${0.35 - k * 0.1})`;
+      ctx.lineWidth = 0.03;
+      ctx.stroke();
+    });
+  });
+  for (let i = 0; i < 7; i++) {
+    const arm = i % 4;
+    const along = W + 0.6 + rand() * (L - W - 1.4);
+    const across = (rand() - 0.5) * W * 1.2;
+    const [x, z] = [[along, across], [-along, across], [across, along], [across, -along]][arm];
+    const r = 0.3 + rand() * 0.12;
+    const start = rand() * TAU;
+    ctx.strokeStyle = 'rgba(238,228,206,0.42)';
+    ctx.lineWidth = 0.05;
+    ctx.beginPath();
+    ctx.ellipse(x, z, r, r, 0, start, start + TAU * (0.7 + rand() * 0.3));
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(238,228,206,0.18)';
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.ellipse(x + 0.02, z - 0.01, r * 0.86, r * 0.86, 0, 0, TAU);
+    ctx.stroke();
   }
-  [[-W * 0.72, -L * 0.12], [W * 0.54, L * 0.58]].forEach(([x, z], i) => {
+  [[-W * 0.72, -L * 0.42], [W * 0.62, L * 0.18]].forEach(([x, z], i) => {
     ctx.save();
     ctx.translate(x, z);
-    ctx.rotate(i * 0.8);
-    ctx.fillStyle = 'rgba(72,51,35,0.48)';
+    ctx.rotate(i * 0.9);
+    ctx.fillStyle = 'rgba(30,16,6,0.5)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 0.48, 0.28, 0.15, 0, TAU);
+    ctx.ellipse(0.04, 0.05, 0.46, 0.26, 0, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = '#b6a27b';
+    ctx.fillStyle = '#b48a5c';
     ctx.beginPath();
-    ctx.moveTo(-0.34, -0.08);
-    ctx.lineTo(-0.12, -0.37);
-    ctx.lineTo(0.37, -0.21);
-    ctx.lineTo(0.43, 0.03);
-    ctx.lineTo(0.02, 0.2);
-    ctx.closePath();
+    ctx.ellipse(0, 0, 0.42, 0.22, 0, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(234,219,182,0.7)';
-    ctx.lineWidth = 0.025;
+    ctx.strokeStyle = 'rgba(60,34,14,0.8)';
+    ctx.lineWidth = 0.018;
+    ctx.beginPath();
+    ctx.moveTo(-0.3, -0.02); ctx.lineTo(-0.05, 0.06); ctx.lineTo(0.12, -0.05); ctx.lineTo(0.32, 0.03);
     ctx.stroke();
     ctx.restore();
   });
-  for (let i = 0; i < 700; i++) {
+  for (let i = 0; i < 900; i++) {
     const edge = rand() > 0.5;
-    const x = edge ? (rand() > 0.5 ? 1 : -1) * (W - rand() * 0.7) : (rand() - 0.5) * 2 * W;
-    const z = edge ? (rand() - 0.5) * 2 * L : (rand() > 0.5 ? 1 : -1) * (L - rand() * 0.7);
-    ctx.fillStyle = `rgba(52,67,49,${0.04 + rand() * 0.11})`;
+    const x = edge ? (rand() > 0.5 ? 1 : -1) * (W - rand() * 0.6) : (rand() - 0.5) * 2 * W;
+    const z = edge ? (rand() - 0.5) * 2 * L : (rand() > 0.5 ? 1 : -1) * (L - rand() * 0.6);
+    ctx.fillStyle = `rgba(34,44,28,${0.08 + rand() * 0.2})`;
     ctx.beginPath();
-    ctx.arc(x, z, 0.012 + rand() * 0.045, 0, TAU);
+    ctx.arc(x, z, 0.01 + rand() * 0.04, 0, TAU);
     ctx.fill();
   }
   return canvas;
@@ -5352,10 +5384,9 @@ const WATER_DAMAGE_SHADER = `{
     float ring = (1.0 - smoothstep(0.018, 0.052, abs(dist - phase * 0.58)))
       * (1.0 - smoothstep(0.72, 1.0, phase));
     float edge = 1.0 - smoothstep(0.012, 0.045, abs(dist - 0.43));
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.19, 0.22, 0.23), puddle * 0.26);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.07, 0.05), puddle * 0.5);
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.64, 0.66), ring * 0.62 + edge * 0.28);
     roughnessFactor = mix(roughnessFactor, 0.14, puddle * 0.92);
-    clearcoatRoughness = mix(clearcoatRoughness, 0.12, puddle);
   }
 }`;
 
@@ -5481,9 +5512,9 @@ const SPECIAL_BOARDS = {
   unlucky: (layout) => {
     const { halfWidth: w, halfLength: l } = layout.spec;
     return {
-      canvas: waterDamageCanvas(layout), repeat: BOARD_R, roughness: 0.72, clearcoat: 0.42,
+      canvas: waterDamageCanvas(layout), repeat: BOARD_R, roughness: 0.55, clearcoat: 0.5,
       params: { specularIntensity: 0.3, clearcoatRoughness: 0.3 },
-      dish: '#71634e', felt: '#514c43', cup: '#25211c', side: '#786b58',
+      dish: '#6e4b2e', felt: '#37332e', cup: '#22160c', side: '#6a4a2e',
       accent: { color: '#a4a9aa', metalness: 0.82, roughness: 0.36 },
       shaderCommon: 'uniform vec2 uLeakPoints[4];',
       uniforms: { uLeakPoints: { value: [new THREE.Vector2(w * 0.56, l - 1.2), new THREE.Vector2(l - 1.2, -w * 0.56), new THREE.Vector2(-w * 0.56, -l + 1.2), new THREE.Vector2(l + 0.5, w + 0.5)] } },
