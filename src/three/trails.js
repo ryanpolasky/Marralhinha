@@ -231,6 +231,12 @@ const TRAILS = {
   },
 
   // tidy tufts part on alternating sides, and hopping onto another marble startles it
+  unlucky: (emit, p, { n, bumps = [] }) => {
+    const y = overBumps(p[0], p[2], bumps);
+    emit('spr', { position: [p[0], y + 0.55, p[2]], tile: TILE.smoke, c: ['#7d8894', '#a5afb8'], add: false, size: 0.26, size2: 0.36, life: 0.48, a: 0.6, drag: 1.7 });
+    emit('spr', { position: [p[0], y + 0.4, p[2]], n: n % 2 ? 2 : 3, tile: TILE.drop, c: ['#bcc8d1', '#e6edf2'], add: false, speed: 0.12, up: 0, size: 0.1, size2: 0.07, life: 0.5, grav: 1, land: true, drag: 0.5 });
+    emit('decal', { position: [p[0], 0.09, p[2]], kind: 'wet', size: 0.42, life: 3, grow: 0.3, opacity: 0.68 });
+  },
   wild: (emit, p, { n, prev, bumps = [] }) => {
     const from = prev || p;
     const len = Math.hypot(p[0] - from[0], p[2] - from[2]) || 1;

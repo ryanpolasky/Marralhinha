@@ -121,6 +121,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     };
     a.scale = 1;
     a.vel = 0;
+    a.landedAt = -10;
     a.gone = false;
     a.label.start = -10;
     sfx.dice();
@@ -149,6 +150,11 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     }
     mesh.visible = a.scale > 0.01;
     mesh.scale.setScalar(Math.min(a.scale, 1.25));
+    const squashAge = now - a.landedAt;
+    if (skinKey(skin) === 'unlucky' && squashAge >= 0 && squashAge < 0.35) {
+      const hit = Math.exp(-squashAge * 9) * (0.58 + 0.42 * Math.cos(squashAge * 22));
+      mesh.scale.set(a.scale * (1 + hit * 0.12), a.scale * (1 - hit * 0.28), a.scale * (1 + hit * 0.12));
+    }
 
     if (a.roll) {
       const r = a.roll;
@@ -161,6 +167,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
       if (t >= 1) {
         a.roll = null;
         a.landedAt = now;
+        if (skinKey(skin) === 'unlucky') fx.emit('decal', { position: [a.pos.x, TABLE_Y + 0.015, a.pos.z], kind: 'wet', size: 0.9, life: 3, grow: 0.28, opacity: 0.75 });
         a.label.start = now;
         a.label.pos.copy(a.pos);
         label.current.material.map = assets.numbers[r.die - 1];

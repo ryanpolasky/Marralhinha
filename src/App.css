@@ -6175,6 +6175,24 @@ img.emote-glyph {
   pointer-events: none;
 }
 
+.tag-badge.tag-unlucky {
+  color: #eef3f8;
+  background: #56626f;
+  border-color: #8796a6;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.tag-unlucky-icon { display: block; width: 1em; height: 1em; flex: none; color: #dbe5ef; }
+.tag-unlucky .unl-drops path { animation: tag-unlucky-drip 1.4s ease-in infinite; transform-box: fill-box; transform-origin: center; }
+.tag-unlucky .unl-drops path:nth-child(2) { animation-delay: 0.25s; }
+.tag-unlucky .unl-drops path:nth-child(3) { animation-delay: 0.5s; }
+@keyframes tag-unlucky-drip {
+  0% { transform: translateY(-2px); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(3px); opacity: 0; }
+}
+
 @keyframes glitter {
   50% {
     opacity: 0.2;
@@ -11325,6 +11343,42 @@ body {
 .plate-lucky.big > span:not(.avatar) { text-shadow: 0 0 7px rgba(255, 196, 70, 0.55), 0 1px 3px #021a0e; }
 .plate-lucky .badge { background: rgba(255, 255, 255, 0.16); }
 
+.plate-unlucky {
+  --plate-ink: #eef3f8;
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(128deg, transparent 0 15px, rgba(220, 232, 242, 0.11) 15px 16px, transparent 16px 27px),
+    linear-gradient(105deg, #3d4753, #56626f);
+  border-color: #8796a6 !important;
+  box-shadow: none !important;
+  animation: overcast-rain 5s linear infinite;
+}
+.thumb-nameplate .plate-unlucky,
+.plate-preview .plate-unlucky { background: repeating-linear-gradient(128deg, transparent 0 15px, rgba(220, 232, 242, 0.11) 15px 16px, transparent 16px 27px), linear-gradient(105deg, #3d4753, #56626f) !important; }
+.plate-unlucky::after {
+  content: '';
+  position: absolute;
+  top: 40%;
+  right: 7px;
+  width: 5px;
+  height: 8px;
+  border-radius: 70% 25% 65% 65%;
+  background: #dbe5ef;
+  opacity: 0;
+  pointer-events: none;
+  animation: overcast-drip 4s ease-in infinite;
+}
+.plate-unlucky .account-name,
+.plate-unlucky .chip-name-text,
+.plate-unlucky .seat-name-text,
+.plate-unlucky.big > span:not(.avatar) { color: #eef3f8; text-shadow: 0 1px 3px rgba(10, 16, 22, 0.85); }
+@keyframes overcast-rain { to { background-position: -48px 48px, 0 0; } }
+@keyframes overcast-drip {
+  0%, 72% { transform: translateY(-4px); opacity: 0; }
+  76% { opacity: 0.9; }
+  100% { transform: translateY(13px) scale(0.7); opacity: 0; }
+}
+
 .thumb-marble.skin-lucky {
   background: radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85) 0 5%, transparent 16%),
     radial-gradient(ellipse 34% 14% at 36% 44%, transparent 0 58%, #ffe08a 64% 78%, transparent 84%),
@@ -11353,6 +11407,25 @@ body {
   --t2: #fff3b8;
   --t-bg: #04301a;
 }
+.thumb-marble.skin-unlucky {
+  background: repeating-linear-gradient(110deg, transparent 0 10px, rgba(225, 237, 246, 0.52) 11px 12px, transparent 13px 21px),
+    radial-gradient(circle at 54% 56%, color-mix(in srgb, var(--seat-light), #aebbc7 35%), color-mix(in srgb, var(--seat), #74818e 35%) 53%, color-mix(in srgb, var(--seat-dark), #333b44 35%) 92%);
+  box-shadow: inset -7px -9px 14px rgba(0, 0, 0, 0.42), inset 4px 4px 11px rgba(255, 255, 255, 0.18);
+}
+.thumb-board.skin-unlucky {
+  background: repeating-linear-gradient(90deg, transparent 0 15px, rgba(220, 224, 226, 0.65) 16px 18px, transparent 19px 34px),
+    radial-gradient(ellipse at 75% 24%, rgba(170, 120, 118, 0.8), transparent 15%),
+    radial-gradient(circle at 50% 50%, #34383e 0, #24272c 72%, #17191d);
+  box-shadow: inset 0 0 0 2px #7a838c;
+}
+.thumb-dice.skin-unlucky {
+  --face: radial-gradient(circle at 18% 20%, #745f26 0 1.5px, transparent 2.5px), radial-gradient(circle at 70% 26%, #725f28 0 2px, transparent 3px),
+    radial-gradient(circle at 52% 70%, #725f28 0 1.4px, transparent 2.5px), #e3c13f;
+  --pip: #51471f;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3);
+}
+.thumb-fx.skin-unlucky { --fx: #5d6875; --fx2: #d8d1c1; --fx-bg: #353b42; }
+.thumb-trail.skin-unlucky { --t1: #7d8894; --t2: #d5e0e8; --t-bg: #333940; }
 .item-card.locked .thumb-marble.skin-lucky,
 .item-card.locked .thumb-board.skin-lucky { animation: none; }
 

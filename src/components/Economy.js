@@ -78,6 +78,16 @@ export function TagBadge({ tag, small = false, icon = false, title }) {
           <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
         </svg>
       )}
+      {tag === 'unlucky' && (
+        <svg className="tag-unlucky-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M7 15a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 17.8 7.6 3.8 3.8 0 0 1 17.5 15Z" />
+          <g className="unl-drops" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M8 18l-.7 2.4" />
+            <path d="M12.5 18l-.7 2.4" />
+            <path d="M17 18l-.7 2.4" />
+          </g>
+        </svg>
+      )}
       {icon ? tag === 'beta' && info.label[0] : info.label}
     </span>
   );

@@ -1133,6 +1133,30 @@ const MARBLES = {
       onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-molten',
       animate: (m, t) => { uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 2.1; } };
   },
+  unlucky: (c) => {
+    const uniforms = { uRainTime: { value: 0 } };
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const color = new THREE.Color(c.main).lerp(new THREE.Color('#7d8894'), 0.35);
+    return {
+      color, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.18,
+      onBeforeCompile: (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec2 vRainUv;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRainUv = uv;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform float uRainTime;\nvarying vec2 vRainUv;\nfloat rainWet = 0.0;')
+          .replace('#include <color_fragment>', `#include <color_fragment>
+            float lane = sin(vRainUv.x * 63.0 + sin(vRainUv.y * 13.0 + uRainTime * 0.18) * 1.8);
+            float rivulet = smoothstep(0.57, 0.92, lane) * (0.62 + 0.38 * sin(vRainUv.y * 27.0 - uRainTime * 1.1));
+            rainWet = clamp(rivulet, 0.0, 1.0);
+            diffuseColor.rgb *= 1.0 - rainWet * 0.23;`)
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.055, rainWet * 0.9);');
+      },
+      customProgramCacheKey: () => 'marble-unlucky-rivulets',
+      animate: (m, t) => { uniforms.uRainTime.value = reducedMotion?.matches ? 0 : t; },
+    };
+  },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
   halloween: (c, seat) => {
     const W = 512;
@@ -1354,7 +1378,7 @@ export function marbleSkin(itemId, seat, color = null) {
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'cloud' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 
@@ -1394,6 +1418,7 @@ const DICE = {
   minecraft: { bg: 'minecraft', pip: '#2fd8e8', one: '#22d36a', roughness: 0.85 },
   defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
+  unlucky: { bg: 'sponge', pip: '#51471f', one: '#51471f', roughness: 1 },
   sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
@@ -1402,8 +1427,8 @@ const DICE = {
 };
 
 const SCANNER_LEDS = [['#7a1010', 85, 0.19], ['#7a6a10', 170, 0.25], ['#1a6a20', 255, 0.31]];
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'unlucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const MOTION_SAFE_DICE = ['unlucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
 
 const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
@@ -1481,7 +1506,25 @@ function grid(ctx, size, step, color, width = 1) {
 
 function dieBackground(ctx, style, size, value) {
   const rand = seeded(200 + value);
-  if (style === 'wood') ctx.drawImage(makeWoodCanvas({ base: '#b9824a', grain: '80,40,15', seed: 30 + value, size: 256 }), 0, 0);
+  if (style === 'sponge') {
+    ctx.fillStyle = '#e3c13f';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 760; i++) {
+      const x = rand() * size;
+      const y = rand() * size;
+      const r = 1 + rand() * 3.2;
+      ctx.fillStyle = `rgba(87,71,26,${0.18 + rand() * 0.28})`;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 1.35, r, rand() * TAU, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = `rgba(77,64,26,${0.6 + rand() * 0.3})`;
+      ctx.beginPath();
+      ctx.ellipse(x + r * 0.14, y + r * 0.1, r * 0.55, r * 0.4, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,238,141,0.25)';
+      ctx.fillRect(x - r * 0.6, y - r * 0.65, r * 0.45, 0.7);
+    }
+  } else if (style === 'wood') ctx.drawImage(makeWoodCanvas({ base: '#b9824a', grain: '80,40,15', seed: 30 + value, size: 256 }), 0, 0);
   else if (style === 'jade') {
     ctx.fillStyle = '#2e7d54';
     ctx.fillRect(0, 0, size, size);
@@ -1870,6 +1913,26 @@ function blockPips(ctx, value, size, color, lit = true) {
   });
 }
 
+function spongePips(ctx, value, size, color) {
+  PIPS[value].forEach(([x, y]) => {
+    const cx = x * size;
+    const cy = y * size;
+    const r = value === 1 ? 29 : 21;
+    ctx.fillStyle = '#a88e32';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r + 2, r + 2, 0, 0, TAU);
+    ctx.fill();
+    const shade = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, 2, cx, cy, r);
+    shade.addColorStop(0, '#4b421e');
+    shade.addColorStop(0.7, color);
+    shade.addColorStop(1, '#746128');
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.9, 0, 0, TAU);
+    ctx.fill();
+  });
+}
+
 const DIE_FACE_ORDER = [2, 5, 1, 6, 3, 4];
 
 export function diceSkin(itemId) {
@@ -1882,7 +1945,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips, unlucky: spongePips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1927,7 +1990,12 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'train' ? `{
+            .replace('#include <color_fragment>', key === 'unlucky' ? `#include <color_fragment>
+              float dampY = fract(uSkinTime * 0.12 + uFacePhase * 0.2);
+              float dampBand = 1.0 - smoothstep(0.012, 0.085, abs(vMapUv.y - dampY));
+              float soaked = step(vMapUv.y, dampY) * 0.2;
+              diffuseColor.rgb *= 1.0 - soaked - dampBand * 0.25;` : '#include <color_fragment>')
+            .replace('#include <emissivemap_fragment>', key === 'unlucky' ? '{ totalEmissiveRadiance = vec3(0.0); }' : key === 'train' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               float wag = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(uSkinTime * 5.0 + uFacePhase));
@@ -2121,6 +2189,59 @@ function boardSpace(layout, S = 1024) {
     ctx.restore();
   };
   return { canvas, ctx, S, W, L, toWorld, label, mid: (from + to) / 2, room: to - from };
+}
+
+function parkingLotCanvas(layout) {
+  const { canvas, ctx, S, W, L, toWorld } = boardSpace(layout);
+  const rand = seeded(738);
+  ctx.fillStyle = '#2a2d32';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 18000; i++) {
+    const light = rand() > 0.48;
+    ctx.fillStyle = light ? `rgba(170,178,184,${0.04 + rand() * 0.12})` : `rgba(5,7,9,${0.08 + rand() * 0.2})`;
+    const r = 0.5 + rand() * 1.8;
+    ctx.beginPath();
+    ctx.ellipse(rand() * S, rand() * S, r * 1.5, r, rand() * TAU, 0, TAU);
+    ctx.fill();
+  }
+  toWorld();
+  for (let arm = 0; arm < 4; arm++) {
+    ctx.save();
+    ctx.rotate(arm * Math.PI / 2);
+    for (let z = 2.6; z < L - 0.75; z += 0.82) {
+      [-1, 1].forEach((side) => {
+        const x = side * (W - 0.58);
+        ctx.strokeStyle = `rgba(226,230,230,${0.24 + rand() * 0.17})`;
+        ctx.lineWidth = 0.045;
+        ctx.beginPath();
+        ctx.moveTo(x - 0.36, z);
+        ctx.lineTo(x + 0.36, z);
+        ctx.stroke();
+        if (rand() > 0.6) {
+          ctx.strokeStyle = 'rgba(35,38,42,0.65)';
+          ctx.lineWidth = 0.025;
+          ctx.beginPath();
+          ctx.moveTo(x - 0.24, z + 0.015);
+          ctx.lineTo(x + 0.1, z + 0.015);
+          ctx.stroke();
+        }
+      });
+    }
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.translate(-1.55, L - 0.95);
+  ctx.rotate(-0.35);
+  const oil = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 0.76);
+  oil.addColorStop(0, 'rgba(121,110,93,0.32)');
+  oil.addColorStop(0.45, 'rgba(105,100,104,0.2)');
+  oil.addColorStop(1, 'rgba(52,55,60,0)');
+  ctx.fillStyle = oil;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.76, 0.38, 0.1, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+  return canvas;
 }
 
 function cardboardCanvas(layout) {
@@ -5255,6 +5376,23 @@ const LUCKY_SHADER = `{
   totalEmissiveRadiance += goldC * (top * (gold * (a + twinkle) * 0.9 + twinkle * 0.3) + gold * sideGlint * 0.6);
 }`;
 
+const UNLUCKY_BOARD_SHADER = `{
+  vec2 p = vSkinPos.xz;
+  vec2 cell = floor(p * 1.7);
+  vec2 local = fract(p * 1.7) - 0.5;
+  float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+  float phase = fract(uSkinTime * 0.22 + seed);
+  float ring = (1.0 - smoothstep(0.018, 0.045, abs(length(local) - phase * 0.62)))
+    * (1.0 - smoothstep(0.62, 1.0, phase)) * step(0.57, seed);
+  diffuseColor.rgb += vec3(0.045, 0.05, 0.055) * ring;
+  vec2 oilP = p - uOilCenter;
+  float oil = (1.0 - smoothstep(0.25, 0.82, length(oilP * vec2(0.85, 1.6))));
+  float viewAngle = 1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+  float film = dot(oilP, oilP) * 4.0 + uSkinTime * 0.28 + viewAngle * 6.0;
+  vec3 rainbow = vec3(0.48 + 0.22 * sin(film), 0.46 + 0.19 * sin(film + 2.1), 0.48 + 0.21 * sin(film + 4.2));
+  diffuseColor.rgb = mix(diffuseColor.rgb, rainbow, oil * 0.34);
+}`;
+
 const SPECIAL_BOARDS = {
   // An oak deck with a log rim, stump trays with bark sides, and a crafting table in the middle.
   // Outer walls get bark; hole walls carry the planks down into the divots
@@ -5374,6 +5512,15 @@ const SPECIAL_BOARDS = {
     uniforms: { uSide: { value: finish(decoSideCanvas()) } },
     shader: LUCKY_SHADER,
   }),
+  unlucky: (layout) => ({
+    canvas: parkingLotCanvas(layout), repeat: BOARD_R, roughness: 0.34, clearcoat: 0.55,
+    params: { specularIntensity: 0.3, clearcoatRoughness: 0.3, color: '#90969b' },
+    dish: '#202328', felt: '#62696e', cup: '#101215', side: '#777d82',
+    accent: { color: '#8a9096', metalness: 0.6, roughness: 0.5 },
+    shaderCommon: 'uniform vec2 uOilCenter;',
+    uniforms: { uOilCenter: { value: new THREE.Vector2(-1.55, layout.spec.halfLength - 0.95) } },
+    shader: UNLUCKY_BOARD_SHADER,
+  }),
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -5456,7 +5603,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'glass']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'unlucky', 'wild', 'cardboard', 'glass']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

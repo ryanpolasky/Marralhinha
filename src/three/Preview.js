@@ -17,6 +17,7 @@ import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
 import { ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { SingularityAura } from './Gravity';
+import RainCloud from './RainCloud';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
@@ -37,11 +38,14 @@ function MarblePreview({ itemId, seat, color }) {
   useFrame(({ clock }) => skin.animate?.(clock.elapsedTime));
   if (skin.aura === 'singularity') return <SingularityAura size={0.62} color={color || SEAT_COLORS[seat]} energy={PREVIEW_ENERGY} seed={seat} />;
   return (
-    <Spinner>
-      <mesh material={skin.material}>
-        <sphereGeometry args={[1.35, 64, 40]} />
-      </mesh>
-    </Spinner>
+    <group>
+      <Spinner>
+        <mesh material={skin.material}>
+          <sphereGeometry args={[1.35, 64, 40]} />
+        </mesh>
+      </Spinner>
+      {skin.aura === 'cloud' && <RainCloud size={1.35} />}
+    </group>
   );
 }
 
@@ -273,10 +277,11 @@ function CompileGate({ children, onReady }) {
 export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
+  const cloudMarble = slot === 'marble' && skinKey(itemId) === 'unlucky';
   return (
-    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : [0, 0.4, 6.2] }} onCreated={(state) => {
+    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 5.2, 9.5] : cloudMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
         tuneRenderer(state);
-        state.camera.lookAt(0, stage ? 0.9 : 0, 0);
+        state.camera.lookAt(0, stage ? 0.9 : cloudMarble ? 0.7 : 0, 0);
       }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <FrameCap />
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />

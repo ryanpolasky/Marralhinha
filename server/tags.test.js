@@ -37,7 +37,7 @@ test('tags are stored, normalized and drive the admin flag', () => {
 test('Supporter is ordered above Luckiest and cannot be granted as a stored tag', () => {
   const { accounts } = setup();
   const { id } = accounts.createUser({ name: 'Supporter' });
-  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky', 'halloween', 'painter']);
+  assert.deepEqual(Object.keys(catalog.tags), ['dev', 'beta', 'supporter', 'lucky', 'unlucky', 'halloween', 'painter']);
   assert.equal(catalog.items.filter((item) => item.tag === 'supporter').length, 6);
   accounts.setTags(id, ['supporter', 'lucky', 'beta']);
   assert.deepEqual(accounts.tags(accounts.getUser(id)), ['beta']);

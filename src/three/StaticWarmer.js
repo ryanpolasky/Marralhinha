@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
 import { idle } from './Board';
+import { boardSkin, diceSkin, marbleSkin } from './skins';
 
 const PROBE_GEO = new THREE.PlaneGeometry(1, 1);
 const PROBE_MAP = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -9,13 +10,17 @@ PROBE_MAP.needsUpdate = true;
 
 // Program variants that otherwise compile for the first time mid-game: name tags, the die/ghost labels,
 // the invisible pick meshes, the turn gem and the burst particles
-export const probeMaterials = () => [
-  new THREE.SpriteMaterial({ map: PROBE_MAP, transparent: true }),
-  new THREE.SpriteMaterial({ map: PROBE_MAP, transparent: true, toneMapped: false }),
-  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
-  new THREE.MeshPhysicalMaterial({ roughness: 0.1, clearcoat: 1, flatShading: true }),
-  new THREE.MeshBasicMaterial({ toneMapped: false }),
-];
+export const probeMaterials = () => {
+  const base = [
+    new THREE.SpriteMaterial({ map: PROBE_MAP, transparent: true }),
+    new THREE.SpriteMaterial({ map: PROBE_MAP, transparent: true, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
+    new THREE.MeshPhysicalMaterial({ roughness: 0.1, clearcoat: 1, flatShading: true }),
+  ];
+  const marble = marbleSkin('marble.unlucky', 0);
+  const board = boardSkin('board.unlucky');
+  return [...base, marble.material, ...board.surfaces, ...diceSkin('dice.unlucky'), new THREE.MeshBasicMaterial({ toneMapped: false })];
+};
 
 export const buildProbes = (materials) => {
   const scratch = new THREE.Scene();

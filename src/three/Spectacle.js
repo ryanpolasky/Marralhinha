@@ -844,6 +844,44 @@ const DECALS = {
     g.arc(c, c, c * 0.45, 0, 6.28);
     g.stroke();
   }],
+  wet: [256, 256, (g, w) => {
+    const c = w / 2;
+    const shade = g.createRadialGradient(c, c, 4, c, c, c);
+    shade.addColorStop(0, 'rgba(25,29,34,0.8)');
+    shade.addColorStop(0.62, 'rgba(30,35,40,0.52)');
+    shade.addColorStop(1, 'rgba(20,24,28,0)');
+    g.fillStyle = shade;
+    g.beginPath();
+    g.ellipse(c, c, c * 0.94, c * 0.67, -0.2, 0, 6.28);
+    g.fill();
+    g.strokeStyle = 'rgba(135,147,157,0.22)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.ellipse(c, c, c * 0.58, c * 0.38, -0.2, 0, 6.28);
+    g.stroke();
+  }],
+  ticket: [320, 192, (g, w, h) => {
+    g.fillStyle = '#e8e0ce';
+    g.fillRect(14, 10, w - 28, h - 20);
+    g.strokeStyle = '#b6aa91';
+    g.lineWidth = 2;
+    g.strokeRect(15, 11, w - 30, h - 22);
+    g.fillStyle = '#31353a';
+    for (let y = 20; y < h - 12; y += 13) {
+      g.beginPath();
+      g.arc(14, y, 3.2, 0, 6.28);
+      g.arc(w - 14, y, 3.2, 0, 6.28);
+      g.fill();
+    }
+    g.fillStyle = '#a52e2b';
+    g.font = '900 31px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('RAIN CHECK', w / 2, h / 2 + 2);
+    g.strokeStyle = 'rgba(165,46,43,0.6)';
+    g.lineWidth = 2;
+    g.strokeRect(37, 39, w - 74, h - 78);
+  }],
   rune: [256, 256, (g, w) => {
     const c = w / 2;
     g.strokeStyle = '#fff';
@@ -1019,6 +1057,7 @@ const PANELS = { bsod: 512 / 352, headshot: 1 };
 const DECAL_POOL = 6;
 const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
+export const warmDecal = (kind) => decalTexture(kind);
 
 function Decals({ bus, clip = null }) {
   const { camera } = useThree();
@@ -1052,7 +1091,7 @@ function Decals({ bus, clip = null }) {
         const s = state[i];
         const kind = d.kind;
         const billboard = kind in PANELS;
-        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, home: d.position });
+        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, drain: !!d.drain, home: d.position });
         const m = mats[i];
         m.map = decalTexture(kind);
         m.color.set(d.color || '#ffffff');
@@ -1079,8 +1118,9 @@ function Decals({ bus, clip = null }) {
       const k = s.t / s.life;
       const pop = Math.min(1, s.t / 0.22);
       const sc = s.size * (s.grow + (1 - s.grow) * (1 - (1 - pop) ** 3));
-      const aspect = PANELS[s.kind] || 1;
-      mesh.scale.set(sc * aspect, sc, 1);
+      const aspect = s.kind === 'ticket' ? 320 / 192 : PANELS[s.kind] || 1;
+      const drain = s.drain && k > 0.5 ? 1 - ((k - 0.5) / 0.5) * 0.65 : 1;
+      mesh.scale.set(sc * aspect * drain, sc * drain, 1);
       if (s.billboard) {
         mesh.parent.getWorldQuaternion(q).invert().multiply(camera.quaternion);
         mesh.quaternion.copy(q);
@@ -1088,6 +1128,14 @@ function Decals({ bus, clip = null }) {
         mesh.position.set(s.home[0] + rand(-jit, jit), s.home[1] + rand(-jit, jit) * 0.5, s.home[2]);
         mesh.visible = !(s.jitter && Math.random() < 0.06 && k > 0.2);
       } else {
+        if (s.kind === 'ticket') {
+          const peel = Math.max(0, Math.min(1, (k - 0.58) / 0.42));
+          mesh.position.y = s.home[1] + peel * 0.25;
+          mesh.rotation.x = -Math.PI / 2 - peel * 0.45;
+        } else {
+          mesh.position.y = s.home[1];
+          mesh.rotation.x = -Math.PI / 2;
+        }
         mesh.rotation.z = s.angle + s.spin * s.t;
       }
       mats[i].opacity = s.base * Math.min(1, s.t / 0.08) * (k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1);

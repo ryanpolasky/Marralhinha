@@ -1,7 +1,7 @@
 import { SEAT_COLORS } from '../game/geometry';
 import { skinKey } from '../game/catalog';
 import { fx } from './fx';
-import { videoFor } from './Spectacle';
+import { videoFor, warmDecal } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
 import { ANVIL, BALL, TRAIN } from './Props';
 
@@ -329,6 +329,20 @@ const KILL_FX = {
     sfx('splash');
   },
 
+  unlucky: (emit, { at, sfx, later, seq }) => {
+    const base = ground(at);
+    const top = off(at, 0, 1.6);
+    emit('decal', { position: base, kind: 'puddle', color: '#59636c', size: 3, life: 2.4, grow: 0.12, drain: true });
+    seq(6, 55, () => emit('spr', { position: top, n: 5, tile: TILE.smoke, c: ['#5d6875', '#7d8894'], add: false, radius: 0.28, speed: 0.55, up: 0.18, size: 0.42, size2: 0.72, life: 0.36, a: 0.66, drag: 1.8 }));
+    seq(12, 72, (k, i) => {
+      const x = (i % 4 - 1.5) * 0.18;
+      const z = (Math.floor(i / 4) - 1) * 0.16;
+      emit('spr', { position: off(top, x, -0.1, z), n: 2, tile: TILE.drop, c: ['#aebdca', '#e2edf4'], add: false, speed: 0.4, up: 0.1, size: 0.12, size2: 0.08, life: 0.7, grav: 1.2, land: true, drag: 0.45 });
+      if (i % 3 === 0) emit('ring', { position: ground(at, x, z), color: '#9daab4', size: 0.5, life: 0.38 });
+    });
+    later(950, () => emit('decal', { position: [base[0], base[1] + 0.02, base[2]], kind: 'ticket', size: 1.7, life: 2, grow: 0.2, angle: -0.12 }));
+    later(700, () => sfx('splash'));
+  },
   lucky: (emit, { at, sfx, seq }) => {
     const base = ground(at);
     const gold = ['#fff3b8', '#ffd166', '#f0b93a', '#c48a1c'];
@@ -503,7 +517,14 @@ const KILL_FX = {
 };
 
 const CLIPS = { police: '/fx/police-crash.mp4' };
-export const warmKillFx = (itemId) => CLIPS[skinKey(itemId)] && videoFor(CLIPS[skinKey(itemId)]);
+export const warmKillFx = (itemId) => {
+  const key = skinKey(itemId);
+  if (key === 'unlucky') {
+    warmDecal('ticket');
+    warmDecal('puddle');
+  }
+  return CLIPS[key] && videoFor(CLIPS[key]);
+};
 
 export const playKillFx = (itemId, info, { bus = fx, sfx = () => {} } = {}) => {
   (KILL_FX[skinKey(itemId)] || KILL_FX.pop)(bus.emit, { ...info, sfx, ...timeline(bus) });
