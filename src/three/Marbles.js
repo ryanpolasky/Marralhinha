@@ -7,7 +7,7 @@ import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { SHADOW_ONLY, SingularityAura } from './Gravity';
 import { SolCorona } from './Corona';
-import RainCloud from './RainCloud';
+import RainGlobe from './RainGlobe';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
@@ -237,7 +237,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   const rocky = star && stunt?.kind === 'rocky';
   const aura = skinAura === 'singularity' && !rocky;
   const corona = skinAura === 'corona' && !rocky;
-  const cloud = skinAura === 'cloud';
+  const globe = skinAura === 'rain-globe';
   if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
@@ -426,10 +426,9 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   return (
     <>
       <group ref={group}>
-        <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow />
+        <mesh ref={body} geometry={MARBLE_GEO} material={aura || globe ? SHADOW_ONLY : material} castShadow />
         {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} />}
         {corona && <SolCorona size={MARBLE_R} color={color} seed={seed} />}
-        {cloud && <RainCloud size={MARBLE_R} />}
         {rocky && <Limbs rig={rig} />}
         {down && (
           <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
@@ -442,6 +441,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
           </mesh>
         )}
       </group>
+      {globe && <RainGlobe anchor={group} color={color} size={MARBLE_R} />}
       {movable && (
         <mesh ref={halo} geometry={HALO_GEO} position={[target.x, 0.02, target.z]} rotation-x={-Math.PI / 2}>
           <meshBasicMaterial color={selected ? '#ffe066' : color.light} transparent toneMapped={false} depthWrite={false} />

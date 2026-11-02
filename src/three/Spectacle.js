@@ -855,49 +855,6 @@ const DECALS = {
     g.ellipse(c * 0.68, c * 0.43, c * 0.24, c * 0.08, -0.4, 0, 6.28);
     g.stroke();
   }],
-  wet: [256, 256, (g, w) => {
-    const c = w / 2;
-    const shade = g.createRadialGradient(c * 0.48, c * 0.4, 4, c, c, c);
-    shade.addColorStop(0, 'rgba(5,8,10,0.98)');
-    shade.addColorStop(0.62, 'rgba(12,17,21,0.88)');
-    shade.addColorStop(0.9, 'rgba(18,25,30,0.68)');
-    shade.addColorStop(1, 'rgba(20,24,28,0)');
-    g.fillStyle = shade;
-    g.beginPath();
-    g.ellipse(c, c, c * 0.94, c * 0.67, -0.2, 0, 6.28);
-    g.fill();
-    g.fillStyle = 'rgba(5,8,10,0.52)';
-    g.beginPath();
-    g.ellipse(c, c, c * 0.58, c * 0.37, -0.2, 0, 6.28);
-    g.fill();
-    g.strokeStyle = 'rgba(147,171,188,0.32)';
-    g.lineWidth = 3;
-    g.beginPath();
-    g.ellipse(c, c, c * 0.84, c * 0.58, -0.2, 0, 6.28);
-    g.stroke();
-  }],
-  ticket: [320, 192, (g, w, h) => {
-    g.fillStyle = '#e8e0ce';
-    g.fillRect(14, 10, w - 28, h - 20);
-    g.strokeStyle = '#b6aa91';
-    g.lineWidth = 2;
-    g.strokeRect(15, 11, w - 30, h - 22);
-    g.fillStyle = '#31353a';
-    for (let y = 20; y < h - 12; y += 13) {
-      g.beginPath();
-      g.arc(14, y, 3.2, 0, 6.28);
-      g.arc(w - 14, y, 3.2, 0, 6.28);
-      g.fill();
-    }
-    g.fillStyle = '#bd6661';
-    g.font = '900 64px sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText('RAIN CHECK', w / 2, h / 2 + 2, w - 32);
-    g.strokeStyle = 'rgba(205,119,112,0.62)';
-    g.lineWidth = 2;
-    g.strokeRect(22, 30, w - 44, h - 60);
-  }],
   rune: [256, 256, (g, w) => {
     const c = w / 2;
     g.strokeStyle = '#fff';
@@ -1073,7 +1030,6 @@ const PANELS = { bsod: 512 / 352, headshot: 1 };
 const DECAL_POOL = 6;
 const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
-export const warmDecal = (kind) => decalTexture(kind);
 
 function Decals({ bus, clip = null, timeScale = 1 }) {
   const { camera } = useThree();
@@ -1135,7 +1091,7 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
       const k = s.t / s.life;
       const pop = Math.min(1, s.t / 0.22);
       const sc = s.size * (s.grow + (1 - s.grow) * (1 - (1 - pop) ** 3));
-      const aspect = s.kind === 'ticket' ? 320 / 192 : PANELS[s.kind] || 1;
+      const aspect = PANELS[s.kind] || 1;
       const drain = s.drain && k > 0.5 ? 1 - ((k - 0.5) / 0.5) * 0.65 : 1;
       mesh.scale.set(sc * aspect * drain, sc * drain, 1);
       if (s.billboard) {
@@ -1145,14 +1101,8 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
         mesh.position.set(s.home[0] + rand(-jit, jit), s.home[1] + rand(-jit, jit) * 0.5, s.home[2]);
         mesh.visible = !(s.jitter && Math.random() < 0.06 && k > 0.2);
       } else {
-        if (s.kind === 'ticket') {
-          const peel = Math.max(0, Math.min(1, (k - 0.58) / 0.42));
-          mesh.position.y = s.home[1] + peel * 0.25;
-          mesh.rotation.x = -Math.PI / 2 - peel * 0.45;
-        } else {
-          mesh.position.y = s.home[1];
-          mesh.rotation.x = -Math.PI / 2;
-        }
+        mesh.position.y = s.home[1];
+        mesh.rotation.x = -Math.PI / 2;
         mesh.rotation.z = s.angle + s.spin * s.t;
       }
       mats[i].opacity = s.base * Math.min(1, s.t / 0.08) * (k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1);
@@ -1166,6 +1116,45 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
       ))}
     </group>
   );
+}
+
+const BEAD_POOL = 48;
+
+function WaterBeads({ bus, clip = null, timeScale = 1 }) {
+  const state = useMemo(() => Array.from({ length: BEAD_POOL }, () => ({ alive: false, t: 0, life: 3, at: new THREE.Vector3(), size: 0.07 })), []);
+  const meshes = useRef([]);
+  const geometry = useMemo(() => new THREE.SphereGeometry(1, 16, 10), []);
+  const materials = useMemo(() => state.map(() => {
+    const m = new THREE.MeshPhysicalMaterial({ color: '#a6d4e2', metalness: 0.06, roughness: 0.035, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.9, depthWrite: false });
+    clipToBoard(m, clip);
+    return m;
+  }), [state, clip]);
+  useEffect(() => () => { geometry.dispose(); materials.forEach((m) => m.dispose()); }, [geometry, materials]);
+  useEffect(() => bus.on((type, d) => {
+    if (type !== 'bead') return;
+    const i = Math.max(0, state.findIndex((s) => !s.alive));
+    const s = state[i];
+    Object.assign(s, { alive: true, t: 0, life: d.life || 3, size: d.size || 0.075 });
+    s.at.set(d.position[0], d.position[1], d.position[2]);
+  }), [bus, state]);
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05) * timeScale;
+    state.forEach((s, i) => {
+      const mesh = meshes.current[i];
+      if (!mesh) return;
+      if (s.alive) {
+        s.t += dt;
+        if (s.t >= s.life) s.alive = false;
+      }
+      mesh.visible = s.alive;
+      if (!s.alive) return;
+      const k = s.t / s.life;
+      mesh.position.copy(s.at);
+      mesh.scale.set(s.size * (1.15 - k * 0.5), s.size * (0.56 - k * 0.3), s.size * (0.86 - k * 0.35));
+      materials[i].opacity = Math.max(0.08, 0.9 * (1 - k));
+    });
+  });
+  return <group>{state.map((_, i) => <mesh key={i} ref={(m) => { meshes.current[i] = m; }} geometry={geometry} material={materials[i]} visible={false} />)}</group>;
 }
 
 const VIDEO_VERT = `
@@ -1296,6 +1285,7 @@ export default function Spectacle({ bus = fx, clip = null, timeScale = 1 }) {
   return (
     <group ref={root}>
       <Decals bus={bus} clip={clip} timeScale={timeScale} />
+      <WaterBeads bus={bus} clip={clip} timeScale={timeScale} />
       <Warps bus={bus} />
       <Holes bus={bus} />
       <Shards bus={bus} clip={clip} />

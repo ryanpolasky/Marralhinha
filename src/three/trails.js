@@ -230,12 +230,12 @@ const TRAILS = {
     emit('spr', { position: [p[0], p[1] + 0.25, p[2]], n: n % 2 ? 1 : 2, tile: TILE.smoke, c: ['#ffffff', '#eeeeec', '#dcdad6'], add: false, speed: 0.35, up: 1.1, uj: 0.4, size: n % 2 ? 0.3 : 0.5, size2: 1.3, life: 1.3, a: 0.85, drag: 1.4 });
   },
 
-  // tidy tufts part on alternating sides, and hopping onto another marble startles it
   unlucky: (emit, p, { n, bumps = [] }) => {
     const y = overBumps(p[0], p[2], bumps);
-    emit('spr', { position: [p[0], y + 0.55, p[2]], n: 6, tile: TILE.smoke, c: ['#6b7581', '#7d8894'], add: false, radius: 0.22, speed: 0.08, up: 0.04, size: 0.42, size2: 0.58, life: 0.9, a: 0.96, drag: 1.9 });
-    emit('spr', { position: [p[0], y + 0.43, p[2]], n: n % 2 ? 3 : 4, tile: TILE.drop, c: ['#cfdbe6', '#e6edf2'], add: false, speed: 0.32, up: 0.02, size: 0.26, size2: 0.14, life: 0.78, grav: 2.8, land: true, drag: 0.45 });
-    emit('decal', { position: [p[0], 0.09, p[2]], kind: 'wet', size: 0.9, life: 3, grow: 0.26, opacity: 0.98 });
+    const dripY = Math.max(0.26, y + 0.38);
+    emit('spr', { position: [p[0], dripY, p[2]], n: n % 2 ? 1 : 2, tile: TILE.streak, c: ['#d7edf3', '#a8d4e0'], add: false, speed: 0.04, up: -0.32, uj: 0.12, size: 0.34, size2: 0.045, life: 0.58, grav: 0.15, drag: 0.5, a: 0.94 });
+    emit('spr', { position: [p[0], dripY - 0.04, p[2]], n: 1, tile: TILE.drop, c: ['#e9f7fa'], add: false, speed: 0.03, up: -0.3, uj: 0.05, size: 0.14, size2: 0.08, life: 0.55, grav: 0.1, a: 0.96 });
+    if (n % 2 === 0) emit('bead', { position: [p[0], 0.09, p[2]], life: 3, size: 0.075 + (n % 3) * 0.012 });
   },
   wild: (emit, p, { n, prev, bumps = [] }) => {
     const from = prev || p;

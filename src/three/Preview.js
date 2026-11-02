@@ -5,7 +5,7 @@ import { Lights } from './Stage';
 import FrameCap from './FrameCap';
 import { tuneRenderer } from './quality';
 import { marbleSkin, diceSkin, animateDiceSkin } from './skins';
-import { LeadSlug } from './Die';
+import { LeadSlug, HalfFullWater, HALF_FULL_ACRYLIC } from './Die';
 import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
@@ -17,7 +17,7 @@ import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
 import { ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { SingularityAura } from './Gravity';
-import RainCloud from './RainCloud';
+import RainGlobe from './RainGlobe';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
@@ -35,16 +35,21 @@ const PREVIEW_ENERGY = { current: 0.75 };
 
 function MarblePreview({ itemId, seat, color }) {
   const skin = marbleSkin(itemId, seat, color);
+  const anchor = useRef();
   useFrame(({ clock }) => skin.animate?.(clock.elapsedTime));
   if (skin.aura === 'singularity') return <SingularityAura size={0.62} color={color || SEAT_COLORS[seat]} energy={PREVIEW_ENERGY} seed={seat} />;
   return (
     <group>
-      <Spinner>
-        <mesh material={skin.material}>
-          <sphereGeometry args={[1.35, 64, 40]} />
-        </mesh>
-      </Spinner>
-      {skin.aura === 'cloud' && <RainCloud size={1.35} />}
+      <group ref={anchor}>
+        <Spinner>
+          {skin.aura !== 'rain-globe' && (
+            <mesh material={skin.material}>
+              <sphereGeometry args={[1.35, 64, 40]} />
+            </mesh>
+          )}
+        </Spinner>
+      </group>
+      {skin.aura === 'rain-globe' && <RainGlobe anchor={anchor} color={color || SEAT_COLORS[seat]} size={1.35} />}
     </group>
   );
 }
@@ -53,11 +58,18 @@ function DicePreview({ itemId }) {
   const materials = diceSkin(itemId);
   useFrame(() => animateDiceSkin(materials));
   const geometry = useMemo(() => new RoundedBoxGeometry(1.9, 1.9, 1.9, 6, 0.28), []);
+  const orientation = useRef();
+  const state = useMemo(() => ({ roll: null, landedAt: -10 }), []);
+  const halfFull = skinKey(itemId) === 'unlucky';
   return (
     <Spinner speed={0.8} tilt={0.6}>
-      <mesh geometry={geometry} material={materials}>
-        {skinKey(itemId) === 'loaded' && <LeadSlug size={1.9} />}
-      </mesh>
+      <group ref={orientation}>
+        {halfFull && <mesh geometry={geometry} material={HALF_FULL_ACRYLIC} renderOrder={3} />}
+        <mesh geometry={geometry} material={materials} renderOrder={4}>
+          {skinKey(itemId) === 'loaded' && <LeadSlug size={1.9} />}
+        </mesh>
+        {halfFull && <HalfFullWater orientation={orientation} state={state} size={1.9} />}
+      </group>
     </Spinner>
   );
 }
@@ -284,11 +296,11 @@ function CompileGate({ children, onReady }) {
 export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady, timeScale = 1 }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
-  const cloudMarble = slot === 'marble' && skinKey(itemId) === 'unlucky';
+  const globeMarble = slot === 'marble' && skinKey(itemId) === 'unlucky';
   return (
-    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 3.8, 6.4] : cloudMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
+    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 3.8, 6.4] : globeMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
         tuneRenderer(state);
-        state.camera.lookAt(0, stage ? 0.9 : cloudMarble ? 0.7 : 0, 0);
+        state.camera.lookAt(0, stage ? 0.9 : globeMarble ? 0.7 : 0, 0);
       }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <FrameCap />
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />

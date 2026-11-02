@@ -714,6 +714,14 @@ const App = () => {
 
   return (
     <div className={`app mode-${sceneProps.mode}${quality.glass ? '' : ' flat-glass'}`}>
+      <svg className="puddle-filter-defs" aria-hidden="true" focusable="false">
+        <filter id="puddle-wave" x="-10%" y="-10%" width="120%" height="125%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.018 0.08" numOctaves="2" seed="8">
+            <animate attributeName="baseFrequency" dur="8s" values="0.018 0.08;0.025 0.06;0.018 0.08" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="2.2" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       <div className="scene-layer">
         <SceneBoundary>
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>

@@ -10,8 +10,8 @@ import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
 import { skinKey } from '../game/catalog';
 import { TABLE_Y, DISH_BEVEL } from './Board';
-import { fx } from './fx';
 import { useRainbow } from '../game/rainbow';
+import { fx } from './fx';
 
 const SIZE = 0.85;
 const REST_Y = TABLE_Y + SIZE / 2;
@@ -23,6 +23,123 @@ const SLUG_GEO = new THREE.SphereGeometry(0.12, 20, 14);
 const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85, roughness: 0.45 });
 const _down = new THREE.Vector3();
 const _inv = new THREE.Quaternion();
+export const HALF_FULL_ACRYLIC = new THREE.MeshPhysicalMaterial({
+  color: '#c9e0e7',
+  transparent: true,
+  opacity: 0.16,
+  roughness: 0.08,
+  clearcoat: 1,
+  clearcoatRoughness: 0.035,
+  envMapIntensity: 1.6,
+  depthWrite: false,
+});
+
+export function HalfFullWater({ orientation, state, size = SIZE }) {
+  const surfaceRef = useRef();
+  const bubbles = useRef([]);
+  const planeState = useRef({ tiltX: 0, tiltZ: 0, vx: 0, vz: 0, lastLanding: -10 });
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), []);
+  const material = useMemo(() => new THREE.MeshPhysicalMaterial({
+    color: '#627f8b',
+    transparent: true,
+    opacity: 0.84,
+    roughness: 0.12,
+    metalness: 0.04,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.12,
+    side: THREE.BackSide,
+    clippingPlanes: [plane],
+    depthWrite: false,
+  }), [plane]);
+  const waterGeometry = useMemo(() => new THREE.BoxGeometry(size * 0.82, size * 0.82, size * 0.82), [size]);
+  const surfaceGeometry = useMemo(() => new THREE.PlaneGeometry(size * 0.78, size * 0.78), [size]);
+  const worldQ = useMemo(() => new THREE.Quaternion(), []);
+  const previousQ = useRef(new THREE.Quaternion());
+  const deltaQ = useMemo(() => new THREE.Quaternion(), []);
+  const localNormal = useMemo(() => new THREE.Vector3(), []);
+  const worldNormal = useMemo(() => new THREE.Vector3(), []);
+  const worldPos = useMemo(() => new THREE.Vector3(), []);
+  const surfaceQ = useMemo(() => new THREE.Quaternion(), []);
+  const inverseQ = useMemo(() => new THREE.Quaternion(), []);
+  const previousQuatReady = useRef(false);
+  const planePoint = useMemo(() => new THREE.Vector3(), []);
+  const down = useMemo(() => new THREE.Vector3(0, -1, 0), []);
+  const planeUp = useMemo(() => new THREE.Vector3(0, 0, 1), []);
+  const clock = useMemo(() => ({ t: 0 }), []);
+  useFrame((_, dt) => {
+    if (!orientation.current) return;
+    orientation.current.updateWorldMatrix(true, false);
+    orientation.current.getWorldQuaternion(worldQ);
+    orientation.current.getWorldPosition(worldPos);
+    const step = Math.max(dt, 1 / 240);
+    let omegaX = 0;
+    let omegaZ = 0;
+    if (previousQuatReady.current) {
+      deltaQ.copy(previousQ.current).invert().multiply(worldQ).normalize();
+      const angle = 2 * Math.acos(Math.min(1, Math.abs(deltaQ.w)));
+      const sine = Math.sqrt(Math.max(0, 1 - deltaQ.w * deltaQ.w));
+      if (sine > 0.001) {
+        const rate = angle / step / sine;
+        omegaX = deltaQ.x * rate;
+        omegaZ = deltaQ.z * rate;
+      }
+    } else previousQuatReady.current = true;
+    previousQ.current.copy(worldQ);
+    clock.t += dt;
+    const p = planeState.current;
+    const rolling = !!state.roll;
+    const targetX = rolling ? THREE.MathUtils.clamp(-omegaZ * 0.04, -0.24, 0.24) : 0;
+    const targetZ = rolling ? THREE.MathUtils.clamp(omegaX * 0.04, -0.24, 0.24) : 0;
+    if (!rolling && state.landedAt !== p.lastLanding && state.landedAt >= 0) {
+      p.lastLanding = state.landedAt;
+      p.vx += THREE.MathUtils.clamp(-omegaZ * 0.015, -0.18, 0.18);
+      p.vz += THREE.MathUtils.clamp(omegaX * 0.015, -0.18, 0.18);
+      if (Math.abs(p.vx) + Math.abs(p.vz) < 0.03) p.vx = 0.13;
+    }
+    const h = Math.min(dt, 0.05);
+    p.vx += (targetX - p.tiltX) * 34 * h;
+    p.vz += (targetZ - p.tiltZ) * 34 * h;
+    p.vx *= Math.exp(-8 * h);
+    p.vz *= Math.exp(-8 * h);
+    p.tiltX += p.vx * h;
+    p.tiltZ += p.vz * h;
+    inverseQ.copy(worldQ).invert();
+    localNormal.copy(down).applyQuaternion(inverseQ);
+    localNormal.x += p.tiltX;
+    localNormal.z += p.tiltZ;
+    localNormal.normalize();
+    worldNormal.copy(localNormal).applyQuaternion(worldQ).normalize();
+    planePoint.copy(worldPos).addScaledVector(worldNormal, size * 0.035);
+    plane.setFromNormalAndCoplanarPoint(worldNormal, planePoint);
+    if (surfaceRef.current) {
+      surfaceRef.current.position.copy(localNormal).multiplyScalar(size * 0.035);
+      surfaceQ.setFromUnitVectors(planeUp, localNormal);
+      surfaceRef.current.quaternion.copy(surfaceQ);
+      surfaceRef.current.material.opacity = 0.56 + Math.sin(clock.t * 2.5) * 0.035;
+    }
+    bubbles.current.forEach((bubble, i) => {
+      if (!bubble) return;
+      const phase = (clock.t * 0.35 + i * 0.31) % 1;
+      bubble.position.set((i - 1) * size * 0.12, (phase - 0.76) * size * 0.42, (i % 2 ? 1 : -1) * size * 0.1);
+      bubble.visible = phase < 0.78;
+      bubble.scale.setScalar(size * (0.025 + 0.012 * (i % 2)));
+    });
+  });
+  return (
+    <group>
+      <mesh geometry={waterGeometry} material={material} renderOrder={1} />
+      <mesh ref={surfaceRef} geometry={surfaceGeometry} position-y={-size * 0.035} renderOrder={2}>
+        <meshPhysicalMaterial color="#a8c7d0" transparent opacity={0.58} roughness={0.08} clearcoat={1} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {Array.from({ length: 3 }, (_, i) => (
+        <mesh key={i} ref={(m) => { bubbles.current[i] = m; }} visible={false} renderOrder={2}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshPhysicalMaterial color="#dceff3" transparent opacity={0.65} roughness={0.06} clearcoat={1} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 
 export function LeadSlug({ size = SIZE }) {
   const ref = useRef();
@@ -88,6 +205,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
   const glow = useRef();
   const label = useRef();
   const loaded = skinKey(skin) === 'loaded';
+  const halfFull = skinKey(skin) === 'unlucky';
   const anim = useRef(null);
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
@@ -152,12 +270,6 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     }
     mesh.visible = a.scale > 0.01;
     mesh.scale.setScalar(Math.min(a.scale, 1.25));
-    const squashAge = now - a.landedAt;
-    if (skinKey(skin) === 'unlucky' && squashAge >= 0 && squashAge < 0.35) {
-      const hit = Math.exp(-squashAge * 9) * (0.58 + 0.42 * Math.cos(squashAge * 22));
-      mesh.scale.set(a.scale * (1 + hit * 0.12), a.scale * (1 - hit * 0.28), a.scale * (1 + hit * 0.12));
-    }
-
     if (a.roll) {
       const r = a.roll;
       if (r.start === null) r.start = now;
@@ -169,7 +281,6 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
       if (t >= 1) {
         a.roll = null;
         a.landedAt = now;
-        if (skinKey(skin) === 'unlucky') fx.emit('decal', { position: [a.pos.x, TABLE_Y + 0.015, a.pos.z], kind: 'wet', size: 1.1, life: 3, grow: 0.28, opacity: 0.95 });
         a.label.start = now;
         a.label.pos.copy(a.pos);
         label.current.material.map = assets.numbers[r.die - 1];
@@ -224,9 +335,11 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     <group>
       <group ref={ref}>
         <group ref={orientation}>
-          <mesh geometry={assets.geometry} material={materials} castShadow {...interactive}>
+          {halfFull && <mesh geometry={assets.geometry} material={HALF_FULL_ACRYLIC} renderOrder={3} />}
+          <mesh geometry={assets.geometry} material={materials} castShadow renderOrder={4} {...interactive}>
             {loaded && <LeadSlug />}
           </mesh>
+          {halfFull && <HalfFullWater orientation={orientation} state={anim.current} />}
         </group>
       </group>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>

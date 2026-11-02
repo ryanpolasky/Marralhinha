@@ -10,6 +10,7 @@ import PicnicProps from './PicnicProps';
 import MinecraftProps from './MinecraftProps';
 import WildProps from './WildProps';
 import TrainProps from './TrainProps';
+import BucketModel from './BucketModel';
 import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
@@ -23,6 +24,82 @@ export const TABLE_Y = -(DEPTH + BEVEL * 2);
 export const DISH_R = 2.2;
 export const DISH_BEVEL = BEVEL;
 const CLASSIC_LAYOUT = layoutFor('classic');
+const WATER_BOARD_Y = -BEVEL * 2 + 0.012;
+
+function WaterDamageFX({ layout }) {
+  const drops = useRef([]);
+  const splashes = useRef([]);
+  const splashRings = useRef([]);
+  const leaks = useMemo(() => {
+    const { halfWidth: w, halfLength: l } = layout.spec;
+    const o = w * 0.56;
+    return [[o, l - 1.2], [l - 1.2, -o], [-o, -l + 1.2], [l + 0.5, w + 0.5]];
+  }, [layout]);
+  const periods = [1.7, 2.05, 2.35, 2.8];
+  const offsets = [0.08, 0.57, 1.13, 1.66];
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    leaks.forEach(([x, z], i) => {
+      const cycle = (t + offsets[i]) % periods[i];
+      const falling = cycle > 0.55 && cycle < 1.05;
+      const p = Math.min(1, Math.max(0, (cycle - 0.55) / 0.5));
+      const targetY = i === 3 ? TABLE_Y + 0.66 : WATER_BOARD_Y;
+      const drop = drops.current[i];
+      const splash = splashes.current[i];
+      if (drop) {
+        drop.visible = falling;
+        drop.position.set(x, 2.5 + (targetY - 2.5) * p, z);
+        drop.scale.set(0.024, 0.11, 0.024);
+      }
+      if (splash) {
+        const hit = Math.max(0, cycle - 1.05);
+        const live = hit < 0.38;
+        splash.visible = live;
+        if (live) {
+          splash.position.set(x, targetY, z);
+          const k = hit / 0.38;
+          splash.scale.setScalar(0.12 + k * 0.88);
+          if (splashRings.current[i]) splashRings.current[i].material.opacity = (1 - k) * 0.82;
+        }
+      }
+    });
+  });
+  return (
+    <group>
+      {leaks.map(([x, z], i) => {
+        const targetY = i === 3 ? TABLE_Y + 0.66 : WATER_BOARD_Y;
+        return (
+        <React.Fragment key={i}>
+          {i < 3 && (
+            <mesh position={[x, targetY - 0.006, z]} rotation-x={-Math.PI / 2} scale={[1.5, 1, 0.65]}>
+              <circleGeometry args={[0.44, 32]} />
+              <meshPhysicalMaterial color="#394d54" transparent opacity={0.76} roughness={0.065} clearcoat={1} clearcoatRoughness={0.08} depthWrite={false} />
+            </mesh>
+          )}
+          <mesh ref={(m) => { drops.current[i] = m; }} position={[x, 2.5, z]}>
+            <capsuleGeometry args={[0.022, 0.2, 3, 6]} />
+            <meshPhysicalMaterial color="#c9e5ec" roughness={0.08} metalness={0.02} clearcoat={1} />
+          </mesh>
+          <group ref={(m) => { splashes.current[i] = m; }} visible={false}>
+            <mesh ref={(m) => { splashRings.current[i] = m; }} rotation-x={-Math.PI / 2}>
+              <torusGeometry args={[0.18, 0.025, 8, 24]} />
+              <meshPhysicalMaterial color="#c5dbe0" transparent opacity={0.8} roughness={0.09} clearcoat={1} depthWrite={false} />
+            </mesh>
+            {Array.from({ length: 6 }, (_, j) => {
+              const a = (j / 6) * Math.PI * 2;
+              return (
+                <mesh key={j} position={[Math.cos(a) * 0.18, 0.09 + (j % 2) * 0.05, Math.sin(a) * 0.18]} scale={[0.028, 0.075, 0.028]}>
+                  <sphereGeometry args={[1, 8, 8]} />
+                  <meshPhysicalMaterial color="#c5dbe0" roughness={0.1} clearcoat={1} />
+                </mesh>
+              );
+            })}
+          </group>
+        </React.Fragment>
+      );})}
+    </group>
+  );
+}
 
 const sx = ([r, c]) => [c, -r];
 
@@ -447,6 +524,12 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
   return (
     <group>
       {table && !materials.noTable && <Table materials={materials} />}
+      {table && skinKey(shownSkin) === 'unlucky' && (
+        <group position={[layout.spec.halfLength + 0.5, TABLE_Y, layout.spec.halfWidth + 0.5]}>
+          <BucketModel scale={0.88} />
+        </group>
+      )}
+      {table && skinKey(shownSkin) === 'unlucky' && <WaterDamageFX layout={layout} />}
       {materials.blanket && <mesh geometry={blanketGeometry} material={materials.blanket} position={[0, TABLE_Y + 0.02, 0]} receiveShadow />}
       {[...propKeys].map((key) => {
         const Props = BOARD_PROPS[key];
