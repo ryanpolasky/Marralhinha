@@ -490,6 +490,9 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
   }, [movesKey]);
 
   useWinFireworks(board);
+  useEffect(() => {
+    if (mode !== 'game') fx.clear();
+  }, [mode]);
 
   // The die and the table tap both land on one pointerup, so only the first roll in a beat goes through
   const lastRoll = useRef(0);

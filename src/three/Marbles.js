@@ -244,6 +244,9 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       a.seen = planKey;
       a.segs = plan.map((s) => ({ ...s, start: null }));
       a.bumps = plan.filter((s) => s.tap).map((s) => [s.to.x, s.to.z]);
+    } else if (planKey == null && a.seen != null) {
+      a.seen = undefined;
+      a.segs = [];
     }
   }, [plan, planKey]);
 
