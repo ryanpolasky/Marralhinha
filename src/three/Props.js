@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
-import BucketModel from './BucketModel';
 
 export const ANVIL = { drop: 0.42, hold: 0.95, lift: 0.3 };
 export const CLAW = [[0, 6, 0, 1], [0.5, 0, 0, 1], [0.65, 0, 0, 0], [1.15, 2.2, 0, 0], [1.3, 2.2, 0.15, 0], [1.45, 2.2, -0.15, 0], [1.55, 2.2, 0, 1], [2.0, 2.2, 0, 1], [2.4, 0, 0, 1], [2.55, 0, 0, 0], [3.15, 6.5, 0, 0]];
 export const TRAIN = { wait: 0.7, run: 1.1 };
+export const MOP = { run: 1.05, from: -2.2, to: 2.4, hit: 0.5, drag: 1.15 };
+export const mopDir = (at) => (Math.abs(at[0]) > Math.abs(at[2]) ? [-Math.sign(at[0]) || 1, 0, 0] : [0, 0, -Math.sign(at[2]) || 1]);
 export const BALL = { absorb: 0.35, shakes: [0.85, 1.45, 2.05], shake: 0.4, click: 2.6, pop: 2.9 };
 // Sideways rock of the capturing marble, t seconds after impact; it rolls in place so the wobble reads like a ball tipping
 export const ballRock = (t) => BALL.shakes.reduce((x, at) => {
@@ -157,29 +158,63 @@ function Train({ bus }) {
   );
 }
 
-function Bucket({ bus }) {
+const handleWood = new THREE.MeshStandardMaterial({ color: '#b98a55', roughness: 0.55 });
+const clampPlastic = new THREE.MeshStandardMaterial({ color: '#3f6fa8', roughness: 0.45 });
+const yarn = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 });
+const LEAN = 0.62;
+
+function mopStrands() {
+  const n = 46;
+  const mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.028, 0.034, 1, 5), yarn, n);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const c = new THREE.Color();
+  let seed = 7;
+  const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < n; i++) {
+    const u = (i / (n - 1) - 0.5) * 0.62;
+    const top = new THREE.Vector3((r() - 0.5) * 0.12, 0.3, u);
+    const bottom = new THREE.Vector3(top.x - 0.12 - r() * 0.22, 0.015, u * 1.3 + (r() - 0.5) * 0.08);
+    const d = bottom.clone().sub(top);
+    q.setFromUnitVectors(up, d.clone().normalize());
+    m.compose(top.clone().addScaledVector(d, 0.5), q, new THREE.Vector3(1, d.length(), 1));
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, c.set('#b3ab98').offsetHSL(0, 0, (r() - 0.6) * 0.14));
+  }
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function Mop({ bus }) {
   const g = useRef();
-  const s = useProp(bus, 'bucket');
+  const s = useProp(bus, 'mop');
+  const strands = useMemo(mopStrands, []);
   useFrame((_, dt) => {
     const st = s.current;
     g.current.visible = st.alive;
     if (!st.alive) return;
     st.t += Math.min(dt, 0.05);
-    const fall = 0.42;
-    const hold = 0.8;
-    const lift = 0.38;
-    let y;
-    if (st.t < fall) y = 7 * (1 - (st.t / fall) ** 2);
-    else if (st.t < fall + 0.09) y = Math.sin(((st.t - fall) / 0.09) * Math.PI) * 0.1;
-    else if (st.t < fall + 0.09 + hold) y = 0;
-    else y = 7 * clamp01((st.t - fall - 0.09 - hold) / lift) ** 2;
-    if (st.t > fall + 0.09 + hold + lift) st.alive = false;
-    g.current.position.set(st.at[0], st.at[1] + 1.02 + y, st.at[2]);
-    const hit = clamp01((st.t - fall) / 0.12) * (1 - clamp01((st.t - fall - 0.09 - hold) / lift));
-    g.current.scale.set(1.12 + hit * 0.05, 1 - hit * 0.12, 1.12 + hit * 0.05);
-    g.current.rotation.z = st.t < fall ? 0.12 * (1 - st.t / fall) : 0;
+    const { run, from, to } = MOP;
+    const k = st.t / run;
+    if (k > 1) st.alive = false;
+    const x = from + (to - from) * k;
+    const y = 2.4 * clamp01(1 - k / 0.2) ** 2 + 2.4 * clamp01((k - 0.78) / 0.22) ** 2;
+    const [ax, , az] = st.across || [1, 0, 0];
+    g.current.position.set(st.at[0] + ax * x, st.at[1] - 0.08 + y, st.at[2] + az * x);
+    g.current.rotation.set(0, Math.atan2(-az, ax), Math.sin(st.t * 22) * 0.025);
   });
-  return <group ref={g} visible={false}><BucketModel flipped scale={0.88} /></group>;
+  return (
+    <group ref={g} visible={false} scale={1.15}>
+      <primitive object={strands} />
+      <mesh material={clampPlastic} position={[0, 0.33, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.08, 0.66]} />
+      </mesh>
+      <mesh material={handleWood} position={[-Math.sin(LEAN) * 1.7, 0.37 + Math.cos(LEAN) * 1.7, 0]} rotation={[0, 0, LEAN]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 3.4, 10]} />
+      </mesh>
+    </group>
+  );
 }
 
 export default function Props({ bus = fx }) {
@@ -188,7 +223,7 @@ export default function Props({ bus = fx }) {
       <Anvil bus={bus} />
       <Claw bus={bus} />
       <Train bus={bus} />
-      <Bucket bus={bus} />
+      <Mop bus={bus} />
     </>
   );
 }

@@ -210,7 +210,7 @@
     { "id": "fx.dev", "slot": "fx", "name": "Supernova", "rarity": "exclusive", "tag": "dev", "desc": "A star is born. A marble isn't." },
     { "id": "fx.supporter", "slot": "fx", "name": "Riptide", "rarity": "exclusive", "tag": "supporter", "desc": "The tide takes what it's owed." },
     { "id": "fx.lucky", "slot": "fx", "name": "Jackpot", "rarity": "exclusive", "tag": "lucky", "desc": "Pays out in gold coins. Part of the Luckiest set." },
-    { "id": "fx.unlucky", "slot": "fx", "name": "Bucket", "rarity": "exclusive", "tag": "unlucky", "desc": "Somebody should have emptied it. Part of the Unluckiest set." },
+    { "id": "fx.unlucky", "slot": "fx", "name": "Mopped Up", "rarity": "exclusive", "tag": "unlucky", "desc": "Cleanup on aisle you. Part of the Unluckiest set." },
     {"id": "fx.popper", "slot": "fx", "name": "Party Popper", "rarity": "common", "desc": "Congrats on going home!"},
     {"id": "fx.anvil", "slot": "fx", "name": "Anvil", "rarity": "legendary", "desc": "Falls out of nowhere. Every single time."},
     {"id": "fx.claw", "slot": "fx", "name": "Claw Machine", "rarity": "legendary", "desc": "Rigged, obviously. It drops you once for show."},

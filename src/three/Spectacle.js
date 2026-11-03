@@ -802,6 +802,51 @@ const DECALS = {
       g.fill();
     }
   }],
+  smear: [512, 192, (g, w, h) => {
+    const m = h / 2;
+    const half = (x) => h * 0.42 * (1 - (x / w) ** 1.6 * 0.75);
+    const band = g.createLinearGradient(0, 0, w, 0);
+    band.addColorStop(0, 'rgba(255,255,255,0.86)');
+    band.addColorStop(0.55, 'rgba(255,255,255,0.7)');
+    band.addColorStop(0.9, 'rgba(255,255,255,0.25)');
+    band.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = band;
+    g.beginPath();
+    for (let x = 96; x <= w; x += 16) g.lineTo(x, m - half(x) + rand(-7, 7));
+    for (let x = w; x >= 96; x -= 16) g.lineTo(x, m + half(x) + rand(-7, 7));
+    g.closePath();
+    g.fill();
+    g.lineCap = 'round';
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 16; i++) {
+      const y = m + (Math.random() - 0.5) * h * 0.7;
+      const x0 = rand(w * 0.15, w * 0.6);
+      g.strokeStyle = `rgba(0,0,0,${rand(0.35, 0.8)})`;
+      g.lineWidth = rand(1.5, 4);
+      g.beginPath();
+      g.moveTo(x0, y);
+      g.lineTo(x0 + rand(80, 220), y + rand(-4, 4));
+      g.stroke();
+    }
+    g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 26; i++) {
+      const y = m + (Math.random() - 0.5) * h * 0.72;
+      g.strokeStyle = `rgba(255,255,255,${rand(0.15, 0.35)})`;
+      g.lineWidth = rand(2, 5);
+      g.beginPath();
+      g.moveTo(rand(70, 110), y);
+      g.lineTo(w * rand(0.5, 0.95), y + rand(-6, 6));
+      g.stroke();
+    }
+    const blob = g.createRadialGradient(96, m, 0, 96, m, m * 0.85);
+    blob.addColorStop(0, 'rgba(255,255,255,0.95)');
+    blob.addColorStop(0.7, 'rgba(255,255,255,0.6)');
+    blob.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = blob;
+    g.beginPath();
+    g.arc(96, m, m * 0.85, 0, 6.28);
+    g.fill();
+  }],
   cracks: [256, 256, (g, w) => {
     const c = w / 2;
     g.lineCap = 'round';
@@ -1027,6 +1072,7 @@ DECALS.headshot = [256, 256, (g, w) => {
 }];
 
 const PANELS = { bsod: 512 / 352, headshot: 1 };
+const ASPECT = { ...PANELS, smear: 512 / 192 };
 const DECAL_POOL = 6;
 const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
@@ -1063,7 +1109,7 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
         const s = state[i];
         const kind = d.kind;
         const billboard = kind in PANELS;
-        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, drain: !!d.drain, home: d.position });
+        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, drain: !!d.drain, wipe: d.wipe || 0, home: d.position });
         const m = mats[i];
         m.map = decalTexture(kind);
         m.color.set(d.color || '#ffffff');
@@ -1091,7 +1137,7 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
       const k = s.t / s.life;
       const pop = Math.min(1, s.t / 0.22);
       const sc = s.size * (s.grow + (1 - s.grow) * (1 - (1 - pop) ** 3));
-      const aspect = PANELS[s.kind] || 1;
+      const aspect = ASPECT[s.kind] || 1;
       const drain = s.drain && k > 0.5 ? 1 - ((k - 0.5) / 0.5) * 0.65 : 1;
       mesh.scale.set(sc * aspect * drain, sc * drain, 1);
       if (s.billboard) {
@@ -1102,6 +1148,13 @@ function Decals({ bus, clip = null, timeScale = 1 }) {
         mesh.visible = !(s.jitter && Math.random() < 0.06 && k > 0.2);
       } else {
         mesh.position.y = s.home[1];
+        if (s.wipe) {
+          const w = Math.min(1, s.t / s.wipe);
+          const back = (sc * aspect * (1 - w)) / 2;
+          mesh.scale.x *= w;
+          mesh.position.x = s.home[0] - Math.cos(s.angle) * back;
+          mesh.position.z = s.home[2] + Math.sin(s.angle) * back;
+        }
         mesh.rotation.x = -Math.PI / 2;
         mesh.rotation.z = s.angle + s.spin * s.t;
       }

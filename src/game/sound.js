@@ -756,6 +756,10 @@ export const sfx = {
   },
   trombone: () =>
     [[392, 370], [370, 349], [349, 330], [330, 262]].forEach(([f, to], i) => tone({ freq: f, to, type: 'sawtooth', dur: i === 3 ? 1.1 : 0.32, vol: 0.05, delay: i * 0.34, attack: 0.03 })),
+  mop: () => {
+    noise({ dur: 0.5, vol: 0.16, freq: 500, to: 1300, q: 0.7, delay: 0.3 });
+    noise({ dur: 0.18, vol: 0.06, freq: 2600, q: 1.4, delay: 0.55 });
+  },
   squeak: () => {
     tone({ freq: 1800, to: 2700, type: 'sine', dur: 0.12, vol: 0.12, attack: 0.01 });
     tone({ freq: 2700, to: 1500, type: 'sine', dur: 0.18, vol: 0.1, delay: 0.12 });

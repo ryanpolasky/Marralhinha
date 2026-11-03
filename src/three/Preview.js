@@ -91,7 +91,7 @@ const HOP_TIME = 0.2;
 const START = 0.9;
 const PERIOD = 5.5;
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw', 'wild', 'train'];
+const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw', 'wild', 'train', 'unlucky'];
 const VICTIM_AT = new THREE.Vector3(0, 0.07, 0);
 const ACROSS = new THREE.Vector3(0, 0, -1);
 
@@ -142,9 +142,6 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
     const rock = fired.current && skinKey(itemId) === 'wild' ? ballRock(t - START - HOPS * HOP_TIME) : 0;
     attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e) - rock);
     attacker.current.rotation.x = -rock / MARBLE_R;
-    const afterImpact = t - START - HOPS * HOP_TIME;
-    attacker.current.visible = !(skinKey(itemId) === 'unlucky' && fired.current && afterImpact > 0.9);
-    target.current.visible = !(skinKey(itemId) === 'unlucky' && fired.current && afterImpact > 1.45);
     if (flight.current) {
       const at = flightAt(flight.current, t - flight.current.at);
       if (at) {
