@@ -71,7 +71,7 @@ const secureDie = () => randomInt(1, 7);
 const newId = (bytes = 6) => randomBytes(bytes).toString('hex');
 
 class Room {
-  constructor(code, hooks, { instanceId = null, quickPlay = false } = {}) {
+  constructor(code, hooks, { instanceId = null, quickPlay = false, variant = 'classic' } = {}) {
     this.code = code;
     this.hooks = hooks;
     this.instanceId = instanceId;
@@ -83,7 +83,7 @@ class Room {
     this.hostId = null;
     this.game = null;
     this.teams = false;
-    this.variant = 'classic';
+    this.variant = variant;
     this.turnSeconds = TURN_SECONDS_DEFAULT;
     this.humansAtStart = 0;
     // Player ids of the last round's winners: one of them starts the rematch on their board
