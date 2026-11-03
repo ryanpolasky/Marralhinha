@@ -298,6 +298,8 @@ test('month-end Luckiest shoutout pings the champion only when they are in the D
   const member = '345678901234567890';
   const posts = [];
   try {
+    env.forEach((key) => delete process.env[key]);
+    global.fetch = async () => assert.fail('nothing should be fetched without a webhook');
     assert.equal(await discord.announceLuckiest({ name: 'A', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 20 }), false, 'no webhook configured, nothing sent');
     Object.assign(process.env, { DISCORD_BOT_TOKEN: 'test-bot-token', DISCORD_GUILD_ID: guildId, DISCORD_LUCKIEST_WEBHOOK_URL: 'https://discord.test/hook', CLIENT_URL: 'https://marralhinha.app' });
     global.fetch = async (url, options = {}) => {
@@ -306,18 +308,21 @@ test('month-end Luckiest shoutout pings the champion only when they are in the D
         assert.equal(options.headers.Authorization, 'Bot test-bot-token');
         return { ok: url.endsWith(member), status: url.endsWith(member) ? 200 : 404 };
       }
-      assert.equal(url, 'https://discord.test/hook');
-      posts.push(JSON.parse(options.body));
+      assert.equal(String(url), 'https://discord.test/hook?with_components=true');
+      const body = JSON.parse(options.body);
+      body.text = body.components[0].components.map((c) => c.content || c.accessory?.url || '').join('\n');
+      posts.push(body);
       return { ok: true, status: 204 };
     };
     await discord.announceLuckiest({ name: 'A_*', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 20 });
     await discord.announceLuckiest({ name: 'B', discordId: '456789012345678901', monthName: 'April 2026', rolls: 40, sixes: 12 });
     await discord.announceLuckiest({ name: 'Guest @everyone', discordId: null, monthName: 'April 2026', rolls: 40, sixes: 12 });
-    assert.match(posts[0].content, /^\*\*THE LUCKIEST PLAYER OF APRIL 2026 IS A\\_\\\* \(<@345678901234567890>\)! CONGRATULATIONS!\*\*$/m);
-    assert.match(posts[0].content, /20 sixes in 50 rolls \(40\.0%\)/);
-    assert.match(posts[0].content, /https:\/\/marralhinha\.app/);
+    assert.match(posts[0].text, /^# The Luckiest player of April 2026 is A\\_\\\* \(<@345678901234567890>\)!$/m);
+    assert.match(posts[0].text, /\*\*20 sixes\*\* in \*\*50 rolls\*\* for a \*\*40\.0%\*\* six rate/);
+    assert.match(posts[0].text, /^https:\/\/marralhinha\.app$/m, 'claim button links to the game');
+    assert.equal(posts[0].flags, 1 << 15);
     assert.deepEqual(posts[0].allowed_mentions, { parse: [], users: [member] });
-    assert.doesNotMatch(posts[1].content, /<@/);
+    assert.doesNotMatch(posts[1].text, /<@/);
     assert.deepEqual(posts[1].allowed_mentions, { parse: [] });
     assert.deepEqual(posts[2].allowed_mentions, { parse: [] }, '@everyone in a name never pings');
   } finally {
