@@ -8671,7 +8671,7 @@ select.admin-input optgroup {
 /* ---------- Leaderboards ---------- */
 
 .board-modal {
-  width: min(640px, 96vw);
+  width: min(760px, 96vw);
   max-width: 96vw;
 }
 
@@ -8785,6 +8785,10 @@ select.admin-input optgroup {
   border-color: #a9bccf;
 }
 
+.board-modal.unlucky .board-value {
+  color: #a9bccf;
+}
+
 .board-modal.unlucky .board-poised {
   border-color: rgba(169, 188, 207, 0.55);
   background: rgba(169, 188, 207, 0.08);
@@ -8792,6 +8796,25 @@ select.admin-input optgroup {
 
 .board-modal.unlucky .board-poised:hover {
   background: rgba(169, 188, 207, 0.14);
+}
+
+@media (max-width: 560px) {
+  .board-modal .board-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 44px;
+    gap: 6px;
+  }
+
+  .board-modal .board-tab {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    text-align: center;
+    line-height: 1.15;
+  }
 }
 
 .board-rank {

@@ -375,7 +375,7 @@ test('month-end Unluckiest shoutout pings the champion only when they are in the
       : { ok: false, status: 500 };
     await assert.rejects(
       discord.announceUnluckiest({ name: 'A', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 2 }),
-      { message: 'Unluckiest shoutout failed' }
+      { message: 'Unluckiest shoutout failed (500)' }
     );
   } finally {
     env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });

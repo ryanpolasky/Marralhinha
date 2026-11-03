@@ -167,7 +167,7 @@ async function announceMonthlyRace({ name, discordId, monthName, rolls, sixes },
       allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] },
     }),
   });
-  if (!res.ok) throw new Error(lucky ? `Luckiest shoutout failed (${res.status})` : 'Unluckiest shoutout failed');
+  if (!res.ok) throw new Error(`${lucky ? 'Luckiest' : 'Unluckiest'} shoutout failed (${res.status})`);
   return true;
 }
 
