@@ -306,10 +306,10 @@ io.on('connection', (socket) => {
   const preferOf = (payload) => (Number.isInteger(payload?.prefer) ? payload.prefer : null);
 
   handle('room:create', (payload) => enter(() => rooms.create(), { prefer: preferOf(payload) }));
-  // One round trip for "Quick play vs bots": a lobby with bots in every other seat, so you can still
-  // swap colours, switch on teams or change the timer before hitting Start
+  // One round trip for "Quick play vs bots": a Blitz lobby with bots in every other seat, so you can still
+  // swap colours, switch to Classic or teams, or change the timer before hitting Start
   handle('room:quickPlay', (payload) => {
-    const res = enter(() => rooms.create({ quickPlay: true }), { prefer: preferOf(payload) });
+    const res = enter(() => rooms.create({ quickPlay: true, variant: socket.data.blitz ? 'blitz' : 'classic' }), { prefer: preferOf(payload) });
     const room = rooms.get(res.code);
     [0, 1, 2, 3].filter((seat) => !room.seats[seat]).forEach((seat) => room.addBot(userId, seat));
     return res;

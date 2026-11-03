@@ -281,6 +281,20 @@ test('quick play rooms with nobody connected are swept after minutes, other room
   normal.dispose();
 });
 
+test('rooms can open on a variant, and classic stays the default', () => {
+  const manager = new RoomManager({ onChange: () => {} });
+  const quick = manager.create({ quickPlay: true, variant: 'blitz' });
+  const normal = manager.create();
+  quick.join({ userId: 'u1', name: 'Ana' });
+  quick.attach('u1', 's1');
+  quick.addBot('u1', 1);
+  quick.start('u1');
+  assert.strictEqual(quick.game.variant, 'blitz');
+  assert.strictEqual(normal.variant, 'classic');
+  quick.dispose();
+  normal.dispose();
+});
+
 test('seat swaps require acceptance and force swaps work only before the game', (t) => {
   const { room } = startedRoom();
   t.after(() => room.dispose());
