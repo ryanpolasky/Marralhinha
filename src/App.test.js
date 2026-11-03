@@ -6,7 +6,7 @@ import Game from './components/Game';
 import { SettingsButton } from './components/Settings';
 import { DialogHost } from './components/Dialog';
 import { LuckiestPanel } from './components/Stats';
-import { canUse, collectible, itemsForSlot } from './game/catalog';
+import { ITEMS, canUse, collectible, itemsForSlot, unobtainable } from './game/catalog';
 
 // CRA resets jest.fn mocks between tests, so plain functions it is
 jest.mock('./net/socket', () => ({
@@ -77,38 +77,40 @@ test('Supporter pack does not unlock until the profile carries a verified tag', 
   const account = { name: 'Tester', coins: 300, pity: {}, tags: [], inventory: [], discordLinked: false };
   expect(canUse(account, 'marble.supporter')).toBe(false);
   const { rerender } = render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
+  expect(document.querySelector('.item-grid.featured').compareDocumentPosition(document.querySelector('.pack-shelf')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Supporter Pack, $5.99' }));
   expect(screen.getByRole('button', { name: /Discord checkout coming soon/i })).toBeDisabled();
   expect(screen.getByText(/from the bottom of my heart/i)).toBeInTheDocument();
   expect(screen.getByText('- Ryan :)')).toHaveClass('supporter-signature');
   expect(screen.getByText('- Ryan :)').closest('.supporter-actions')).toContainElement(screen.getByRole('button', { name: /Discord checkout coming soon/i }));
-  expect(screen.getByRole('img', { name: /Tideglass marble and Beacon die/i })).toHaveAttribute('width', '680');
-  expect(document.querySelector('.item-grid.featured').compareDocumentPosition(document.querySelector('.supporter-shop')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getAllByLabelText(/Tideglass marble and Beacon die/i)[0]).toHaveAttribute('width', '680');
   rerender(<Shop account={{ ...account, tags: ['supporter'] }} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
   expect(canUse({ ...account, tags: ['supporter'] }, 'marble.supporter')).toBe(true);
   expect(screen.getByText(/your Supporter set is waiting/i)).toBeInTheDocument();
 });
 
-test('shop carousel starts on the Supporter Pack and flips to the October-only Halloween Pack', () => {
+test('Halloween Pack only sits on the shop shelf in October', () => {
   const account = { name: 'Tester', coins: 300, pity: {}, tags: [], inventory: [], discordLinked: false };
   expect(canUse(account, 'marble.halloween')).toBe(false);
   expect(canUse({ ...account, tags: ['halloween'] }, 'dice.halloween')).toBe(true);
   expect(canUse({ ...account, tags: ['supporter'] }, 'dice.halloween')).toBe(false);
-  render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
-  const slides = document.querySelectorAll('.carousel-slide');
-  expect(slides).toHaveLength(2);
-  expect(slides[0]).not.toHaveAttribute('aria-hidden');
-  expect(slides[1]).toHaveAttribute('aria-hidden', 'true');
-  expect(screen.getByRole('button', { name: 'Previous pack' })).toBeDisabled();
-  fireEvent.click(screen.getByRole('button', { name: 'Next pack' }));
-  expect(slides[0]).toHaveAttribute('aria-hidden', 'true');
-  expect(slides[1]).not.toHaveAttribute('aria-hidden');
-  expect(screen.getByRole('button', { name: 'Next pack' })).toBeDisabled();
-  expect(screen.getByText('Only available in October!')).toBeInTheDocument();
-  expect(screen.getByText('$3.99 USD · one time')).toBeInTheDocument();
-  expect(screen.getByText('Crystal Ball')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
-  fireEvent.keyDown(document.querySelector('.shop-carousel'), { key: 'ArrowLeft' });
-  expect(slides[0]).not.toHaveAttribute('aria-hidden');
+  const now = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-15T12:00:00Z'));
+  try {
+    const { unmount } = render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Halloween Pack, $3.99' }));
+    expect(document.querySelector('.pack-sheet .halloween-ribbon')).toHaveTextContent('Only available in October!');
+    expect(screen.getByText('$3.99 USD · one time')).toBeInTheDocument();
+    expect(screen.getByText('Crystal Ball')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+    unmount();
+    now.mockReturnValue(Date.parse('2026-11-02T12:00:00Z'));
+    render(<Shop account={account} onClose={() => {}} onProfile={() => {}} onEquip={() => {}} notify={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Supporter Pack, $5.99' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Halloween Pack/ })).not.toBeInTheDocument();
+    expect(unobtainable(ITEMS['marble.halloween'])).toBe(true);
+  } finally {
+    now.mockRestore();
+  }
 });
 
 test('Discord lobby keeps seats and controls in a fitted two-column panel', () => {

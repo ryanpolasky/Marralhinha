@@ -182,10 +182,17 @@ test('Halloween Pack is verified through its own SKU, keeps Supporter separate, 
     delete process.env.DISCORD_HALLOWEEN_SKU_ID;
     assert.equal(accounts.owns(id, 'dice.halloween'), false, 'unconfigured verification fails closed');
 
-    assert.equal(discord.halloweenOpen(Date.parse('2026-10-01T00:00:00Z')), true);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-10-31T23:59:59Z')), true);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-09-30T23:59:59Z')), false);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-11-01T00:00:00Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-10-01T00:00:00Z')), true);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-10-31T23:59:59Z')), true);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-09-30T23:59:59Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-11-01T00:00:00Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2031-10-15T12:00:00Z')), true, 'seasons repeat every year');
+    assert.equal(discord.packOpen('supporter', Date.parse('2026-11-01T00:00:00Z')), true, 'packs without a season never close');
+    const { inSeason } = require('../src/shared/seasons');
+    const winter = { from: '12-01', to: '01-06' };
+    assert.equal(inSeason(winter, Date.parse('2026-12-25T00:00:00Z')), true);
+    assert.equal(inSeason(winter, Date.parse('2027-01-06T23:59:59Z')), true, 'seasons can wrap past New Year');
+    assert.equal(inSeason(winter, Date.parse('2027-01-07T00:00:00Z')), false);
   } finally {
     env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     global.fetch = originalFetch;

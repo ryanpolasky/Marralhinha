@@ -9681,7 +9681,6 @@ textarea.report-text {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 18px rgba(255, 154, 60, 0.5);
 }
 
-.halloween-ribbon.closed { background: linear-gradient(110deg, #4a3a5c, #6b5a80); color: #f1e8ff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
 
 .halloween-shop-body { padding: 20px 24px 22px; }
 .halloween-shop-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; }

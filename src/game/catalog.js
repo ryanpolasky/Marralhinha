@@ -1,4 +1,5 @@
 import catalog from '../shared/cosmetics.json';
+import { inSeason } from '../shared/seasons';
 
 export { catalog };
 export const CURRENCY = catalog.currency;
@@ -14,7 +15,8 @@ export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', '
 const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'painter', 'halloween', 'ants', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag && !item.unobtainable);
 export const SETS = Object.fromEntries(Object.entries(catalog.sets || {}).map(([key, set]) => [key, { ...set, key, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }]));
-export const unobtainable = (item, now = Date.now()) => item.unobtainable || ['dev', 'beta'].includes(item.tag) || (item.tag === 'halloween' && new Date(now).getUTCMonth() !== 9);
+export const unobtainable = (item, now = Date.now()) => item.unobtainable || ['dev', 'beta'].includes(item.tag) || !inSeason(catalog.tags[item.tag]?.season, now);
+export const packInSeason = (kind, now = Date.now()) => inSeason(catalog.tags[kind]?.season, now);
 
 export const itemsForSlot = (slot) =>
   catalog.items.filter((item) => item.slot === slot).sort((a, b) => LOCKER_ORDER.indexOf(a.tag || a.rarity) - LOCKER_ORDER.indexOf(b.tag || b.rarity));
