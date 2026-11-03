@@ -396,4 +396,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, process.env.HOST, () => console.log(`Marralhinha server listening on http://${process.env.HOST || 'localhost'}:${PORT}`));
-discord.connectGateway();
+discord.connectGateway(() => new Set([...io.sockets.sockets.values()].map((socket) => socket.data.userId)).size);
