@@ -15,7 +15,7 @@ import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
-import { touchActive, useTouchTarget } from './touchPick';
+import { touchActive, touchClaimed, useTouchTarget } from './touchPick';
 import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive, ufoSway } from '../game/stunts';
 
 export const MARBLE_R = 0.335;
@@ -511,6 +511,37 @@ function Ghost({ move, color = SEAT_COLORS[move.seat], strong, label, onMove, la
   );
 }
 
+// Bringing a marble out of base: the whole dish is the hit target, not just one marble
+function BaseDish({ seat, layout, onEnter, onHover }) {
+  const [r, c] = layout.BASE_TRAY[seat];
+  const geo = useMemo(() => new THREE.CircleGeometry(layout.spec.dishR, 40), [layout]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh
+      geometry={geo}
+      position={[c, REST_Y + 0.02, r]}
+      rotation-x={-Math.PI / 2}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (touchClaimed()) return;
+        setCursor(false);
+        onEnter();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setCursor(true);
+        onHover(true);
+      }}
+      onPointerOut={() => {
+        setCursor(false);
+        onHover(false);
+      }}
+    >
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
 function PathDots({ move, color = SEAT_COLORS[move.seat], layout }) {
   if (!move.path || move.path.length < 2) return null;
   return move.path.slice(0, -1).map((cell, i) => {
@@ -561,8 +592,16 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
     }
   };
 
+  const enterFrom = (seat) => board.marbles[seat].findIndex((pos) => pos.zone === 'base' && moves.some((m) => m.seat === seat && m.kind === 'enter'));
+
   return (
     <group>
+      {board.active.map((seat) => {
+        const marble = enterFrom(seat);
+        if (marble < 0) return null;
+        const pos = board.marbles[seat][marble];
+        return <BaseDish key={`dish-${seat}`} seat={seat} layout={layout} onEnter={() => clickMarble(seat, marble, pos)} onHover={(on) => setHovered(on ? { seat, marble } : null)} />;
+      })}
       {board.active.map((seat) =>
         board.marbles[seat].map((pos, marble) => {
           const key = `${seat}-${marble}`;
