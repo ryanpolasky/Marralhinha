@@ -310,7 +310,7 @@ class Accounts {
     while (last < shiftMonth(current, -1)) {
       last = shiftMonth(last, 1);
       const best = this.monthBest(last);
-      if (best && this.q.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last) });
+      if (best && this.q.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last), rolls: best.rolls, sixes: best.sixes });
     }
     this.q.setMeta.run('luckiest_settled', last);
     return champions;

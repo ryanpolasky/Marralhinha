@@ -182,10 +182,17 @@ test('Halloween Pack is verified through its own SKU, keeps Supporter separate, 
     delete process.env.DISCORD_HALLOWEEN_SKU_ID;
     assert.equal(accounts.owns(id, 'dice.halloween'), false, 'unconfigured verification fails closed');
 
-    assert.equal(discord.halloweenOpen(Date.parse('2026-10-01T00:00:00Z')), true);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-10-31T23:59:59Z')), true);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-09-30T23:59:59Z')), false);
-    assert.equal(discord.halloweenOpen(Date.parse('2026-11-01T00:00:00Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-10-01T00:00:00Z')), true);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-10-31T23:59:59Z')), true);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-09-30T23:59:59Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2026-11-01T00:00:00Z')), false);
+    assert.equal(discord.packOpen('halloween', Date.parse('2031-10-15T12:00:00Z')), true, 'seasons repeat every year');
+    assert.equal(discord.packOpen('supporter', Date.parse('2026-11-01T00:00:00Z')), true, 'packs without a season never close');
+    const { inSeason } = require('../src/shared/seasons');
+    const winter = { from: '12-01', to: '01-06' };
+    assert.equal(inSeason(winter, Date.parse('2026-12-25T00:00:00Z')), true);
+    assert.equal(inSeason(winter, Date.parse('2027-01-06T23:59:59Z')), true, 'seasons can wrap past New Year');
+    assert.equal(inSeason(winter, Date.parse('2027-01-07T00:00:00Z')), false);
   } finally {
     env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     global.fetch = originalFetch;
@@ -276,11 +283,52 @@ test('a new month resets the race and crowns last month\'s champion with a rewar
   assert.deepEqual(accounts.profile(a.id).lucky.pending, []);
   const change = accounts.refreshLucky(may);
   assert.equal(change.holder, null, 'nobody leads a fresh month');
-  assert.deepEqual(change.champions, [{ id: a.id, month: '2026-04', monthName: 'April 2026' }]);
+  assert.deepEqual(change.champions, [{ id: a.id, month: '2026-04', monthName: 'April 2026', rolls: 50, sixes: 20 }]);
   assert.equal(accounts.refreshLucky(may + 60000), null, 'a month is settled once');
   assert.equal(accounts.profile(a.id).lucky.monthsWon, 1);
   assert.deepEqual(accounts.profile(a.id).lucky.pending.map((p) => p.month), ['2026-04']);
   assert.equal(accounts.publicCard(accounts.getUser(a.id)).lucky.pending, undefined);
+});
+
+test('month-end Luckiest shoutout pings the champion only when they are in the Discord server', async () => {
+  const env = ['DISCORD_BOT_TOKEN', 'DISCORD_GUILD_ID', 'DISCORD_LUCKIEST_WEBHOOK_URL', 'CLIENT_URL'];
+  const previous = env.map((key) => process.env[key]);
+  const originalFetch = global.fetch;
+  const guildId = '123456789012345678';
+  const member = '345678901234567890';
+  const posts = [];
+  try {
+    env.forEach((key) => delete process.env[key]);
+    global.fetch = async () => assert.fail('nothing should be fetched without a webhook');
+    assert.equal(await discord.announceLuckiest({ name: 'A', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 20 }), false, 'no webhook configured, nothing sent');
+    Object.assign(process.env, { DISCORD_BOT_TOKEN: 'test-bot-token', DISCORD_GUILD_ID: guildId, DISCORD_LUCKIEST_WEBHOOK_URL: 'https://discord.test/hook', CLIENT_URL: 'https://marralhinha.app' });
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/guilds/')) {
+        assert.equal(String(url), `https://discord.com/api/v10/guilds/${guildId}/members/${url.endsWith(member) ? member : '456789012345678901'}`);
+        assert.equal(options.headers.Authorization, 'Bot test-bot-token');
+        return { ok: url.endsWith(member), status: url.endsWith(member) ? 200 : 404 };
+      }
+      assert.equal(String(url), 'https://discord.test/hook?with_components=true');
+      const body = JSON.parse(options.body);
+      body.text = body.components[0].components.map((c) => c.content || c.accessory?.url || '').join('\n');
+      posts.push(body);
+      return { ok: true, status: 204 };
+    };
+    await discord.announceLuckiest({ name: 'A_*', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 20 });
+    await discord.announceLuckiest({ name: 'B', discordId: '456789012345678901', monthName: 'April 2026', rolls: 40, sixes: 12 });
+    await discord.announceLuckiest({ name: 'Guest @everyone', discordId: null, monthName: 'April 2026', rolls: 40, sixes: 12 });
+    assert.match(posts[0].text, /^# The Luckiest player of April 2026 is A\\_\\\* \(<@345678901234567890>\)!$/m);
+    assert.match(posts[0].text, /\*\*20 sixes\*\* in \*\*50 rolls\*\* for a \*\*40\.0%\*\* six rate/);
+    assert.match(posts[0].text, /^https:\/\/marralhinha\.app$/m, 'claim button links to the game');
+    assert.equal(posts[0].flags, 1 << 15);
+    assert.deepEqual(posts[0].allowed_mentions, { parse: [], users: [member] });
+    assert.doesNotMatch(posts[1].text, /<@/);
+    assert.deepEqual(posts[1].allowed_mentions, { parse: [] });
+    assert.deepEqual(posts[2].allowed_mentions, { parse: [] }, '@everyone in a name never pings');
+  } finally {
+    env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    global.fetch = originalFetch;
+  }
 });
 
 test('a lucky pick grants one unowned piece per month won, then coins once the set is complete', () => {

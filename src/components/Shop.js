@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse } from '../game/catalog';
+import { BOXES, ITEMS, RARITIES, CURRENCY, SETS, catalog, canUse, packInSeason } from '../game/catalog';
 import { api, post } from '../net/api';
 import { sfx } from '../game/sound';
 import { Coins, ItemCard, ItemThumb, PreviewLoader, PreviewStage, RarityTag, Coin, preloadEmoteImages } from './Economy';
@@ -212,7 +212,6 @@ function PackArtwork({ kind, shop, className }) {
     },
   }[kind];
   const lazy = kind === 'supporter' ? {} : { loading: 'lazy' };
-  const halloweenClosed = shop && !shop.halloween?.open;
   useEffect(() => {
     videoRef.current?.play()?.catch(() => setPlaying(true));
   }, []);
@@ -227,7 +226,7 @@ function PackArtwork({ kind, shop, className }) {
           <video ref={videoRef} className={`pack-hero pack-video${playing ? ' in' : ''}`} src={artwork.animated} poster={artwork.still} width="680" height="240" autoPlay muted loop playsInline preload="auto" aria-label={artwork.alt} onPlaying={() => setPlaying(true)} onError={() => setPlaying(true)} onTransitionEnd={() => setLoaderGone(true)} />
         </>
       )}
-      {kind === 'halloween' && <span className={`halloween-ribbon${halloweenClosed ? ' closed' : ''}`}>{halloweenClosed ? 'Gone until next October' : 'Only available in October!'}</span>}
+      {kind === 'halloween' && <span className="halloween-ribbon">Only available in October!</span>}
     </div>
   );
 }
@@ -462,9 +461,9 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
   const hasSupporter = account.tags.includes('supporter');
   const hasHalloween = account.tags.includes('halloween');
   const hasPainter = account.tags.includes('painter');
-  const halloweenOpen = shop?.halloween?.open;
+  const halloweenOpen = packInSeason('halloween');
   const supporterLabel = !shop?.supporter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Support the game on Discord' : 'Link Discord to support';
-  const halloweenLabel = !shop ? 'Loading…' : !halloweenOpen ? 'Back next October' : !shop.halloween.skuId ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Halloween Pack' : 'Link Discord to get it';
+  const halloweenLabel = !shop ? 'Loading…' : !shop.halloween?.skuId ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Halloween Pack' : 'Link Discord to get it';
   const painterLabel = !shop?.painter ? 'Discord checkout coming soon' : IS_ACTIVITY ? 'Purchase pack' : account.discordLinked ? 'Get the Painter Pack' : 'Link Discord to get it';
   const openPack = (kind, e) => {
     packTrigger.current = e.currentTarget;
@@ -591,13 +590,13 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
               <span className="pack-card-blurb">Everyone at your table picks their own colour.</span>
             </div>
           </button>
-          <button type="button" className="pack-card hw" aria-label={`Halloween Pack, ${hasHalloween ? 'owned' : '$3.99'}`} onClick={(e) => openPack('halloween', e)}>
+          {halloweenOpen && <button type="button" className="pack-card hw" aria-label={`Halloween Pack, ${hasHalloween ? 'owned' : '$3.99'}`} onClick={(e) => openPack('halloween', e)}>
             <PackArtwork kind="halloween" shop={shop} className="pack-card-art" />
             <div className="pack-card-body">
               <div className="pack-card-row"><h3>Halloween Pack</h3><span className="pack-card-price">{hasHalloween ? 'Owned' : '$3.99'}</span></div>
               <span className="pack-card-blurb">Haunted badge and 6 candlelit cosmetics. October only.</span>
             </div>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -660,7 +659,7 @@ export default function Shop({ account, onClose, onProfile, onEquip, notify }) {
                 <p className="halloween-note">The candles are lit and there's a seat at the table with your name on it. Thank you for spending October here; the spirits (and I) are glad you came.</p>
                 <div className="halloween-actions">
                   {hasHalloween ? <span className="halloween-owned">Your Haunted set is waiting in the locker. Welcome to the séance.</span> : (
-                    <button className="btn primary" disabled={!shop || !halloweenOpen || !shop.halloween.skuId || !!syncing} onClick={() => purchasePack('halloween')}>{halloweenLabel}</button>
+                    <button className="btn primary" disabled={!shop?.halloween?.skuId || !!syncing} onClick={() => purchasePack('halloween')}>{halloweenLabel}</button>
                   )}
                   {shop?.halloween?.skuId && account.discordLinked && !hasHalloween && <button className="btn secondary" disabled={!!syncing} onClick={() => refreshPack('halloween')}>{syncing === 'halloween' ? 'Checking…' : 'Already purchased? Check access'}</button>}
                 </div>
