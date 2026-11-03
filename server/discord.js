@@ -127,15 +127,18 @@ async function isGuildMember(discordId) {
 
 const escapeMarkdown = (text) => String(text).replace(/([\\*_~`|])/g, '\\$1');
 
-async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
+async function announceMonthlyRace({ name, discordId, monthName, rolls, sixes }, race) {
   const { luckiestWebhookUrl, clientUrl } = config();
   if (!luckiestWebhookUrl) return false;
   const ping = await isGuildMember(discordId).catch((err) => {
-    console.error('[luckiest shoutout]', err);
+    console.error(`[${race === 'lucky' ? 'luckiest' : 'unluckiest'} shoutout]`, err);
     return false;
   });
   const who = ping ? `${escapeMarkdown(name)} (<@${discordId}>)` : escapeMarkdown(name);
   const text = (content) => ({ type: 10, content });
+  const lucky = race === 'lucky';
+  const label = lucky ? 'Luckiest' : 'Unluckiest';
+  const pct = ((sixes / rolls) * 100).toFixed(1);
   const url = new URL(luckiestWebhookUrl);
   url.searchParams.set('with_components', 'true');
   const res = await fetch(url, {
@@ -147,16 +150,16 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
       flags: 1 << 15,
       components: [{
         type: 17,
-        accent_color: 0xffd166,
+        accent_color: lucky ? 0xffd166 : 0xa9bccf,
         components: [
-          text('-# MARRALHINHA · MONTHLY LUCKIEST'),
-          text(`# The Luckiest player of ${monthName} is ${who}!`),
-          text(`**${sixes} sixes** in **${rolls} rolls** for a **${((sixes / rolls) * 100).toFixed(1)}%** six rate in one game.`),
+          text(`-# MARRALHINHA · MONTHLY ${label.toUpperCase()}`),
+          text(lucky ? `# The ${label} player of ${monthName} is ${who}!` : `# The Unluckiest player of ${monthName} is ${who}.`),
+          text(lucky ? `**${sixes} sixes** in **${rolls} rolls** for a **${pct}%** six rate in one game.` : `**${sixes} sixes** in **${rolls} rolls**, a **${pct}%** six rate in one game. Brutal.`),
           { type: 12, items: [{ media: { url: `${clientUrl}/og-image.jpg` } }] },
           { type: 14, divider: true, spacing: 2 },
           {
             type: 9,
-            components: [text('**Congratulations!** Your Luckiest reward is waiting.\n-# Log in on the site or launch the Activity to claim it.')],
+            components: [text(lucky ? '**Congratulations!** Your Luckiest reward is waiting.\n-# Log in on the site or launch the Activity to claim it.' : '**Condolences.** Your Unluckiest reward is waiting.\n-# Log in on the site or launch the Activity to claim it.')],
             accessory: { type: 2, style: 5, label: 'Claim reward', url: clientUrl },
           },
         ],
@@ -164,9 +167,12 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
       allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] },
     }),
   });
-  if (!res.ok) throw new Error(`Luckiest shoutout failed (${res.status})`);
+  if (!res.ok) throw new Error(`${lucky ? 'Luckiest' : 'Unluckiest'} shoutout failed (${res.status})`);
   return true;
 }
+
+const announceLuckiest = (details) => announceMonthlyRace(details, 'lucky');
+const announceUnluckiest = (details) => announceMonthlyRace(details, 'unlucky');
 
 const playingPresence = (n) => ({ status: 'online', since: null, afk: false, activities: [{ name: 'Custom Status', type: 4, state: `${n} playing now · ${new URL(config().clientUrl).host}` }] });
 
@@ -196,4 +202,4 @@ function connectGateway(playing = () => 0) {
   return manager;
 }
 
-module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, packOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };
+module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, packOpen, activeEntitlement, isGuildMember, announceLuckiest, announceUnluckiest, connectGateway };

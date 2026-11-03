@@ -388,6 +388,19 @@ function UserEditor({ user, me, onChange, onMerged, notify }) {
         <p className="muted small-text">They choose any Luckiest set piece they don't own yet, the same picker monthly winners get.</p>
       </div>
 
+      <div className="admin-section">
+        <h4>Unluckiest picks {user.unluckyPicks > 0 && <span className="badge">{user.unluckyPicks} waiting</span>}</h4>
+        <div className="admin-row-inline">
+          <button className="btn secondary" disabled={busy} onClick={() => act('/unluckiest-picks', { delta: 1 }, `${user.name} got an Unluckiest pick`)}>
+            Grant a pick
+          </button>
+          <button className="btn ghost" disabled={busy || !user.unluckyPicks} onClick={() => act('/unluckiest-picks', { delta: -1 }, `Took an Unluckiest pick back from ${user.name}`)}>
+            Take one back
+          </button>
+        </div>
+        <p className="muted small-text">They choose any Unluckiest set piece they don't own yet, the same picker monthly winners get.</p>
+      </div>
+
       <MergeAccounts user={user} me={me} onMerged={onMerged} notify={notify} />
 
       {!isMe && !user.tags.some((t) => TAGS[t]?.admin) && (

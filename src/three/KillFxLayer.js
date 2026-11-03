@@ -11,7 +11,7 @@ import Props from './Props';
 // Every kill-effect renderer in one group, aware of the board outline so floor effects don't spill into the void
 const NO_ORIGIN = [0, 0];
 
-export default function KillFxLayer({ bus = fx, layout, origin = NO_ORIGIN }) {
+export default function KillFxLayer({ bus = fx, layout, origin = NO_ORIGIN, timeScale = 1 }) {
   const group = useRef();
   const clip = useMemo(() => makeBoardClip(), []);
   const { halfWidth, halfLength } = layout.spec;
@@ -26,8 +26,8 @@ export default function KillFxLayer({ bus = fx, layout, origin = NO_ORIGIN }) {
   return (
     <group ref={group}>
       <Particles bus={bus} />
-      <Shockwaves bus={bus} clip={clip} />
-      <Spectacle bus={bus} clip={clip} />
+      <Shockwaves bus={bus} clip={clip} timeScale={timeScale} />
+      <Spectacle bus={bus} clip={clip} timeScale={timeScale} />
       <Cane bus={bus} />
       <Props bus={bus} />
     </group>

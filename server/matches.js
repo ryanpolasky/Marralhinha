@@ -25,6 +25,7 @@ class Matches {
       leadersRate: db.prepare("SELECT * FROM users WHERE games >= ? ORDER BY (wins * 1.0 / games) DESC, wins DESC LIMIT ?"),
       leadersLevel: db.prepare("SELECT * FROM users ORDER BY xp DESC LIMIT ?"),
       leadersLucky: db.prepare("SELECT u.*, COUNT(*) AS lucky_months, MAX(lm.month) AS lucky_last FROM luckiest_months lm JOIN users u ON u.id = lm.player_id GROUP BY u.id ORDER BY lucky_months DESC, MIN(lm.month) ASC LIMIT ?"),
+      leadersUnlucky: db.prepare("SELECT u.*, COUNT(*) AS unlucky_months, MAX(um.month) AS unlucky_last FROM unluckiest_months um JOIN users u ON u.id = um.player_id GROUP BY u.id ORDER BY unlucky_months DESC, MIN(um.month) ASC LIMIT ?"),
       leadersHome: db.prepare("SELECT * FROM users WHERE marbles_home > 0 ORDER BY marbles_home DESC, games DESC LIMIT ?"),
     };
   }
@@ -106,11 +107,15 @@ class Matches {
       home: u.marbles_home || 0,
       xp: u.xp,
       ...(u.lucky_months ? { luckyMonths: u.lucky_months, luckyLast: u.lucky_last } : {}),
+      ...(u.unlucky_months ? { unluckyMonths: u.unlucky_months, unluckyLast: u.unlucky_last } : {}),
     });
     const lead = this.accounts.monthLeader();
     const leadUser = lead && this.accounts.getUser(lead.id);
+    const unluckyLead = this.accounts.unluckyMonthLeader();
+    const unluckyLeadUser = unluckyLead && this.accounts.getUser(unluckyLead.id);
     return {
       luckyNow: leadUser ? { ...mini(leadUser), rate: lead.rate, rolls: lead.rolls, sixes: lead.sixes, monthName: lead.monthName, endsAt: lead.endsAt } : null,
+      unluckyNow: unluckyLeadUser ? { ...mini(unluckyLeadUser), rate: unluckyLead.rate, rolls: unluckyLead.rolls, sixes: unluckyLead.sixes, monthName: unluckyLead.monthName, endsAt: unluckyLead.endsAt } : null,
       wins: this.q.leadersWins.all(BOARD_MIN_GAMES, BOARD_SIZE).map(mini),
       winRate: this.q.leadersRate.all(BOARD_MIN_GAMES, BOARD_SIZE).map(mini),
       sixes: this.q.leadersSixes.all(BOARD_SIZE).map(mini),
@@ -118,6 +123,7 @@ class Matches {
       home: this.q.leadersHome.all(BOARD_SIZE).map(mini),
       level: this.q.leadersLevel.all(BOARD_SIZE).map(mini),
       lucky: this.q.leadersLucky.all(BOARD_SIZE).map(mini),
+      unlucky: this.q.leadersUnlucky.all(BOARD_SIZE).map(mini),
     };
   }
 }

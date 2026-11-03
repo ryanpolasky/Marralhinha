@@ -7,6 +7,7 @@ import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { SHADOW_ONLY, SingularityAura } from './Gravity';
 import { SolCorona } from './Corona';
+import { TapeX, Seep } from './DuctTape';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
@@ -237,6 +238,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   const rocky = star && stunt?.kind === 'rocky';
   const aura = skinAura === 'singularity' && !rocky;
   const corona = skinAura === 'corona' && !rocky;
+  const taped = skinAura === 'duct-tape';
   if (!anim.current) anim.current = { pos: target.clone(), segs: [], lift: 0, seen: planKey, trailAt: null, off: new THREE.Vector3() };
 
   useLayoutEffect(() => {
@@ -433,7 +435,10 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   return (
     <>
       <group ref={group}>
-        <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow />
+        <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow>
+          {taped && <TapeX size={MARBLE_R} />}
+          {taped && <Seep size={MARBLE_R} seed={seed} />}
+        </mesh>
         {aura && <SingularityAura size={MARBLE_R} color={color} energy={energy} seed={seed} />}
         {corona && <SolCorona size={MARBLE_R} color={color} seed={seed} />}
         {rocky && <Limbs rig={rig} />}
@@ -619,7 +624,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               planKey={planKey}
               material={materials[seat].material}
               aura={materials[seat].aura}
-              keel={skinKey(skins[seat]) === 'wild'}
+              keel={['wild', 'unlucky'].includes(skinKey(skins[seat]))}
               movable={movable}
               selected={!!selected && selected.seat === seat && selected.marble === marble}
               hovered={!!hovered && hovered.seat === seat && hovered.marble === marble}

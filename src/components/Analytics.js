@@ -29,6 +29,7 @@ const REASON_LABEL = {
   admin: 'Dev grants',
   report: 'Report gifts',
   luckiest: 'Luckiest payout',
+  unluckiest: 'Unluckiest payout',
 };
 
 const Stat = ({ label, value, sub }) => (

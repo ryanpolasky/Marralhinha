@@ -257,7 +257,7 @@ void main() {
 const SPRITES = 900;
 const SPRITE_ATTRS = [['position', 3], ['aColor', 3], ['aSize', 1], ['aAlpha', 1], ['aTile', 1], ['aRot', 1]];
 
-function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false }) {
+function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false, timeScale = 1 }) {
   const { gl, camera, size } = useThree();
   const live = useRef(0);
   const cursor = useRef(0);
@@ -354,7 +354,7 @@ function SpriteLayer({ bus, atlas, clip = null, additive = false, pixel = false 
   useFrame((_, rawDt) => {
     if (!live.current) return;
     let j = 0;
-    const dt = Math.min(rawDt, 0.05);
+    const dt = Math.min(rawDt, 0.05) * timeScale;
     material.uniforms.uScale.value = (size.height * gl.getPixelRatio()) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const pos = geo.attributes.position.array;
     const col = geo.attributes.aColor.array;
@@ -828,20 +828,31 @@ const DECALS = {
   }],
   puddle: [256, 256, (g, w) => {
     const c = w / 2;
-    g.fillStyle = 'rgba(120,200,255,0.4)';
+    const water = g.createRadialGradient(c * 0.45, c * 0.36, c * 0.08, c, c, c * 0.88);
+    water.addColorStop(0, 'rgba(12,22,31,0.9)');
+    water.addColorStop(0.68, 'rgba(17,29,39,0.82)');
+    water.addColorStop(0.91, 'rgba(26,42,54,0.75)');
+    water.addColorStop(1, 'rgba(26,42,54,0)');
+    g.fillStyle = water;
     g.beginPath();
     for (let i = 0; i <= 40; i++) {
       const a = (i / 40) * 6.28;
-      const r = c * 0.85 * (0.82 + Math.sin(a * 5) * 0.08 + Math.sin(a * 3 + 1) * 0.07);
+      const r = c * 0.88 * (0.82 + Math.sin(a * 5) * 0.08 + Math.sin(a * 3 + 1) * 0.07);
       g.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
     }
     g.fill();
-    g.strokeStyle = 'rgba(230,248,255,0.85)';
-    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(200,222,237,0.92)';
+    g.lineWidth = 5;
     g.stroke();
-    g.strokeStyle = 'rgba(230,248,255,0.4)';
+    g.strokeStyle = 'rgba(114,151,177,0.68)';
+    g.lineWidth = 2;
     g.beginPath();
-    g.arc(c, c, c * 0.45, 0, 6.28);
+    g.arc(c, c, c * 0.77, 0, 6.28);
+    g.stroke();
+    g.strokeStyle = 'rgba(219,237,248,0.76)';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.ellipse(c * 0.68, c * 0.43, c * 0.24, c * 0.08, -0.4, 0, 6.28);
     g.stroke();
   }],
   rune: [256, 256, (g, w) => {
@@ -1020,7 +1031,7 @@ const DECAL_POOL = 6;
 const decalCache = {};
 const decalTexture = (kind) => decalCache[kind] || (decalCache[kind] = canvasTex(...DECALS[kind]));
 
-function Decals({ bus, clip = null }) {
+function Decals({ bus, clip = null, timeScale = 1 }) {
   const { camera } = useThree();
   const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const state = useMemo(() => Array.from({ length: DECAL_POOL }, () => ({ alive: false, t: 0, life: 1, size: 1, spin: 0, angle: 0, grow: 0.3, kind: 'scorch', billboard: false, base: 1, jitter: 0, home: [0, 0, 0] })), []);
@@ -1052,7 +1063,7 @@ function Decals({ bus, clip = null }) {
         const s = state[i];
         const kind = d.kind;
         const billboard = kind in PANELS;
-        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, home: d.position });
+        Object.assign(s, { alive: true, t: -(d.delay || 0), life: d.life || 1.5, size: d.size || 2, spin: d.spin || 0, angle: d.angle ?? Math.random() * 6.28, grow: d.grow ?? 0.3, kind, billboard, base: d.opacity ?? 1, jitter: d.jitter || 0, drain: !!d.drain, home: d.position });
         const m = mats[i];
         m.map = decalTexture(kind);
         m.color.set(d.color || '#ffffff');
@@ -1066,7 +1077,8 @@ function Decals({ bus, clip = null }) {
     [bus, state, mats]
   );
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
+    const dt = rawDt * timeScale;
     state.forEach((s, i) => {
       const mesh = meshes.current[i];
       if (!mesh) return;
@@ -1080,7 +1092,8 @@ function Decals({ bus, clip = null }) {
       const pop = Math.min(1, s.t / 0.22);
       const sc = s.size * (s.grow + (1 - s.grow) * (1 - (1 - pop) ** 3));
       const aspect = PANELS[s.kind] || 1;
-      mesh.scale.set(sc * aspect, sc, 1);
+      const drain = s.drain && k > 0.5 ? 1 - ((k - 0.5) / 0.5) * 0.65 : 1;
+      mesh.scale.set(sc * aspect * drain, sc * drain, 1);
       if (s.billboard) {
         mesh.parent.getWorldQuaternion(q).invert().multiply(camera.quaternion);
         mesh.quaternion.copy(q);
@@ -1088,6 +1101,8 @@ function Decals({ bus, clip = null }) {
         mesh.position.set(s.home[0] + rand(-jit, jit), s.home[1] + rand(-jit, jit) * 0.5, s.home[2]);
         mesh.visible = !(s.jitter && Math.random() < 0.06 && k > 0.2);
       } else {
+        mesh.position.y = s.home[1];
+        mesh.rotation.x = -Math.PI / 2;
         mesh.rotation.z = s.angle + s.spin * s.t;
       }
       mats[i].opacity = s.base * Math.min(1, s.t / 0.08) * (k > 0.55 ? 1 - (k - 0.55) / 0.45 : 1);
@@ -1101,6 +1116,45 @@ function Decals({ bus, clip = null }) {
       ))}
     </group>
   );
+}
+
+const BEAD_POOL = 48;
+
+function WaterBeads({ bus, clip = null, timeScale = 1 }) {
+  const state = useMemo(() => Array.from({ length: BEAD_POOL }, () => ({ alive: false, t: 0, life: 3, at: new THREE.Vector3(), size: 0.07 })), []);
+  const meshes = useRef([]);
+  const geometry = useMemo(() => new THREE.SphereGeometry(1, 16, 10), []);
+  const materials = useMemo(() => state.map(() => {
+    const m = new THREE.MeshPhysicalMaterial({ color: '#cfeef7', metalness: 0.1, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0.01, envMapIntensity: 2.2, transparent: true, opacity: 0.95, depthWrite: false });
+    clipToBoard(m, clip);
+    return m;
+  }), [state, clip]);
+  useEffect(() => () => { geometry.dispose(); materials.forEach((m) => m.dispose()); }, [geometry, materials]);
+  useEffect(() => bus.on((type, d) => {
+    if (type !== 'bead') return;
+    const i = Math.max(0, state.findIndex((s) => !s.alive));
+    const s = state[i];
+    Object.assign(s, { alive: true, t: 0, life: d.life || 3, size: d.size || 0.075 });
+    s.at.set(d.position[0], d.position[1], d.position[2]);
+  }), [bus, state]);
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05) * timeScale;
+    state.forEach((s, i) => {
+      const mesh = meshes.current[i];
+      if (!mesh) return;
+      if (s.alive) {
+        s.t += dt;
+        if (s.t >= s.life) s.alive = false;
+      }
+      mesh.visible = s.alive;
+      if (!s.alive) return;
+      const k = s.t / s.life;
+      mesh.position.copy(s.at);
+      mesh.scale.set(s.size * (1.15 - k * 0.5), s.size * (0.56 - k * 0.3), s.size * (0.86 - k * 0.35));
+      materials[i].opacity = Math.max(0.08, 0.9 * (1 - k));
+    });
+  });
+  return <group>{state.map((_, i) => <mesh key={i} ref={(m) => { meshes.current[i] = m; }} geometry={geometry} material={materials[i]} visible={false} />)}</group>;
 }
 
 const VIDEO_VERT = `
@@ -1220,26 +1274,27 @@ export const useWarmup = () => {
 };
 
 // Everything the kill effects need beyond plain bursts: billboard sprites, domes, lightning, solid shards and floor decals
-export default function Spectacle({ bus = fx, clip = null }) {
+export default function Spectacle({ bus = fx, clip = null, timeScale = 1 }) {
   const { gl } = useThree();
   const atlas = sharedAtlas();
   const root = useWarmup();
   useEffect(() => {
     [atlas, ...Object.keys(DECALS).map(decalTexture)].forEach((t) => gl.initTexture(t));
   }, [gl, atlas]);
-  useFrame((_, dt) => bus.tick(Math.min(dt, 0.05)));
+  useFrame((_, dt) => bus.tick(Math.min(dt, 0.05) * timeScale));
   return (
     <group ref={root}>
-      <Decals bus={bus} clip={clip} />
+      <Decals bus={bus} clip={clip} timeScale={timeScale} />
+      <WaterBeads bus={bus} clip={clip} timeScale={timeScale} />
       <Warps bus={bus} />
       <Holes bus={bus} />
       <Shards bus={bus} clip={clip} />
       <Domes bus={bus} />
       <Bolts bus={bus} />
       <VideoClip bus={bus} />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive />
-      <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} timeScale={timeScale} />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} additive timeScale={timeScale} />
+      <SpriteLayer bus={bus} atlas={atlas} clip={clip} pixel timeScale={timeScale} />
     </group>
   );
 }

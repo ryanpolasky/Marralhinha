@@ -122,6 +122,7 @@ const App = () => {
   const mySeatRef = useRef(-1);
   const [modal, setModal] = useState(null);
   const [luckyLater, setLuckyLater] = useState(false);
+  const [unluckyLater, setUnluckyLater] = useState(false);
   // The player card being peeked at (right-clicked nameplates, end-screen rows, leaderboard rows)
   const [peek, setPeek] = useState(null);
   const mailShown = useRef(false);
@@ -714,6 +715,14 @@ const App = () => {
 
   return (
     <div className={`app mode-${sceneProps.mode}${quality.glass ? '' : ' flat-glass'}`}>
+      <svg className="puddle-filter-defs" aria-hidden="true" focusable="false">
+        <filter id="puddle-wave" x="-10%" y="-10%" width="120%" height="125%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.018 0.08" numOctaves="2" seed="8">
+            <animate attributeName="baseFrequency" dur="8s" values="0.018 0.08;0.025 0.06;0.018 0.08" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="2.2" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       <div className="scene-layer">
         <SceneBoundary>
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>
@@ -761,10 +770,11 @@ const App = () => {
           }
         />
       )}
-      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} onReport={() => setModal('report')} onClaimLucky={() => { setModal(null); setLuckyLater(false); }} />}
+      {modal === 'profile' && account && <Profile account={account} onClose={() => setModal(null)} onLocker={() => setModal('locker')} onReport={() => setModal('report')} onClaimLucky={() => { setModal(null); setLuckyLater(false); }} onClaimUnlucky={() => { setModal(null); setUnluckyLater(false); }} />}
       {modal === 'boards' && account && <Leaderboard meId={account.id} onClose={() => setModal(null)} onPlayer={(u) => setPeek({ ...u, userId: u.id })} />}
       {modal === 'report' && account && <ReportModal onClose={() => setModal(null)} notify={notify} />}
-      {!modal && !game && !localView && !luckyLater && account?.lucky?.pending?.length > 0 && <LuckyClaim key={account.lucky.pending[0].month} account={account} onClaimed={setAccount} onLater={() => setLuckyLater(true)} notify={(text) => notify(text, 'good')} />}
+      {!modal && !game && !localView && account?.lucky?.pending?.length > 0 && !luckyLater && <LuckyClaim key={`lucky:${account.lucky.pending[0].month}`} race="lucky" account={account} onClaimed={setAccount} onLater={() => setLuckyLater(true)} notify={(text) => notify(text, 'good')} />}
+      {!modal && !game && !localView && !account?.lucky?.pending?.length && account?.unlucky?.pending?.length > 0 && !unluckyLater && <LuckyClaim key={`unlucky:${account.unlucky.pending[0].month}`} race="unlucky" account={account} onClaimed={setAccount} onLater={() => setUnluckyLater(true)} notify={(text) => notify(text, 'good')} />}
       {modal === 'replies' && account && <RepliesModal replies={account.replies || []} onClose={() => setModal(null)} onClaim={setAccount} />}
       {peek && <PlayerCard userId={peek.userId} hint={peek} onClose={() => setPeek(null)} />}
       {pingMenu && canPing && (

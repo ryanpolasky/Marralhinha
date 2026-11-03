@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { fx } from './fx';
+import BucketModel from './BucketModel';
 
 export const ANVIL = { drop: 0.42, hold: 0.95, lift: 0.3 };
 export const CLAW = [[0, 6, 0, 1], [0.5, 0, 0, 1], [0.65, 0, 0, 0], [1.15, 2.2, 0, 0], [1.3, 2.2, 0.15, 0], [1.45, 2.2, -0.15, 0], [1.55, 2.2, 0, 1], [2.0, 2.2, 0, 1], [2.4, 0, 0, 1], [2.55, 0, 0, 0], [3.15, 6.5, 0, 0]];
@@ -156,12 +157,38 @@ function Train({ bus }) {
   );
 }
 
+function Bucket({ bus }) {
+  const g = useRef();
+  const s = useProp(bus, 'bucket');
+  useFrame((_, dt) => {
+    const st = s.current;
+    g.current.visible = st.alive;
+    if (!st.alive) return;
+    st.t += Math.min(dt, 0.05);
+    const fall = 0.42;
+    const hold = 0.8;
+    const lift = 0.38;
+    let y;
+    if (st.t < fall) y = 7 * (1 - (st.t / fall) ** 2);
+    else if (st.t < fall + 0.09) y = Math.sin(((st.t - fall) / 0.09) * Math.PI) * 0.1;
+    else if (st.t < fall + 0.09 + hold) y = 0;
+    else y = 7 * clamp01((st.t - fall - 0.09 - hold) / lift) ** 2;
+    if (st.t > fall + 0.09 + hold + lift) st.alive = false;
+    g.current.position.set(st.at[0], st.at[1] + 1.02 + y, st.at[2]);
+    const hit = clamp01((st.t - fall) / 0.12) * (1 - clamp01((st.t - fall - 0.09 - hold) / lift));
+    g.current.scale.set(1.12 + hit * 0.05, 1 - hit * 0.12, 1.12 + hit * 0.05);
+    g.current.rotation.z = st.t < fall ? 0.12 * (1 - st.t / fall) : 0;
+  });
+  return <group ref={g} visible={false}><BucketModel flipped scale={0.88} /></group>;
+}
+
 export default function Props({ bus = fx }) {
   return (
     <>
       <Anvil bus={bus} />
       <Claw bus={bus} />
       <Train bus={bus} />
+      <Bucket bus={bus} />
     </>
   );
 }

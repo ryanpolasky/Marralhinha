@@ -4,6 +4,7 @@ import { fx } from './fx';
 import { videoFor } from './Spectacle';
 import { ORES as MC_ORES } from './minecraft';
 import { ANVIL, BALL, TRAIN } from './Props';
+import { warmBucket } from './BucketModel';
 
 const col = (s) => SEAT_COLORS[s];
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
@@ -329,6 +330,25 @@ const KILL_FX = {
     sfx('splash');
   },
 
+  unlucky: (emit, { at, sfx, later }) => {
+    const base = ground(at);
+    [0, 125, 245].forEach((delay, i) => later(delay, () => {
+      const x = (i - 1) * 0.19;
+      const drop = off(at, x, 1.25, 0.12 - i * 0.12);
+      emit('spr', { position: drop, n: 1, tile: TILE.streak, c: ['#d6e5ec'], add: false, speed: 0, up: -2.8, size: 0.58, size2: 0.045, life: 0.4, grav: 0, rot: Math.PI / 2, a: 0.98 });
+      emit('spr', { position: drop, n: 1, tile: TILE.drop, c: ['#e8f1f4'], add: false, speed: 0, up: -2.8, size: 0.24, size2: 0.08, life: 0.42, grav: 0, a: 0.98 });
+      later(260, () => {
+        emit('ring', { position: ground(at, x, 0.12 - i * 0.12), color: '#cadde4', size: 0.42, life: 0.28 });
+        emit('spr', { position: ground(at, x, 0.12 - i * 0.12), n: 4, tile: TILE.drop, c: ['#d8e7ec'], add: false, speed: 0.5, up: 1.2, size: 0.11, size2: 0.04, life: 0.38, grav: 2, a: 0.9 });
+      });
+    }));
+    later(340, () => emit('bucket', { position: base }));
+    later(760, () => {
+      emit('ring', { position: base, color: '#91aeb8', size: 1.5, life: 1.2 });
+      emit('shake', { amount: 0.24 });
+      sfx('clack');
+    });
+  },
   lucky: (emit, { at, sfx, seq }) => {
     const base = ground(at);
     const gold = ['#fff3b8', '#ffd166', '#f0b93a', '#c48a1c'];
@@ -503,7 +523,11 @@ const KILL_FX = {
 };
 
 const CLIPS = { police: '/fx/police-crash.mp4' };
-export const warmKillFx = (itemId) => CLIPS[skinKey(itemId)] && videoFor(CLIPS[skinKey(itemId)]);
+export const warmKillFx = (itemId) => {
+  const key = skinKey(itemId);
+  if (key === 'unlucky') warmBucket();
+  return CLIPS[key] && videoFor(CLIPS[key]);
+};
 
 export const playKillFx = (itemId, info, { bus = fx, sfx = () => {} } = {}) => {
   (KILL_FX[skinKey(itemId)] || KILL_FX.pop)(bus.emit, { ...info, sfx, ...timeline(bus) });

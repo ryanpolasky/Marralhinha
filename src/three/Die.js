@@ -10,8 +10,8 @@ import { makeNumberTexture } from './textures';
 import { diceSkin, animateDiceSkin } from './skins';
 import { skinKey } from '../game/catalog';
 import { TABLE_Y, DISH_BEVEL } from './Board';
-import { fx } from './fx';
 import { useRainbow } from '../game/rainbow';
+import { fx } from './fx';
 
 const SIZE = 0.85;
 const REST_Y = TABLE_Y + SIZE / 2;
@@ -23,6 +23,149 @@ const SLUG_GEO = new THREE.SphereGeometry(0.12, 20, 14);
 const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85, roughness: 0.45 });
 const _down = new THREE.Vector3();
 const _inv = new THREE.Quaternion();
+export const HALF_FULL_ACRYLIC = new THREE.MeshPhysicalMaterial({
+  color: '#f2fbfd',
+  transparent: true,
+  opacity: 0.16,
+  roughness: 0.04,
+  clearcoat: 1,
+  clearcoatRoughness: 0.035,
+  envMapIntensity: 2.6,
+  depthWrite: false,
+});
+
+export function HalfFullWater({ orientation, state, size = SIZE }) {
+  const surfaceRef = useRef();
+  const bubbles = useRef([]);
+  const planeState = useRef({ tiltX: 0, tiltZ: 0, vx: 0, vz: 0, lastLanding: -10 });
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), []);
+  const planeUniform = useMemo(() => ({ value: new THREE.Vector4() }), []);
+  const material = useMemo(() => {
+    const m = new THREE.MeshPhysicalMaterial({
+      color: '#2f8fb8',
+      roughness: 0.08,
+      side: THREE.DoubleSide,
+      clippingPlanes: [plane],
+    });
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uPlane = planeUniform;
+      shader.uniforms.uDepth = { value: size * 0.8 };
+      shader.uniforms.uDeep = { value: new THREE.Color('#1c6890') };
+      shader.uniforms.uShallow = { value: new THREE.Color('#78c2da') };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld;\nuniform vec4 uPlane;\nuniform float uDepth;\nuniform vec3 uDeep;\nuniform vec3 uShallow;')
+        .replace('#include <opaque_fragment>', `float ndv = abs(dot(normalize(normal), normalize(vViewPosition)));
+          float lit = clamp(dot(totalDiffuse, vec3(1.0)) / max(dot(diffuseColor.rgb, vec3(1.0)), 0.001), 0.0, 1.2);
+          float wd = clamp(abs(dot(uPlane.xyz, vWaterWorld) + uPlane.w) / uDepth, 0.0, 1.0);
+          vec3 body = uDeep * (0.68 + 0.32 * lit) * mix(1.08, 0.72, wd);
+          body = mix(body, uShallow, pow(1.0 - ndv, 3.0) * 0.5);
+          outgoingLight = body + totalSpecular;
+          #include <opaque_fragment>
+          if (!gl_FrontFacing) gl_FragColor = vec4(mix(uDeep, uShallow, 0.3), 1.0);`);
+    };
+    m.customProgramCacheKey = () => 'half-full-water';
+    return m;
+  }, [plane, planeUniform, size]);
+  const waterGeometry = useMemo(() => new RoundedBoxGeometry(size * 0.86, size * 0.86, size * 0.86, 5, size * 0.11), [size]);
+  const surfaceGeometry = useMemo(() => new THREE.PlaneGeometry(size * 0.78, size * 0.78), [size]);
+  const worldQ = useMemo(() => new THREE.Quaternion(), []);
+  const previousQ = useRef(new THREE.Quaternion());
+  const deltaQ = useMemo(() => new THREE.Quaternion(), []);
+  const localNormal = useMemo(() => new THREE.Vector3(), []);
+  const worldNormal = useMemo(() => new THREE.Vector3(), []);
+  const worldPos = useMemo(() => new THREE.Vector3(), []);
+  const surfaceQ = useMemo(() => new THREE.Quaternion(), []);
+  const tangentA = useMemo(() => new THREE.Vector3(), []);
+  const tangentB = useMemo(() => new THREE.Vector3(), []);
+  const inverseQ = useMemo(() => new THREE.Quaternion(), []);
+  const previousQuatReady = useRef(false);
+  const planePoint = useMemo(() => new THREE.Vector3(), []);
+  const down = useMemo(() => new THREE.Vector3(0, -1, 0), []);
+  const planeUp = useMemo(() => new THREE.Vector3(0, 0, 1), []);
+  const clock = useMemo(() => ({ t: 0 }), []);
+  useFrame((_, dt) => {
+    if (!orientation.current) return;
+    orientation.current.updateWorldMatrix(true, false);
+    orientation.current.getWorldQuaternion(worldQ);
+    orientation.current.getWorldPosition(worldPos);
+    const step = Math.max(dt, 1 / 240);
+    let omegaX = 0;
+    let omegaZ = 0;
+    if (previousQuatReady.current) {
+      deltaQ.copy(previousQ.current).invert().multiply(worldQ).normalize();
+      const angle = 2 * Math.acos(Math.min(1, Math.abs(deltaQ.w)));
+      const sine = Math.sqrt(Math.max(0, 1 - deltaQ.w * deltaQ.w));
+      if (sine > 0.001) {
+        const rate = angle / step / sine;
+        omegaX = deltaQ.x * rate;
+        omegaZ = deltaQ.z * rate;
+      }
+    } else previousQuatReady.current = true;
+    previousQ.current.copy(worldQ);
+    clock.t += dt;
+    const p = planeState.current;
+    const rolling = !!state.roll;
+    const targetX = rolling ? THREE.MathUtils.clamp(-omegaZ * 0.04, -0.24, 0.24) : 0;
+    const targetZ = rolling ? THREE.MathUtils.clamp(omegaX * 0.04, -0.24, 0.24) : 0;
+    if (!rolling && state.landedAt !== p.lastLanding && state.landedAt >= 0) {
+      p.lastLanding = state.landedAt;
+      p.vx += THREE.MathUtils.clamp(-omegaZ * 0.015, -0.18, 0.18);
+      p.vz += THREE.MathUtils.clamp(omegaX * 0.015, -0.18, 0.18);
+      if (Math.abs(p.vx) + Math.abs(p.vz) < 0.03) p.vx = 0.13;
+    }
+    const h = Math.min(dt, 0.05);
+    p.vx += (targetX - p.tiltX) * 34 * h;
+    p.vz += (targetZ - p.tiltZ) * 34 * h;
+    p.vx *= Math.exp(-8 * h);
+    p.vz *= Math.exp(-8 * h);
+    p.tiltX += p.vx * h;
+    p.tiltZ += p.vz * h;
+    inverseQ.copy(worldQ).invert();
+    localNormal.copy(down).applyQuaternion(inverseQ);
+    localNormal.x += p.tiltX;
+    localNormal.z += p.tiltZ;
+    localNormal.normalize();
+    worldNormal.copy(localNormal).applyQuaternion(worldQ).normalize();
+    planePoint.copy(worldPos).addScaledVector(worldNormal, size * 0.035);
+    plane.setFromNormalAndCoplanarPoint(worldNormal, planePoint);
+    planeUniform.value.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+    if (surfaceRef.current) {
+      surfaceRef.current.position.copy(localNormal).multiplyScalar(size * 0.035);
+      surfaceQ.setFromUnitVectors(planeUp, localNormal);
+      surfaceRef.current.quaternion.copy(surfaceQ);
+      surfaceRef.current.material.opacity = 0.56 + Math.sin(clock.t * 2.5) * 0.035;
+    }
+    tangentA.set(Math.abs(localNormal.x) > 0.9 ? 0 : 1, 0, Math.abs(localNormal.x) > 0.9 ? 1 : 0);
+    tangentA.addScaledVector(localNormal, -tangentA.dot(localNormal)).normalize();
+    tangentB.crossVectors(localNormal, tangentA);
+    bubbles.current.forEach((bubble, i) => {
+      if (!bubble) return;
+      const phase = (clock.t * 0.3 + i * 0.37) % 1;
+      bubble.position.copy(localNormal).multiplyScalar(size * 0.022)
+        .addScaledVector(tangentA, (i - 1) * size * 0.15 + Math.sin(clock.t * 0.7 + i * 2) * size * 0.03)
+        .addScaledVector(tangentB, (i % 2 ? 1 : -1) * size * 0.11);
+      bubble.visible = phase < 0.85;
+      bubble.scale.setScalar(size * (0.018 + 0.01 * (i % 2)) * Math.min(1, phase * 6));
+    });
+  });
+  return (
+    <group>
+      <mesh geometry={waterGeometry} material={material} renderOrder={1} />
+      <mesh ref={surfaceRef} geometry={surfaceGeometry} position-y={-size * 0.035} renderOrder={2} visible={false}>
+        <meshPhysicalMaterial color="#9fe0f2" transparent opacity={0.58} roughness={0.08} clearcoat={1} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {Array.from({ length: 3 }, (_, i) => (
+        <mesh key={i} ref={(m) => { bubbles.current[i] = m; }} visible={false} renderOrder={2}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshPhysicalMaterial color="#dceff3" transparent opacity={0.65} roughness={0.06} clearcoat={1} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 
 export function LeadSlug({ size = SIZE }) {
   const ref = useRef();
@@ -81,12 +224,14 @@ function useDieAssets() {
   );
 }
 
-function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, assets, layout }) {
+function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, showRollLabel = true, assets, layout }) {
   const materials = diceSkin(skin);
   const ref = useRef();
+  const orientation = useRef();
   const glow = useRef();
   const label = useRef();
   const loaded = skinKey(skin) === 'loaded';
+  const halfFull = skinKey(skin) === 'unlucky';
   const anim = useRef(null);
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
@@ -121,6 +266,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     };
     a.scale = 1;
     a.vel = 0;
+    a.landedAt = -10;
     a.gone = false;
     a.label.start = -10;
     sfx.dice();
@@ -133,6 +279,7 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     const a = anim.current;
     const now = state.clock.elapsedTime;
     const mesh = ref.current;
+    const rotation = orientation.current;
     animateDiceSkin(materials, color);
 
     const wanted = active || !!a.roll || now - a.landedAt < LAND_HOLD;
@@ -149,7 +296,6 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
     }
     mesh.visible = a.scale > 0.01;
     mesh.scale.setScalar(Math.min(a.scale, 1.25));
-
     if (a.roll) {
       const r = a.roll;
       if (r.start === null) r.start = now;
@@ -170,21 +316,21 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
         }
       }
       mesh.position.copy(a.pos);
-      mesh.quaternion.copy(a.quat);
+      rotation.quaternion.copy(a.quat);
     } else {
       const hover = canRoll ? 0.35 + Math.sin(now * 3.5) * 0.12 : 0;
       const shrink = 1 - Math.min(a.scale, 1);
       mesh.position.set(a.pos.x, a.pos.y + hover - shrink * (SIZE / 2), a.pos.z);
-      mesh.quaternion.copy(a.quat);
-      if (canRoll) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
-      if (shrink > 0) mesh.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
+      rotation.quaternion.copy(a.quat);
+      if (canRoll) rotation.quaternion.premultiply(twist.setFromAxisAngle(UP, Math.sin(now * 2) * 0.25));
+      if (shrink > 0) rotation.quaternion.premultiply(twist.setFromAxisAngle(UP, shrink * 2.4));
     }
     glow.current.visible = canRoll && !a.roll && a.scale > 0.6;
     glow.current.position.set(a.pos.x, TABLE_Y + 0.02, a.pos.z);
     glow.current.material.opacity = 0.4 + Math.sin(now * 5) * 0.3;
 
     const lt = now - a.label.start;
-    const showLabel = lt >= 0 && lt < 1.6;
+    const showLabel = showRollLabel && lt >= 0 && lt < 1.6;
     label.current.visible = showLabel;
     if (showLabel) {
       const pop = lt < 0.25 ? 0.4 + (lt / 0.25) * 0.9 : lt < 0.4 ? 1.3 - ((lt - 0.25) / 0.15) * 0.3 : 1;
@@ -213,9 +359,15 @@ function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll,
 
   return (
     <group>
-      <mesh ref={ref} geometry={assets.geometry} material={materials} castShadow {...interactive}>
-        {loaded && <LeadSlug />}
-      </mesh>
+      <group ref={ref}>
+        <group ref={orientation}>
+          {halfFull && <mesh geometry={assets.geometry} material={HALF_FULL_ACRYLIC} renderOrder={3} />}
+          <mesh geometry={assets.geometry} material={materials} castShadow renderOrder={4} {...interactive}>
+            {loaded && <LeadSlug />}
+          </mesh>
+          {halfFull && <HalfFullWater orientation={orientation} state={anim.current} />}
+        </group>
+      </group>
       <mesh ref={glow} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, 0.95, 48]} />
         <meshBasicMaterial color="#ffd166" transparent toneMapped={false} depthWrite={false} />
@@ -423,7 +575,7 @@ function DiceStorm({ stunt, skin, color, assets, layout, onPickDie }) {
   );
 }
 
-export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, layout = layoutFor('classic') }) {
+export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, showRollLabel = true, layout = layoutFor('classic') }) {
   const palette = useRainbow(colors);
   const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const assets = useDieAssets();
@@ -459,6 +611,7 @@ export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRol
           canRoll={!stormLive && canRoll && d.seat === activeSeat}
           onRoll={onRoll}
           onGone={onGone}
+          showRollLabel={showRollLabel}
           assets={assets}
           layout={layout}
         />

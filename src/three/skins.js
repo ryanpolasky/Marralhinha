@@ -1133,6 +1133,64 @@ const MARBLES = {
       onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-molten',
       animate: (m, t) => { uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 2.1; } };
   },
+  unlucky: (c, seat) => {
+    const W = 1024;
+    const H = 512;
+    const [canvas, ctx] = makeCanvas(W, H);
+    const rand = seeded(733 + seat * 13);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c.light);
+    g.addColorStop(0.35, c.main);
+    g.addColorStop(1, mix(c.main, c.dark, 0.6));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+      ctx.beginPath();
+      ctx.ellipse(rand() * W, rand() * H, 4 + rand() * 18, 2 + rand() * 6, rand() * 3, 0, TAU);
+      ctx.fill();
+    }
+    const dark = mix(c.dark, '#000000', 0.55);
+    const glint = mix(c.light, '#ffffff', 0.6);
+    const crack = (x0, from, to, width, wander) => {
+      const pts = [];
+      let j = 0;
+      for (let k = 0; k <= 40; k++) {
+        const th = (from + (to - from) * (k / 40)) * Math.PI;
+        j += (rand() - 0.5) * wander;
+        const s = Math.max(0.1, Math.sin(th));
+        pts.push([x0 + ((j / s) / TAU) * W, (th / Math.PI) * H, ((width / s) / TAU) * W]);
+      }
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      pts.forEach(([x, y, w], k) => (k ? ctx.lineTo(x - w, y) : ctx.moveTo(x - w, y)));
+      [...pts].reverse().forEach(([x, y, w]) => ctx.lineTo(x + w * 0.4, y));
+      ctx.fill();
+      ctx.strokeStyle = glint;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      pts.forEach(([x, y, w], k) => (k ? ctx.lineTo(x + w * 1.2, y) : ctx.moveTo(x + w * 1.2, y)));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return pts;
+    };
+    [0.25, 0.75].forEach((u) => {
+      const pts = crack(u * W, 0.01, 0.46, 0.022, 0.07);
+      [10, 19, 29].forEach((k) => {
+        const [x, y] = pts[k];
+        const th = (y / H) * Math.PI;
+        crack(x, th / Math.PI, th / Math.PI + 0.06 + rand() * 0.06, 0.011, 0.12);
+      });
+      const [ex, ey] = pts[pts.length - 1];
+      const wet = ctx.createRadialGradient(ex, ey + 20, 2, ex, ey + 20, 60);
+      wet.addColorStop(0, 'rgba(0,0,0,0.22)');
+      wet.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = wet;
+      ctx.fillRect(ex - 60, ey - 40, 120, 120);
+    });
+    return { map: finishMarble(canvas), roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.05 };
+  },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
   halloween: (c, seat) => {
     const W = 512;
@@ -1354,7 +1412,7 @@ export function marbleSkin(itemId, seat, color = null) {
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'duct-tape' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 
@@ -1394,6 +1452,7 @@ const DICE = {
   minecraft: { bg: 'minecraft', pip: '#2fd8e8', one: '#22d36a', roughness: 0.85 },
   defuse: { bg: 'defuse', pip: '#d9d3c1', one: '#cf2f28', roughness: 0.7 },
   lucky: { bg: 'lucky', pip: '#0e7a43', one: '#0e7a43', roughness: 0.32, metalness: 0.85, clearcoat: 1 },
+  unlucky: { bg: 'clear', pip: '#ffffff', one: '#ffffff', roughness: 0.08, clearcoat: 1, extra: { transparent: true, opacity: 0.96, depthWrite: false } },
   sugar: { bg: 'sugar', pip: '#b8641c', one: '#b8641c', roughness: 0.6, clearcoat: 0.4 },
   fuzzy: { bg: 'fuzzy', pip: '#17131a', one: '#17131a', roughness: 1, extra: { sheen: 1, sheenColor: '#ffd3ea', sheenRoughness: 0.45 } },
   disco: { bg: 'disco', pip: '#ff4fd8', one: '#4fe3ff', roughness: 0.12, metalness: 0.9, glow: 1.3 },
@@ -1481,7 +1540,8 @@ function grid(ctx, size, step, color, width = 1) {
 
 function dieBackground(ctx, style, size, value) {
   const rand = seeded(200 + value);
-  if (style === 'wood') ctx.drawImage(makeWoodCanvas({ base: '#b9824a', grain: '80,40,15', seed: 30 + value, size: 256 }), 0, 0);
+  if (style === 'clear') ctx.clearRect(0, 0, size, size);
+  else if (style === 'wood') ctx.drawImage(makeWoodCanvas({ base: '#b9824a', grain: '80,40,15', seed: 30 + value, size: 256 }), 0, 0);
   else if (style === 'jade') {
     ctx.fillStyle = '#2e7d54';
     ctx.fillRect(0, 0, size, size);
@@ -1851,6 +1911,17 @@ function drawPips(ctx, value, size, color) {
   });
 }
 
+function glassPips(ctx, value, size, color) {
+  const r = value === 1 ? 30 : 21;
+  PIPS[value].forEach(([x, y]) => {
+    ctx.fillStyle = 'rgba(20,44,58,0.85)';
+    ctx.beginPath();
+    ctx.arc(x * size, y * size, r + 5, 0, TAU);
+    ctx.fill();
+  });
+  drawPips(ctx, value, size, color);
+}
+
 function blockPips(ctx, value, size, color, lit = true) {
   const step = size / 32;
   const r = value === 1 ? 32 : 24;
@@ -1882,7 +1953,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips, unlucky: glassPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -1927,6 +1998,7 @@ export function diceSkin(itemId) {
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
+            .replace('#include <color_fragment>', '#include <color_fragment>')
             .replace('#include <emissivemap_fragment>', key === 'train' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
@@ -2121,6 +2193,114 @@ function boardSpace(layout, S = 1024) {
     ctx.restore();
   };
   return { canvas, ctx, S, W, L, toWorld, label, mid: (from + to) / 2, room: to - from };
+}
+
+function waterDamageCanvas(layout) {
+  const { canvas, ctx, S, W, L, toWorld } = boardSpace(layout);
+  const rand = seeded(1457);
+  ctx.fillStyle = '#a77a4b';
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 26; i++) softBlob(ctx, rand() * S, rand() * S, 80 + rand() * 200, i % 2 ? '#94683d' : '#b88a58', 0.3);
+  for (let i = 0; i < 420; i++) {
+    const y0 = rand() * S;
+    const amp = 2 + rand() * 6;
+    const freq = 0.004 + rand() * 0.01;
+    const ph = rand() * TAU;
+    ctx.strokeStyle = rand() > 0.45 ? `rgba(58,34,16,${0.08 + rand() * 0.16})` : `rgba(196,150,98,${0.06 + rand() * 0.1})`;
+    ctx.lineWidth = 0.6 + rand() * 1.8;
+    ctx.beginPath();
+    for (let x = 0; x <= S; x += 16) {
+      const y = y0 + Math.sin(x * freq + ph) * amp + Math.sin(x * freq * 3.1 + ph) * amp * 0.3;
+      if (!x) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let y = S / 8; y < S; y += S / 8) {
+    ctx.fillStyle = 'rgba(40,22,10,0.45)';
+    ctx.fillRect(0, y + (rand() - 0.5) * 6, S, 1.6);
+  }
+  toWorld();
+  const blob = (x, z, r, jag) => {
+    ctx.beginPath();
+    for (let p = 0; p <= 64; p++) {
+      const a = (p / 64) * TAU;
+      const rr = r * (1 + Math.sin(a * 2 + jag) * 0.16 + Math.sin(a * 5 + jag * 1.7) * 0.08 + Math.sin(a * 11 + jag * 3.1) * 0.035);
+      const px = x + Math.cos(a) * rr;
+      const pz = z + Math.sin(a) * rr * 0.82;
+      if (!p) ctx.moveTo(px, pz); else ctx.lineTo(px, pz);
+    }
+    ctx.closePath();
+  };
+  const stains = [[W * 0.56, L - 1.2, 2.3], [L - 1.2, -W * 0.56, 2.1], [-W * 0.56, -L + 1.2, 2.2], [-L + 1.6, W * 0.3, 1.5], [W * 0.3, -W * 0.5, 1.6], [-W * 0.6, L - 2.8, 1.2]];
+  stains.forEach(([x, z, r]) => {
+    const jag = rand() * TAU;
+    for (let k = 0; k < 10; k++) {
+      blob(x, z, r * (1.02 - k * 0.05), jag + k * 0.08);
+      ctx.fillStyle = 'rgba(92,56,22,0.06)';
+      ctx.fill();
+    }
+    blob(x, z, r, jag);
+    ctx.strokeStyle = 'rgba(66,34,10,0.7)';
+    ctx.lineWidth = 0.045;
+    ctx.stroke();
+    blob(x, z, r * 0.97, jag);
+    ctx.strokeStyle = 'rgba(122,78,34,0.45)';
+    ctx.lineWidth = 0.09;
+    ctx.stroke();
+    [0.62, 0.34].forEach((f, k) => {
+      blob(x + (rand() - 0.5) * 0.3, z + (rand() - 0.5) * 0.3, r * f, jag + 1.3 + k);
+      ctx.strokeStyle = `rgba(74,40,12,${0.35 - k * 0.1})`;
+      ctx.lineWidth = 0.03;
+      ctx.stroke();
+    });
+  });
+  for (let i = 0; i < 7; i++) {
+    const arm = i % 4;
+    const along = W + 0.6 + rand() * (L - W - 1.4);
+    const across = (rand() - 0.5) * W * 1.2;
+    const [x, z] = [[along, across], [-along, across], [across, along], [across, -along]][arm];
+    const r = 0.3 + rand() * 0.12;
+    const start = rand() * TAU;
+    ctx.strokeStyle = 'rgba(52,32,16,0.34)';
+    ctx.lineWidth = 0.05;
+    ctx.beginPath();
+    ctx.ellipse(x, z, r, r, 0, start, start + TAU * (0.7 + rand() * 0.3));
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(52,32,16,0.16)';
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.ellipse(x + 0.02, z - 0.01, r * 0.86, r * 0.86, 0, 0, TAU);
+    ctx.stroke();
+  }
+  [[-W * 0.72, -L * 0.42], [W * 0.62, L * 0.18]].forEach(([x, z], i) => {
+    ctx.save();
+    ctx.translate(x, z);
+    ctx.rotate(i * 0.9);
+    ctx.fillStyle = 'rgba(30,16,6,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(0.04, 0.05, 0.46, 0.26, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#b48a5c';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.42, 0.22, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(60,34,14,0.8)';
+    ctx.lineWidth = 0.018;
+    ctx.beginPath();
+    ctx.moveTo(-0.3, -0.02); ctx.lineTo(-0.05, 0.06); ctx.lineTo(0.12, -0.05); ctx.lineTo(0.32, 0.03);
+    ctx.stroke();
+    ctx.restore();
+  });
+  for (let i = 0; i < 900; i++) {
+    const edge = rand() > 0.5;
+    const x = edge ? (rand() > 0.5 ? 1 : -1) * (W - rand() * 0.6) : (rand() - 0.5) * 2 * W;
+    const z = edge ? (rand() - 0.5) * 2 * L : (rand() > 0.5 ? 1 : -1) * (L - rand() * 0.6);
+    ctx.fillStyle = `rgba(34,44,28,${0.08 + rand() * 0.2})`;
+    ctx.beginPath();
+    ctx.arc(x, z, 0.01 + rand() * 0.04, 0, TAU);
+    ctx.fill();
+  }
+  return canvas;
 }
 
 function cardboardCanvas(layout) {
@@ -5255,6 +5435,19 @@ const LUCKY_SHADER = `{
   totalEmissiveRadiance += goldC * (top * (gold * (a + twinkle) * 0.9 + twinkle * 0.3) + gold * sideGlint * 0.6);
 }`;
 
+const WATER_DAMAGE_SHADER = `{
+  vec2 p = vSkinPos.xz;
+  for (int i = 0; i < 4; i++) {
+    vec2 d = p - uLeakPoints[i];
+    float dist = length(d);
+    float puddle = 1.0 - smoothstep(0.36, 0.72, dist);
+    float edge = 1.0 - smoothstep(0.012, 0.045, abs(dist - 0.43));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.07, 0.05), puddle * 0.5);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.13, 0.08), edge * 0.45);
+    roughnessFactor = mix(roughnessFactor, 0.14, puddle * 0.92);
+  }
+}`;
+
 const SPECIAL_BOARDS = {
   // An oak deck with a log rim, stump trays with bark sides, and a crafting table in the middle.
   // Outer walls get bark; hole walls carry the planks down into the divots
@@ -5374,6 +5567,18 @@ const SPECIAL_BOARDS = {
     uniforms: { uSide: { value: finish(decoSideCanvas()) } },
     shader: LUCKY_SHADER,
   }),
+  unlucky: (layout) => {
+    const { halfWidth: w, halfLength: l } = layout.spec;
+    return {
+      canvas: waterDamageCanvas(layout), repeat: BOARD_R, roughness: 0.55, clearcoat: 0.5,
+      params: { specularIntensity: 0.3, clearcoatRoughness: 0.3 },
+      dish: '#6e4b2e', felt: '#37332e', cup: '#22160c', side: '#6a4a2e',
+      accent: { color: '#a4a9aa', metalness: 0.82, roughness: 0.36 },
+      shaderCommon: 'uniform vec2 uLeakPoints[4];',
+      uniforms: { uLeakPoints: { value: [new THREE.Vector2(w * 0.56, l - 1.2), new THREE.Vector2(l - 1.2, -w * 0.56), new THREE.Vector2(-w * 0.56, -l + 1.2), new THREE.Vector2(l + 0.5, w + 0.5)] } },
+      shader: WATER_DAMAGE_SHADER,
+    };
+  },
   dev: (layout) => {
     const [dishCanvas, dishGlowCanvas, dishRepeat] = horizonDish(layout);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -5456,7 +5661,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'wild', 'cardboard', 'glass']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'unlucky', 'wild', 'cardboard', 'glass']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

@@ -164,7 +164,7 @@ function TagsPane({ account, ownedTags, onTagLoadout }) {
   const held = (tag) => isDev || (account.tags || []).includes(tag);
   const hidden = (tag) => isDev && tag === 'beta';
   const { main, shorthands } = account.tagLoadout || { main: null, shorthands: [] };
-  const roleOf = (tag) => (main === tag ? 'Main' : shorthands.includes(tag) ? 'Shorthand' : tag === 'lucky' && (account.tags || []).includes(tag) ? 'Always shown' : held(tag) ? 'Owned' : 'Locked');
+  const roleOf = (tag) => (main === tag ? 'Main' : shorthands.includes(tag) ? 'Shorthand' : ['lucky', 'unlucky'].includes(tag) && (account.tags || []).includes(tag) ? 'Always shown' : held(tag) ? 'Owned' : 'Locked');
   const full = shorthands.length >= MAX_SHORTHANDS;
   const info = TAGS[selected];
   return (
@@ -190,7 +190,7 @@ function TagsPane({ account, ownedTags, onTagLoadout }) {
                     {shorthands.includes(selected) ? 'Remove shorthand' : full ? `Shorthands full (${MAX_SHORTHANDS}/${MAX_SHORTHANDS})` : 'Add as shorthand'}
                   </button>
                 )}
-                {selected === 'lucky' && <p className="muted">Always shown while you hold it.</p>}
+                {['lucky', 'unlucky'].includes(selected) && <p className="muted">Always shown while you hold it.</p>}
               </>
             )
           )}

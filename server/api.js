@@ -200,6 +200,15 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
   );
 
   router.post(
+    '/me/unluckiest/claim',
+    auth,
+    handle((req) => {
+      const claim = accounts.claimUnlucky(req.user.id, String(req.body?.month ?? ''), req.body?.item ?? null);
+      return { claim, profile: changed(req.user.id) };
+    })
+  );
+
+  router.post(
     '/me/name',
     auth,
     handle((req) => {
@@ -433,6 +442,17 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
     handle((req) => {
       const user = target(req);
       accounts.grantLuckyPick(user.id, req.body?.delta);
+      return adminResult(user);
+    })
+  );
+
+  router.post(
+    '/admin/users/:id/unluckiest-picks',
+    auth,
+    admin,
+    handle((req) => {
+      const user = target(req);
+      accounts.grantUnluckyPick(user.id, req.body?.delta);
       return adminResult(user);
     })
   );

@@ -12,7 +12,7 @@ export const ITEMS = Object.fromEntries(catalog.items.map((item) => [item.id, it
 export const BOXES = catalog.boxes;
 export const DEFAULT_COSMETICS = Object.fromEntries(SLOT_KEYS.map((slot) => [slot, catalog.slots[slot].default]));
 export const RARITY_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
-const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'painter', 'halloween', 'ants', 'beta', 'dev'];
+const LOCKER_ORDER = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'unlucky', 'supporter', 'painter', 'halloween', 'ants', 'beta', 'dev'];
 export const DROPPABLE = catalog.items.filter((item) => item.rarity !== 'default' && !item.tag && !item.unobtainable);
 export const SETS = Object.fromEntries(Object.entries(catalog.sets || {}).map(([key, set]) => [key, { ...set, key, items: catalog.items.filter((item) => item.set === key).map((item) => item.id) }]));
 export const unobtainable = (item, now = Date.now()) => item.unobtainable || ['dev', 'beta'].includes(item.tag) || !inSeason(catalog.tags[item.tag]?.season, now);
@@ -28,6 +28,7 @@ export const rarityOf = (item) => {
   if (!item.tag) return base;
   const tag = TAGS[item.tag];
   if (item.tag === 'lucky') return { ...base, label: 'Luckiest set', short: 'Luckiest set', color: tag.color };
+  if (item.tag === 'unlucky') return { ...base, label: 'Unluckiest set', short: 'Unluckiest set', color: tag.color };
   return { ...base, label: `${tag.label} exclusive`, short: tag.label, color: tag.color };
 };
 

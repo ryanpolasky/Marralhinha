@@ -13,5 +13,6 @@ export const antialiasFor = (q) => q.msaa === 'always' || (q.msaa === 'low-dpr' 
 
 // Shader error checks force a sync wait on every program's first draw; prod gets the parallel compile instead
 export const tuneRenderer = ({ gl }) => {
+  gl.localClippingEnabled = true;
   if (process.env.NODE_ENV === 'production') gl.debug.checkShaderErrors = false;
 };
