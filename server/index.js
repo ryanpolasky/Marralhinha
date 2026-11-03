@@ -10,6 +10,7 @@ const { Reports } = require('./reports');
 const { Matches } = require('./matches');
 const { Analytics } = require('./analytics');
 const discord = require('./discord');
+const { postPatchNotes } = require('./patchnotes');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
 const { legalRoutes } = require('./legal');
@@ -397,3 +398,4 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, process.env.HOST, () => console.log(`Marralhinha server listening on http://${process.env.HOST || 'localhost'}:${PORT}`));
 discord.connectGateway();
+postPatchNotes(db).then((posted) => posted.length && console.log(`[patch notes] posted ${posted.join(', ')}`)).catch((err) => console.error('[patch notes]', err));
