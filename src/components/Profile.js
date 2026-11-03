@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { ITEMS, SLOTS, SLOT_KEYS, canUse, collectible } from '../game/catalog';
 import { ItemThumb, Nameplate, TagBadges } from './Economy';
-import { StatGrid, MatchHistory, LuckiestPanel, MATCH_LIMIT } from './Stats';
+import { StatGrid, MatchHistory, RacePanels, MATCH_LIMIT } from './Stats';
 import { Close } from './Icons';
 
 export default function Profile({ account, onClose, onLocker, onReport, onClaimLucky, onClaimUnlucky, history }) {
@@ -58,8 +58,7 @@ export default function Profile({ account, onClose, onLocker, onReport, onClaimL
 
         <StatGrid stats={stats} />
 
-        <LuckiestPanel lucky={account.lucky} onClaim={onClaimLucky} />
-        <LuckiestPanel lucky={account.unlucky} race="unlucky" onClaim={onClaimUnlucky} />
+        <RacePanels lucky={account.lucky} unlucky={account.unlucky} onClaimLucky={onClaimLucky} onClaimUnlucky={onClaimUnlucky} />
 
         <h3 className="profile-section">Match history <span className="muted small-text">(last {MATCH_LIMIT})</span></h3>
         <MatchHistory matches={matches} meId={account.id} />

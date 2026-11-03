@@ -11977,3 +11977,21 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+.race-split { margin-top: 12px; display: grid; gap: 8px; }
+.race-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.race-tile { display: grid; gap: 8px; align-content: start; padding: 11px 12px; border-radius: 12px; text-align: left; cursor: pointer; font-size: 13px; background: rgba(255, 209, 102, 0.08); border: 1px dashed rgba(255, 209, 102, 0.4); }
+.race-tile.holder { border-style: solid; }
+.race-tile.unlucky { background: rgba(44, 48, 51, 0.78); border-color: rgba(169, 188, 207, 0.38); }
+.race-tile.unlucky.holder { border-color: #a9bccf; }
+.race-tile.on { outline: 2px solid rgba(255, 209, 102, 0.6); outline-offset: -1px; }
+.race-tile.unlucky.on { outline-color: rgba(169, 188, 207, 0.7); }
+.race-tile-top { display: flex; justify-content: space-between; align-items: center; }
+.race-tile .tag-badge { margin-left: 0; }
+.race-tile.on .profile-lucky-chevron { transform: rotate(225deg); }
+.race-tile.unlucky .profile-lucky-chevron { border-color: #a9bccf; }
+.race-tile.unlucky .profile-lucky-track { background: rgba(169, 188, 207, 0.18); }
+.race-tile.unlucky .profile-lucky-track > span { background: #a9bccf; }
+.race-tile .profile-lucky-claim { justify-self: start; }
+.profile-lucky.race-flat { margin: 0; border-radius: 12px; box-shadow: none; }
+.profile-lucky.race-flat .profile-lucky-details { display: grid; border-top: 0; }

@@ -5,7 +5,7 @@ import Lobby from './components/Lobby';
 import Game from './components/Game';
 import { SettingsButton } from './components/Settings';
 import { DialogHost } from './components/Dialog';
-import { LuckiestPanel } from './components/Stats';
+import { RacePanels } from './components/Stats';
 import { ITEMS, canUse, collectible, itemsForSlot, unobtainable } from './game/catalog';
 
 // CRA resets jest.fn mocks between tests, so plain functions it is
@@ -50,23 +50,27 @@ test('holding Luckiest alone does not unlock the Luckiest set', () => {
   expect(collectible(account).some((item) => item.id === 'dice.lucky')).toBe(true);
 });
 
-test('Luckiest starts collapsed and shows the month race on demand', () => {
+test('race tiles start collapsed and open one race at a time', () => {
   const lucky = { month: '2026-10', monthName: 'October 2026', endsAt: Date.now() + 3 * 86400000, holder: false, best: { rate: 0.2, rolls: 60, sixes: 12 }, leader: { id: 'x', name: 'Rui', rate: 0.25, rolls: 40, sixes: 10 }, monthsWon: 1, setOwned: ['dice.lucky'], set: ['marble.lucky', 'board.lucky', 'dice.lucky', 'plate.lucky', 'fx.lucky', 'trail.lucky'], minRolls: 30, expectedRate: 1 / 6 };
-  const { container, rerender } = render(<LuckiestPanel lucky={lucky} />);
-  const panel = container.querySelector('details.profile-lucky');
-  expect(panel).not.toHaveAttribute('open');
-  expect(screen.getByText('Best this month 20.0%')).toBeInTheDocument();
+  const unlucky = { ...lucky, best: { rate: 0.1, rolls: 40, sixes: 4 }, leader: { id: 'y', name: 'Ana', rate: 0.05, rolls: 40, sixes: 2 }, monthsWon: 2, setOwned: [] };
+  const { container, rerender } = render(<RacePanels lucky={lucky} unlucky={unlucky} />);
+  expect(container.querySelector('.profile-lucky-details')).toBeNull();
+  expect(screen.getByText('20.0%')).toBeInTheDocument();
   expect(screen.getByRole('progressbar', { name: "Your best six rate against this month's leader" })).toHaveAttribute('aria-valuenow', '80');
-  fireEvent.click(panel.querySelector('summary'));
-  expect(panel).toHaveAttribute('open');
+  fireEvent.click(container.querySelector('.race-tile.lucky'));
   expect(screen.getByText('5.0% behind Rui')).toBeInTheDocument();
   expect(screen.getByText('1 / 6 collected')).toBeInTheDocument();
-  rerender(<LuckiestPanel lucky={{ ...lucky, best: null, leader: null }} />);
-  expect(screen.getByText('Not in the race yet')).toBeInTheDocument();
+  fireEvent.click(container.querySelector('.race-tile.unlucky'));
+  expect(screen.queryByText('5.0% behind Rui')).toBeNull();
+  expect(screen.getByText('Months lost')).toBeInTheDocument();
+  fireEvent.click(container.querySelector('.race-tile.unlucky'));
+  expect(container.querySelector('.profile-lucky-details')).toBeNull();
+  rerender(<RacePanels lucky={{ ...lucky, best: null, leader: null }} />);
+  expect(screen.getByText('Not in yet')).toBeInTheDocument();
 });
 
-test('locker lists ordinary rarities before Luckiest, Supporter, Haunted, Beta, Ants and Dev', () => {
-  const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'supporter', 'halloween', 'ants', 'beta', 'dev'];
+test('locker lists ordinary rarities before Luckiest, Unluckiest, Supporter, Haunted, Beta, Ants and Dev', () => {
+  const tiers = ['default', 'common', 'rare', 'epic', 'legendary', 'mythic', 'lucky', 'unlucky', 'supporter', 'halloween', 'ants', 'beta', 'dev'];
   for (const slot of ['marble', 'board', 'dice', 'nameplate', 'fx', 'trail']) {
     const order = itemsForSlot(slot).map((item) => item.tag || item.rarity);
     expect(order).toEqual([...order].sort((a, b) => tiers.indexOf(a) - tiers.indexOf(b)));
