@@ -977,7 +977,7 @@ export function Rewards({ reward, onRevealed }) {
     if (!done) return undefined;
     onRevealed?.();
     if (!reward.leveledUp && !reward.luckyTag && !reward.unluckyTag) return undefined;
-    const t = setTimeout(() => sfx.reveal(reward.luckyTag ? 'legendary' : reward.unluckyTag ? 'rare' : 'epic'), 150);
+    const t = setTimeout(() => sfx.reveal(reward.unluckyTag ? 'rare' : reward.luckyTag ? 'legendary' : 'epic'), 150);
     return () => clearTimeout(t);
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!reward) return null;

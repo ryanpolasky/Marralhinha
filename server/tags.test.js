@@ -246,6 +246,8 @@ function recordLuckyGame(matches, user, rolls, sixes, now, played = {}) {
   } }, now);
 }
 
+const recordUnluckyGame = recordLuckyGame;
+
 test('Luckiest follows the month\'s best single-game six rate, with a minimum of own rolls', () => {
   const { db, accounts, matches } = setup();
   const a = accounts.createUser({ name: 'A' });
@@ -331,6 +333,56 @@ test('month-end Luckiest shoutout pings the champion only when they are in the D
   }
 });
 
+test('month-end Unluckiest shoutout pings the champion only when they are in the Discord server', async () => {
+  const env = ['DISCORD_BOT_TOKEN', 'DISCORD_GUILD_ID', 'DISCORD_LUCKIEST_WEBHOOK_URL', 'CLIENT_URL'];
+  const previous = env.map((key) => process.env[key]);
+  const originalFetch = global.fetch;
+  const guildId = '123456789012345678';
+  const member = '345678901234567890';
+  const posts = [];
+  try {
+    env.forEach((key) => delete process.env[key]);
+    global.fetch = async () => assert.fail('nothing should be fetched without a webhook');
+    assert.equal(await discord.announceUnluckiest({ name: 'A', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 2 }), false, 'no webhook configured, nothing sent');
+    Object.assign(process.env, { DISCORD_BOT_TOKEN: 'test-bot-token', DISCORD_GUILD_ID: guildId, DISCORD_LUCKIEST_WEBHOOK_URL: 'https://discord.test/hook', CLIENT_URL: 'https://marralhinha.app' });
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/guilds/')) {
+        assert.equal(String(url), `https://discord.com/api/v10/guilds/${guildId}/members/${url.endsWith(member) ? member : '456789012345678901'}`);
+        assert.equal(options.headers.Authorization, 'Bot test-bot-token');
+        return { ok: url.endsWith(member), status: url.endsWith(member) ? 200 : 404 };
+      }
+      assert.equal(String(url), 'https://discord.test/hook?with_components=true');
+      const body = JSON.parse(options.body);
+      body.text = body.components[0].components.map((c) => c.content || c.accessory?.url || '').join('\n');
+      posts.push(body);
+      return { ok: true, status: 204 };
+    };
+    await discord.announceUnluckiest({ name: 'A_*', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 2 });
+    await discord.announceUnluckiest({ name: 'B', discordId: '456789012345678901', monthName: 'April 2026', rolls: 40, sixes: 0 });
+    await discord.announceUnluckiest({ name: 'Guest @everyone', discordId: null, monthName: 'April 2026', rolls: 40, sixes: 1 });
+    assert.equal(posts[0].components[0].components[0].content, '-# MARRALHINHA · MONTHLY UNLUCKIEST');
+    assert.match(posts[0].text, /^# The Unluckiest player of April 2026 is A\\_\\\* \(<@345678901234567890>\)\.$/m);
+    assert.match(posts[0].text, /\*\*2 sixes\*\* in \*\*50 rolls\*\*, a \*\*4\.0%\*\* six rate in one game\. Brutal\./);
+    assert.equal(posts[0].components[0].components[5].components[0].content, '**Condolences.** Your Unluckiest reward is waiting.\n-# Log in on the site or launch the Activity to claim it.');
+    assert.equal(posts[0].components[0].accent_color, 0xa9bccf);
+    assert.equal(posts[0].components[0].components[5].accessory.label, 'Claim reward');
+    assert.deepEqual(posts[0].allowed_mentions, { parse: [], users: [member] });
+    assert.doesNotMatch(posts[1].text, /<@/);
+    assert.deepEqual(posts[1].allowed_mentions, { parse: [] });
+    assert.deepEqual(posts[2].allowed_mentions, { parse: [] }, '@everyone in a name never pings');
+    global.fetch = async (url) => String(url).includes('/guilds/')
+      ? { ok: true, status: 200 }
+      : { ok: false, status: 500 };
+    await assert.rejects(
+      discord.announceUnluckiest({ name: 'A', discordId: member, monthName: 'April 2026', rolls: 50, sixes: 2 }),
+      { message: 'Unluckiest shoutout failed' }
+    );
+  } finally {
+    env.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    global.fetch = originalFetch;
+  }
+});
+
 test('a lucky pick grants one unowned piece per month won, then coins once the set is complete', () => {
   const { accounts, matches } = setup();
   const a = accounts.createUser({ name: 'A' });
@@ -385,6 +437,107 @@ test('admins can grant Luckiest picks and take cosmetics back, including a legac
   assert.equal(accounts.luckyStatus(accounts.getUser(a.id)).monthsWon, 0, 'granted picks are not month wins');
 });
 
+test('Unluckiest follows the worst qualifying single-game six rate and keeps earlier-game ties', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const tiny = accounts.createUser({ name: 'Tiny' });
+  const start = Date.parse('2026-04-01T12:00:00Z');
+  assert.equal(accounts.refreshUnlucky(start), null);
+  recordUnluckyGame(matches, tiny, 29, 0, start + 1);
+  recordUnluckyGame(matches, a, 30, 6, start + 2);
+  recordUnluckyGame(matches, b, 30, 9, start + 3);
+  assert.equal(accounts.refreshUnlucky(start + 3).holder, a.id, '29 rolls do not qualify; the lowest rate wins');
+  assert.equal(accounts.unluckyStatus(accounts.getUser(a.id), start + 3).best.rate, 0.2);
+  assert.deepEqual(accounts.tags(accounts.getUser(a.id)), ['unlucky']);
+  assert.deepEqual(accounts.badges(accounts.getUser(a.id)), ['unlucky']);
+  assert.equal(accounts.owns(a.id, 'marble.unlucky'), false, 'holding the title does not grant set pieces');
+  assert.throws(() => accounts.equip(a.id, 'marble', 'marble.unlucky'), /Unluckiest only/);
+  recordUnluckyGame(matches, b, 60, 5, start + 4);
+  assert.equal(accounts.refreshUnlucky(start + 4).holder, b.id);
+  recordUnluckyGame(matches, a, 60, 5, start + 5);
+  assert.equal(accounts.refreshUnlucky(start + 5), null, 'equal rates go to the earlier game');
+  assert.equal(accounts.unluckyMonthBest('2026-04').id, b.id);
+  recordUnluckyGame(matches, a, 90, 3, start + 6);
+  const reclaim = accounts.refreshUnlucky(start + 6);
+  assert.equal(reclaim.holder, a.id);
+  assert.equal(reclaim.reclaimed, true, 'reclaims are determined from Unluckiest reign history');
+  assert.equal(accounts.unluckyMonthBest('2026-04').id, a.id);
+  assert.equal(accounts.unluckyStatus(accounts.getUser(a.id), start + 6).leader.name, 'A');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM unluckiest_reigns').get().n, 3);
+});
+
+test('the first Unluckiest settlement starts at the previous month without retroactive awards', () => {
+  const { accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const may = Date.parse('2026-05-02T12:00:00Z');
+  recordUnluckyGame(matches, a, 40, 0, Date.parse('2026-04-15T12:00:00Z'));
+  assert.equal(accounts.refreshUnlucky(may), null);
+  assert.deepEqual(accounts.profile(a.id).unlucky.pending, []);
+  assert.equal(accounts.db.prepare("SELECT value FROM meta WHERE key = 'unluckiest_settled'").get().value, '2026-04');
+});
+
+test('an Unluckiest month awards one unowned piece per month, then 2500 coins for the full set', () => {
+  const { accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const set = catalog.items.filter((i) => i.tag === 'unlucky').map((i) => i.id);
+  assert.equal(set.length, 6);
+  accounts.refreshUnlucky(Date.parse('2025-12-15T00:00:00Z'));
+  for (let m = 0; m < 7; m++) {
+    const at = Date.UTC(2026, m, 15);
+    recordUnluckyGame(matches, a, 40, 0, at);
+    accounts.refreshUnlucky(at);
+  }
+  accounts.refreshUnlucky(Date.UTC(2026, 7, 1));
+  assert.equal(accounts.profile(a.id).unlucky.pending.length, 7);
+  assert.equal(accounts.unluckyStatus(accounts.getUser(a.id)).monthsWon, 7);
+  assert.throws(() => accounts.claimUnlucky(a.id, '2026-09', 'marble.unlucky'), /Nothing to claim/);
+  assert.throws(() => accounts.claimUnlucky(a.id, '2026-01', 'dice.lucky'), /Unluckiest piece/);
+  assert.deepEqual(accounts.claimUnlucky(a.id, '2026-01', set[0]), { item: set[0], coins: 0 });
+  set.slice(1).forEach((id, i) => accounts.claimUnlucky(a.id, `2026-0${i + 2}`, id));
+  assert.ok(set.every((id) => accounts.owns(a.id, id)));
+  const coins = accounts.getUser(a.id).coins;
+  assert.deepEqual(accounts.claimUnlucky(a.id, '2026-07', null), { item: null, coins: 2500 });
+  assert.equal(accounts.getUser(a.id).coins, coins + 2500);
+  assert.deepEqual(accounts.profile(a.id).unlucky.pending, []);
+});
+
+test('admins can grant and revoke Unluckiest picks, and race claims cannot cross sets', () => {
+  const { accounts } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  accounts.grantUnluckyPick(a.id, 1);
+  accounts.grantUnluckyPick(a.id, 1);
+  assert.equal(accounts.adminView(accounts.getUser(a.id)).unluckyPicks, 2);
+  assert.equal(accounts.profile(a.id).unlucky.pending.length, 2);
+  accounts.grantUnluckyPick(a.id, -1);
+  assert.equal(accounts.adminView(accounts.getUser(a.id)).unluckyPicks, 1);
+  accounts.grantLuckyPick(a.id, 1);
+  assert.equal(accounts.adminView(accounts.getUser(a.id)).luckyPicks, 1);
+  assert.throws(() => accounts.claimUnlucky(a.id, 'pick', 'dice.lucky'), /Unluckiest piece/);
+  assert.throws(() => accounts.claimLucky(a.id, 'pick', 'board.unlucky'), /Luckiest piece/);
+  assert.deepEqual(accounts.claimUnlucky(a.id, 'pick', 'marble.unlucky'), { item: 'marble.unlucky', coins: 0 });
+  assert.deepEqual(accounts.claimLucky(a.id, 'pick', 'marble.lucky'), { item: 'marble.lucky', coins: 0 });
+  assert.throws(() => accounts.grantUnluckyPick(a.id, -1), /no Unluckiest picks waiting/);
+  assert.throws(() => accounts.claimUnlucky(a.id, 'pick', 'board.unlucky'), /Nothing to claim/);
+});
+
+test('Lucky and Unluckiest can be held by different players at the same time', () => {
+  const { accounts, matches } = setup();
+  const unlucky = accounts.createUser({ name: 'Worst' });
+  const lucky = accounts.createUser({ name: 'Best' });
+  const now = Date.parse('2026-05-04T12:00:00Z');
+  recordLuckyGame(matches, unlucky, 30, 0, now);
+  recordLuckyGame(matches, lucky, 30, 30, now + 1);
+  assert.equal(accounts.refreshLucky(now + 1).holder, lucky.id);
+  assert.equal(accounts.refreshUnlucky(now + 1).holder, unlucky.id);
+  assert.equal(accounts.luckyHolder(), lucky.id);
+  assert.equal(accounts.unluckyHolder(), unlucky.id);
+  assert.deepEqual(accounts.tags(accounts.getUser(lucky.id)), ['lucky']);
+  assert.deepEqual(accounts.tags(accounts.getUser(unlucky.id)), ['unlucky']);
+  assert.equal(accounts.publicCard(accounts.getUser(unlucky.id)).unlucky.holder, true);
+  assert.equal(accounts.publicCard(accounts.getUser(unlucky.id)).unlucky.pending, undefined);
+});
+
 test('legacy games without roll totals never qualify for Luckiest', () => {
   const { db, accounts } = setup();
   const a = accounts.createUser({ name: 'A' });
@@ -416,16 +569,25 @@ test('linking a guest preserves an active reign, its recorded games and unclaime
   const account = accounts.loginDiscord({ id: 'lucky-merge', username: 'Saved' });
   const april = Date.parse('2026-04-10T12:00:00Z');
   accounts.refreshLucky(april);
+  accounts.refreshUnlucky(april);
   recordLuckyGame(matches, guest, 40, 12, april);
+  recordUnluckyGame(matches, guest, 40, 0, april);
   accounts.refreshLucky(Date.parse('2026-05-01T00:00:00Z'));
+  accounts.refreshUnlucky(Date.parse('2026-05-01T00:00:00Z'));
   recordLuckyGame(matches, guest, 40, 12, Date.parse('2026-05-02T00:00:00Z'));
+  recordUnluckyGame(matches, guest, 40, 0, Date.parse('2026-05-02T00:00:00Z'));
   assert.equal(accounts.refreshLucky(Date.parse('2026-05-02T00:00:00Z')).holder, guest.id);
+  assert.equal(accounts.refreshUnlucky(Date.parse('2026-05-02T00:00:00Z')).holder, guest.id);
+  accounts.grantUnluckyPick(guest.id, 1);
   const merged = accounts.loginDiscord({ id: 'lucky-merge', username: 'Saved' }, guest.id);
   assert.equal(merged.id, account.id);
   assert.equal(accounts.luckyHolder(), account.id);
   assert.equal(accounts.monthBest('2026-05', account.id).rolls, 40);
+  assert.equal(accounts.unluckyMonthBest('2026-05', account.id).rolls, 40);
   assert.deepEqual(accounts.profile(account.id).lucky.pending.map((p) => p.month), ['2026-04']);
-  assert.deepEqual(accounts.tags(accounts.getUser(account.id)), ['lucky']);
+  assert.deepEqual(accounts.profile(account.id).unlucky.pending.map((p) => p.month), ['2026-04', 'pick']);
+  assert.equal(accounts.unluckyHolder(), account.id);
+  assert.deepEqual(accounts.tags(accounts.getUser(account.id)), ['lucky', 'unlucky']);
 });
 
 test('daily SQLite backups include committed WAL data and never overwrite earlier snapshots', (t) => {

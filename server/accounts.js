@@ -56,7 +56,7 @@ const isThrowaway = (user) => !user.discord_id && !user.games && !user.boxes_ope
 // CDN url for a linked account's Discord avatar; Discord picks a default from the id when none is set
 function avatarUrl(user) {
   if (!user.discord_id) return null;
-  if (!user.avatar) return `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.discord_id) >> 22n) % 6}.png`;
+  if (!user.avatar) return `https://cdn.discordapp.com/embed/avatars/${Number(global.BigInt(user.discord_id) >> 22n) % 6}.png`;
   return `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.${user.avatar.startsWith('a_') ? 'gif' : 'png'}?size=128`;
 }
 

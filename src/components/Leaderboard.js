@@ -44,7 +44,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="panel modal board-modal" role="dialog" aria-modal="true" aria-label="Leaderboards" onClick={(e) => e.stopPropagation()}>
+      <div className={`panel modal board-modal${tab === 'unlucky' ? ' unlucky' : ''}`} role="dialog" aria-modal="true" aria-label="Leaderboards" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>
             <Trophy /> Leaderboards

@@ -36,7 +36,7 @@ export default function LuckyClaim({ account, race = 'lucky', onClaimed, onLater
       <div className={`panel modal lucky-claim${race === 'unlucky' ? ' unlucky' : ''}`} role="dialog" aria-modal="true" aria-label={`Pick your ${label} reward`}>
         <div className="lucky-claim-head">
           <TagBadge tag={race} />
-          <h2>{claim.granted ? `You got a ${label} pick!` : `${label} of ${claim.monthName}!`}</h2>
+          <h2>{claim.granted ? `You got a ${label} pick!` : race === 'unlucky' ? `${label} of ${claim.monthName}.` : `${label} of ${claim.monthName}!`}</h2>
           <p className="muted">
             {!claim.granted && `${claim.sixes} sixes in ${claim.rolls} rolls (${((claim.sixes / claim.rolls) * 100).toFixed(1)}%) was the ${adjective} game of the month. `}
             {chosen ? `Pick a piece of the ${label} set to keep forever.` : `You already own the whole ${label} set, so this one pays out in coins.`}

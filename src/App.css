@@ -8191,6 +8191,21 @@ select.admin-input optgroup {
 .profile-lucky-leader { font-size: 13px; color: var(--ink-dim); }
 .profile-lucky-leader b { color: var(--gold); }
 .profile-lucky-gold-head + .profile-lucky-track { margin-top: 7px; }
+.profile-lucky.unlucky {
+  background: rgba(44, 48, 51, 0.78);
+  border-color: rgba(169, 188, 207, 0.38);
+}
+.profile-lucky.unlucky.holder {
+  border-color: #a9bccf;
+  box-shadow: none;
+}
+.profile-lucky.unlucky .profile-lucky-head:focus-visible { outline-color: #a9bccf; }
+.profile-lucky.unlucky .profile-lucky-track { background: rgba(169, 188, 207, 0.18); }
+.profile-lucky.unlucky .profile-lucky-track > span { background: #a9bccf; }
+.profile-lucky.unlucky .profile-lucky-chevron { border-color: #a9bccf; }
+.profile-lucky.unlucky .profile-lucky-details { border-color: rgba(169, 188, 207, 0.24); }
+.profile-lucky.unlucky .profile-lucky-status,
+.profile-lucky.unlucky .profile-lucky-leader b { color: #a9bccf; }
 
 .profile-section {
   margin: 18px 0 8px;
@@ -8585,6 +8600,11 @@ select.admin-input optgroup {
   animation-delay: 0.35s;
   box-shadow: 0 0 22px rgba(255, 209, 102, 0.35);
 }
+.reward-celebrate.reward-unlucky {
+  background: #2c3033;
+  border: 1px solid rgba(169, 188, 207, 0.5);
+  box-shadow: none;
+}
 
 @keyframes reward-celebrate {
   from {
@@ -8747,6 +8767,31 @@ select.admin-input optgroup {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--gold);
+}
+
+.board-modal.unlucky .modal-head h2 svg,
+.board-modal.unlucky .board-tab.on,
+.board-modal.unlucky .board-poised-kicker,
+.board-modal.unlucky .board-rank.top1 {
+  color: #a9bccf;
+}
+
+.board-modal.unlucky .board-tab.on {
+  background: rgba(169, 188, 207, 0.14);
+  border-color: #a9bccf;
+}
+
+.board-modal.unlucky .board-row.me {
+  border-color: #a9bccf;
+}
+
+.board-modal.unlucky .board-poised {
+  border-color: rgba(169, 188, 207, 0.55);
+  background: rgba(169, 188, 207, 0.08);
+}
+
+.board-modal.unlucky .board-poised:hover {
+  background: rgba(169, 188, 207, 0.14);
 }
 
 .board-rank {
@@ -11452,6 +11497,9 @@ body {
 .lucky-claim-head { display: grid; justify-items: center; gap: 6px; text-align: center; }
 .lucky-claim-head h2 { margin: 0; color: var(--gold); font-size: clamp(22px, 4vw, 30px); }
 .lucky-claim-head p { margin: 0; max-width: 620px; line-height: 1.45; }
+.lucky-claim.unlucky { border-color: rgba(169, 188, 207, 0.5); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.lucky-claim.unlucky .lucky-claim-head h2,
+.lucky-claim.unlucky .lucky-claim-stage h3 { color: #a9bccf; }
 .lucky-claim-body { display: grid; gap: 18px; margin: 16px 0; }
 .lucky-claim-stage { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr; column-gap: 28px; row-gap: 8px; align-items: center; }
 .lucky-claim-stage .preview-stage { grid-row: 1 / -1; height: clamp(230px, 38vh, 360px); }

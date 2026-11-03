@@ -92,9 +92,11 @@ const announceLucky = (change) => {
 const announceUnlucky = (change) => {
   if (!change) return;
   const { holder, previous, reclaimed, champions = [] } = change;
-  for (const { id, monthName } of champions) {
-    const name = accounts.getUser(id)?.name;
-    if (name) io.emit('luckiest:change', `${name} won Unluckiest for ${monthName}. Condolences.`);
+  for (const { id, monthName, rolls, sixes } of champions) {
+    const user = accounts.getUser(id);
+    if (!user?.name) continue;
+    io.emit('luckiest:change', `${user.name} won Unluckiest for ${monthName}. Condolences.`);
+    discord.announceUnluckiest({ name: user.name, discordId: user.discord_id, monthName, rolls, sixes }).catch((err) => console.error('[unluckiest shoutout]', err));
   }
   if (holder !== previous && holder) {
     const name = accounts.getUser(holder)?.name;
