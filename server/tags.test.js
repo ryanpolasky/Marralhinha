@@ -477,6 +477,52 @@ test('the first Unluckiest settlement starts at the previous month without retro
   assert.equal(accounts.db.prepare("SELECT value FROM meta WHERE key = 'unluckiest_settled'").get().value, '2026-04');
 });
 
+test('Unluckiest backfills October 2026 for the worst qualifying game', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const october = Date.parse('2026-10-15T12:00:00Z');
+  recordUnluckyGame(matches, a, 30, 0, october);
+  recordUnluckyGame(matches, b, 30, 3, october + 1);
+
+  const refresh = accounts.refreshUnlucky(Date.parse('2026-11-03T00:00:00Z'));
+  assert.deepEqual(refresh.champions, [{ id: a.id, month: '2026-10', monthName: 'October 2026', rolls: 30, sixes: 0 }]);
+  const month = db.prepare("SELECT month, player_id, rolls, sixes FROM unluckiest_months WHERE month = '2026-10'").get();
+  assert.equal(month.player_id, a.id);
+  assert.equal(month.rolls, 30);
+  assert.equal(month.sixes, 0);
+  assert.deepEqual(accounts.profile(a.id).unlucky.pending.map(({ month: key }) => key), ['2026-10']);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'unluckiest_settled'").get().value, '2026-10');
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'unluckiest_settled_backfill'").get().value, '1');
+});
+
+test('Unluckiest backfill settles October once when production meta already says October', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  const b = accounts.createUser({ name: 'B' });
+  const october = Date.parse('2026-10-15T12:00:00Z');
+  recordUnluckyGame(matches, a, 30, 0, october);
+  recordUnluckyGame(matches, b, 30, 3, october + 1);
+  accounts.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('unluckiest_settled', '2026-10');
+
+  const refresh = accounts.refreshUnlucky(Date.parse('2026-11-03T00:00:00Z'));
+  assert.deepEqual(refresh.champions.map(({ id, month }) => ({ id, month })), [{ id: a.id, month: '2026-10' }]);
+  assert.equal(accounts.refreshUnlucky(Date.parse('2026-11-04T00:00:00Z')), null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM unluckiest_months WHERE month = '2026-10'").get().n, 1);
+  assert.deepEqual(accounts.profile(a.id).unlucky.pending.map(({ month }) => month), ['2026-10']);
+});
+
+test('Unluckiest October backfill does not change Luckiest settlement', () => {
+  const { db, accounts, matches } = setup();
+  const a = accounts.createUser({ name: 'A' });
+  recordLuckyGame(matches, a, 30, 0, Date.parse('2026-10-15T12:00:00Z'));
+  accounts.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('luckiest_settled', '2026-10');
+
+  assert.equal(accounts.refreshLucky(Date.parse('2026-11-03T00:00:00Z')), null);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM luckiest_months').get().n, 0);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'luckiest_settled'").get().value, '2026-10');
+});
+
 test('an Unluckiest month awards one unowned piece per month, then 2500 coins for the full set', () => {
   const { accounts, matches } = setup();
   const a = accounts.createUser({ name: 'A' });

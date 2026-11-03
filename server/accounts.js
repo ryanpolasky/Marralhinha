@@ -8,7 +8,7 @@ const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS }
 const LUCKY_ITEM = 'dice.lucky';
 const RACES = {
   lucky: { tag: 'lucky', set: [...ITEMS.values()].filter((item) => item.tag === 'lucky').map((item) => item.id), months: 'luckiest_months', reigns: 'luckiest_reigns', picks: 'lucky_picks', meta: 'luckiest_settled', order: 'DESC', label: 'Luckiest', ledger: 'luckiest' },
-  unlucky: { tag: 'unlucky', set: [...ITEMS.values()].filter((item) => item.tag === 'unlucky').map((item) => item.id), months: 'unluckiest_months', reigns: 'unluckiest_reigns', picks: 'unlucky_picks', meta: 'unluckiest_settled', order: 'ASC', label: 'Unluckiest', ledger: 'unluckiest' },
+  unlucky: { tag: 'unlucky', set: [...ITEMS.values()].filter((item) => item.tag === 'unlucky').map((item) => item.id), months: 'unluckiest_months', reigns: 'unluckiest_reigns', picks: 'unlucky_picks', meta: 'unluckiest_settled', order: 'ASC', label: 'Unluckiest', ledger: 'unluckiest', backfill: '2026-10' },
 };
 const LUCK_MIN_ROLLS = 30;
 const LUCK_EXPECTED_SIX_RATE = 1 / 6;
@@ -357,6 +357,11 @@ class Accounts {
     const queries = this.raceQueries[race];
     const current = monthKey(now);
     let last = this.q.getMeta.get(config.meta)?.value || shiftMonth(current, -1);
+    const backfillKey = `${config.meta}_backfill`;
+    if (config.backfill && !this.q.getMeta.get(backfillKey)) {
+      if (last >= config.backfill) last = shiftMonth(config.backfill, -1);
+      this.q.setMeta.run(backfillKey, '1');
+    }
     const champions = [];
     while (last < shiftMonth(current, -1)) {
       last = shiftMonth(last, 1);
