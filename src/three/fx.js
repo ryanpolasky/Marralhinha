@@ -9,6 +9,9 @@ export const makeFxBus = () => {
       return () => listeners.delete(fn);
     },
     later: (seconds, fn) => timers.push({ at: now + seconds, fn }),
+    clear: () => {
+      timers = [];
+    },
     tick: (dt) => {
       now += dt;
       if (!timers.length || !timers.some((t) => t.at <= now)) return;
