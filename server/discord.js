@@ -168,8 +168,10 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
   return true;
 }
 
+const playingPresence = (n) => ({ status: 'online', since: null, afk: false, activities: [{ name: 'Custom Status', type: 4, state: `${n} playing now · ${new URL(config().clientUrl).host}` }] });
+
 // Holding a Gateway connection is the only way a bot shows online; intents 0 means Discord sends it no events
-function connectGateway() {
+function connectGateway(playing = () => 0) {
   const { botToken } = config();
   if (!botToken) return null;
   const { WebSocketManager, WebSocketShardEvents } = require('@discordjs/ws');
@@ -178,10 +180,19 @@ function connectGateway() {
     token: botToken,
     intents: 0,
     rest: new REST().setToken(botToken),
-    initialPresence: { status: 'online', since: null, afk: false, activities: [{ name: 'Marralhinha!', type: 0 }] },
+    initialPresence: playingPresence(playing()),
   });
+  let shown = null;
+  const refresh = () => {
+    const n = playing();
+    if (n === shown) return;
+    shown = n;
+    manager.send(0, { op: 3, d: playingPresence(n) }).catch((err) => console.error('[discord gateway]', err));
+  };
+  manager.on(WebSocketShardEvents.Ready, () => { shown = null; refresh(); });
   manager.on(WebSocketShardEvents.Error, ({ error }) => console.error('[discord gateway]', error));
   manager.connect().catch((err) => console.error('[discord gateway]', err));
+  setInterval(refresh, 60_000).unref();
   return manager;
 }
 
