@@ -11,7 +11,7 @@ import { TapeX, Seep } from './DuctTape';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
-import { ANVIL, BALL, TRAIN, ballRock } from './Props';
+import { ANVIL, BALL, TRAIN, MOP, ballRock, mopDir } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
@@ -139,6 +139,16 @@ export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(s
       { to: spot.clone(), dur: 0.7, height: 0, quiet: true },
       { to: up(6.5), dur: 0.6, height: 0, quiet: true },
       { to: home, dur: 0.9, height: 1.2, final: true },
+    ];
+  }
+  if (kind === 'unlucky') {
+    const [dx, , dz] = mopDir([spot.x, 0, spot.z]);
+    const tiny = [0.05, 0.05, 0.05];
+    return [
+      { to: spot.clone(), dur: MOP.hit, height: 0, quiet: true, ...start },
+      { to: spot.clone().add(new THREE.Vector3(dx * MOP.drag, -0.12, dz * MOP.drag)), dur: 0.26, height: 0, scale: tiny, quiet: true },
+      { to: home.clone(), dur: 0.02, height: 0, scale: tiny, quiet: true },
+      { to: home, dur: 0.35, height: 0.35, scale: [1, 1, 1], final: true },
     ];
   }
   if (kind === 'wild') {
