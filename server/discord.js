@@ -7,6 +7,8 @@ const config = () => ({
   supporterSkuId: process.env.DISCORD_SUPPORTER_SKU_ID || '',
   halloweenSkuId: process.env.DISCORD_HALLOWEEN_SKU_ID || '',
   painterSkuId: process.env.DISCORD_PAINTER_SKU_ID || '',
+  guildId: process.env.DISCORD_GUILD_ID || '',
+  luckiestWebhookUrl: process.env.DISCORD_LUCKIEST_WEBHOOK_URL || '',
   publicUrl: (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, ''),
   clientUrl: (process.env.CLIENT_URL || process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, ''),
 });
@@ -112,4 +114,54 @@ async function updateRoleConnection(accessToken, { username, supporter }) {
   if (!res.ok) throw new Error(`Role connection update failed (${res.status})`);
 }
 
-module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement };
+async function isGuildMember(discordId) {
+  const { botToken, guildId } = config();
+  if (!botToken || !/^\d{17,20}$/.test(guildId) || !/^\d{17,20}$/.test(discordId || '')) return false;
+  const res = await fetch(`${API}/guilds/${guildId}/members/${discordId}`, { headers: { Authorization: `Bot ${botToken}` } });
+  if (res.status === 404) return false;
+  if (!res.ok) throw new Error(`Discord member lookup failed (${res.status})`);
+  return true;
+}
+
+const escapeMarkdown = (text) => String(text).replace(/([\\*_~`|])/g, '\\$1');
+
+async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
+  const { luckiestWebhookUrl, clientUrl } = config();
+  if (!luckiestWebhookUrl) return false;
+  const ping = await isGuildMember(discordId).catch((err) => {
+    console.error('[luckiest shoutout]', err);
+    return false;
+  });
+  const who = ping ? `${escapeMarkdown(name)} (<@${discordId}>)` : escapeMarkdown(name);
+  const content = [
+    `**THE LUCKIEST PLAYER OF ${monthName.toUpperCase()} IS ${who}! CONGRATULATIONS!**`,
+    `${sixes} sixes in ${rolls} rolls (${((sixes / rolls) * 100).toFixed(1)}%) in a single game.`,
+    `Log in at ${clientUrl} or launch the Activity to claim your Luckiest reward.`,
+  ].join('\n');
+  const res = await fetch(luckiestWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] } }),
+  });
+  if (!res.ok) throw new Error(`Luckiest shoutout failed (${res.status})`);
+  return true;
+}
+
+// Holding a Gateway connection is the only way a bot shows online; intents 0 means Discord sends it no events
+function connectGateway() {
+  const { botToken } = config();
+  if (!botToken) return null;
+  const { WebSocketManager, WebSocketShardEvents } = require('@discordjs/ws');
+  const { REST } = require('@discordjs/rest');
+  const manager = new WebSocketManager({
+    token: botToken,
+    intents: 0,
+    rest: new REST().setToken(botToken),
+    initialPresence: { status: 'online', since: null, afk: false, activities: [{ name: 'Marralhinha', type: 0 }] },
+  });
+  manager.on(WebSocketShardEvents.Error, ({ error }) => console.error('[discord gateway]', error));
+  manager.connect().catch((err) => console.error('[discord gateway]', err));
+  return manager;
+}
+
+module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };
