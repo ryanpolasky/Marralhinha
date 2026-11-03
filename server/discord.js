@@ -149,7 +149,7 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
         components: [
           text('-# MARRALHINHA · MONTHLY LUCKIEST'),
           text(`# The Luckiest player of ${monthName} is ${who}!`),
-          text(`**${sixes} sixes** in **${rolls} rolls** for a **${((sixes / rolls) * 100).toFixed(1)}%** six rate, all in one game.`),
+          text(`**${sixes} sixes** in **${rolls} rolls** for a **${((sixes / rolls) * 100).toFixed(1)}%** six rate in one game.`),
           { type: 12, items: [{ media: { url: `${clientUrl}/og-image.jpg` } }] },
           { type: 14, divider: true, spacing: 2 },
           {
