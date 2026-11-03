@@ -7,10 +7,9 @@ const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS }
 
 const LUCKY_ITEM = 'dice.lucky';
 const RACES = {
-  lucky: { tag: 'lucky', months: 'luckiest_months', reigns: 'luckiest_reigns', picks: 'lucky_picks', meta: 'luckiest_settled', order: 'DESC', label: 'Luckiest', ledger: 'luckiest' },
-  unlucky: { tag: 'unlucky', months: 'unluckiest_months', reigns: 'unluckiest_reigns', picks: 'unlucky_picks', meta: 'unluckiest_settled', order: 'ASC', label: 'Unluckiest', ledger: 'unluckiest' },
+  lucky: { tag: 'lucky', set: [...ITEMS.values()].filter((item) => item.tag === 'lucky').map((item) => item.id), months: 'luckiest_months', reigns: 'luckiest_reigns', picks: 'lucky_picks', meta: 'luckiest_settled', order: 'DESC', label: 'Luckiest', ledger: 'luckiest' },
+  unlucky: { tag: 'unlucky', set: [...ITEMS.values()].filter((item) => item.tag === 'unlucky').map((item) => item.id), months: 'unluckiest_months', reigns: 'unluckiest_reigns', picks: 'unlucky_picks', meta: 'unluckiest_settled', order: 'ASC', label: 'Unluckiest', ledger: 'unluckiest' },
 };
-const RACE_SETS = Object.fromEntries(Object.entries(RACES).map(([key, race]) => [key, [...ITEMS.values()].filter((item) => item.tag === race.tag).map((item) => item.id)]));
 const LUCK_MIN_ROLLS = 30;
 const LUCK_EXPECTED_SIX_RATE = 1 / 6;
 const LUCKY_FULL_SET_COINS = 2500;
@@ -104,21 +103,8 @@ class Accounts {
       ),
       getMeta: db.prepare('SELECT value FROM meta WHERE key = ?'),
       setMeta: db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
-      luckiest: db.prepare('SELECT * FROM luckiest_reigns WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1'),
-      monthBest: db.prepare(`SELECT mp.user_id AS id, mp.match_id AS matchId, mp.roll_count AS rolls, mp.six_count AS sixes, m.ended_at AS endedAt
-        FROM match_players mp JOIN matches m ON m.id = mp.match_id JOIN users u ON u.id = mp.user_id
-        WHERE m.ended_at >= ? AND m.ended_at < ? AND mp.roll_count >= ? AND mp.six_count >= 0 AND mp.six_count <= mp.roll_count AND u.banned_at IS NULL AND (? IS NULL OR mp.user_id = ?)
-        ORDER BY mp.six_count * 1.0 / mp.roll_count DESC, m.ended_at ASC, m.id ASC LIMIT 1`),
-      addMonth: db.prepare('INSERT OR IGNORE INTO luckiest_months (month, player_id, match_id, rolls, sixes, settled_at) VALUES (?, ?, ?, ?, ?, ?)'),
-      monthsWon: db.prepare('SELECT COUNT(*) AS n FROM luckiest_months WHERE player_id = ?'),
-      pendingMonths: db.prepare('SELECT * FROM luckiest_months WHERE player_id = ? AND claimed_at IS NULL ORDER BY month'),
-      claimMonth: db.prepare('UPDATE luckiest_months SET claimed_item = ?, claimed_at = ? WHERE month = ? AND player_id = ? AND claimed_at IS NULL'),
-      moveMonths: db.prepare('UPDATE luckiest_months SET player_id = ? WHERE player_id = ?'),
       removeItem: db.prepare('DELETE FROM inventory WHERE user_id = ? AND item_id = ?'),
       lockDie: db.prepare('UPDATE users SET golden_die_unlocked = 0, golden_die_unlocked_at = NULL WHERE id = ?'),
-      addPicks: db.prepare('UPDATE users SET lucky_picks = MAX(0, lucky_picks + ?) WHERE id = ?'),
-      endReign: db.prepare('UPDATE luckiest_reigns SET ended_at = ?, duration_seconds = ? WHERE id = ?'),
-      addReign: db.prepare('INSERT INTO luckiest_reigns (player_id, started_at) VALUES (?, ?)'),
       reignTime: db.prepare('UPDATE users SET luckiest_total_seconds = luckiest_total_seconds + ?, luckiest_longest_reign_seconds = MAX(luckiest_longest_reign_seconds, ?) WHERE id = ?'),
       reignCount: db.prepare('UPDATE users SET luckiest_reign_count = luckiest_reign_count + 1 WHERE id = ?'),
       unlockDie: db.prepare('UPDATE users SET golden_die_unlocked = 1, golden_die_unlocked_at = ? WHERE id = ? AND golden_die_unlocked = 0'),
@@ -128,7 +114,6 @@ class Accounts {
       moveReports: db.prepare('UPDATE reports SET user_id = ? WHERE user_id = ?'),
       dropSharedMatches: db.prepare('DELETE FROM match_players WHERE user_id = ? AND match_id IN (SELECT match_id FROM match_players WHERE user_id = ?)'),
       moveMatchPlayers: db.prepare('UPDATE match_players SET user_id = ? WHERE user_id = ?'),
-      moveReigns: db.prepare('UPDATE luckiest_reigns SET player_id = ? WHERE player_id = ?'),
       deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
       ledger: db.prepare('INSERT INTO ledger (user_id, delta, reason, created_at) VALUES (?, ?, ?, ?)'),
       addCoins: db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?'),
@@ -338,7 +323,7 @@ class Accounts {
   raceStatus(race, user, now = Date.now(), { self = false } = {}) {
     const config = RACES[race];
     const queries = this.raceQueries[race];
-    const set = RACE_SETS[race];
+    const set = config.set;
     const month = monthKey(now);
     const leader = this.raceMonthBest(race, month);
     const best = this.raceMonthBest(race, month, user.id);
@@ -376,7 +361,7 @@ class Accounts {
     while (last < shiftMonth(current, -1)) {
       last = shiftMonth(last, 1);
       const best = this.raceMonthBest(race, last);
-      if (best && queries.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last) });
+      if (best && queries.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last), rolls: best.rolls, sixes: best.sixes });
     }
     this.q.setMeta.run(config.meta, last);
     return champions;
@@ -423,7 +408,7 @@ class Accounts {
   claimRace(race, userId, month, itemId) {
     const config = RACES[race];
     const queries = this.raceQueries[race];
-    const set = RACE_SETS[race];
+    const set = config.set;
     const user = this.requireUser(userId);
     return transaction(this.db, () => {
       const granted = month === 'pick';

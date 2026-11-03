@@ -263,7 +263,7 @@ function createApi({ accounts, economy, rooms, reports, matches, analytics, onPr
     return {
       ...economy.shop(),
       supporter: discord.packConfigured('supporter') ? { skuId: config[discord.PACKS.supporter.sku], clientId } : null,
-      halloween: { open: discord.halloweenOpen(), ...(discord.packConfigured('halloween') ? { skuId: config[discord.PACKS.halloween.sku], clientId } : {}) },
+      halloween: { open: discord.packOpen('halloween'), ...(discord.packConfigured('halloween') ? { skuId: config[discord.PACKS.halloween.sku], clientId } : {}) },
       painter: discord.packConfigured('painter') ? { skuId: config[discord.PACKS.painter.sku], clientId } : null,
     };
   }));

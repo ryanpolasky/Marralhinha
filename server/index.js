@@ -10,6 +10,7 @@ const { Reports } = require('./reports');
 const { Matches } = require('./matches');
 const { Analytics } = require('./analytics');
 const discord = require('./discord');
+const { postPatchNotes } = require('./patchnotes');
 const { createApi } = require('./api');
 const { RoomManager, UserError } = require('./rooms');
 const { legalRoutes } = require('./legal');
@@ -75,9 +76,11 @@ const emitToSeats = (room, seats, event, payload) => {
 const announceLucky = (change) => {
   if (!change) return;
   const { holder, previous, reclaimed, champions = [] } = change;
-  for (const { id, monthName } of champions) {
-    const name = accounts.getUser(id)?.name;
-    if (name) io.emit('luckiest:change', `${name} won Luckiest for ${monthName}!`);
+  for (const { id, monthName, rolls, sixes } of champions) {
+    const user = accounts.getUser(id);
+    if (!user?.name) continue;
+    io.emit('luckiest:change', `${user.name} won Luckiest for ${monthName}!`);
+    discord.announceLuckiest({ name: user.name, discordId: user.discord_id, monthName, rolls, sixes }).catch((err) => console.error('[luckiest shoutout]', err));
   }
   if (holder !== previous && holder) {
     const name = accounts.getUser(holder)?.name;
@@ -323,10 +326,10 @@ io.on('connection', (socket) => {
   const preferOf = (payload) => (Number.isInteger(payload?.prefer) ? payload.prefer : null);
 
   handle('room:create', (payload) => enter(() => rooms.create(), { prefer: preferOf(payload) }));
-  // One round trip for "Quick play vs bots": a lobby with bots in every other seat, so you can still
-  // swap colours, switch on teams or change the timer before hitting Start
+  // One round trip for "Quick play vs bots": a Blitz lobby with bots in every other seat, so you can still
+  // swap colours, switch to Classic or teams, or change the timer before hitting Start
   handle('room:quickPlay', (payload) => {
-    const res = enter(() => rooms.create({ quickPlay: true }), { prefer: preferOf(payload) });
+    const res = enter(() => rooms.create({ quickPlay: true, variant: socket.data.blitz ? 'blitz' : 'classic' }), { prefer: preferOf(payload) });
     const room = rooms.get(res.code);
     [0, 1, 2, 3].filter((seat) => !room.seats[seat]).forEach((seat) => room.addBot(userId, seat));
     return res;
@@ -414,3 +417,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, process.env.HOST, () => console.log(`Marralhinha server listening on http://${process.env.HOST || 'localhost'}:${PORT}`));
+discord.connectGateway(() => new Set([...io.sockets.sockets.values()].map((socket) => socket.data.userId)).size);
+postPatchNotes(db).then((posted) => posted.length && console.log(`[patch notes] posted ${posted.join(', ')}`)).catch((err) => console.error('[patch notes]', err));

@@ -81,7 +81,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
               <span className="board-detail muted">
                 {poised.sixes}/{poised.rolls} sixes · {daysLeft} day{daysLeft === 1 ? '' : 's'} left
               </span>
-              <b className="board-value">{Math.round(poised.rate * 100)}%</b>
+              <b className="board-value">{(poised.rate * 100).toFixed(1)}%</b>
             </button>
           )}
           {rows.map((u, i) => (

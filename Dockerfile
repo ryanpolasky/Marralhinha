@@ -14,6 +14,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server ./server
 COPY src/shared ./src/shared
+COPY patch-notes ./patch-notes
 COPY TERMS.md PRIVACY.md RULES.md FAQ.md ./
 COPY --from=build /app/build ./build
 VOLUME /app/data

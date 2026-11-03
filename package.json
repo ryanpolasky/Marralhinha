@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@discordjs/rest": "2.6.0",
+    "@discordjs/ws": "1.2.3",
     "express": "4.22.2",
     "socket.io": "4.8.3"
   },
