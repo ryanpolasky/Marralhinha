@@ -167,5 +167,3 @@ function connectGateway() {
 }
 
 module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, packOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };
-||||||| parent of 2476d3c (Seasonal packs: pull the Halloween Pack outside its year-agnostic shop window)
-module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, packOpen, activeEntitlement };
