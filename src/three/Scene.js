@@ -18,6 +18,7 @@ import FrameCap from './FrameCap';
 import useMedia, { PHONE_QUERY } from '../components/useMedia';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { warmBoardSkin } from '../game/skinWarm';
+import { TouchPicker, pickAt, touchClaimed } from './touchPick';
 
 const BG = '#0b1f24';
 const PHONE_FPS = 30;
@@ -434,11 +435,11 @@ function StartWarmer({ prep, skin, onWarm }) {
 const TAP_MS = 280;
 const TAP_SLOP = 10;
 
-// On touch screens a quick tap anywhere on the table rolls; drags, pinches and long-press pings never count
-function useTapToRoll(canvasRef, canRoll, onRoll) {
+// On touch screens a quick tap snaps to the nearest marble or ghost, else rolls; drags, pinches and long-press pings never count
+function useTouchTaps(canvasRef, canRoll, onRoll) {
   useEffect(() => {
     const el = canvasRef.current;
-    if (!el || !canRoll) return undefined;
+    if (!el) return undefined;
     const touches = new Map();
     let multi = false;
     const down = (e) => {
@@ -455,7 +456,10 @@ function useTapToRoll(canvasRef, canRoll, onRoll) {
     };
     const up = (e) => {
       const start = release(e);
-      if (start && performance.now() - start.t <= TAP_MS && Math.hypot(e.clientX - start.x, e.clientY - start.y) <= TAP_SLOP) onRoll();
+      if (start && performance.now() - start.t <= TAP_MS && Math.hypot(e.clientX - start.x, e.clientY - start.y) <= TAP_SLOP) {
+        if (pickAt(el.getBoundingClientRect(), e.clientX, e.clientY)) return;
+        if (canRoll) onRoll();
+      }
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointerup', up);
@@ -500,7 +504,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
     onRoll?.();
   }, [onRoll]);
   const canvasRef = useRef(null);
-  useTapToRoll(canvasRef, canRoll, roll);
+  useTouchTaps(canvasRef, canRoll, roll);
   const phoneScreen = useMedia(PHONE_QUERY);
   const touch = useMedia('(pointer: coarse)');
   const phone = phoneScreen && touch;
@@ -513,9 +517,10 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       dpr={[1, quality.dpr]}
       camera={{ fov: 38, near: 0.5, far: 400, position: [0, 34, 34] }}
       gl={{ antialias: antialiasFor(quality), powerPreference: 'high-performance' }}
-      onPointerMissed={() => setSelected(null)}
+      onPointerMissed={() => !touchClaimed() && setSelected(null)}
       onCreated={tuneRenderer}
     >
+      <TouchPicker />
       <FrameCap paused={paused} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors])} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />

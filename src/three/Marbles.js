@@ -15,6 +15,7 @@ import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
 import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
+import { touchActive, useTouchTarget } from './touchPick';
 import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive, ufoSway } from '../game/stunts';
 
 export const MARBLE_R = 0.335;
@@ -385,13 +386,18 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     }
   });
 
+  const pick = () => {
+    setCursor(false);
+    pickHover.current = false;
+    onPick();
+  };
+  useTouchTarget(group, pickable ? pick : movable ? onClick : null);
+
   const handlers = pickable
     ? {
         onClick: (e) => {
           e.stopPropagation();
-          setCursor(false);
-          pickHover.current = false;
-          onPick();
+          if (!touchActive()) pick();
         },
         onPointerOver: (e) => {
           e.stopPropagation();
@@ -407,7 +413,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     ? {
         onClick: (e) => {
           e.stopPropagation();
-          onClick();
+          if (!touchActive()) onClick();
         },
         onPointerOver: (e) => {
           e.stopPropagation();
@@ -464,6 +470,10 @@ function Ghost({ move, color = SEAT_COLORS[move.seat], strong, label, onMove, la
   const ref = useRef();
   const ring = useRef();
   const target = worldOf(move.seat, move.to, move.marble, layout);
+  useTouchTarget(ref, () => {
+    setCursor(false);
+    onMove(move.id);
+  });
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     ref.current.position.y = REST_Y + 0.25 + Math.sin(t * 4) * 0.07;
@@ -476,6 +486,7 @@ function Ghost({ move, color = SEAT_COLORS[move.seat], strong, label, onMove, la
         geometry={GHOST_GEO}
         onClick={(e) => {
           e.stopPropagation();
+          if (touchActive()) return;
           setCursor(false);
           onMove(move.id);
         }}
