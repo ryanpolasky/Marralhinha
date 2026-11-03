@@ -976,8 +976,8 @@ export function Rewards({ reward, onRevealed }) {
   useEffect(() => {
     if (!done) return undefined;
     onRevealed?.();
-    if (!reward.leveledUp && !reward.luckyTag) return undefined;
-    const t = setTimeout(() => sfx.reveal(reward.luckyTag ? 'legendary' : 'epic'), 150);
+    if (!reward.leveledUp && !reward.luckyTag && !reward.unluckyTag) return undefined;
+    const t = setTimeout(() => sfx.reveal(reward.luckyTag ? 'legendary' : reward.unluckyTag ? 'rare' : 'epic'), 150);
     return () => clearTimeout(t);
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!reward) return null;
@@ -1006,6 +1006,14 @@ export function Rewards({ reward, onRevealed }) {
           <TagBadge tag="lucky" small />
           <span>
             <b>You're the Luckiest!</b> That's the best six rate this month. Hold it until the month ends to pick a piece of the Luckiest set.
+          </span>
+        </div>
+      )}
+      {reward.unluckyTag && (
+        <div className={`reward-celebrate reward-unlucky${done ? ' shown' : ''}`}>
+          <TagBadge tag="unlucky" small />
+          <span>
+            <b>You're the Unluckiest.</b> That's the worst six rate this month. Hold it until the month ends to pick a piece of the Unluckiest set.
           </span>
         </div>
       )}

@@ -6,7 +6,11 @@ const { nameBlocked } = require('./namefilter');
 const { ITEMS, SLOTS, DEFAULTS, REWARDS, TAGS, TAG_KEYS, ADMIN_TAGS, AUTO_TAGS } = require('./catalog');
 
 const LUCKY_ITEM = 'dice.lucky';
-const LUCKY_SET = [...ITEMS.values()].filter((item) => item.tag === 'lucky').map((item) => item.id);
+const RACES = {
+  lucky: { tag: 'lucky', months: 'luckiest_months', reigns: 'luckiest_reigns', picks: 'lucky_picks', meta: 'luckiest_settled', order: 'DESC', label: 'Luckiest', ledger: 'luckiest' },
+  unlucky: { tag: 'unlucky', months: 'unluckiest_months', reigns: 'unluckiest_reigns', picks: 'unlucky_picks', meta: 'unluckiest_settled', order: 'ASC', label: 'Unluckiest', ledger: 'unluckiest' },
+};
+const RACE_SETS = Object.fromEntries(Object.entries(RACES).map(([key, race]) => [key, [...ITEMS.values()].filter((item) => item.tag === race.tag).map((item) => item.id)]));
 const LUCK_MIN_ROLLS = 30;
 const LUCK_EXPECTED_SIX_RATE = 1 / 6;
 const LUCKY_FULL_SET_COINS = 2500;
@@ -144,6 +148,23 @@ class Accounts {
       removeIpBan: db.prepare('DELETE FROM ip_bans WHERE ip = ?'),
       count: db.prepare(`SELECT COUNT(*) AS n, SUM(${THROWAWAY}) AS throwaway FROM users`),
     };
+    this.raceQueries = Object.fromEntries(Object.entries(RACES).map(([key, race]) => [key, {
+      holder: db.prepare(`SELECT * FROM ${race.reigns} WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`),
+      monthBest: db.prepare(`SELECT mp.user_id AS id, mp.match_id AS matchId, mp.roll_count AS rolls, mp.six_count AS sixes, m.ended_at AS endedAt
+        FROM match_players mp JOIN matches m ON m.id = mp.match_id JOIN users u ON u.id = mp.user_id
+        WHERE m.ended_at >= ? AND m.ended_at < ? AND mp.roll_count >= ? AND mp.six_count >= 0 AND mp.six_count <= mp.roll_count AND u.banned_at IS NULL AND (? IS NULL OR mp.user_id = ?)
+        ORDER BY mp.six_count * 1.0 / mp.roll_count ${race.order}, m.ended_at ASC, m.id ASC LIMIT 1`),
+      addMonth: db.prepare(`INSERT OR IGNORE INTO ${race.months} (month, player_id, match_id, rolls, sixes, settled_at) VALUES (?, ?, ?, ?, ?, ?)`),
+      monthsWon: db.prepare(`SELECT COUNT(*) AS n FROM ${race.months} WHERE player_id = ?`),
+      pendingMonths: db.prepare(`SELECT * FROM ${race.months} WHERE player_id = ? AND claimed_at IS NULL ORDER BY month`),
+      claimMonth: db.prepare(`UPDATE ${race.months} SET claimed_item = ?, claimed_at = ? WHERE month = ? AND player_id = ? AND claimed_at IS NULL`),
+      moveMonths: db.prepare(`UPDATE ${race.months} SET player_id = ? WHERE player_id = ?`),
+      addPicks: db.prepare(`UPDATE users SET ${race.picks} = MAX(0, ${race.picks} + ?) WHERE id = ?`),
+      endReign: db.prepare(`UPDATE ${race.reigns} SET ended_at = ?, duration_seconds = ? WHERE id = ?`),
+      addReign: db.prepare(`INSERT INTO ${race.reigns} (player_id, started_at) VALUES (?, ?)`),
+      reignCount: db.prepare(`SELECT COUNT(*) AS n FROM ${race.reigns} WHERE player_id = ?`),
+      moveReigns: db.prepare(`UPDATE ${race.reigns} SET player_id = ? WHERE player_id = ?`),
+    }]));
   }
 
   createUser({ name, discordId = null, avatar = null }) {
@@ -197,7 +218,7 @@ class Accounts {
   heldTags(user) {
     const stored = storableTags(parse(user.tags, []));
     const entitlements = PACKS.filter((pack) => user[`${pack}_entitlement_id`] && discord.packConfigured(pack));
-    return normalizeTags([...stored, ...this.grantedPacks(user), ...entitlements, ...(this.luckyHolder() === user.id ? ['lucky'] : [])]);
+    return normalizeTags([...stored, ...this.grantedPacks(user), ...entitlements, ...(this.luckyHolder() === user.id ? ['lucky'] : []), ...(this.unluckyHolder() === user.id ? ['unlucky'] : [])]);
   }
 
   tags(user) {
@@ -211,7 +232,7 @@ class Accounts {
   tagLoadout(user, held = this.heldTags(user)) {
     const pick = pickableTags(held);
     if (!user.tag_loadout_set && !user.featured_tag && parse(user.shorthand_tags, []).length === 0) {
-      const auto = held.includes('dev') ? ['dev'] : held.filter((t) => t !== 'lucky');
+      const auto = held.includes('dev') ? ['dev'] : held.filter((t) => !['lucky', 'unlucky'].includes(t));
       return { main: auto[0] || null, shorthands: auto.slice(1, 1 + MAX_SHORTHANDS) };
     }
     const main = pick.includes(user.featured_tag) ? user.featured_tag : null;
@@ -219,11 +240,11 @@ class Accounts {
     return { main, shorthands };
   }
 
-  // What nameplates show: exactly the loadout, plus Lucky while it's held
+  // What nameplates show: exactly the loadout, plus race tags while held
   badges(user) {
     const held = this.heldTags(user);
     const { main, shorthands } = this.tagLoadout(user, held);
-    return [...new Set([main, ...shorthands, ...(held.includes('lucky') ? ['lucky'] : [])].filter(Boolean))];
+    return [...new Set([main, ...shorthands, ...['lucky', 'unlucky'].filter((tag) => held.includes(tag))].filter(Boolean))];
   }
 
   setTagLoadout(userId, main, shorthands) {
@@ -267,103 +288,178 @@ class Accounts {
   }
 
   luckyHolder() {
-    return this.q.luckiest.get()?.player_id || null;
+    return this.raceHolder('lucky');
   }
 
   monthBest(key, userId = null) {
+    return this.raceMonthBest('lucky', key, userId);
+  }
+
+  unluckyMonthBest(key, userId = null) {
+    return this.raceMonthBest('unlucky', key, userId);
+  }
+
+  raceHolder(race) {
+    return this.raceQueries[race].holder.get()?.player_id || null;
+  }
+
+  unluckyHolder() {
+    return this.raceHolder('unlucky');
+  }
+
+  raceMonthBest(race, key, userId = null) {
     const next = shiftMonth(key, 1);
-    const row = this.q.monthBest.get(monthStart(key), monthStart(next), LUCK_MIN_ROLLS, userId, userId);
+    const row = this.raceQueries[race].monthBest.get(monthStart(key), monthStart(next), LUCK_MIN_ROLLS, userId, userId);
     return row ? { ...row, rate: row.sixes / row.rolls } : null;
   }
 
   monthLeader(now = Date.now()) {
+    return this.raceMonthLeader('lucky', now);
+  }
+
+  unluckyMonthLeader(now = Date.now()) {
+    return this.raceMonthLeader('unlucky', now);
+  }
+
+  raceMonthLeader(race, now = Date.now()) {
     const month = monthKey(now);
-    const best = this.monthBest(month);
+    const best = this.raceMonthBest(race, month);
     return best && { ...best, month, monthName: monthName(month), endsAt: monthStart(shiftMonth(month, 1)) };
   }
 
   luckyStatus(user, now = Date.now(), { self = false } = {}) {
+    return this.raceStatus('lucky', user, now, { self });
+  }
+
+  unluckyStatus(user, now = Date.now(), { self = false } = {}) {
+    return this.raceStatus('unlucky', user, now, { self });
+  }
+
+  raceStatus(race, user, now = Date.now(), { self = false } = {}) {
+    const config = RACES[race];
+    const queries = this.raceQueries[race];
+    const set = RACE_SETS[race];
     const month = monthKey(now);
-    const leader = this.monthBest(month);
-    const best = this.monthBest(month, user.id);
+    const leader = this.raceMonthBest(race, month);
+    const best = this.raceMonthBest(race, month, user.id);
     const leaderUser = leader && this.getUser(leader.id);
     const game = (row) => row && { rate: row.rate, rolls: row.rolls, sixes: row.sixes, endedAt: row.endedAt };
     return {
       month, monthName: monthName(month), endsAt: monthStart(shiftMonth(month, 1)),
-      holder: this.luckyHolder() === user.id, best: game(best),
+      holder: this.raceHolder(race) === user.id, best: game(best),
       leader: leader && leaderUser ? { ...game(leader), id: leader.id, name: leaderUser.name } : null,
-      monthsWon: this.q.monthsWon.get(user.id).n,
-      setOwned: LUCKY_SET.filter((id) => this.ownsLucky(user, id)),
-      set: LUCKY_SET, minRolls: LUCK_MIN_ROLLS, expectedRate: LUCK_EXPECTED_SIX_RATE,
-      ...(self ? { pending: [...this.q.pendingMonths.all(user.id).map((row) => ({ month: row.month, monthName: monthName(row.month), rolls: row.rolls, sixes: row.sixes })), ...Array.from({ length: user.lucky_picks || 0 }, () => ({ month: 'pick', granted: true }))] } : {}),
+      monthsWon: queries.monthsWon.get(user.id).n,
+      setOwned: set.filter((id) => this.ownsRaceItem(race, user, id)),
+      set, minRolls: LUCK_MIN_ROLLS, expectedRate: LUCK_EXPECTED_SIX_RATE,
+      ...(self ? { pending: [...queries.pendingMonths.all(user.id).map((row) => ({ month: row.month, monthName: monthName(row.month), rolls: row.rolls, sixes: row.sixes })), ...Array.from({ length: user[config.picks] || 0 }, () => ({ month: 'pick', granted: true }))] } : {}),
     };
   }
 
   ownsLucky(user, itemId) {
-    return this.inventory(user.id).includes(itemId) || (itemId === LUCKY_ITEM && !!user.golden_die_unlocked);
+    return this.ownsRaceItem('lucky', user, itemId);
+  }
+
+  ownsRaceItem(race, user, itemId) {
+    return this.inventory(user.id).includes(itemId) || (race === 'lucky' && itemId === LUCKY_ITEM && !!user.golden_die_unlocked);
   }
 
   settleLuckyMonths(now) {
+    return this.settleRaceMonths('lucky', now);
+  }
+
+  settleRaceMonths(race, now) {
+    const config = RACES[race];
+    const queries = this.raceQueries[race];
     const current = monthKey(now);
-    let last = this.q.getMeta.get('luckiest_settled')?.value || shiftMonth(current, -1);
+    let last = this.q.getMeta.get(config.meta)?.value || shiftMonth(current, -1);
     const champions = [];
     while (last < shiftMonth(current, -1)) {
       last = shiftMonth(last, 1);
-      const best = this.monthBest(last);
-      if (best && this.q.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last) });
+      const best = this.raceMonthBest(race, last);
+      if (best && queries.addMonth.run(last, best.id, best.matchId, best.rolls, best.sixes, now).changes) champions.push({ id: best.id, month: last, monthName: monthName(last) });
     }
-    this.q.setMeta.run('luckiest_settled', last);
+    this.q.setMeta.run(config.meta, last);
     return champions;
   }
 
   refreshLucky(now = Date.now()) {
+    return this.refreshRace('lucky', now);
+  }
+
+  refreshUnlucky(now = Date.now()) {
+    return this.refreshRace('unlucky', now);
+  }
+
+  refreshRace(race, now = Date.now()) {
+    const queries = this.raceQueries[race];
     return transaction(this.db, () => {
-      const champions = this.settleLuckyMonths(now);
-      const current = this.q.luckiest.get();
-      const next = this.monthBest(monthKey(now))?.id || null;
+      const champions = this.settleRaceMonths(race, now);
+      const current = queries.holder.get();
+      const next = this.raceMonthBest(race, monthKey(now))?.id || null;
       if (next === (current?.player_id || null)) return champions.length ? { holder: next, previous: next, champions } : null;
       if (current) {
         const seconds = Math.max(0, Math.floor((now - current.started_at) / 1000));
-        this.q.endReign.run(now, seconds, current.id);
-        this.q.reignTime.run(seconds, seconds, current.player_id);
+        queries.endReign.run(now, seconds, current.id);
+        if (race === 'lucky') this.q.reignTime.run(seconds, seconds, current.player_id);
       }
       const nextUser = next && this.getUser(next);
+      const priorReigns = nextUser ? queries.reignCount.get(next).n : 0;
       if (nextUser) {
-        this.q.addReign.run(next, now);
-        this.q.reignCount.run(next);
+        queries.addReign.run(next, now);
+        if (race === 'lucky') this.q.reignCount.run(next);
       }
-      return { holder: next, previous: current?.player_id || null, reclaimed: !!nextUser?.luckiest_reign_count, champions };
+      return { holder: next, previous: current?.player_id || null, reclaimed: race === 'lucky' ? !!nextUser?.luckiest_reign_count : priorReigns > 0, champions };
     });
   }
 
   claimLucky(userId, month, itemId) {
+    return this.claimRace('lucky', userId, month, itemId);
+  }
+
+  claimUnlucky(userId, month, itemId) {
+    return this.claimRace('unlucky', userId, month, itemId);
+  }
+
+  claimRace(race, userId, month, itemId) {
+    const config = RACES[race];
+    const queries = this.raceQueries[race];
+    const set = RACE_SETS[race];
     const user = this.requireUser(userId);
     return transaction(this.db, () => {
       const granted = month === 'pick';
-      const pending = granted ? user.lucky_picks > 0 : this.q.pendingMonths.all(user.id).some((row) => row.month === month);
+      const pending = granted ? user[config.picks] > 0 : queries.pendingMonths.all(user.id).some((row) => row.month === month);
       if (!pending) throw new AccountError('Nothing to claim for that month');
-      const missing = LUCKY_SET.filter((id) => !this.ownsLucky(user, id));
+      const missing = set.filter((id) => !this.ownsRaceItem(race, user, id));
       if (missing.length) {
-        if (!missing.includes(itemId)) throw new AccountError('Pick a Luckiest piece you don\'t have yet');
+        if (!missing.includes(itemId)) throw new AccountError(`Pick a ${config.label} piece you don't have yet`);
         this.q.addItem.run(user.id, itemId, Date.now());
-        if (itemId === LUCKY_ITEM) this.q.unlockDie.run(Date.now(), user.id);
+        if (race === 'lucky' && itemId === LUCKY_ITEM) this.q.unlockDie.run(Date.now(), user.id);
       } else {
         itemId = null;
         this.q.addCoins.run(LUCKY_FULL_SET_COINS, user.id);
-        this.q.ledger.run(user.id, LUCKY_FULL_SET_COINS, 'luckiest', Date.now());
+        this.q.ledger.run(user.id, LUCKY_FULL_SET_COINS, config.ledger, Date.now());
       }
-      if (granted) this.q.addPicks.run(-1, user.id);
-      else this.q.claimMonth.run(itemId || 'coins', Date.now(), month, user.id);
+      if (granted) queries.addPicks.run(-1, user.id);
+      else queries.claimMonth.run(itemId || 'coins', Date.now(), month, user.id);
       return { item: itemId, coins: itemId ? 0 : LUCKY_FULL_SET_COINS };
     });
   }
 
   grantLuckyPick(userId, delta) {
+    return this.grantRacePick('lucky', userId, delta);
+  }
+
+  grantUnluckyPick(userId, delta) {
+    return this.grantRacePick('unlucky', userId, delta);
+  }
+
+  grantRacePick(race, userId, delta) {
+    const config = RACES[race];
     const user = this.requireUser(userId);
     const step = Math.sign(Number(delta) || 0);
     if (!step) throw new AccountError('Nothing to change');
-    if (step < 0 && !user.lucky_picks) throw new AccountError(`${user.name} has no Luckiest picks waiting`);
-    this.q.addPicks.run(step, user.id);
+    if (step < 0 && !user[config.picks]) throw new AccountError(`${user.name} has no ${config.label} picks waiting`);
+    this.raceQueries[race].addPicks.run(step, user.id);
   }
 
   revokeItem(userId, itemId) {
@@ -433,7 +529,7 @@ class Accounts {
     const tags = this.tags(user);
     if (tags.includes('dev')) return true;
     if (this.inventory(user.id).includes(itemId)) return true;
-    if (item.tag === 'lucky') return this.ownsLucky(user, itemId);
+    if (item.tag === 'lucky' || item.tag === 'unlucky') return this.ownsRaceItem(item.tag, user, itemId);
     if (item.tag) return tags.includes(item.tag);
     return false;
   }
@@ -444,7 +540,7 @@ class Accounts {
     const inv = this.inventory(user.id);
     const valid = (slot, id) => {
       const item = ITEMS.get(id);
-      return item && item.slot === slot && (tags.includes('dev') || !item.tag || (item.tag !== 'lucky' && tags.includes(item.tag)) || inv.includes(id) || (id === LUCKY_ITEM && user.golden_die_unlocked));
+      return item && item.slot === slot && (tags.includes('dev') || !item.tag || (!['lucky', 'unlucky'].includes(item.tag) && tags.includes(item.tag)) || inv.includes(id) || (id === LUCKY_ITEM && user.golden_die_unlocked));
     };
     return Object.fromEntries(SLOTS.map((slot) => [slot, valid(slot, stored[slot]) ? stored[slot] : DEFAULTS[slot]]));
   }
@@ -540,9 +636,12 @@ class Accounts {
     this.q.moveReports.run(intoId, guest.id);
     this.q.dropSharedMatches.run(guest.id, intoId);
     this.q.moveMatchPlayers.run(intoId, guest.id);
-    this.q.moveReigns.run(intoId, guest.id);
-    this.q.moveMonths.run(intoId, guest.id);
-    this.q.addPicks.run(guest.lucky_picks || 0, intoId);
+    for (const race of Object.keys(RACES)) {
+      const queries = this.raceQueries[race];
+      queries.moveReigns.run(intoId, guest.id);
+      queries.moveMonths.run(intoId, guest.id);
+      queries.addPicks.run(guest[RACES[race].picks] || 0, intoId);
+    }
     this.setTags(intoId, [...this.tags(into), ...this.tags(guest)]);
     this.q.setPacks.run(JSON.stringify([...new Set([...this.grantedPacks(into), ...this.grantedPacks(guest)])]), intoId);
     this.q.deleteUser.run(guest.id);
@@ -612,6 +711,7 @@ class Accounts {
       pity: parse(user.pity, {}),
       stats: this.statLine(user),
       lucky: this.luckyStatus(user, Date.now(), { self: true }),
+      unlucky: this.unluckyStatus(user, Date.now(), { self: true }),
       ...extras,
     };
   }
@@ -644,6 +744,7 @@ class Accounts {
       items: this.inventory(user.id).length,
       owned: [...new Set([...this.inventory(user.id), ...(user.golden_die_unlocked ? [LUCKY_ITEM] : [])])],
       luckyPicks: user.lucky_picks || 0,
+      unluckyPicks: user.unlucky_picks || 0,
       painterColor: user.painter_color || null,
       stats: this.statLine(user),
       createdAt: user.created_at,
@@ -667,6 +768,7 @@ class Accounts {
       badges: this.badges(user),
       stats: this.statLine(user),
       lucky: this.luckyStatus(user),
+      unlucky: this.unluckyStatus(user),
       createdAt: user.created_at,
     };
   }

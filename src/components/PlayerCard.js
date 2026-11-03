@@ -55,6 +55,7 @@ export default function PlayerCard({ userId, hint, data, onClose }) {
 
             {player.stats && <StatGrid stats={player.stats} />}
             <LuckiestPanel lucky={player.lucky} />
+            <LuckiestPanel lucky={player.unlucky} race="unlucky" />
 
             {player.equipped && (
               <div className="profile-loadout peek">

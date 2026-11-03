@@ -10,6 +10,7 @@ const BOARDS = [
   ['captures', 'Captures', (u) => u.captures.toLocaleString(), () => 'marbles sent home'],
   ['home', 'Marbles home', (u) => u.home.toLocaleString(), () => 'marbles brought home'],
   ['lucky', 'Luckiest', (u) => `${u.luckyMonths}×`, (u) => `last won ${new Date(`${u.luckyLast}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })}`],
+  ['unlucky', 'Unluckiest', (u) => `${u.unluckyMonths}×`, (u) => `last lost ${new Date(`${u.unluckyLast}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })}`],
   ['level', 'Level', (u) => `Lv ${u.level}`, (u) => `${u.xp.toLocaleString()} XP`],
 ];
 
@@ -38,7 +39,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
 
   const board = BOARDS.find(([key]) => key === tab);
   const rows = data?.[tab] || [];
-  const poised = tab === 'lucky' ? data?.luckyNow : null;
+  const poised = tab === 'lucky' ? data?.luckyNow : tab === 'unlucky' ? data?.unluckyNow : null;
   const daysLeft = poised && Math.max(1, Math.ceil((poised.endsAt - Date.now()) / 86400000));
 
   return (
@@ -72,7 +73,7 @@ export default function Leaderboard({ meId, boards, onClose, onPlayer }) {
               onClick={() => onPlayer?.(poised)}
               title={`See ${poised.name}'s stats`}
             >
-              <span className="board-poised-kicker">Poised to win {poised.monthName.split(' ')[0]}</span>
+              <span className="board-poised-kicker">Poised to {tab === 'lucky' ? 'win' : 'lose'} {poised.monthName.split(' ')[0]}</span>
               <span className="board-name">
                 {poised.id === meId ? 'You' : poised.name}
                 <TagBadges tags={poised.tags} badges={poised.badges} small />

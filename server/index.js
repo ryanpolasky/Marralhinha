@@ -86,6 +86,20 @@ const announceLucky = (change) => {
   new Set([holder, previous, ...champions.map((c) => c.id)].filter(Boolean)).forEach(pushProfile);
 };
 
+const announceUnlucky = (change) => {
+  if (!change) return;
+  const { holder, previous, reclaimed, champions = [] } = change;
+  for (const { id, monthName } of champions) {
+    const name = accounts.getUser(id)?.name;
+    if (name) io.emit('luckiest:change', `${name} won Unluckiest for ${monthName}. Condolences.`);
+  }
+  if (holder !== previous && holder) {
+    const name = accounts.getUser(holder)?.name;
+    if (name) io.emit('luckiest:change', `${name} has ${reclaimed ? 'reclaimed' : 'taken'} Unluckiest${previous && !reclaimed ? ` from ${accounts.getUser(previous)?.name || 'the previous holder'}` : ''}!`);
+  }
+  new Set([holder, previous, ...champions.map((c) => c.id)].filter(Boolean)).forEach(pushProfile);
+};
+
 const rooms = new RoomManager({
   onChange: (room) => {
     const view = room.view();
@@ -134,17 +148,21 @@ const rooms = new RoomManager({
   },
   onGameOver: (room, { players, botGame }) => {
     try {
-      const { rewards, lucky } = transaction(db, () => {
+      const { rewards, lucky, unlucky } = transaction(db, () => {
         matches.record(room);
         const rewards = economy.awardGame({ game: room.game, players, botGame });
         const lucky = accounts.refreshLucky();
+        const unlucky = accounts.refreshUnlucky();
         const winner = players.find((p) => p.userId === lucky?.holder);
         if (winner && lucky?.previous !== lucky.holder) rewards[winner.seat].luckyTag = true;
-        return { rewards, lucky };
+        const unluckyWinner = players.find((p) => p.userId === unlucky?.holder);
+        if (unluckyWinner && unlucky?.previous !== unlucky.holder) rewards[unluckyWinner.seat].unluckyTag = true;
+        return { rewards, lucky, unlucky };
       });
       setTimeout(() => {
         players.forEach(({ userId }) => pushProfile(userId));
         announceLucky(lucky);
+        announceUnlucky(unlucky);
       }, 0);
       return rewards;
     } catch (err) {
@@ -154,10 +172,12 @@ const rooms = new RoomManager({
   },
 });
 announceLucky(accounts.refreshLucky());
+announceUnlucky(accounts.refreshUnlucky());
 setInterval(() => {
   rooms.sweep();
   try {
     announceLucky(accounts.refreshLucky());
+    announceUnlucky(accounts.refreshUnlucky());
   } catch (err) {
     console.error('[luckiest]', err);
   }

@@ -42,19 +42,29 @@ const left = (t) => {
   return s >= 86400 ? `${Math.floor(s / 86400)}d left` : s >= 3600 ? `${Math.floor(s / 3600)}h left` : `${Math.ceil(s / 60)}m left`;
 };
 
-export function LuckiestPanel({ lucky, onClaim }) {
+export function LuckiestPanel({ lucky, onClaim, race = 'lucky' }) {
   if (!lucky?.month) return null;
+  const isLucky = race === 'lucky';
+  const label = isLucky ? 'Luckiest' : 'Unluckiest';
   const { best, leader, holder } = lucky;
   const owned = lucky.setOwned?.length || 0;
-  const status = holder ? `Leading ${lucky.monthName}` : best ? `${pct(leader.rate - best.rate)} behind ${leader.name}` : `No qualifying game yet · ${lucky.minRolls}+ of your own rolls`;
+  const ratio = leader && best ? (isLucky
+    ? (leader.rate ? best.rate / leader.rate : best.rate === 0 ? 1 : 0)
+    : (best.rate ? leader.rate / best.rate : leader.rate === 0 ? 1 : 0)) : 0;
+  const width = Math.max(0, Math.min(100, ratio * 100));
+  const status = holder
+    ? `${isLucky ? 'Leading' : 'Trailing'} ${lucky.monthName}`
+    : best && leader
+      ? `${pct(isLucky ? leader.rate - best.rate : best.rate - leader.rate)} ${isLucky ? 'behind' : 'ahead of'} ${leader.name}`
+      : `No qualifying game yet · ${lucky.minRolls}+ of your own rolls`;
   return (
-    <details className={`profile-lucky${holder ? ' holder' : ''}`}>
+    <details className={`profile-lucky${holder ? ' holder' : ''}${isLucky ? '' : ' unlucky'}`}>
       <summary className="profile-lucky-head">
-        <TagBadge tag="lucky" small />
+        <TagBadge tag={race} small />
         <span className="profile-lucky-overview">
-          <span>{holder ? 'Current holder' : best ? `Best this month ${pct(best.rate)}` : 'Not in the race yet'}</span>
-          <span className="profile-lucky-track" role="progressbar" aria-label="Your best six rate against this month's leader" aria-valuemin={0} aria-valuemax={100} aria-valuenow={leader && best ? Math.round((best.rate / leader.rate) * 100) : 0}>
-            <span style={{ width: `${leader && best ? (best.rate / leader.rate) * 100 : 0}%` }} />
+          <span>{holder ? 'Current holder' : best ? `${isLucky ? 'Best' : 'Worst'} this month ${pct(best.rate)}` : 'Not in the race yet'}</span>
+          <span className="profile-lucky-track" role="progressbar" aria-label={`Your ${isLucky ? 'best' : 'worst'} six rate against this month's ${isLucky ? 'leader' : 'holder'}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(width)}>
+            <span style={{ width: `${width}%` }} />
           </span>
         </span>
         {onClaim && lucky.pending?.length > 0 && <button type="button" className="btn primary small profile-lucky-claim" onClick={(e) => { e.preventDefault(); onClaim(); }}>Claim reward</button>}
@@ -63,17 +73,17 @@ export function LuckiestPanel({ lucky, onClaim }) {
       <div className="profile-lucky-details">
         <div className="profile-lucky-status">{status}</div>
         <div className="profile-lucky-metrics">
-          <div><b>{best ? pct(best.rate) : '–'}</b><span>Best game <small>· {pct(lucky.expectedRate)} expected</small></span></div>
+          <div><b>{best ? pct(best.rate) : '–'}</b><span>{isLucky ? 'Best' : 'Worst'} game <small>· {pct(lucky.expectedRate)} expected</small></span></div>
           <div><b>{best ? `${best.sixes} / ${best.rolls}` : '–'}</b><span>Sixes / rolls</span></div>
-          <div><b>{lucky.monthsWon}</b><span>Months won</span></div>
+          <div><b>{lucky.monthsWon}</b><span>{isLucky ? 'Months won' : 'Months lost'}</span></div>
         </div>
         <div className="profile-lucky-section">
           <div className="profile-lucky-gold-head"><h4>{lucky.monthName}</h4><span>{left(lucky.endsAt)}</span></div>
-          <div className="profile-lucky-leader">{leader ? <><b>{leader.name}</b> leads with {pct(leader.rate)} <small>({leader.sixes} sixes in {leader.rolls} rolls)</small></> : 'Nobody has qualified yet. Finish a game to take it.'}</div>
+          <div className="profile-lucky-leader">{leader ? <><b>{leader.name}</b> {isLucky ? 'leads' : 'trails'} with {pct(leader.rate)} <small>({leader.sixes} sixes in {leader.rolls} rolls)</small></> : 'Nobody has qualified yet. Finish a game to take it.'}</div>
         </div>
         <div className="profile-lucky-section">
-          <div className="profile-lucky-gold-head"><h4>Luckiest set</h4><span>{owned} / {lucky.set.length} collected</span></div>
-          <span className="profile-lucky-track gold" role="progressbar" aria-label="Luckiest set pieces collected" aria-valuemin={0} aria-valuemax={lucky.set.length} aria-valuenow={owned}>
+          <div className="profile-lucky-gold-head"><h4>{label} set</h4><span>{owned} / {lucky.set.length} collected</span></div>
+          <span className="profile-lucky-track gold" role="progressbar" aria-label={`${label} set pieces collected`} aria-valuemin={0} aria-valuemax={lucky.set.length} aria-valuenow={owned}>
             <span style={{ width: `${(owned / lucky.set.length) * 100}%` }} />
           </span>
         </div>

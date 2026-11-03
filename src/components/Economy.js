@@ -100,7 +100,7 @@ export const SHOWN_TAGS = 3;
 export const shownTags = (tags) => {
   const all = visibleTags(tags);
   const head = all.slice(0, SHOWN_TAGS);
-  return all.includes('lucky') && !head.includes('lucky') ? [...head, 'lucky'] : head;
+  return [...head, ...['lucky', 'unlucky'].filter((tag) => all.includes(tag) && !head.includes(tag))];
 };
 
 export const TagBadges = ({ tags, badges, small, full = false }) =>
@@ -264,7 +264,7 @@ export function ItemCard({ itemId, owned = true, equipped = false, selected = fa
       <span className="item-name">{item.name}</span>
       <span className="item-rarity">{rarity.short || rarity.label}</span>
       {equipped && <span className="item-badge">Equipped</span>}
-      {!owned && !footer && <span className="item-lock">{item.id === 'dice.lucky' ? '7 days as Luckiest' : item.tag ? `${rarity.short} only` : 'Locked'}</span>}
+      {!owned && !footer && <span className="item-lock">{item.id === 'dice.lucky' ? '7 days as Luckiest' : item.tag ? `${TAGS[item.tag]?.label || rarity.short} only` : 'Locked'}</span>}
       {footer}
     </button>
   );

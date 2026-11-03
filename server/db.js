@@ -108,6 +108,26 @@ CREATE TABLE IF NOT EXISTS luckiest_months (
   claimed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS luckiest_months_player ON luckiest_months(player_id);
+CREATE TABLE IF NOT EXISTS unluckiest_reigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER,
+  duration_seconds INTEGER
+);
+CREATE INDEX IF NOT EXISTS unluckiest_reigns_player ON unluckiest_reigns(player_id);
+CREATE UNIQUE INDEX IF NOT EXISTS unluckiest_reigns_open ON unluckiest_reigns ((1)) WHERE ended_at IS NULL;
+CREATE TABLE IF NOT EXISTS unluckiest_months (
+  month TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  match_id INTEGER,
+  rolls INTEGER NOT NULL,
+  sixes INTEGER NOT NULL,
+  settled_at INTEGER NOT NULL,
+  claimed_item TEXT,
+  claimed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS unluckiest_months_player ON unluckiest_months(player_id);
 CREATE TABLE IF NOT EXISTS ip_bans (
   ip TEXT PRIMARY KEY,
   name TEXT,
@@ -140,6 +160,7 @@ const MIGRATIONS = [
   ['users', 'ban_reason', 'TEXT'],
   ['users', 'last_ip', 'TEXT'],
   ['users', 'lucky_picks', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'unlucky_picks', 'INTEGER NOT NULL DEFAULT 0'],
   ['match_players', 'roll_count', 'INTEGER'],
   ['match_players', 'six_count', 'INTEGER'],
 ];
