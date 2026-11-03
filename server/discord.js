@@ -133,15 +133,34 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
     return false;
   });
   const who = ping ? `${escapeMarkdown(name)} (<@${discordId}>)` : escapeMarkdown(name);
-  const content = [
-    `**THE LUCKIEST PLAYER OF ${monthName.toUpperCase()} IS ${who}! CONGRATULATIONS!**`,
-    `${sixes} sixes in ${rolls} rolls (${((sixes / rolls) * 100).toFixed(1)}%) in a single game.`,
-    `Log in at ${clientUrl} or launch the Activity to claim your Luckiest reward.`,
-  ].join('\n');
-  const res = await fetch(luckiestWebhookUrl, {
+  const text = (content) => ({ type: 10, content });
+  const url = new URL(luckiestWebhookUrl);
+  url.searchParams.set('with_components', 'true');
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] } }),
+    body: JSON.stringify({
+      username: 'Marralhinha',
+      avatar_url: `${clientUrl}/logo512.png`,
+      flags: 1 << 15,
+      components: [{
+        type: 17,
+        accent_color: 0xffd166,
+        components: [
+          text('-# MARRALHINHA · MONTHLY LUCKIEST'),
+          text(`# The Luckiest player of ${monthName} is ${who}!`),
+          text(`**${sixes} sixes** in **${rolls} rolls** for a **${((sixes / rolls) * 100).toFixed(1)}%** six rate, all in one game.`),
+          { type: 12, items: [{ media: { url: `${clientUrl}/og-image.jpg` } }] },
+          { type: 14, divider: true, spacing: 2 },
+          {
+            type: 9,
+            components: [text('**Congratulations!** Your Luckiest reward is waiting.\n-# Log in on the site or launch the Activity to claim it.')],
+            accessory: { type: 2, style: 5, label: 'Claim reward', url: clientUrl },
+          },
+        ],
+      }],
+      allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] },
+    }),
   });
   if (!res.ok) throw new Error(`Luckiest shoutout failed (${res.status})`);
   return true;
@@ -157,7 +176,7 @@ function connectGateway() {
     token: botToken,
     intents: 0,
     rest: new REST().setToken(botToken),
-    initialPresence: { status: 'online', since: null, afk: false, activities: [{ name: 'Marralhinha', type: 0 }] },
+    initialPresence: { status: 'online', since: null, afk: false, activities: [{ name: 'Marralhinha!', type: 0 }] },
   });
   manager.on(WebSocketShardEvents.Error, ({ error }) => console.error('[discord gateway]', error));
   manager.connect().catch((err) => console.error('[discord gateway]', err));
