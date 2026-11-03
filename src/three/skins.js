@@ -1133,13 +1133,63 @@ const MARBLES = {
       onBeforeCompile, customProgramCacheKey: () => 'marble-lucky-molten',
       animate: (m, t) => { uniforms.uTime.value = reducedMotion?.matches ? 0 : t + seat * 2.1; } };
   },
-  unlucky: (c) => {
-    return {
-      color: c.main,
-      roughness: 0.24,
-      clearcoat: 1,
-      clearcoatRoughness: 0.04,
+  unlucky: (c, seat) => {
+    const W = 1024;
+    const H = 512;
+    const [canvas, ctx] = makeCanvas(W, H);
+    const rand = seeded(733 + seat * 13);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c.light);
+    g.addColorStop(0.35, c.main);
+    g.addColorStop(1, mix(c.main, c.dark, 0.6));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+      ctx.beginPath();
+      ctx.ellipse(rand() * W, rand() * H, 4 + rand() * 18, 2 + rand() * 6, rand() * 3, 0, TAU);
+      ctx.fill();
+    }
+    const dark = mix(c.dark, '#000000', 0.55);
+    const glint = mix(c.light, '#ffffff', 0.6);
+    const crack = (x0, from, to, width, wander) => {
+      const pts = [];
+      let j = 0;
+      for (let k = 0; k <= 40; k++) {
+        const th = (from + (to - from) * (k / 40)) * Math.PI;
+        j += (rand() - 0.5) * wander;
+        const s = Math.max(0.1, Math.sin(th));
+        pts.push([x0 + ((j / s) / TAU) * W, (th / Math.PI) * H, ((width / s) / TAU) * W]);
+      }
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      pts.forEach(([x, y, w], k) => (k ? ctx.lineTo(x - w, y) : ctx.moveTo(x - w, y)));
+      [...pts].reverse().forEach(([x, y, w]) => ctx.lineTo(x + w * 0.4, y));
+      ctx.fill();
+      ctx.strokeStyle = glint;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      pts.forEach(([x, y, w], k) => (k ? ctx.lineTo(x + w * 1.2, y) : ctx.moveTo(x + w * 1.2, y)));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return pts;
     };
+    [0.25, 0.75].forEach((u) => {
+      const pts = crack(u * W, 0.01, 0.46, 0.022, 0.07);
+      [10, 19, 29].forEach((k) => {
+        const [x, y] = pts[k];
+        const th = (y / H) * Math.PI;
+        crack(x, th / Math.PI, th / Math.PI + 0.06 + rand() * 0.06, 0.011, 0.12);
+      });
+      const [ex, ey] = pts[pts.length - 1];
+      const wet = ctx.createRadialGradient(ex, ey + 20, 2, ex, ey + 20, 60);
+      wet.addColorStop(0, 'rgba(0,0,0,0.22)');
+      wet.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = wet;
+      ctx.fillRect(ex - 60, ey - 40, 120, 120);
+    });
+    return { map: finishMarble(canvas), roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.05 };
   },
   // Halloween set: smoky seat-colored fog rolling inside a dark crystal ball, with a face that surfaces every so often
   halloween: (c, seat) => {
@@ -1362,7 +1412,7 @@ export function marbleSkin(itemId, seat, color = null) {
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'rain-globe' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'duct-tape' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 
@@ -1861,6 +1911,17 @@ function drawPips(ctx, value, size, color) {
   });
 }
 
+function glassPips(ctx, value, size, color) {
+  const r = value === 1 ? 30 : 21;
+  PIPS[value].forEach(([x, y]) => {
+    ctx.fillStyle = 'rgba(20,44,58,0.85)';
+    ctx.beginPath();
+    ctx.arc(x * size, y * size, r + 5, 0, TAU);
+    ctx.fill();
+  });
+  drawPips(ctx, value, size, color);
+}
+
 function blockPips(ctx, value, size, color, lit = true) {
   const step = size / 32;
   const r = value === 1 ? 32 : 24;
@@ -1892,7 +1953,7 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips, unlucky: glassPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -2200,12 +2261,12 @@ function waterDamageCanvas(layout) {
     const [x, z] = [[along, across], [-along, across], [across, along], [across, -along]][arm];
     const r = 0.3 + rand() * 0.12;
     const start = rand() * TAU;
-    ctx.strokeStyle = 'rgba(238,228,206,0.42)';
+    ctx.strokeStyle = 'rgba(52,32,16,0.34)';
     ctx.lineWidth = 0.05;
     ctx.beginPath();
     ctx.ellipse(x, z, r, r, 0, start, start + TAU * (0.7 + rand() * 0.3));
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(238,228,206,0.18)';
+    ctx.strokeStyle = 'rgba(52,32,16,0.16)';
     ctx.lineWidth = 0.02;
     ctx.beginPath();
     ctx.ellipse(x + 0.02, z - 0.01, r * 0.86, r * 0.86, 0, 0, TAU);
@@ -5380,12 +5441,9 @@ const WATER_DAMAGE_SHADER = `{
     vec2 d = p - uLeakPoints[i];
     float dist = length(d);
     float puddle = 1.0 - smoothstep(0.36, 0.72, dist);
-    float phase = fract(uSkinTime * (0.62 + float(i) * 0.035) + float(i) * 0.237);
-    float ring = (1.0 - smoothstep(0.018, 0.052, abs(dist - phase * 0.58)))
-      * (1.0 - smoothstep(0.72, 1.0, phase));
     float edge = 1.0 - smoothstep(0.012, 0.045, abs(dist - 0.43));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.07, 0.05), puddle * 0.5);
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.64, 0.66), ring * 0.62 + edge * 0.28);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.13, 0.08), edge * 0.45);
     roughnessFactor = mix(roughnessFactor, 0.14, puddle * 0.92);
   }
 }`;

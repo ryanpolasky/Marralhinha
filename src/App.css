@@ -11385,16 +11385,6 @@ body {
 .plate-unlucky .chip-name-text,
 .plate-unlucky .seat-name-text,
 .plate-unlucky.big > span:not(.avatar) { color: #e7edf1; text-shadow: 0 1px 3px rgba(10, 16, 22, 0.85); }
-.plate-unlucky .account-name,
-.plate-unlucky .chip-name-text,
-.plate-unlucky .seat-name-text {
-  -webkit-box-reflect: below -1px linear-gradient(transparent 30%, rgba(197, 220, 230, 0.42));
-  filter: url(#puddle-wave) blur(0.15px);
-}
-.plate-unlucky.mini .chip-name-text,
-.plate-unlucky .chip-name-text {
-  -webkit-box-reflect: below -2px linear-gradient(transparent 30%, rgba(197, 220, 230, 0.42));
-}
 .puddle-filter-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 @keyframes puddle-breathe { 0%, 100% { transform: scaleX(0.93); opacity: 0.45; } 50% { transform: scaleX(1.06); opacity: 0.75; } }
 @keyframes puddle-drip {
@@ -11433,12 +11423,11 @@ body {
   --t-bg: #04301a;
 }
 .thumb-marble.skin-unlucky {
-  background: radial-gradient(ellipse at 50% 72%, color-mix(in srgb, var(--seat), #1788a5 36%) 0 26%, transparent 28%),
-    radial-gradient(circle at 39% 34%, #f4f6f5 0 9%, transparent 10%), radial-gradient(circle at 53% 31%, #dfe4e5 0 10%, transparent 11%),
-    radial-gradient(circle at 56% 54%, transparent 0 56%, rgba(242, 250, 255, 0.92) 68%, rgba(110, 139, 157, 0.64) 73%, transparent 82%),
-    radial-gradient(circle at 54% 56%, rgba(238, 248, 252, 0.92) 0 58%, rgba(255,255,255,0.18) 70%, transparent 84%),
-    radial-gradient(circle at 54% 56%, var(--seat-light), var(--seat) 60%, var(--seat-dark) 92%);
-  box-shadow: inset -7px -9px 14px rgba(0, 0, 0, 0.32), inset 4px 4px 11px rgba(255, 255, 255, 0.45), 0 1px 5px rgba(201, 224, 235, 0.45);
+  background: linear-gradient(45deg, transparent 0 41%, #a3a8ab 41% 59%, transparent 59%),
+    linear-gradient(-45deg, transparent 0 41%, #b4b8bb 41% 59%, transparent 59%),
+    linear-gradient(92deg, transparent 0 48%, var(--seat-dark) 48% 51%, transparent 51%),
+    radial-gradient(circle at 54% 56%, var(--seat-light), var(--seat) 50%, var(--seat-dark) 92%);
+  box-shadow: inset -7px -9px 14px rgba(0, 0, 0, 0.45), inset 4px 4px 11px rgba(255, 255, 255, 0.35);
 }
 .thumb-board.skin-unlucky {
   background: radial-gradient(ellipse at 30% 32%, rgba(74, 49, 34, 0.8) 0 9%, rgba(141, 89, 52, 0.5) 10% 14%, transparent 15%),

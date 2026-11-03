@@ -4,6 +4,7 @@ import { useThree } from '@react-three/fiber';
 import { idle } from './Board';
 import { boardSkin, diceSkin, marbleSkin } from './skins';
 import { warmBucket } from './BucketModel';
+import { TAPE_MATERIAL, SEEP_MATERIAL } from './DuctTape';
 
 const PROBE_GEO = new THREE.PlaneGeometry(1, 1);
 const PROBE_MAP = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -20,11 +21,7 @@ export const probeMaterials = () => {
   ];
   const marble = marbleSkin('marble.unlucky', 0);
   const board = boardSkin('board.unlucky');
-  const rainGlobe = [
-    new THREE.MeshPhysicalMaterial({ transparent: true, opacity: 0.2, roughness: 0.04, clearcoat: 1, envMapIntensity: 1.8 }),
-    new THREE.MeshPhysicalMaterial({ transparent: true, opacity: 0.68, roughness: 0.08, clearcoat: 0.8 }),
-  ];
-  return [...base, marble.material, ...board.surfaces, ...diceSkin('dice.unlucky'), ...rainGlobe, ...warmBucket().materials, new THREE.MeshBasicMaterial({ toneMapped: false })];
+  return [...base, marble.material, ...board.surfaces, ...diceSkin('dice.unlucky'), TAPE_MATERIAL, SEEP_MATERIAL, ...warmBucket().materials, new THREE.MeshBasicMaterial({ toneMapped: false })];
 };
 
 export const buildProbes = (materials) => {

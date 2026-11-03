@@ -17,7 +17,7 @@ import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
 import { ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { SingularityAura } from './Gravity';
-import RainGlobe from './RainGlobe';
+import { TapeX, Seep } from './DuctTape';
 import { ITEMS } from '../game/catalog';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { sfx } from '../game/sound';
@@ -42,14 +42,13 @@ function MarblePreview({ itemId, seat, color }) {
     <group>
       <group ref={anchor}>
         <Spinner>
-          {skin.aura !== 'rain-globe' && (
-            <mesh material={skin.material}>
-              <sphereGeometry args={[1.35, 64, 40]} />
-            </mesh>
-          )}
+          <mesh material={skin.material}>
+            <sphereGeometry args={[1.35, 64, 40]} />
+            {skin.aura === 'duct-tape' && <TapeX size={1.35} />}
+                </mesh>
         </Spinner>
       </group>
-      {skin.aura === 'rain-globe' && <RainGlobe anchor={anchor} color={color || SEAT_COLORS[seat]} size={1.35} />}
+      {skin.aura === 'duct-tape' && <Seep size={1.35} />}
     </group>
   );
 }
@@ -296,11 +295,10 @@ function CompileGate({ children, onReady }) {
 export default function ItemPreview({ itemId, seat = 0, color = null, replay = 0, onReady, timeScale = 1 }) {
   const slot = ITEMS[itemId]?.slot;
   const stage = slot === 'fx' || slot === 'trail';
-  const globeMarble = slot === 'marble' && skinKey(itemId) === 'unlucky';
   return (
-    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 3.8, 6.4] : globeMarble ? [0, 0.8, 10] : [0, 0.4, 6.2] }} onCreated={(state) => {
+    <Canvas key={stage ? 'stage' : 'item'} frameloop="never" dpr={[1, 2]} camera={{ fov: 32, position: stage ? [0, 3.8, 6.4] : [0, 0.4, 6.2] }} onCreated={(state) => {
         tuneRenderer(state);
-        state.camera.lookAt(0, stage ? 0.9 : globeMarble ? 0.7 : 0, 0);
+        state.camera.lookAt(0, stage ? 0.9 : 0, 0);
       }} gl={{ alpha: true, antialias: true }} resize={{ offsetSize: true }} events={() => ({ enabled: false, priority: 1, handlers: {} })}>
       <FrameCap />
       <Lights shadowSize={stage ? 1024 : 512} extent={stage ? 7 : 4} />

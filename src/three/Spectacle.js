@@ -1125,7 +1125,7 @@ function WaterBeads({ bus, clip = null, timeScale = 1 }) {
   const meshes = useRef([]);
   const geometry = useMemo(() => new THREE.SphereGeometry(1, 16, 10), []);
   const materials = useMemo(() => state.map(() => {
-    const m = new THREE.MeshPhysicalMaterial({ color: '#a6d4e2', metalness: 0.06, roughness: 0.035, clearcoat: 1, clearcoatRoughness: 0.02, transparent: true, opacity: 0.9, depthWrite: false });
+    const m = new THREE.MeshPhysicalMaterial({ color: '#cfeef7', metalness: 0.1, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0.01, envMapIntensity: 2.2, transparent: true, opacity: 0.95, depthWrite: false });
     clipToBoard(m, clip);
     return m;
   }), [state, clip]);

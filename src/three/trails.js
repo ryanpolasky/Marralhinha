@@ -235,7 +235,7 @@ const TRAILS = {
     const dripY = Math.max(0.26, y + 0.38);
     emit('spr', { position: [p[0], dripY, p[2]], n: n % 2 ? 1 : 2, tile: TILE.streak, c: ['#d7edf3', '#a8d4e0'], add: false, speed: 0.04, up: -0.32, uj: 0.12, size: 0.34, size2: 0.045, life: 0.58, grav: 0.15, drag: 0.5, a: 0.94 });
     emit('spr', { position: [p[0], dripY - 0.04, p[2]], n: 1, tile: TILE.drop, c: ['#e9f7fa'], add: false, speed: 0.03, up: -0.3, uj: 0.05, size: 0.14, size2: 0.08, life: 0.55, grav: 0.1, a: 0.96 });
-    if (n % 2 === 0) emit('bead', { position: [p[0], 0.09, p[2]], life: 3, size: 0.075 + (n % 3) * 0.012 });
+    if (n % 2 === 0) emit('bead', { position: [p[0], 0.09, p[2]], life: 3, size: 0.12 + (n % 3) * 0.02 });
   },
   wild: (emit, p, { n, prev, bumps = [] }) => {
     const from = prev || p;

@@ -81,7 +81,7 @@
     { "id": "marble.dev", "slot": "marble", "name": "Singularity", "rarity": "exclusive", "tag": "dev", "desc": "A pocket black hole. Light bends around it, and its disk burns in your seat color." },
     { "id": "marble.supporter", "slot": "marble", "name": "Tideglass", "rarity": "exclusive", "tag": "supporter", "desc": "A piece of the Atlantic polished by time. Its center glows with your seat color through layers of deep sea glass." },
     { "id": "marble.lucky", "slot": "marble", "name": "Molten", "rarity": "exclusive", "tag": "lucky", "desc": "Rivers of molten gold flowing through your color of glass. Part of the Luckiest set." },
-    { "id": "marble.unlucky", "slot": "marble", "name": "Rain Globe", "rarity": "exclusive", "tag": "unlucky", "desc": "A storm in your color. Part of the Unluckiest set." },
+    { "id": "marble.unlucky", "slot": "marble", "name": "Duct Taped", "rarity": "exclusive", "tag": "unlucky", "desc": "Good as new. Part of the Unluckiest set." },
     {"id": "marble.train", "slot": "marble", "name": "Signal Lamp", "rarity": "mythic", "set": "train", "desc": "Your color, lit from inside and set in chrome. Proceed."},
     {"id": "marble.wild", "slot": "marble", "name": "Gotcha Ball", "rarity": "mythic", "set": "wild", "desc": "Snap the button, hear the click. Fits in your pocket."},
 

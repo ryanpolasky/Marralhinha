@@ -24,13 +24,13 @@ const LEAD = new THREE.MeshStandardMaterial({ color: '#6b7075', metalness: 0.85,
 const _down = new THREE.Vector3();
 const _inv = new THREE.Quaternion();
 export const HALF_FULL_ACRYLIC = new THREE.MeshPhysicalMaterial({
-  color: '#c9e0e7',
+  color: '#f2fbfd',
   transparent: true,
   opacity: 0.16,
-  roughness: 0.08,
+  roughness: 0.04,
   clearcoat: 1,
   clearcoatRoughness: 0.035,
-  envMapIntensity: 1.6,
+  envMapIntensity: 2.6,
   depthWrite: false,
 });
 
@@ -39,19 +39,37 @@ export function HalfFullWater({ orientation, state, size = SIZE }) {
   const bubbles = useRef([]);
   const planeState = useRef({ tiltX: 0, tiltZ: 0, vx: 0, vz: 0, lastLanding: -10 });
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), []);
-  const material = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#627f8b',
-    transparent: true,
-    opacity: 0.84,
-    roughness: 0.12,
-    metalness: 0.04,
-    clearcoat: 0.85,
-    clearcoatRoughness: 0.12,
-    side: THREE.BackSide,
-    clippingPlanes: [plane],
-    depthWrite: false,
-  }), [plane]);
-  const waterGeometry = useMemo(() => new THREE.BoxGeometry(size * 0.82, size * 0.82, size * 0.82), [size]);
+  const planeUniform = useMemo(() => ({ value: new THREE.Vector4() }), []);
+  const material = useMemo(() => {
+    const m = new THREE.MeshPhysicalMaterial({
+      color: '#2f8fb8',
+      roughness: 0.08,
+      side: THREE.DoubleSide,
+      clippingPlanes: [plane],
+    });
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uPlane = planeUniform;
+      shader.uniforms.uDepth = { value: size * 0.8 };
+      shader.uniforms.uDeep = { value: new THREE.Color('#1c6890') };
+      shader.uniforms.uShallow = { value: new THREE.Color('#78c2da') };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWaterWorld;\nuniform vec4 uPlane;\nuniform float uDepth;\nuniform vec3 uDeep;\nuniform vec3 uShallow;')
+        .replace('#include <opaque_fragment>', `float ndv = abs(dot(normalize(normal), normalize(vViewPosition)));
+          float lit = clamp(dot(totalDiffuse, vec3(1.0)) / max(dot(diffuseColor.rgb, vec3(1.0)), 0.001), 0.0, 1.2);
+          float wd = clamp(abs(dot(uPlane.xyz, vWaterWorld) + uPlane.w) / uDepth, 0.0, 1.0);
+          vec3 body = uDeep * (0.68 + 0.32 * lit) * mix(1.08, 0.72, wd);
+          body = mix(body, uShallow, pow(1.0 - ndv, 3.0) * 0.5);
+          outgoingLight = body + totalSpecular;
+          #include <opaque_fragment>
+          if (!gl_FrontFacing) gl_FragColor = vec4(mix(uDeep, uShallow, 0.3), 1.0);`);
+    };
+    m.customProgramCacheKey = () => 'half-full-water';
+    return m;
+  }, [plane, planeUniform, size]);
+  const waterGeometry = useMemo(() => new RoundedBoxGeometry(size * 0.86, size * 0.86, size * 0.86, 5, size * 0.11), [size]);
   const surfaceGeometry = useMemo(() => new THREE.PlaneGeometry(size * 0.78, size * 0.78), [size]);
   const worldQ = useMemo(() => new THREE.Quaternion(), []);
   const previousQ = useRef(new THREE.Quaternion());
@@ -60,6 +78,8 @@ export function HalfFullWater({ orientation, state, size = SIZE }) {
   const worldNormal = useMemo(() => new THREE.Vector3(), []);
   const worldPos = useMemo(() => new THREE.Vector3(), []);
   const surfaceQ = useMemo(() => new THREE.Quaternion(), []);
+  const tangentA = useMemo(() => new THREE.Vector3(), []);
+  const tangentB = useMemo(() => new THREE.Vector3(), []);
   const inverseQ = useMemo(() => new THREE.Quaternion(), []);
   const previousQuatReady = useRef(false);
   const planePoint = useMemo(() => new THREE.Vector3(), []);
@@ -111,25 +131,31 @@ export function HalfFullWater({ orientation, state, size = SIZE }) {
     worldNormal.copy(localNormal).applyQuaternion(worldQ).normalize();
     planePoint.copy(worldPos).addScaledVector(worldNormal, size * 0.035);
     plane.setFromNormalAndCoplanarPoint(worldNormal, planePoint);
+    planeUniform.value.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
     if (surfaceRef.current) {
       surfaceRef.current.position.copy(localNormal).multiplyScalar(size * 0.035);
       surfaceQ.setFromUnitVectors(planeUp, localNormal);
       surfaceRef.current.quaternion.copy(surfaceQ);
       surfaceRef.current.material.opacity = 0.56 + Math.sin(clock.t * 2.5) * 0.035;
     }
+    tangentA.set(Math.abs(localNormal.x) > 0.9 ? 0 : 1, 0, Math.abs(localNormal.x) > 0.9 ? 1 : 0);
+    tangentA.addScaledVector(localNormal, -tangentA.dot(localNormal)).normalize();
+    tangentB.crossVectors(localNormal, tangentA);
     bubbles.current.forEach((bubble, i) => {
       if (!bubble) return;
-      const phase = (clock.t * 0.35 + i * 0.31) % 1;
-      bubble.position.set((i - 1) * size * 0.12, (phase - 0.76) * size * 0.42, (i % 2 ? 1 : -1) * size * 0.1);
-      bubble.visible = phase < 0.78;
-      bubble.scale.setScalar(size * (0.025 + 0.012 * (i % 2)));
+      const phase = (clock.t * 0.3 + i * 0.37) % 1;
+      bubble.position.copy(localNormal).multiplyScalar(size * 0.022)
+        .addScaledVector(tangentA, (i - 1) * size * 0.15 + Math.sin(clock.t * 0.7 + i * 2) * size * 0.03)
+        .addScaledVector(tangentB, (i % 2 ? 1 : -1) * size * 0.11);
+      bubble.visible = phase < 0.85;
+      bubble.scale.setScalar(size * (0.018 + 0.01 * (i % 2)) * Math.min(1, phase * 6));
     });
   });
   return (
     <group>
       <mesh geometry={waterGeometry} material={material} renderOrder={1} />
-      <mesh ref={surfaceRef} geometry={surfaceGeometry} position-y={-size * 0.035} renderOrder={2}>
-        <meshPhysicalMaterial color="#a8c7d0" transparent opacity={0.58} roughness={0.08} clearcoat={1} side={THREE.DoubleSide} depthWrite={false} />
+      <mesh ref={surfaceRef} geometry={surfaceGeometry} position-y={-size * 0.035} renderOrder={2} visible={false}>
+        <meshPhysicalMaterial color="#9fe0f2" transparent opacity={0.58} roughness={0.08} clearcoat={1} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       {Array.from({ length: 3 }, (_, i) => (
         <mesh key={i} ref={(m) => { bubbles.current[i] = m; }} visible={false} renderOrder={2}>
