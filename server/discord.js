@@ -129,7 +129,7 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
   const { luckiestWebhookUrl, clientUrl } = config();
   if (!luckiestWebhookUrl) return false;
   const ping = await isGuildMember(discordId).catch((err) => {
-    console.error('[luckiest webhook]', err);
+    console.error('[luckiest shoutout]', err);
     return false;
   });
   const who = ping ? `${escapeMarkdown(name)} (<@${discordId}>)` : escapeMarkdown(name);
@@ -143,8 +143,25 @@ async function announceLuckiest({ name, discordId, monthName, rolls, sixes }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, allowed_mentions: ping ? { parse: [], users: [discordId] } : { parse: [] } }),
   });
-  if (!res.ok) throw new Error(`Luckiest webhook failed (${res.status})`);
+  if (!res.ok) throw new Error(`Luckiest shoutout failed (${res.status})`);
   return true;
 }
 
-module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement, isGuildMember, announceLuckiest };
+// Holding a Gateway connection is the only way a bot shows online; intents 0 means Discord sends it no events
+function connectGateway() {
+  const { botToken } = config();
+  if (!botToken) return null;
+  const { WebSocketManager, WebSocketShardEvents } = require('@discordjs/ws');
+  const { REST } = require('@discordjs/rest');
+  const manager = new WebSocketManager({
+    token: botToken,
+    intents: 0,
+    rest: new REST().setToken(botToken),
+    initialPresence: { status: 'online', since: null, afk: false, activities: [{ name: 'Marralhinha', type: 0 }] },
+  });
+  manager.on(WebSocketShardEvents.Error, ({ error }) => console.error('[discord gateway]', error));
+  manager.connect().catch((err) => console.error('[discord gateway]', err));
+  return manager;
+}
+
+module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };

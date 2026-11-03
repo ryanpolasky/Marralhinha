@@ -79,7 +79,7 @@ const announceLucky = (change) => {
     const user = accounts.getUser(id);
     if (!user?.name) continue;
     io.emit('luckiest:change', `${user.name} won Luckiest for ${monthName}!`);
-    discord.announceLuckiest({ name: user.name, discordId: user.discord_id, monthName, rolls, sixes }).catch((err) => console.error('[luckiest webhook]', err));
+    discord.announceLuckiest({ name: user.name, discordId: user.discord_id, monthName, rolls, sixes }).catch((err) => console.error('[luckiest shoutout]', err));
   }
   if (holder !== previous && holder) {
     const name = accounts.getUser(holder)?.name;
@@ -396,3 +396,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, process.env.HOST, () => console.log(`Marralhinha server listening on http://${process.env.HOST || 'localhost'}:${PORT}`));
+discord.connectGateway();

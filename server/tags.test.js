@@ -283,7 +283,7 @@ test('a new month resets the race and crowns last month\'s champion with a rewar
   assert.equal(accounts.publicCard(accounts.getUser(a.id)).lucky.pending, undefined);
 });
 
-test('month-end Luckiest webhook pings the champion only when they are in the Discord server', async () => {
+test('month-end Luckiest shoutout pings the champion only when they are in the Discord server', async () => {
   const env = ['DISCORD_BOT_TOKEN', 'DISCORD_GUILD_ID', 'DISCORD_LUCKIEST_WEBHOOK_URL', 'CLIENT_URL'];
   const previous = env.map((key) => process.env[key]);
   const originalFetch = global.fetch;
@@ -299,6 +299,7 @@ test('month-end Luckiest webhook pings the champion only when they are in the Di
         assert.equal(options.headers.Authorization, 'Bot test-bot-token');
         return { ok: url.endsWith(member), status: url.endsWith(member) ? 200 : 404 };
       }
+      assert.equal(url, 'https://discord.test/hook');
       posts.push(JSON.parse(options.body));
       return { ok: true, status: 204 };
     };
