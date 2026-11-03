@@ -1,3 +1,5 @@
+const catalog = require('../src/shared/cosmetics.json');
+const { inSeason } = require('../src/shared/seasons');
 const API = 'https://discord.com/api/v10';
 
 const config = () => ({
@@ -53,12 +55,12 @@ const skuConfigured = (skuId) => {
   const { clientId, botToken } = config();
   return Boolean(/^\d{17,20}$/.test(clientId) && botToken && /^\d{17,20}$/.test(skuId));
 };
-// The Halloween Pack can only be bought during October (UTC); owners keep it forever
-const halloweenOpen = (now = Date.now()) => new Date(now).getUTCMonth() === 9;
+// Seasonal packs are only sold inside their tag's season; owners keep them forever
+const packOpen = (kind, now = Date.now()) => inSeason(catalog.tags[kind]?.season, now);
 
 const PACKS = {
   supporter: { sku: 'supporterSkuId', name: 'Supporter', checkoutName: 'Supporter', linkPrompt: 'to support the game' },
-  halloween: { sku: 'halloweenSkuId', name: 'Halloween', checkoutName: 'Halloween', linkPrompt: 'to get the Halloween Pack', open: halloweenOpen },
+  halloween: { sku: 'halloweenSkuId', name: 'Halloween', checkoutName: 'Halloween', linkPrompt: 'to get the Halloween Pack' },
   painter: { sku: 'painterSkuId', name: 'Painter', checkoutName: 'Painter Pack', linkPrompt: 'to get the Painter Pack' },
 };
 
@@ -164,4 +166,4 @@ function connectGateway() {
   return manager;
 }
 
-module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, halloweenOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };
+module.exports = { PACKS, config, isEnabled, authorizeUrl, exchangeCode, fetchUser, redirectUri, linkedRoleRedirectUri, updateRoleConnection, packConfigured, packEntitlement, supporterConfigured, supporterEntitlement, halloweenConfigured, halloweenEntitlement, packOpen, activeEntitlement, isGuildMember, announceLuckiest, connectGateway };
