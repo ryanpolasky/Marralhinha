@@ -9,6 +9,7 @@ export default function useFitPanel(active, contentKey, { maxWidth = 880, reserv
     const screen = screenRef.current;
     const panel = panelRef.current;
     if (!screen || !panel) return undefined;
+    panel.setAttribute('data-fit-self', '');
     let frame;
     const measure = () => {
       const bar = reserveBar ? document.querySelector('.account-bar') : null;
@@ -36,7 +37,7 @@ export default function useFitPanel(active, contentKey, { maxWidth = 880, reserv
       const bar = document.querySelector('.account-bar');
       if (bar) observer?.observe(bar);
     }
-    return () => { window.removeEventListener('resize', schedule); observer?.disconnect(); cancelAnimationFrame(frame); };
+    return () => { panel.removeAttribute('data-fit-self'); window.removeEventListener('resize', schedule); observer?.disconnect(); cancelAnimationFrame(frame); };
   }, [active, contentKey, maxWidth, reserveBar, bottom]);
 
   return [screenRef, panelRef];
