@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { SEAT_COLORS, CENTER, layoutFor } from '../game/geometry';
 import { PING_LIFE_MS } from '../game/moves';
 import { makeLabelTexture } from './textures';
+import { useRainbow } from '../game/rainbow';
 
 const DEV_COLOR = '#ffffff';
 const DANGER = '#ff3b3b';
@@ -22,7 +23,7 @@ export function snapToSpot(x, z, layout = layoutFor('classic')) {
   return best || [x, z];
 }
 
-const colorOf = (ping) => (ping.seat === null ? DEV_COLOR : SEAT_COLORS[ping.seat].main);
+const colorOf = (ping, palette) => (ping.seat === null ? DEV_COLOR : (palette?.[ping.seat] || SEAT_COLORS[ping.seat]).main);
 
 function labelFor(ping, teams) {
   if (ping.type === 'ack') return `${ping.name}: on it!`;
@@ -31,16 +32,17 @@ function labelFor(ping, teams) {
   return teams && ping.scope === 'all' && !ping.dev ? `${text} (all)` : text;
 }
 
-function Ping({ ping, teams }) {
+function Ping({ ping, teams, palette, base }) {
   const group = useRef();
   const arrow = useRef();
   const rings = useRef();
   const label = useRef();
-  const color = colorOf(ping);
+  const color = colorOf(ping, palette);
+  const labelColor = colorOf(ping, base);
   const team = ping.seat !== null && ping.scope === 'team';
   const danger = ping.type === 'danger';
   const ack = ping.type === 'ack';
-  const texture = useMemo(() => makeLabelTexture(labelFor(ping, teams), danger ? DANGER : color), [ping, teams, danger, color]);
+  const texture = useMemo(() => makeLabelTexture(labelFor(ping, teams), danger ? DANGER : labelColor), [ping, teams, danger, labelColor]);
   useEffect(() => () => texture.dispose(), [texture]);
   const born = useRef(null);
 
@@ -102,6 +104,7 @@ function Ping({ ping, teams }) {
   );
 }
 
-export default function Pings({ pings = [], teams = false }) {
-  return pings.map((ping) => <Ping key={ping.id} ping={ping} teams={teams} />);
+export default function Pings({ pings = [], teams = false, colors = SEAT_COLORS }) {
+  const palette = useRainbow(colors);
+  return pings.map((ping) => <Ping key={ping.id} ping={ping} teams={teams} palette={palette} base={colors} />);
 }

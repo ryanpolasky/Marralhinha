@@ -37,6 +37,7 @@ export function startPanelFit() {
     queued = false;
     reset = false;
     document.querySelectorAll(PANELS).forEach((el) => {
+      if (el.hasAttribute('data-fit-self')) return;
       if (!seen.has(el)) {
         seen.add(el);
         ro.observe(el);

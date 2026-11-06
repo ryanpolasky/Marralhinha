@@ -274,14 +274,16 @@ function Turntable({ viewSeat, children }) {
   return <group ref={ref}>{children}</group>;
 }
 
-function useWinFireworks(board) {
+function useWinFireworks(board, palette) {
   const wasOver = useRef(board.phase === 'over');
+  const paletteRef = useRef(palette);
+  paletteRef.current = palette;
   useEffect(() => {
     const over = board.phase === 'over';
     const started = over && !wasOver.current;
     wasOver.current = over;
     if (!started) return undefined;
-    const colors = board.winners.flatMap((s) => [SEAT_COLORS[s].main, SEAT_COLORS[s].light]).concat('#ffd166', '#ffffff');
+    const colors = board.winners.flatMap((s) => [(paletteRef.current?.[s] || SEAT_COLORS[s]).main, (paletteRef.current?.[s] || SEAT_COLORS[s]).light]).concat('#ffd166', '#ffffff');
     let count = 0;
     const timer = setInterval(() => {
       count += 1;
@@ -493,7 +495,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
     document.body.style.cursor = '';
   }, [movesKey]);
 
-  useWinFireworks(board);
+  useWinFireworks(board, seatColors);
   useEffect(() => {
     if (mode !== 'game') fx.clear();
   }, [mode]);
@@ -553,7 +555,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
         <StartWarmer prep={board.startPrep} skin={cosmetics[board.boardSeat]?.board} onWarm={onStuntWarm} />
         <StaticWarmer />
-        <Pings pings={pings} teams={teams} />
+        <Pings pings={pings} teams={teams} colors={seatColors} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} />
       </Turntable>
