@@ -7815,7 +7815,8 @@ select.admin-input optgroup {
   flex: none;
   width: 230px;
   height: 230px;
-  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.55));
+  border-radius: 50%;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
 }
 
 .start-wheel {
@@ -7823,8 +7824,30 @@ select.admin-input optgroup {
   inset: 0;
   border-radius: 50%;
   border: 6px solid #fff6e8;
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.35);
   will-change: transform;
+}
+
+.start-wheel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.start-wheel-rainbow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #f06494;
+  animation: start-wheel-hue 10s linear infinite;
+  will-change: filter;
+}
+
+@keyframes start-wheel-hue {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
 }
 
 .start-wheel-hub {

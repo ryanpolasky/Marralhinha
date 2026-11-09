@@ -164,12 +164,30 @@ function statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, loc
     : { title: `${nameOf(turn)} rolled a ${game.die}`, sub: `Thinking…${helpText}` };
 }
 
-// Intro card for a fresh game: a wheel that lands on the starter, or a "champion starts" card after a rematch
+export const StartWheel = React.memo(function StartWheel({ contenders, palette, target, spun, landed, elapsedAtMount }) {
+  const slice = 360 / contenders.length;
+  const stops = contenders.map((s, i) => `${palette[s]?.rainbow ? 'transparent' : (palette[s] || SEAT_COLORS[s]).main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
+  const delay = useRef(`-${Date.now() % 10000}ms`).current;
+  return (
+    <div className="start-wheel-wrap">
+      <span className="start-wheel-pointer" />
+      <div className="start-wheel" aria-hidden="true" style={{ background: `conic-gradient(${stops})`, transform: `rotate(${spun ? target : 0}deg)`, transition: spun && !landed ? `transform ${Math.max(0, START_WHEEL_SPIN_MS - elapsedAtMount)}ms cubic-bezier(0.2, 0.45, 0.22, 1)` : 'none' }}>
+        {contenders.map((s, i) => palette[s]?.rainbow && <span key={s} className="start-wheel-rainbow" style={{ maskImage: `conic-gradient(transparent 0deg ${i * slice}deg, #000 ${i * slice}deg ${(i + 1) * slice}deg, transparent ${(i + 1) * slice}deg 360deg)`, animationDelay: delay }} />)}
+      </div>
+      <span className="start-wheel-hub" />
+    </div>
+  );
+});
+
+function StartCard({ color: base, children }) {
+  const color = useRainbowColor(base);
+  return <div className="start-card" style={{ '--seat': color.main, '--seat-light': color.light }}>{children}</div>;
+}
+
 function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   const { pick } = game;
   const wheel = pick.reason === 'wheel';
-  const prep = !!game.startPrep;
-  const elapsedAtMount = useRef(prep ? 0 : Date.now() - pick.t).current;
+  const elapsedAtMount = useRef(Date.now() - pick.t).current;
   const [spun, setSpun] = useState(elapsedAtMount >= START_WHEEL_SPIN_MS);
   const [landed, setLanded] = useState(!wheel || elapsedAtMount >= START_WHEEL_SPIN_MS);
   const contenders = game.active;
@@ -180,7 +198,7 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
   const target = 360 * 5 - (index * slice + slice / 2) + wobble;
 
   useEffect(() => {
-    if (!wheel || prep || elapsedAtMount >= START_WHEEL_SPIN_MS) return undefined;
+    if (!wheel || elapsedAtMount >= START_WHEEL_SPIN_MS) return undefined;
     const spin = requestAnimationFrame(() => setSpun(true));
     const elapsed = Date.now() - pick.t;
     const land = setTimeout(() => {
@@ -191,33 +209,25 @@ function StartIntro({ game, seats, mySeat, nameOf, onDismiss }) {
       cancelAnimationFrame(spin);
       clearTimeout(land);
     };
-  }, [wheel, prep, pick.t, elapsedAtMount]);
+  }, [wheel, pick.t, elapsedAtMount]);
 
   const palette = game.colors || SEAT_COLORS;
-  const livePalette = useRainbow(contenders.map((s) => palette[s] || SEAT_COLORS[s]));
-  const stops = contenders.map((s, i) => `${livePalette[i].main} ${i * slice}deg ${(i + 1) * slice}deg`).join(', ');
-  const color = useRainbowColor(palette[pick.seat] || SEAT_COLORS[pick.seat]);
+  const color = palette[pick.seat] || SEAT_COLORS[pick.seat];
   const starter = nameOf(pick.seat);
   const boardSeat = game.boardSeat ?? pick.seat;
   const board = seats[boardSeat]?.cosmetics?.board;
   return (
     <div className={`start-intro${landed ? ' landed' : ''}`} aria-live="polite">
-      {wheel && (
-        <div className="start-wheel-wrap">
-          <span className="start-wheel-pointer" />
-          <div className="start-wheel" aria-hidden="true" style={{ background: `conic-gradient(${stops})`, transform: `rotate(${spun ? target : 0}deg)`, transition: spun && !landed ? `transform ${Math.max(0, START_WHEEL_SPIN_MS - elapsedAtMount)}ms cubic-bezier(0.2, 0.45, 0.22, 1)` : 'none' }} />
-          <span className="start-wheel-hub" />
-        </div>
-      )}
-      <div className="start-card" style={{ '--seat': color.main, '--seat-light': color.light }}>
+      {wheel && <StartWheel contenders={contenders} palette={palette} target={target} spun={spun} landed={landed} elapsedAtMount={elapsedAtMount} />}
+      <StartCard color={color}>
         <div className="start-kicker">{wheel ? (landed ? 'The wheel says' : 'Who starts?') : 'Champion starts'}</div>
         <div className="start-name">
           <span className={`marble-dot${color.rainbow ? ' rainbow' : ''}`} />
-          {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : prep ? 'Getting ready…' : 'Spinning…'}
+          {landed ? `${starter} start${pick.seat === mySeat ? '' : 's'}!` : 'Spinning…'}
         </div>
         {landed && <div className="start-sub">Playing on {boardSeat === mySeat ? 'your' : `${nameOf(boardSeat)}'s`} board{ITEMS[board] ? ` · ${ITEMS[board].name}` : ''}</div>}
-        {landed && !prep && <button type="button" className="btn secondary start-continue" onClick={onDismiss}>Continue</button>}
-      </div>
+        {landed && <button type="button" className="btn secondary start-continue" onClick={onDismiss}>Continue</button>}
+      </StartCard>
     </div>
   );
 }
@@ -1192,7 +1202,7 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
     );
   };
   const now = Date.now();
-  const shared = game.log.filter((entry) => (!entry.hold || (entry.t <= now && !game.startPrep)) && (!rollPending || entry.chat || entry.t < game.lastRoll.t));
+  const shared = game.log.filter((entry) => (!entry.hold || entry.t <= now) && (!rollPending || entry.chat || entry.t < game.lastRoll.t));
   const log = [...(room.chat || []), ...shared, ...teamLog].sort((a, b) => a.t - b.t).reverse();
   const entries = showLogs ? log : log.filter((entry) => entry.chat);
   const isMine = (entry) => (entry.from ? entry.from === playerId : entry.seat === mySeat);

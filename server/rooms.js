@@ -1,7 +1,7 @@
 const { randomBytes, randomInt } = require('crypto');
 const rules = require('../src/shared/rules');
 const { chooseMove } = require('../src/shared/bot');
-const { animationMs, START_WHEEL_SPIN_MS, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
+const { animationMs, TURN_SECONDS, TURN_SECONDS_DEFAULT } = require('../src/shared/timing');
 const { REACTION_KEYS } = require('../src/shared/reactions');
 const { STUNT_KINDS, rockyPath, rollStuntDice, nudgeStuntDice, stuntSeconds, stuntHoldMs } = require('../src/shared/stunts');
 const {
@@ -29,7 +29,6 @@ const AWAY_GRACE_MS = 20000;
 const IDLE_MISSES = 2;
 const IDLE_DELAY_MS = 2500;
 const STUNT_WARM_MAX_MS = 15000;
-const START_WARM_MAX_MS = 8000;
 // A disconnected host hands the host role to the next connected player after this long
 const HOST_HANDOFF_MS = 15000;
 const ROOM_TTL_MS = 15 * 60 * 1000;
@@ -594,7 +593,6 @@ class Room {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
     const game = this.game;
     if (!game || game.phase === 'over') throw new UserError('Start a game first');
-    if (game.startPrep) throw new UserError('The game is still loading');
     const real = (seat, marble) => game.active.includes(seat) && Number.isInteger(marble) && marble >= 0 && marble < game.marbles[seat].length;
     if (!real(by, byMarble) || !real(victim, victimMarble) || by === victim) throw new UserError('Pick a shooter and a victim');
     const now = Date.now();
@@ -616,7 +614,6 @@ class Room {
   pauseClock(userId) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
     if (!this.game || this.game.phase === 'over') throw new UserError('Start a game first');
-    if (this.game.startPrep) throw new UserError('The game is still loading');
     this.clockOffSeat = this.game.turn;
     this.changed();
   }
@@ -671,7 +668,6 @@ class Room {
     const game = this.game;
     if (!game || game.phase === 'over') throw new UserError('Start a game first');
     if (!STUNT_KINDS.includes(kind)) throw new UserError('Unknown bit');
-    if (game.startPrep) throw new UserError('The game is still loading');
     const now = Date.now();
     const still = (a, b) => a.zone === b.zone && a.idx === b.idx && a.slot === b.slot;
     // Rocky celebrates until cut, unless the game has since moved its marble for real
@@ -703,17 +699,14 @@ class Room {
   }
   stuntWarm(userId, socketId, id) {
     if (!this.findViewer(userId)) throw new UserError('You are not in this room');
-    if (this.game?.stuntPrep?.id !== id && this.game?.startPrep?.id !== id) return;
+    if (this.game?.stuntPrep?.id !== id) return;
     this.warmSockets.add(socketId);
     this.checkWarm();
   }
   checkWarm() {
-    const game = this.game;
-    if (!game?.stuntPrep && !game?.startPrep) return;
+    if (!this.game?.stuntPrep) return;
     const sockets = [...this.seats.filter((p) => p && !p.isBot), ...this.spectators.values()].flatMap((p) => (p.connected ? [...p.sockets] : []));
-    if (!sockets.every((id) => this.warmSockets.has(id))) return;
-    if (game.startPrep) this.playStart();
-    else this.playPrep();
+    if (sockets.every((id) => this.warmSockets.has(id))) this.playPrep();
   }
   playPrep() {
     clearTimeout(this.prepTimer);
@@ -860,34 +853,6 @@ class Room {
     // disconnected), plus rolls/sixes/captures someone else made for this seat, which never count towards its stats
     this.game.played = [0, 1, 2, 3].map(() => ({ rolls: 0, botRolls: 0, coveredRolls: 0, coveredSixes: 0, coveredCaptures: 0 }));
     this.humansAtStart = humans.length;
-    this.prepStart();
-  }
-
-  // Same ready-check as the heavy bits: the game exists but the wheel stays parked until every
-  // connected screen says it finished compiling, so the spin never stutters
-  prepStart() {
-    const game = this.game;
-    if (!game?.pick) return;
-    game.startPrep = { id: newId() };
-    this.warmSockets = new Set();
-    clearTimeout(this.startTimer);
-    this.startTimer = setTimeout(() => this.playStart(), START_WARM_MAX_MS);
-  }
-  playStart() {
-    clearTimeout(this.startTimer);
-    const game = this.game;
-    if (!game?.startPrep) return;
-    delete game.startPrep;
-    // The intro clock starts at go, not at the click, so nobody joins a half-spun wheel
-    const t = Date.now();
-    game.startedAt = t;
-    if (game.pick) {
-      game.pick.t = t;
-      game.log.forEach((e) => {
-        if (e.hold) e.t = t + START_WHEEL_SPIN_MS;
-      });
-    }
-    this.changed();
   }
 
   pickStarter() {
@@ -939,7 +904,6 @@ class Room {
   }
 
   doRematch() {
-    clearTimeout(this.startTimer);
     this.lastWinners = this.game.winners?.map((s) => this.seats[s]?.id).filter(Boolean) || [];
     this.game = null;
     this.diceSnapshot = null;
@@ -988,7 +952,6 @@ class Room {
 
   roll(userId) {
     const kind = this.requireTurn(userId);
-    if (this.game.startPrep) throw new UserError('The game is still loading');
     if (this.game.phase !== 'roll') throw new UserError('Pick a marble to move first');
     const seat = this.game.turn;
     rules.roll(this.game, secureDie);
@@ -997,7 +960,6 @@ class Room {
   }
 
   move(userId, moveId) {
-    if (this.game?.startPrep) throw new UserError('The game is still loading');
     const diceStunt = this.liveDiceStunt();
     if (diceStunt) {
       if (!this.findViewer(userId)) throw new UserError('You are not in this room');
@@ -1221,13 +1183,13 @@ class Room {
     const cover = player ? this.coverFor(game.turn) : null;
     if (this.clockOffSeat !== game?.turn) this.clockOffSeat = null;
     const bit = game?.stunts?.[0];
-    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused, bit?.id, bit?.cutAt, game.stuntPrep?.id, game.startPrep?.id].join('|');
+    const key = player && [game.turn, game.phase, game.lastRoll?.t, game.lastMove?.t, player.id, player.isBot, player.connected, player.idle, player.away, cover?.id, this.clockOffSeat, this.paused, bit?.id, bit?.cutAt, game.stuntPrep?.id].join('|');
     if (key && key === this.timerKey && this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
     this.timerKey = key;
     this.turnDeadline = null;
-    if (!player || this.paused || this.liveDiceStunt() || game.stuntPrep || game.startPrep) return;
+    if (!player || this.paused || this.liveDiceStunt() || game.stuntPrep) return;
     const human = !player.isBot;
     // Waiting on a person: the player themselves, or their partner covering while they're away
     const waiting = human && (cover || (player.connected && !player.idle && !player.away));
@@ -1281,7 +1243,6 @@ class Room {
   dispose() {
     clearTimeout(this.timer);
     clearTimeout(this.prepTimer);
-    clearTimeout(this.startTimer);
     clearTimeout(this.pauseTimer);
     this.cancelHostHandoff();
     this.banterTimers.forEach(clearTimeout);

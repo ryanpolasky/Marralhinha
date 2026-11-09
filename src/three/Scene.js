@@ -17,7 +17,6 @@ import { quality as defaultQuality, antialiasFor, tuneRenderer } from './quality
 import FrameCap from './FrameCap';
 import useMedia, { PHONE_QUERY } from '../components/useMedia';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
-import { warmBoardSkin } from '../game/skinWarm';
 import { TouchPicker, pickAt, touchClaimed } from './touchPick';
 
 const BG = '#0b1f24';
@@ -46,7 +45,7 @@ const PORTRAIT_FIT = 31;
 const PORTRAIT_ELEVATION = 0.98;
 const RAILS_FIT = 28.5;
 
-function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
+function CameraRig({ mode, resetKey, spinning, locked, onOffView, onSettled, layout }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
@@ -58,8 +57,11 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
   const tween = useRef(null);
   const home = useRef(null);
   const offView = useRef(false);
+  const settled = useRef(false);
 
   useEffect(() => {
+    settled.current = false;
+    onSettled(false);
     const aspect = size.width / size.height;
     const game = mode === 'game';
     // Round the table: straight down, with the board kept clear of the HUD bars on every edge of the short side
@@ -84,7 +86,7 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
     controls.enabled = game;
-  }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout]);
+  }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout, onSettled]);
 
   // The dev hit: a slow push in on a point of the board, a cinematic orbit around it after the shot, then home
   const orbit = useRef(null);
@@ -238,6 +240,11 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, layout }) {
     controls.target.y = f ? 0.55 : o ? o.target.y : 0;
     controls.autoRotate = !o && !f && (mode !== 'game' || spinning);
     controls.update();
+
+    if (!settled.current && !tween.current && !o && !f && Math.abs(goal - l.shift) <= 0.05) {
+      settled.current = true;
+      onSettled(true);
+    }
 
     // Tell the HUD when you've wandered off the default view (panned, zoomed or orbited away), so it
     // can nudge the reset-camera button. Only reports changes, not every frame.
@@ -410,30 +417,6 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
-// While the server parks a fresh game on its ready-check: compile everything the first spin would
-// otherwise trip over (the live scene plus the starter's board skin), then report back
-function StartWarmer({ prep, skin, onWarm }) {
-  const { gl, camera, scene } = useThree();
-  const id = prep?.id;
-  useEffect(() => {
-    if (!id) return undefined;
-    let alive = true;
-    let compiled;
-    try {
-      compiled = gl.compileAsync ? gl.compileAsync(scene, camera) : Promise.resolve(gl.compile(scene, camera));
-    } catch {
-      compiled = Promise.resolve();
-    }
-    Promise.allSettled([compiled, skin ? warmBoardSkin(skin) : null]).then(() => {
-      if (alive) onWarm?.(id);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [id, skin, gl, scene, camera, onWarm]);
-  return null;
-}
-
 const TAP_MS = 280;
 const TAP_SLOP = 10;
 
@@ -475,6 +458,7 @@ function useTouchTaps(canvasRef, canRoll, onRoll) {
 }
 
 export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, devSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false, onStuntWarm }) {
+  const [cameraSettled, setCameraSettled] = useState(false);
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
   const pointer = useRef(null);
@@ -526,7 +510,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       onCreated={tuneRenderer}
     >
       <TouchPicker />
-      <FrameCap paused={paused} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors])} />
+      <FrameCap paused={paused && (mode !== 'game' || cameraSettled)} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors])} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />
@@ -553,13 +537,12 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <Hits hits={board.hits} board={board} layout={layout} />
         <Stunts stunts={board.stunts} prep={board.stuntPrep} onWarm={onStuntWarm} board={board} layout={layout} skins={cosmetics.map((c) => c?.marble)} colors={seatColors} />
         <LoadoutWarmer cosmetics={cosmetics} enabled={mode !== 'idle'} />
-        <StartWarmer prep={board.startPrep} skin={cosmetics[board.boardSeat]?.board} onWarm={onStuntWarm} />
         <StaticWarmer />
         <Pings pings={pings} teams={teams} colors={seatColors} />
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} layout={layout} />
+      <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} onSettled={setCameraSettled} layout={layout} />
     </Canvas>
   );
 }
