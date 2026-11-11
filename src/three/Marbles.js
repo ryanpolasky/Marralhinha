@@ -6,8 +6,9 @@ import { movesForMarble } from '../game/moves';
 import { sfx } from '../game/sound';
 import { marbleSkin } from './skins';
 import { SHADOW_ONLY, SingularityAura } from './Gravity';
-import { SolCorona } from './Corona';
+import { SolCorona, coronaProbe } from './Corona';
 import { TapeX, Seep } from './DuctTape';
+import { useWarmed } from './warm';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
 import { playKillFx } from './killfx';
@@ -572,12 +573,27 @@ function PathDots({ move, color = SEAT_COLORS[move.seat], layout }) {
   });
 }
 
-export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, devSeat = -1, layout = CLASSIC_LAYOUT }) {
+function skinProbes(list) {
+  const probes = new THREE.Group();
+  list.forEach((skin) => {
+    if (!skin) return;
+    const body = new THREE.Mesh(MARBLE_GEO, skin.aura === 'singularity' ? SHADOW_ONLY : skin.material);
+    body.castShadow = true;
+    probes.add(body);
+    if (skin.aura === 'corona') probes.add(coronaProbe());
+  });
+  return probes;
+}
+
+export default function Marbles({ board, skins = [], colors, killFx = [], trails = [], moves, selected, setSelected, hovered, setHovered, onMove, keyMove = null, mySeat = -1, devSeat = -1, layout = CLASSIC_LAYOUT, onSkinSwap }) {
   const basePalette = colors || board.colors || SEAT_COLORS;
   const palette = useRainbow(basePalette);
   const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
-  const materials = [0, 1, 2, 3].map((s) => marbleSkin(skins[s], s, basePalette[s]));
-  useFrame(({ clock }) => materials.forEach((m) => m.animate?.(clock.elapsedTime)));
+  const seated = (s) => board.active.includes(s);
+  const skinKeys = [0, 1, 2, 3].map((s) => (seated(s) ? `${skins[s] || ''}/${basePalette[s]?.main}/${basePalette[s]?.rainbow ? 1 : 0}` : ''));
+  // A seat's marbles keep their old skin until the new one is ready; a newly filled seat shows up once its skin is
+  const materials = useWarmed(skinKeys.join('|'), () => [0, 1, 2, 3].map((s) => (seated(s) ? marbleSkin(skins[s], s, basePalette[s]) : null)), skinProbes, onSkinSwap);
+  useFrame(({ clock }) => materials.forEach((m) => m?.animate?.(clock.elapsedTime)));
   const plans = useMemo(() => planMove(board.lastMove, board, layout, killFx), [board.lastMove, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = board.lastMove?.t;
   const focus = selected || hovered;
@@ -621,7 +637,7 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
         return <BaseDish key={`dish-${seat}`} seat={seat} layout={layout} onEnter={() => clickMarble(seat, marble, pos)} onHover={(on) => setHovered(on ? { seat, marble } : null)} />;
       })}
       {board.active.map((seat) =>
-        board.marbles[seat].map((pos, marble) => {
+        materials[seat] && board.marbles[seat].map((pos, marble) => {
           const key = `${seat}-${marble}`;
           const movable = movesForMarble(moves, seat, marble, pos).length > 0;
           return (

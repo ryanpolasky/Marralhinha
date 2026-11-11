@@ -12,6 +12,7 @@ import { skinKey } from '../game/catalog';
 import { TABLE_Y, DISH_BEVEL } from './Board';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
+import { useWarmed } from './warm';
 
 const SIZE = 0.85;
 const REST_Y = TABLE_Y + SIZE / 2;
@@ -224,14 +225,25 @@ function useDieAssets() {
   );
 }
 
-function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, showRollLabel = true, assets, layout }) {
-  const materials = diceSkin(skin);
+function DieBody({ seat, skin, color, spawnT, lastRoll, active, canRoll, onRoll, onGone, showRollLabel = true, assets, layout, onSkinSwap }) {
+  // The die and its extras (slug, water) change together, once the new skin is ready to draw
+  const { id: shownSkin, materials } = useWarmed(
+    skin || '',
+    () => ({ id: skin, materials: diceSkin(skin) }),
+    (next) => {
+      const probe = new THREE.Mesh(assets.geometry, next.materials);
+      probe.castShadow = true;
+      if (skinKey(next.id) === 'unlucky') probe.add(new THREE.Mesh(assets.geometry, HALF_FULL_ACRYLIC));
+      return probe;
+    },
+    onSkinSwap
+  );
   const ref = useRef();
   const orientation = useRef();
   const glow = useRef();
   const label = useRef();
-  const loaded = skinKey(skin) === 'loaded';
-  const halfFull = skinKey(skin) === 'unlucky';
+  const loaded = skinKey(shownSkin) === 'loaded';
+  const halfFull = skinKey(shownSkin) === 'unlucky';
   const anim = useRef(null);
   if (!anim.current) {
     const settled = !spawnT && lastRoll?.seat === seat;
@@ -575,7 +587,7 @@ function DiceStorm({ stunt, skin, color, assets, layout, onPickDie }) {
   );
 }
 
-export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, showRollLabel = true, layout = layoutFor('classic') }) {
+export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRoll, onRoll, onPickDie, skins = [], colors = null, devSeat = -1, showRollLabel = true, layout = layoutFor('classic'), onSkinSwap }) {
   const palette = useRainbow(colors);
   const tint = devSeat >= 0 ? palette?.[devSeat] || null : null;
   const assets = useDieAssets();
@@ -614,6 +626,7 @@ export default function Dice({ lastRoll, turn, stunts = [], idleSeat = 0, canRol
           showRollLabel={showRollLabel}
           assets={assets}
           layout={layout}
+          onSkinSwap={onSkinSwap}
         />
       ))}
     </>

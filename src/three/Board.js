@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { SEATS, SEAT_COLORS, CENTER, entryIdx, layoutFor } from '../game/geometry';
 import { makeLabelTexture } from './textures';
 import { boardSkin, animateBoardSkin, tintTable } from './skins';
-import { itemsForSlot, skinKey } from '../game/catalog';
+import { skinKey } from '../game/catalog';
 import DefuseProps from './DefuseProps';
 import PicnicProps from './PicnicProps';
 import MinecraftProps from './MinecraftProps';
@@ -15,6 +15,7 @@ import { onBoardSkinWarm } from '../game/skinWarm';
 import { fx } from './fx';
 import { sfx } from '../game/sound';
 import { useRainbow } from '../game/rainbow';
+import { linked, warmObject } from './warm';
 
 export const HOLE_R = 0.37;
 const CENTER_R = HOLE_R;
@@ -331,6 +332,8 @@ const WAVE_R = 13;
 
 // Program compile only needs the material, so a plane stands in for the real board mesh
 const WARM_GEO = new THREE.PlaneGeometry(1, 1);
+const LINK_CAP_MS = 4000;
+const boardMaterials = (mats) => [...new Set([...mats.surfaces, mats.side, mats.dishSide, mats.core, mats.cup, mats.brass].filter(Boolean))];
 export const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 900 }) : setTimeout(fn, 80));
 
 // Glowing shockwave that sweeps out from the center while the board skin changes underneath it
@@ -429,7 +432,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
   const [, propsBumped] = useState(0);
   useEffect(() => () => { mounted.current = false; }, []);
   const prepareSkin = useCallback(
-    async (id, upload = true) => {
+    async (id) => {
       const key = `${id}:${layout.spec.id}`;
       let mats;
       try {
@@ -440,11 +443,14 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
       if (!warmed.current.has(key)) {
         warmed.current.add(key);
         const scratch = new THREE.Scene();
-        mats.surfaces.forEach((m) => {
-          const probe = new THREE.Mesh(WARM_GEO, m);
-          probe.castShadow = probe.receiveShadow = true;
-          scratch.add(probe);
-        });
+        const probe = (m, instanced = false) => {
+          const mesh = instanced ? new THREE.InstancedMesh(WARM_GEO, m, 1) : new THREE.Mesh(WARM_GEO, m);
+          mesh.castShadow = mesh.receiveShadow = true;
+          scratch.add(mesh);
+        };
+        boardMaterials(mats).forEach((m) => probe(m));
+        // Cups and brass also sit in the instanced hole sets, which is its own program
+        [mats.cup, mats.brass].forEach((m) => probe(m, true));
         gl.compile(scratch, camera, scene);
       }
       const propsKey = table && BOARD_PROPS[skinKey(id)] ? skinKey(id) : null;
@@ -454,62 +460,22 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         if (!mounted.current) return;
         const group = propsGroups.current[propsKey];
-        if (group) {
-          // compile() traverses invisible objects too, so the hidden set's programs build against
-          // the real scene lights; textures upload while it's still hidden
-          gl.compile(scene, camera);
-          group.traverse((o) => {
-            const list = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
-            list.forEach((m) => Object.values(m).forEach((v) => v?.isTexture && gl.initTexture(v)));
-          });
-        }
+        // compile traverses invisible objects too, so the hidden set links against the real scene lights and uploads while still hidden
+        if (group) await warmObject(gl, scene, camera, group).catch(() => {});
+        if (!mounted.current) return;
       }
-      if (upload && !uploaded.current.has(key)) {
+      if (!uploaded.current.has(key)) {
         uploaded.current.add(key);
         mats.surfaces.forEach((m) => [m.map, m.emissiveMap].forEach((t) => t && gl.initTexture(t)));
       }
       // Best-effort wait for parallel shader compile; capped so an unmount can't spin forever
-      return new Promise((resolve) => {
-        let tries = 40;
-        const check = () => {
-          const pending = mats.surfaces.some((m) => {
-            const p = gl.properties?.get(m)?.currentProgram;
-            return p && p.isReady && !p.isReady();
-          });
-          if (!pending || --tries <= 0 || !mounted.current) return resolve();
-          setTimeout(check, 30);
-        };
-        check();
-      });
+      return Promise.race([linked(gl, boardMaterials(mats)), new Promise((r) => setTimeout(r, LINK_CAP_MS))]);
     },
     [gl, scene, camera, layout, table]
   );
 
-  // DOM pickers announce hover/open through the bridge; only the real table board answers
-  const warmAllAt = useRef(0);
-  useEffect(() => {
-    if (!table) return undefined;
-    let alive = true;
-    const off = onBoardSkinWarm((id) => {
-      if (id) return prepareSkin(id);
-      const now = Date.now();
-      if (now - warmAllAt.current < 30000) return undefined;
-      warmAllAt.current = now;
-      const queue = itemsForSlot('board').map((b) => b.id);
-      return new Promise((resolve) => {
-        const step = () => {
-          if (!alive || !queue.length) return resolve();
-          prepareSkin(queue.shift(), false);
-          idle(step);
-        };
-        idle(step);
-      });
-    });
-    return () => {
-      alive = false;
-      off();
-    };
-  }, [table, prepareSkin]);
+  // DOM pickers announce hover through the bridge; only the real table board answers
+  useEffect(() => (table ? onBoardSkinWarm((id) => id && prepareSkin(id)) : undefined), [table, prepareSkin]);
 
   const [shownSkin, wave] = useSkinTransition(skin, table, prepareSkin);
   const materials = useMemo(() => (shownSkin === null ? null : boardSkin(shownSkin, layout)), [shownSkin, layout]);

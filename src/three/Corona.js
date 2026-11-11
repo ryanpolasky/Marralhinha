@@ -41,6 +41,10 @@ const coronaMaterial = () =>
     toneMapped: false,
   });
 
+// Never disposed, so the corona program stays linked however many marbles come and go
+let probeMaterial = null;
+export const coronaProbe = () => new THREE.Mesh(PLANE, (probeMaterial ??= coronaMaterial()));
+
 export function SolCorona({ size = 0.335, color = SEAT_COLORS[0], seed = 0 }) {
   const mesh = useRef();
   const material = useMemo(coronaMaterial, []);

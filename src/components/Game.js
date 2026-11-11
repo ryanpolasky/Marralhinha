@@ -422,10 +422,6 @@ export function BoardPicker({ current, seats, colors, onPick, onSkin, onColor, g
     onBitStart?.();
   };
   const boards = itemsForSlot('board');
-  // Opening prebuilds every board on idle; hovering rushes just that one
-  useEffect(() => {
-    if (open) warmBoardSkin();
-  }, [open]);
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && setOpen(false);
@@ -1162,11 +1158,6 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
       document.title = APP_TITLE;
     };
   }, [needsMe]);
-
-  // Only Devs can swap the table mid-game, so only they prebuild every board; everyone else builds a skin when it's picked
-  useEffect(() => {
-    if (isAdmin) warmBoardSkin();
-  }, [isAdmin]);
 
   const status = statusFor({ game, seats, mySeat, nameOf, rollPending, startPending, local, stuck, handoff, table: !!room.table, paused, isAdmin });
   const badge = stuck ? game.lastRoll : game.phase === 'move' && !rollPending ? { die: game.die, seat: game.turn } : null;

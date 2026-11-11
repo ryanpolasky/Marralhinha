@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { SEAT_COLORS } from '../game/geometry';
 import { beamHum, fanfare, labBed, loadSample, playClip, sfx, stopFlashbang, ufoBed } from '../game/sound';
 import { muteMusic, unduckMusic } from '../game/music';
-import { FLASH, UFO, UFO_SCRIPT, liveStunt, rockyTiming, stuntClock } from '../game/stunts';
+import { FLASH, UFO, UFO_SCRIPT, liveStunt, rockyTiming, stuntClock } from '../game/stuntTiming';
 
 const SONG = 'gonna-fly-now';
 const WHITE_S = FLASH.white + FLASH.fade;
