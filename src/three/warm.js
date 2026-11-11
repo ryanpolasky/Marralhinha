@@ -5,9 +5,9 @@ const WARM_CAP_MS = 6000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const capped = (work) => Promise.race([work, sleep(WARM_CAP_MS)]).catch(() => {});
 
-const materialsOf = (root, visibleOnly = false) => {
+const materialsOf = (root) => {
   const found = new Set();
-  root[visibleOnly ? 'traverseVisible' : 'traverse']((o) => [o.material].flat().forEach((m) => m && found.add(m)));
+  root.traverse((o) => [o.material].flat().forEach((m) => m && found.add(m)));
   return [...found];
 };
 
@@ -36,13 +36,9 @@ async function settle(gl, materials) {
 // Builds programs against the live scene's lights, fog and env; compile traverses hidden objects too
 export function warmObject(gl, scene, camera, root) {
   gl.compile(root, camera, scene);
+  // Nothing links until the commands reach the GPU, and a paused table has no frames to carry them
+  gl.getContext().flush();
   return settle(gl, materialsOf(root));
-}
-
-// Same for the whole scene, but only what's on screen holds things up; hidden pools keep linking in the background
-export function warmVisible(gl, scene, camera) {
-  gl.compile(scene, camera);
-  return settle(gl, materialsOf(scene, true));
 }
 
 // What's shown trails what's wanted: a new value only lands once its probe has linked and uploaded, so a swap never stalls a frame
@@ -68,20 +64,4 @@ export function useWarmed(key, build, probe, onSwap) {
     };
   }, [key, gl, scene, camera]); // eslint-disable-line react-hooks/exhaustive-deps
   return shown.current.value;
-}
-
-// Holds the first frame until the scene can draw without blocking
-export function useSceneWarm() {
-  const gl = useThree((s) => s.gl);
-  const scene = useThree((s) => s.scene);
-  const camera = useThree((s) => s.camera);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    capped(Promise.resolve().then(() => warmVisible(gl, scene, camera))).then(() => alive && setReady(true));
-    return () => {
-      alive = false;
-    };
-  }, [gl, scene, camera]);
-  return ready;
 }

@@ -4,7 +4,8 @@ import { useWarmed } from './warm';
 
 const mockLink = { ready: true };
 const mockProgram = { isReady: () => mockLink.ready, getUniforms: jest.fn() };
-const mockGl = { compile: jest.fn(), initTexture: jest.fn(), properties: { get: () => ({ programs: new Map([['variant', mockProgram]]) }) } };
+const mockFlush = jest.fn();
+const mockGl = { getContext: () => ({ flush: mockFlush }), compile: jest.fn(), initTexture: jest.fn(), properties: { get: () => ({ programs: new Map([['variant', mockProgram]]) }) } };
 jest.mock('@react-three/fiber', () => ({ useThree: (select) => select({ gl: mockGl, scene: {}, camera: {} }) }));
 
 const skins = {
@@ -16,7 +17,7 @@ const tick = (ms) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 beforeEach(() => {
   mockLink.ready = true;
-  [mockGl.compile, mockGl.initTexture, mockProgram.getUniforms].forEach((fn) => fn.mockClear());
+  [mockGl.compile, mockGl.initTexture, mockProgram.getUniforms, mockFlush].forEach((fn) => fn.mockClear());
 });
 
 test('the first skin shows at once, a swap waits for its programs to link and its textures to upload', async () => {
@@ -29,6 +30,7 @@ test('the first skin shows at once, a swap waits for its programs to link and it
   rerender({ k: 'b' });
   await tick(60);
   expect(mockGl.compile).toHaveBeenCalledTimes(1);
+  expect(mockFlush).toHaveBeenCalledTimes(1);
   expect(result.current).toBe(skins.a);
   expect(mockProgram.getUniforms).not.toHaveBeenCalled();
 

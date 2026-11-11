@@ -452,6 +452,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
         // Cups and brass also sit in the instanced hole sets, which is its own program
         [mats.cup, mats.brass].forEach((m) => probe(m, true));
         gl.compile(scratch, camera, scene);
+        gl.getContext().flush();
       }
       const propsKey = table && BOARD_PROPS[skinKey(id)] ? skinKey(id) : null;
       if (propsKey && !mountedProps.current.has(propsKey)) {

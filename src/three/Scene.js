@@ -15,7 +15,6 @@ import { Lights } from './Stage';
 import { fx } from './fx';
 import { quality as defaultQuality, antialiasFor, tuneRenderer } from './quality';
 import FrameCap from './FrameCap';
-import { useSceneWarm } from './warm';
 import useMedia, { PHONE_QUERY } from '../components/useMedia';
 import { SEAT_COLORS, layoutFor } from '../game/geometry';
 import { TouchPicker, pickAt, touchClaimed } from './touchPick';
@@ -418,11 +417,6 @@ function usePingKeys(pointer, canPing, onPing, layout) {
   }, [pointer, canPing, onPing, layout]);
 }
 
-function Loop(props) {
-  const ready = useSceneWarm();
-  return ready ? <FrameCap {...props} /> : null;
-}
-
 const TAP_MS = 280;
 const TAP_SLOP = 10;
 
@@ -519,6 +513,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
       onCreated={tuneRenderer}
     >
       <TouchPicker />
+      <FrameCap paused={paused && (mode !== 'game' || cameraSettled)} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors, swaps])} />
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 110, 230]} />
       <Lights shadowSize={quality.shadowSize} />
@@ -552,7 +547,6 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} onSkinSwap={onSkinSwap} />
       </Turntable>
       <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} onSettled={setCameraSettled} layout={layout} />
-      <Loop paused={paused && (mode !== 'game' || cameraSettled)} fps={phone ? PHONE_FPS : 60} wake={JSON.stringify([cosmetics, boardSkinId, seatColors, swaps])} />
     </Canvas>
   );
 }
