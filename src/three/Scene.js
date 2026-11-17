@@ -44,8 +44,10 @@ const CLASSIC_EXTENT = framingExtent(layoutFor('classic').spec);
 const PORTRAIT_FIT = 31;
 const PORTRAIT_ELEVATION = 0.98;
 const RAILS_FIT = 28.5;
+const TABLE_LEAN = 0.3;
+const SIDE_DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
 
-function CameraRig({ mode, resetKey, spinning, locked, onOffView, onSettled, layout }) {
+function CameraRig({ mode, resetKey, spinning, locked, leanSeat = null, onOffView, onSettled, layout }) {
   const { camera, gl, size } = useThree();
   const controls = useMemo(() => {
     const c = new OrbitControls(camera, gl.domElement);
@@ -79,14 +81,16 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, onSettled, lay
         : Math.max(game ? 33 : 28, (portrait ? PORTRAIT_FIT : game ? 33 : 31) / aspect) * zoom;
     controls.minPolarAngle = overhead ? 0 : 0.1;
     const target = new THREE.Vector3(0, 0, 0);
-    const position = target.clone().add(new THREE.Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance));
+    const [dx, dz] = overhead && leanSeat != null ? SIDE_DIRS[leanSeat] : [0, 1];
+    const tilt = overhead && leanSeat != null ? elevation - TABLE_LEAN : elevation;
+    const position = target.clone().add(new THREE.Vector3(dx * Math.cos(tilt) * distance, Math.sin(tilt) * distance, dz * Math.cos(tilt) * distance));
     home.current = { target, distance, dir: position.clone().sub(target).normalize() };
     if (orbit.current || follow.current) return;
     tween.current = { fromPos: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: null };
     controls.minDistance = distance * 0.55;
     controls.maxDistance = distance * 1.5;
     controls.enabled = game;
-  }, [mode, resetKey, locked, size.width, size.height, camera, controls, layout, onSettled]);
+  }, [mode, resetKey, locked, leanSeat, size.width, size.height, camera, controls, layout, onSettled]);
 
   // The dev hit: a slow push in on a point of the board, a cinematic orbit around it after the shot, then home
   const orbit = useRef(null);
@@ -240,6 +244,13 @@ function CameraRig({ mode, resetKey, spinning, locked, onOffView, onSettled, lay
     controls.target.y = f ? 0.55 : o ? o.target.y : 0;
     controls.autoRotate = !o && !f && (mode !== 'game' || spinning);
     controls.update();
+    // Round the table keeps the board square to the tablet while the camera leans toward whoever's up
+    if (locked && !f) {
+      const flat = THREE.MathUtils.smoothstep(_toCamera.copy(camera.position).sub(controls.target).normalize().y, 0.6, 0.8);
+      camera.up.set(0, 1 - flat, -flat).normalize();
+      camera.lookAt(controls.target);
+      camera.up.set(0, 1, 0);
+    }
 
     if (!settled.current && !tween.current && !o && !f && Math.abs(goal - l.shift) <= 0.05) {
       settled.current = true;
@@ -457,7 +468,7 @@ function useTouchTaps(canvasRef, canRoll, onRoll) {
   }, [canvasRef, canRoll, onRoll]);
 }
 
-export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, devSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, quality = defaultQuality, paused = false, onStuntWarm }) {
+export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, colors, boardSkinId, devSeat = -1, viewSeat = 0, mySeat = -1, moves = NO_MOVES, canRoll = false, onRoll, onMove, onPickDie, resetKey, pings = NO_PINGS, teams = false, canPing = false, onPing, onPingMenu, onCameraOffView, preview = false, lockCamera = false, leanSeat = null, quality = defaultQuality, paused = false, onStuntWarm }) {
   const [cameraSettled, setCameraSettled] = useState(false);
   const layout = layoutFor(board.variant);
   const seatColors = colors || board.colors;
@@ -546,7 +557,7 @@ export default function Scene({ mode, board, names, cosmetics = NO_COSMETICS, co
         {canPing && <PingSurface pointer={pointer} onMenu={openPingMenu} />}
         <Die lastRoll={board.lastRoll} turn={board.turn} stunts={board.stunts} idleSeat={viewSeat} canRoll={canRoll} onRoll={roll} onPickDie={onPickDie} skins={cosmetics.map((c) => c?.dice)} colors={seatColors} devSeat={devSeat} layout={layout} onSkinSwap={onSkinSwap} />
       </Turntable>
-      <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} onSettled={setCameraSettled} layout={layout} />
+      <CameraRig mode={mode} resetKey={resetKey} locked={lockCamera} leanSeat={leanSeat} spinning={preview || (!lockCamera && mode === 'game' && board.phase === 'over')} onOffView={onCameraOffView} onSettled={setCameraSettled} layout={layout} />
     </Canvas>
   );
 }

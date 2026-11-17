@@ -10157,8 +10157,8 @@ body[data-table-side] > .modal-backdrop {
   inset: auto;
   left: 50%;
   top: 50%;
-  width: 100vw;
-  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
   box-sizing: border-box;
   transform: translate(-50%, -50%) rotate(var(--table-rot, 0deg));
 }
@@ -10179,8 +10179,8 @@ body[data-table-side='left'] .hud,
 body[data-table-side='right'] .hud,
 body[data-table-side='left'] > .modal-backdrop,
 body[data-table-side='right'] > .modal-backdrop {
-  width: 100vh;
-  height: 100vw;
+  width: 100dvh;
+  height: 100dvw;
 }
 
 body[data-table-side] .action-panel {
@@ -10202,6 +10202,10 @@ body {
   padding-right: max(var(--hud-pad, 14px), env(safe-area-inset-right));
   padding-bottom: max(var(--hud-pad, 14px), env(safe-area-inset-bottom));
   padding-left: max(var(--hud-pad, 14px), env(safe-area-inset-left));
+}
+
+.hud.local-hud {
+  padding-top: max(30px, calc(env(safe-area-inset-top) + 14px));
 }
 
 .screen {

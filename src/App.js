@@ -555,6 +555,8 @@ const App = () => {
     const diceBit = (g.stunts || []).find((s) => s.kind === 'dice' && !s.cut);
     const myTurn = (g.turn === mySeat || coveringTurn(g, view.seats, mySeat) || (!!account?.admin && !!diceBit)) && g.phase !== 'over' && !view.paused;
     if (!(view.local && (held || !boardRevealed))) heldView.current = locked ? 0 : (viewOverride ?? viewSeat);
+    const turnSeat = held ? g.lastRoll.seat : g.turn;
+    const leanSeat = !locked ? null : startPending ? 0 : g.phase === 'over' || view.seats[turnSeat]?.isBot ? Math.max(mySeat, 0) : turnSeat;
     return {
       mode: 'game',
       board: held ? { ...g, turn: g.lastRoll.seat } : startPending ? { ...g, turn: null } : g,
@@ -562,6 +564,7 @@ const App = () => {
       names,
       viewSeat: heldView.current,
       lockCamera: locked,
+      leanSeat,
       cosmetics,
       moves: myTurn && g.phase === 'move' && !held ? g.legalMoves : undefined,
       canRoll: myTurn && g.phase === 'roll' && !held && !startPending,
