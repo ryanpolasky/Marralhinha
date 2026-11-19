@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GEM_GEO, MARBLE_GEO, MARBLE_R } from './marbleGeometry';
+import { GEM_GEO, GEM_FACET_TONES, MARBLE_GEO, MARBLE_R } from './marbleGeometry';
 import { buildProbes } from './StaticWarmer';
 import { hopPosition, wellContact, wellRebound, worldOf } from './Marbles';
 import { layoutFor } from '../game/geometry';
@@ -9,15 +9,27 @@ test('the gem shares sphere seating and contact bounds without protruding into a
   GEM_GEO.computeBoundingSphere();
   expect(GEM_GEO.boundingBox.min.y).toBeCloseTo(-MARBLE_R, 7);
   expect(GEM_GEO.boundingBox.max.y).toBeCloseTo(MARBLE_R, 7);
-  expect(GEM_GEO.boundingSphere.radius).toBeLessThanOrEqual(MARBLE_R * 1.07);
+  expect(GEM_GEO.boundingSphere.radius).toBeCloseTo(MARBLE_R, 7);
   const positions = GEM_GEO.attributes.position;
   for (let i = 0; i < positions.count; i++) {
-    expect(Math.hypot(positions.getX(i), positions.getZ(i))).toBeLessThanOrEqual(MARBLE_R);
+    expect(Math.hypot(positions.getX(i), positions.getZ(i))).toBeLessThanOrEqual(MARBLE_R + 1e-7);
   }
-  expect(positions.count / 3).toBe(48);
+  expect(positions.count / 3).toBe(8);
   const top = Array.from({ length: positions.count }, (_, i) => i).filter(i => Math.abs(positions.getY(i) - MARBLE_R) < 1e-7);
-  expect(top.length).toBeGreaterThan(8);
-  expect(top.some(i => Math.hypot(positions.getX(i), positions.getZ(i)) > MARBLE_R * .3)).toBe(true);
+  expect(top.length).toBe(4);
+  expect(top.every(i => Math.hypot(positions.getX(i), positions.getZ(i)) < 1e-7)).toBe(true);
+  const highlight = new THREE.Vector3();
+  for (let face = 0; face < GEM_FACET_TONES.length; face++) {
+    if (GEM_FACET_TONES[face] !== 4) continue;
+    for (let vertex = 0; vertex < 3; vertex++) highlight.add(new THREE.Vector3().fromBufferAttribute(positions, face * 3 + vertex));
+  }
+  expect(highlight.x).toBeLessThan(0);
+  expect(highlight.y).toBeGreaterThan(0);
+  expect(highlight.z).toBeGreaterThan(0);
+  for (let i = 0; i < positions.count; i++) {
+    const y = positions.getY(i);
+    expect(Math.abs(y) < 1e-7 || Math.abs(Math.abs(y) - MARBLE_R) < 1e-7).toBe(true);
+  }
   const uv = GEM_GEO.attributes.uv;
   for (let i = 0; i < uv.count; i++) {
     expect(uv.getX(i)).toBeGreaterThan(0);

@@ -62,7 +62,7 @@ test('Rough Cut bypasses smooth lighting and the canonical board masks its anima
         expect(spec.toneMapped).toBe(false);
         expect(spec.specularIntensity).toBe(0);
         expect(spec.flatShading).toBe(true);
-        expect(spec.geometry.name).toBe('WellspringCutGem');
+        expect(spec.geometry.name).toBe('WellspringDiamond');
         expect(spec.upright).toBe(true);
         const shader = { vertexShader: '#include <begin_vertex>', fragmentShader: '#include <opaque_fragment>' };
         spec.onBeforeCompile(shader);
@@ -111,7 +111,7 @@ test('Rough Cut rests clean and shows a tiny camera-aligned plus for only two of
   try {
     const spec = wellMarble(SEAT_COLORS[0]);
     expect(frames).toHaveLength(1);
-    expect(frames[0]).toHaveLength(48);
+    expect(frames[0]).toHaveLength(8);
     expect(frames[0].some(({ color }) => color === '#f4efe6')).toBe(false);
     expect(spec.userData.wellTwinkle.value).toBe(-1);
     let active = 0;

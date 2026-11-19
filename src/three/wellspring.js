@@ -70,10 +70,10 @@ export function wellGem(ctx, x, y, scale = 1, accent = WELL[2]) {
 
 export function wellMarble(c) {
   const tones = [.42, .65, .84, 1, 1.15].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
-  const image = canvas(128, 96), g = image.getContext('2d');
+  const image = canvas(128, 16), g = image.getContext('2d');
   GEM_FACET_TONES.forEach((tone, face) => {
     g.fillStyle = tones[tone];
-    g.fillRect((face % 8) * 16, Math.floor(face / 8) * 16, 16, 16);
+    g.fillRect(face * 16, 0, 16, 16);
   });
   const map = new THREE.CanvasTexture(image);
   map.colorSpace = THREE.SRGBColorSpace;
