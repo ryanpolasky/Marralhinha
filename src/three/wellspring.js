@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GEM_GEO } from './marbleGeometry';
+import { GEM_GEO, GEM_FACET_TONES, MARBLE_R } from './marbleGeometry';
 
 // Wellspring src/art.ts: default palette and pickup/spell bitmap art.
 export const WELL = ['#07070a', '#f4efe6', '#f0354b', '#2b2a35'];
@@ -69,43 +69,43 @@ export function wellGem(ctx, x, y, scale = 1, accent = WELL[2]) {
 }
 
 export function wellMarble(c) {
-  const tones = [.42, .65, .84, 1].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
-  const frames = Array.from({ length: 32 }, (_, frame) => {
-    const image = canvas(128, 16), g = image.getContext('2d');
-    for (let face = 0; face < 8; face++) {
-      g.fillStyle = tones[[3, 2, 1, 2, 2, 1, 0, 1][face]];
-      g.fillRect(face * 16, 0, 16, 16);
-      const step = (frame + face * 4) % 32;
-      if (step >= 12) continue;
-      const x = face * 16 + 6 + Math.floor(step * 4 / 11), y = 5 + Math.floor(step * 2 / 11);
-      const r = step < 2 || step > 9 ? 1 : 2;
-      g.fillStyle = WELL[1];
-      g.fillRect(x - r, y, r * 2 + 1, 1);
-      g.fillRect(x, y - r, 1, r * 2 + 1);
-    }
-    return image;
+  const tones = [.42, .65, .84, 1, 1.15].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
+  const image = canvas(128, 96), g = image.getContext('2d');
+  GEM_FACET_TONES.forEach((tone, face) => {
+    g.fillStyle = tones[tone];
+    g.fillRect((face % 8) * 16, Math.floor(face / 8) * 16, 16, 16);
   });
-  const map = new THREE.CanvasTexture(frames[0]);
+  const map = new THREE.CanvasTexture(image);
   map.colorSpace = THREE.SRGBColorSpace;
   map.magFilter = map.minFilter = THREE.NearestFilter;
   map.generateMipmaps = false;
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-  let lastFrame = 0;
+  const twinkle = { value: -1 };
   return {
-    geometry: GEM_GEO, upright: true, userData: { marbleGeometry: 'gem' },
+    geometry: GEM_GEO, upright: true, userData: { marbleGeometry: 'gem', wellTwinkle: twinkle },
     map, flatShading: true, roughness: 1, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0, toneMapped: false,
     onBeforeCompile: (shader) => {
+      shader.uniforms = { ...shader.uniforms, uWellTwinkle: twinkle };
+      const common = 'varying vec3 vWellCenter;\nvarying float vWellRadius;';
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${common}`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vWellCenter = -(modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+          vWellRadius = length(modelViewMatrix[0].xyz) * ${MARBLE_R};`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${common}\nuniform float uWellTwinkle;`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `outgoingLight = diffuseColor.rgb;
-        if (abs(normal.z) < 0.4) {
-          outgoingLight = texture2D(map, vec2((floor(vMapUv.x * 8.0) + 0.5) / 8.0, 0.0625)).rgb;
+        if (uWellTwinkle >= 0.0 && abs(normal.z) > 0.4) {
+          vec2 point = (vWellCenter.xy - vViewPosition.xy) / vWellRadius;
+          vec2 pixel = floor((point - vec2(mix(-0.35, 0.35, uWellTwinkle), 0.4)) / 0.045 + 0.5);
+          if ((abs(pixel.x) < 0.5 && abs(pixel.y) < 1.5) || (abs(pixel.y) < 0.5 && abs(pixel.x) < 1.5)) {
+            outgoingLight = vec3(${new THREE.Color(WELL[1]).toArray().join(', ')});
+          }
         }
         #include <opaque_fragment>`);
     },
     customProgramCacheKey: () => 'wellspring-gem-ink',
     animate: (material, t) => {
-      const frame = motion?.matches ? 0 : Math.floor(t * 8) % frames.length;
-      if (frame === lastFrame) return;
-      map.image = frames[frame]; map.needsUpdate = true; lastFrame = frame;
+      const phase = ((t % 4) + 4) % 4;
+      twinkle.value = !motion?.matches && phase >= 3.25 && phase < 3.5 ? (phase - 3.25) * 4 : -1;
     },
   };
 }

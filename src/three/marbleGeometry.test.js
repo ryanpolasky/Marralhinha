@@ -9,7 +9,15 @@ test('the gem shares sphere seating and contact bounds without protruding into a
   GEM_GEO.computeBoundingSphere();
   expect(GEM_GEO.boundingBox.min.y).toBeCloseTo(-MARBLE_R, 7);
   expect(GEM_GEO.boundingBox.max.y).toBeCloseTo(MARBLE_R, 7);
-  expect(GEM_GEO.boundingSphere.radius).toBeCloseTo(MARBLE_R, 7);
+  expect(GEM_GEO.boundingSphere.radius).toBeLessThanOrEqual(MARBLE_R * 1.07);
+  const positions = GEM_GEO.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    expect(Math.hypot(positions.getX(i), positions.getZ(i))).toBeLessThanOrEqual(MARBLE_R);
+  }
+  expect(positions.count / 3).toBe(48);
+  const top = Array.from({ length: positions.count }, (_, i) => i).filter(i => Math.abs(positions.getY(i) - MARBLE_R) < 1e-7);
+  expect(top.length).toBeGreaterThan(8);
+  expect(top.some(i => Math.hypot(positions.getX(i), positions.getZ(i)) > MARBLE_R * .3)).toBe(true);
   const uv = GEM_GEO.attributes.uv;
   for (let i = 0; i < uv.count; i++) {
     expect(uv.getX(i)).toBeGreaterThan(0);

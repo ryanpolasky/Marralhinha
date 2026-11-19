@@ -62,17 +62,15 @@ test('Rough Cut bypasses smooth lighting and the canonical board masks its anima
         expect(spec.toneMapped).toBe(false);
         expect(spec.specularIntensity).toBe(0);
         expect(spec.flatShading).toBe(true);
-        expect(spec.geometry.type).toBe('OctahedronGeometry');
+        expect(spec.geometry.name).toBe('WellspringCutGem');
         expect(spec.upright).toBe(true);
         const shader = { vertexShader: '#include <begin_vertex>', fragmentShader: '#include <opaque_fragment>' };
         spec.onBeforeCompile(shader);
         expect(shader.fragmentShader).toContain('outgoingLight = diffuseColor.rgb;');
-        const version = spec.map.version;
+        spec.animate(null, 3.375);
+        expect(shader.uniforms.uWellTwinkle.value).toBe(.5);
         spec.animate(null, 1);
-        expect(spec.map.version).toBeGreaterThan(version);
-        const held = spec.map.version;
-        spec.animate(null, 1);
-        expect(spec.map.version).toBe(held);
+        expect(shader.uniforms.uWellTwinkle.value).toBe(-1);
       }
     for (const variant of ['classic', 'blitz']) {
       const spec = wellBoard(layoutFor(variant));
@@ -97,13 +95,13 @@ test('Rough Cut freezes its surface animation for reduced motion', () => {
   const old = window.matchMedia;
   window.matchMedia = () => ({ matches: true });
   try {
-    const spec = wellMarble(SEAT_COLORS[0]), version = spec.map.version;
-    spec.animate(null, 5);
-    expect(spec.map.version).toBe(version);
+    const spec = wellMarble(SEAT_COLORS[0]);
+    spec.animate(null, 3.375);
+    expect(spec.userData.wellTwinkle.value).toBe(-1);
   } finally { getContext.mockRestore(); window.matchMedia = old; }
 });
 
-test('Rough Cut uses isolated pixel crosses, never a connected white glint line', () => {
+test('Rough Cut rests clean and shows a tiny camera-aligned plus for only two of 32 frames', () => {
   const frames = [];
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
     const rectangles = [];
@@ -111,18 +109,22 @@ test('Rough Cut uses isolated pixel crosses, never a connected white glint line'
     return { fillStyle: '', fillRect(x, y, width, height) { rectangles.push({ color: this.fillStyle, x, y, width, height }); } };
   });
   try {
-    wellMarble(SEAT_COLORS[0]);
-    expect(frames).toHaveLength(32);
-    for (const rectangles of frames) {
-      expect(rectangles.filter(({ width, height }) => width === 16 && height === 16)).toHaveLength(8);
-      const cream = rectangles.filter(({ color }) => color === '#f4efe6');
-      expect(cream.length).toBeGreaterThan(0);
-      for (const { width, height } of cream) {
-        expect(Math.min(width, height)).toBe(1);
-        expect(Math.max(width, height)).toBeLessThanOrEqual(5);
-      }
+    const spec = wellMarble(SEAT_COLORS[0]);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toHaveLength(48);
+    expect(frames[0].some(({ color }) => color === '#f4efe6')).toBe(false);
+    expect(spec.userData.wellTwinkle.value).toBe(-1);
+    let active = 0;
+    for (let frame = 0; frame < 32; frame++) {
+      spec.animate(null, frame / 8);
+      if (spec.userData.wellTwinkle.value >= 0) active++;
     }
-    expect(new Set(frames.map((frame) => JSON.stringify(frame))).size).toBe(32);
+    expect(active).toBe(2);
+    expect(3 * .045 / 2).toBeLessThan(.15);
+    const shader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <opaque_fragment>' };
+    spec.onBeforeCompile(shader);
+    expect(shader.fragmentShader).toContain('abs(pixel.x) < 0.5 && abs(pixel.y) < 1.5');
+    expect(shader.fragmentShader).toContain('abs(pixel.y) < 0.5 && abs(pixel.x) < 1.5');
   } finally { getContext.mockRestore(); }
 });
 
