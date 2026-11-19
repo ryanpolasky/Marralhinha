@@ -57,6 +57,20 @@ export const worldOf = (seat, pos, marble, layout = CLASSIC_LAYOUT) => {
 
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
+export function hopPosition(from, seg, t, out = new THREE.Vector3()) {
+  const k = Math.max(0, Math.min(1, t)), e = easeInOut(k);
+  if (k === 1) return out.copy(seg.to);
+  out.lerpVectors(from, seg.to, e);
+  out.y += Math.sin(Math.PI * k) * seg.height;
+  return out;
+}
+
+export const wellContact = (spot) => spot.clone().setY(spot.y + MARBLE_R * 2);
+export const wellRebound = (spot) => [
+  { to: wellContact(spot).add(new THREE.Vector3(0, WELL_STOMP.height, 0)), dur: WELL_STOMP.dur * 0.4, height: 0, quiet: true },
+  { to: spot.clone(), dur: WELL_STOMP.dur * 0.6, height: 0, quiet: true, final: true },
+];
+
 function hopTiming(dist) {
   if (dist < 1.6) return { dur: 0.19, height: 0.45 };
   return { dur: 0.3 + dist * 0.05, height: 0.5 + dist * 0.22 };
@@ -66,6 +80,7 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) 
   const plans = {};
   if (!lastMove) return plans;
   const { seat, marble, capture } = lastMove;
+  const stomp = capture && skinKey(killFx[seat]) === 'wellspring' ? {} : null;
   const others = board.active.flatMap((s) => board.marbles[s].flatMap((pos, m) => (pos.zone === 'base' || (s === seat && m === marble) ? [] : [worldOf(s, pos, m, layout)])));
   const occupied = (spot) => others.some((o) => Math.abs(o.x - spot.x) < 0.05 && Math.abs(o.z - spot.z) < 0.05);
   const path = lastMove.path || [lastMove.to];
@@ -75,28 +90,37 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) 
     const to = worldOf(seat, cell, marble, layout);
     const timing = hopTiming(prev.distanceTo(to));
     prev = to;
-    const tap = i < path.length - 1 && occupied(to);
+    const contact = stomp && i === path.length - 1;
+    const tap = contact || (i < path.length - 1 && occupied(to));
     if (tap) {
-      to.y = STACKED_Y;
+      to.y = contact ? wellContact(to).y : STACKED_Y;
       timing.dur += 0.04;
     }
     total += timing.dur;
     return { to, tap, ...timing };
   });
   const last = hops[hops.length - 1];
-  last.final = true;
+  last.final = !stomp;
   if (lastMove.to.zone === 'home' && lastMove.from.zone !== 'home') last.burst = { colors: ['#ffd166', '#fff3b0', SEAT_COLORS[seat].light], count: 40, up: 4, speed: 2.5 };
   if (lastMove.kind === 'enter') last.burst = { colors: [SEAT_COLORS[seat].light, '#ffffff'], count: 18, up: 2, speed: 2, size: 0.07 };
   plans[`${seat}-${marble}`] = hops;
   if (capture && skinKey(killFx[seat]) === 'wild') hops.push({ to: last.to.clone(), dur: BALL.pop, height: 0, quiet: true, rock: true });
-  if (capture && skinKey(killFx[seat]) === 'wellspring') hops.push({ to: last.to.clone(), ...WELL_STOMP, quiet: true });
+  if (stomp) {
+    last.stomp = stomp;
+    hops.push(...wellRebound(last.to.clone().setY(REST_Y)));
+  }
   if (capture) {
-    plans[`${capture.seat}-${capture.marble}`] = victimPlan(skinKey(killFx[seat]), last.to, worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), { delay: total - 0.04, impact: { by: seat, victim: capture.seat } });
+    plans[`${capture.seat}-${capture.marble}`] = victimPlan(skinKey(killFx[seat]), last.to.clone().setY(REST_Y), worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), { ...(stomp ? { contactSignal: stomp } : { delay: total - 0.04 }), impact: { by: seat, victim: capture.seat } });
   }
   return plans;
 }
 
 export function victimPlan(kind, spot, home, start, across = new THREE.Vector3(spot.x >= 0 ? 1 : -1, 0, 0)) {
+  if (kind === 'wellspring') return [
+    { to: spot.clone(), dur: 0.8, height: 0, quiet: true, vanish: true, scale: [0, 0, 0], ...start },
+    { to: home.clone(), dur: 0.01, height: 0, quiet: true, scale: [0, 0, 0] },
+    { to: home, dur: 0.18, height: 0, quiet: true, scale: [1, 1, 1], final: true },
+  ];
   if (kind === 'deflate') {
     const zips = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ to: new THREE.Vector3(spot.x + Math.sin(i * 2.3 + spot.z) * 1.1, 0.7 + i * 0.32, spot.z + Math.cos(i * 1.7 + spot.x) * 1.1), dur: 0.15, height: 0.12, puff: true }));
     return [{ ...zips[0], ...start }, ...zips.slice(1), { to: home, dur: 0.8, height: 1.2, final: true }];
@@ -258,6 +282,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     if (plan && planKey !== a.seen && (!a.seen || planKey > a.seen)) {
       a.seen = planKey;
       a.segs = plan.map((s) => ({ ...s, start: null }));
+      a.stomping = plan.some((s) => s.stomp || s.contactSignal);
       a.bumps = plan.filter((s) => s.tap).map((s) => [s.to.x, s.to.z]);
     } else if (planKey == null && a.seen != null) {
       a.seen = undefined;
@@ -271,6 +296,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
 
   useFrame((state, dt) => {
     const a = anim.current;
+    const stomping = a.stomping && a.segs.length > 0;
     const now = state.clock.elapsedTime;
     prev.copy(a.pos);
     const dropTrail = (drop = 0.08) => {
@@ -299,8 +325,9 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       a.spin = pose.spin;
     } else if (a.segs.length) {
       const seg = a.segs[0];
+      if (seg.contactSignal?.hit && seg.start === Infinity) seg.start = null;
       if (seg.start === null) {
-        seg.start = now + (seg.delay || 0);
+        seg.start = seg.contactSignal && !seg.contactSignal.hit ? Infinity : now + (seg.delay || 0);
         seg.from = a.pos.clone();
         seg.fromScale = body.current.scale.toArray();
         if (seg.rock) {
@@ -313,13 +340,15 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       const t = (now - seg.start) / seg.dur;
       if (t >= 0 && !seg.begun) {
         seg.begun = true;
+        if (seg.vanish) { body.current.scale.setScalar(0); seg.fromScale = [0, 0, 0]; }
         if (seg.impact) {
           sfx.capture(seg.impact.by === mySeat ? 'mine' : seg.impact.victim === mySeat ? 'victim' : 'other');
-          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim, color: tint, victimColor: palette?.[seg.impact.victim] }, { sfx: (name, ...args) => sfx[name]?.(...args) });
+          playKillFx(killFx[seg.impact.by], { at: [seg.from.x, seg.contactSignal ? seg.from.y + MARBLE_R : 0.4, seg.from.z], by: seg.impact.by, victim: seg.impact.victim, color: tint, victimColor: palette?.[seg.impact.victim] }, { sfx: (name, ...args) => sfx[name]?.(...args) });
         }
       }
       if (t >= 1) {
         a.pos.copy(seg.to);
+        if (seg.stomp) seg.stomp.hit = true;
         a.segs.shift();
         if (seg.scale) body.current.scale.fromArray(seg.scale);
         if (seg.final) sfx.land();
@@ -328,8 +357,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         if (seg.burst) fx.emit('burst', { position: [seg.to.x, 0.3, seg.to.z], ...seg.burst });
       } else if (t >= 0) {
         const e = easeInOut(t);
-        a.pos.lerpVectors(seg.from, seg.to, e);
-        a.pos.y = seg.from.y + (seg.to.y - seg.from.y) * e + Math.sin(Math.PI * t) * seg.height;
+        hopPosition(seg.from, seg, t, a.pos);
         if (seg.rock) {
           body.current.quaternion.slerpQuaternions(seg.tilt, seg.upright, easeInOut(Math.min(1, (t * seg.dur) / UPRIGHT_S)));
           group.current.parent.getWorldQuaternion(_turn).invert();
@@ -352,7 +380,8 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const bob = (Math.sin(now * 5) * 0.5 + 0.5) * 0.14;
     const arc = a.returning && !pose ? Math.min(1.6, a.pos.distanceTo(target) * 0.35) : 0;
     const liftTarget = pose ? 0 : arc + (pickable ? (pickHover.current ? 0.55 : 0.1 + bob) : selected ? 0.5 : hovered ? 0.28 : movable ? 0.1 + bob : 0);
-    a.lift += (liftTarget - a.lift) * (1 - Math.exp(-dt * 12));
+    if (stomping) a.lift = 0;
+    else a.lift += (liftTarget - a.lift) * (1 - Math.exp(-dt * 12));
     const k = down ? downAmount(down.hit) : 0;
     const fly = easeInOut(k);
     const prevOffX = a.off.x;
@@ -401,7 +430,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
       halo.current.scale.setScalar(1 + pulse * 0.25);
       halo.current.material.opacity = selected ? 0.95 : 0.35 + pulse * 0.45;
     }
-  });
+  }, plan?.some((seg) => seg.stomp || seg.contactSignal) ? -1 : 0);
 
   const pick = () => {
     setCursor(false);

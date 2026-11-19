@@ -10,10 +10,10 @@ import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
-import { playKillFx, warmKillFx, wellStompLift } from './killfx';
+import { playKillFx, warmKillFx } from './killfx';
 import { playTrail } from './trails';
 import * as THREE from 'three';
-import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
+import { MARBLE_GEO, MARBLE_R, victimPlan, hopPosition, wellContact, wellRebound } from './Marbles';
 import { ballRock } from './Props';
 import { skinKey } from '../game/catalog';
 import { SingularityAura } from './Gravity';
@@ -95,16 +95,15 @@ const FLIGHTS = ['deflate', 'stage', 'anvil', 'claw', 'wild', 'train', 'unlucky'
 const VICTIM_AT = new THREE.Vector3(0, 0.07, 0);
 const ACROSS = new THREE.Vector3(0, 0, -1);
 
-function flightAt({ segs }, t) {
-  let from = VICTIM_AT;
+function flightAt({ segs, from: initial = VICTIM_AT }, t) {
+  let from = initial;
   let scale = [1, 1, 1];
   for (const seg of segs) {
     const to = seg.scale || scale;
     if (t < seg.dur) {
       const k = Math.max(0, t) / seg.dur;
       const e = easeInOut(k);
-      const p = from.clone().lerp(seg.to, e);
-      p.y = from.y + (seg.to.y - from.y) * e + Math.sin(Math.PI * k) * seg.height;
+      const p = hopPosition(from, seg, k);
       return { p, seg, scale: scale.map((v, j) => v + (to[j] - v) * e) };
     }
     t -= seg.dur;
@@ -127,6 +126,7 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
   const fired = useRef(false);
   const flight = useRef(null);
   const origin = useRef(null);
+  const stomp = useMemo(() => ({ from: VICTIM_AT.clone().setZ(1), contact: wellContact(VICTIM_AT), segs: wellRebound(VICTIM_AT) }), []);
   useFrame(({ clock }) => {
     if (!origin.current || origin.current.replay !== replay) {
       origin.current = { at: clock.elapsedTime, replay };
@@ -142,7 +142,12 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
     const e = h >= HOPS ? 1 : h - i;
     const rock = fired.current && skinKey(itemId) === 'wild' ? ballRock(t - START - HOPS * HOP_TIME) : 0;
     attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e) - rock);
-    if (wellspring) attacker.current.position.y += wellStompLift(t - START - HOPS * HOP_TIME);
+    const contactAt = START + HOPS * HOP_TIME + (wellspring ? 0.04 : 0);
+    if (wellspring && t >= START + (HOPS - 1) * HOP_TIME) {
+      if (t < contactAt) hopPosition(stomp.from, { to: stomp.contact, height: 0.45 }, (t - START - (HOPS - 1) * HOP_TIME) / (HOP_TIME + 0.04), attacker.current.position);
+      else if (!fired.current) attacker.current.position.copy(stomp.contact);
+      else attacker.current.position.copy(flightAt({ from: stomp.contact, segs: stomp.segs }, t - origin.current.contactAt)?.p || VICTIM_AT);
+    }
     attacker.current.rotation.x = -rock / MARBLE_R;
     if (flight.current) {
       const at = flightAt(flight.current, t - flight.current.at);
@@ -161,15 +166,16 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
       target.current.position.copy(VICTIM_AT);
       target.current.scale.set(1, 1, 1);
       target.current.visible = true;
-    } else if (h >= HOPS && !fired.current) {
+    } else if ((wellspring ? t >= contactAt : h >= HOPS) && !fired.current) {
       fired.current = true;
+      origin.current.contactAt = t;
       const kind = skinKey(itemId);
       if (FLIGHTS.includes(kind)) flight.current = { at: t, segs: victimPlan(kind, VICTIM_AT, new THREE.Vector3(0, 7, 0), {}, ACROSS) };
       else target.current.visible = false;
       sfx.capture('mine');
-      playKillFx(itemId, { at: [0, 0.4, 0], by: seat, victim, across: ACROSS.toArray() }, { bus, sfx: (name, ...args) => sfx[name]?.(...args) });
+      playKillFx(itemId, { at: [0, wellspring ? VICTIM_AT.y + MARBLE_R : 0.4, 0], by: seat, victim, across: ACROSS.toArray() }, { bus, sfx: (name, ...args) => sfx[name]?.(...args) });
     }
-  });
+  }, wellspring ? -1 : 0);
   return (
     <group rotation-y={-Math.PI / 2}>
       <group position={[-2, 0, -4]}>

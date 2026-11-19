@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { planMove } from './Marbles';
+import { planMove, hopPosition, MARBLE_R, worldOf } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle, devTintSat } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS, rarityOf } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
-import { KILL_FX, DEV_RED, WELL_STOMP, wellStompLift } from './killfx';
+import { KILL_FX, DEV_RED, WELL_STOMP } from './killfx';
 import { TRAILS } from './trails';
 import { diskFrame, holeEnvelope } from './Gravity';
 
@@ -415,21 +415,31 @@ test('landing on an opponent is a capture, not a tap', () => {
   expect(plans['1-0'][0].impact).toBeTruthy();
 });
 
-test('Wellspring capture rebounds only the killer and returns to the exact landing hole', () => {
-  const board = { active: [0, 1], marbles: [[track(13)], [track(13)]] };
+test.each(['classic', 'blitz'])('Wellspring taps the victim top before the pop and settles exactly on %s', (variant) => {
+  const board = { active: [0, 1], marbles: [[track(13)], [base]] };
   const move = { seat: 0, marble: 0, from: track(12), to: track(13), path: [track(13)], capture: { seat: 1, marble: 0 } };
   const normal = planMove(move, board);
-  const plans = planMove(move, board, layoutFor('classic'), ['fx.wellspring']);
-  const [landing, rebound] = plans['0-0'];
-  expect(plans['0-0']).toHaveLength(normal['0-0'].length + 1);
-  expect(rebound.to.equals(landing.to)).toBe(true);
-  expect(rebound.to).not.toBe(landing.to);
-  expect(rebound).toMatchObject({ ...WELL_STOMP, quiet: true });
+  const layout = layoutFor(variant);
+  const plans = planMove(move, board, layout, ['fx.wellspring']);
+  const [contact, rise, settle] = plans['0-0'];
+  const hole = worldOf(0, move.to, 0, layout);
+  expect(plans['0-0']).toHaveLength(normal['0-0'].length + 2);
+  expect(contact.tap).toBeTruthy();
+  expect(contact.final).toBe(false);
+  expect(contact.to.y - MARBLE_R).toBeCloseTo(hole.y + MARBLE_R, 12);
+  expect(hopPosition(worldOf(0, move.from, 0, layout), contact, 1).distanceTo(contact.to)).toBeLessThan(1e-12);
+  expect(plans['1-0'][0].contactSignal).toBe(contact.stomp);
+  expect(contact.stomp.hit).toBeUndefined();
+  expect(plans['1-0'][0].delay).toBeUndefined();
+  expect(plans['1-0'][0].vanish).toBe(true);
+  expect(hopPosition(contact.to, rise, 1).y - contact.to.y).toBeCloseTo(WELL_STOMP.height);
+  expect(settle.to.equals(hole)).toBe(true);
+  expect(hopPosition(rise.to, settle, 1).equals(hole)).toBe(true);
+  expect(rise.dur + settle.dur).toBeCloseTo(WELL_STOMP.dur);
+  expect(contact.dur + rise.dur + settle.dur).toBeLessThan(1);
   expect(plans['1-0'][0].impact).toEqual({ by: 0, victim: 1 });
-  expect(wellStompLift(WELL_STOMP.dur / 2)).toBeCloseTo(WELL_STOMP.height);
-  expect(WELL_STOMP.height).toBeGreaterThanOrEqual(0.67);
+  expect(WELL_STOMP.height).toBeGreaterThanOrEqual(MARBLE_R * 2);
   expect(WELL_STOMP.dur).toBeLessThanOrEqual(0.6);
-  for (const t of [-1, 0, WELL_STOMP.dur, 1]) expect(wellStompLift(t)).toBe(0);
   const noCapture = planMove({ ...move, capture: null }, board, layoutFor('classic'), ['fx.wellspring']);
   expect(noCapture['0-0']).toHaveLength(1);
   expect(planMove(null, board)).toEqual({});

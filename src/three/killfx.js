@@ -7,7 +7,6 @@ import { ANVIL, BALL, TRAIN, MOP, mopDir } from './Props';
 
 const col = (s) => SEAT_COLORS[s];
 export const WELL_STOMP = { dur: 0.5, height: 0.72 };
-export const wellStompLift = (t) => t <= 0 || t >= WELL_STOMP.dur ? 0 : Math.sin(Math.PI * t / WELL_STOMP.dur) * WELL_STOMP.height;
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
 export const DEV_RED = SEAT_COLORS[0];
 const rand = (a, b) => a + Math.random() * (b - a);
