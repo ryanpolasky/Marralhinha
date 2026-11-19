@@ -69,43 +69,67 @@ export function wellGem(ctx, x, y, scale = 1, accent = WELL[2]) {
 }
 
 export function wellMarble(c) {
-  const tones = [.42, .65, .84, 1, 1.15].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
-  const image = canvas(128, 16), g = image.getContext('2d');
+  const tones = [.42, .66, .86, 1.13].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
+  const ink = tones.map(tone => new THREE.Color(tone).toArray().join(', '));
+  const image = canvas(80, 10), g = image.getContext('2d');
   GEM_FACET_TONES.forEach((tone, face) => {
-    g.fillStyle = tones[tone];
-    g.fillRect(face * 16, 0, 16, 16);
+    const base = tone === 4 ? 1 : Math.min(tone, 2);
+    for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) {
+      const band = Math.max(0, Math.min(3, base + 1 - Math.floor((y + Math.floor(x / 3)) / 4)));
+      g.fillStyle = tones[band];
+      g.fillRect(face * 10 + x, y, 1, 1);
+    }
+    if (tone === 4) {
+      g.fillStyle = tones[3];
+      [[6, 2], [7, 3], [6, 3], [5, 4], [6, 4], [4, 5], [5, 5]].forEach(([x, y]) => g.fillRect(face * 10 + x, y, 1, 1));
+      g.fillStyle = WELL[1];
+      [[8, 1], [7, 2]].forEach(([x, y]) => g.fillRect(face * 10 + x, y, 1, 1));
+    }
   });
   const map = new THREE.CanvasTexture(image);
   map.colorSpace = THREE.SRGBColorSpace;
   map.magFilter = map.minFilter = THREE.NearestFilter;
   map.generateMipmaps = false;
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-  const twinkle = { value: -1 };
+  const twinkle = { value: motion?.matches ? -1 : 0 };
   return {
     geometry: GEM_GEO, upright: true, userData: { marbleGeometry: 'gem', wellTwinkle: twinkle },
     map, flatShading: true, roughness: 1, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0, toneMapped: false,
     onBeforeCompile: (shader) => {
       shader.uniforms = { ...shader.uniforms, uWellTwinkle: twinkle };
-      const common = 'varying vec3 vWellCenter;\nvarying float vWellRadius;';
+      const common = 'varying vec3 vWellCenter;\nvarying float vWellRadius;\nvarying float vWellPhase;';
       shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${common}`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vWellCenter = -(modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-          vWellRadius = length(modelViewMatrix[0].xyz) * ${MARBLE_R};`);
+          vWellRadius = length(modelViewMatrix[0].xyz) * ${MARBLE_R};
+          vWellPhase = dot(modelMatrix[3].xz, vec2(0.173, 0.317));`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${common}\nuniform float uWellTwinkle;`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `outgoingLight = diffuseColor.rgb;
-        if (uWellTwinkle >= 0.0 && abs(normal.z) > 0.4) {
-          vec2 point = (vWellCenter.xy - vViewPosition.xy) / vWellRadius;
-          vec2 pixel = floor((point - vec2(mix(-0.35, 0.35, uWellTwinkle), 0.4)) / 0.045 + 0.5);
-          if ((abs(pixel.x) < 0.5 && abs(pixel.y) < 1.5) || (abs(pixel.y) < 0.5 && abs(pixel.x) < 1.5)) {
-            outgoingLight = vec3(${new THREE.Color(WELL[1]).toArray().join(', ')});
+        if (uWellTwinkle >= 0.0) {
+          float time = uWellTwinkle + vWellPhase;
+          vec2 facetPixel = floor(vec2(fract(vMapUv.x * 8.0), 1.0 - vMapUv.y) * 10.0);
+          float sweep = floor(mod(time - floor(vMapUv.x * 8.0) * 0.09, 2.0) * 8.0) - 3.0;
+          if (abs(facetPixel.x + floor(facetPixel.y / 3.0) - sweep) < 0.5) {
+            ${ink.map((color, i) => `if (distance(diffuseColor.rgb, vec3(${color})) < 0.005) outgoingLight = vec3(${ink[Math.min(i + 1, 3)]});`).join('\n')}
+          }
+          if (abs(normal.z) > 0.4) {
+            vec2 point = (vWellCenter.xy - vViewPosition.xy) / vWellRadius;
+            for (int i = 0; i < 2; i++) {
+              if (i == 1 && mod(time, 1.2) >= 0.6) continue;
+              float phase = fract(time / 1.2 + float(i) * 0.5);
+              vec2 center = vec2((floor(phase * 5.0) - 2.0) * 0.1, 0.35 + float(i) * 0.3);
+              vec2 pixel = floor((point - center) / 0.04 + 0.5);
+              if ((abs(pixel.x) < 0.5 && abs(pixel.y) < 1.5) || (abs(pixel.y) < 0.5 && abs(pixel.x) < 1.5)) {
+                outgoingLight = vec3(${new THREE.Color(WELL[1]).toArray().join(', ')});
+              }
+            }
           }
         }
         #include <opaque_fragment>`);
     },
-    customProgramCacheKey: () => 'wellspring-gem-ink',
+    customProgramCacheKey: () => `wellspring-gem-ink-pixels-${tones.join('-')}`,
     animate: (material, t) => {
-      const phase = ((t % 4) + 4) % 4;
-      twinkle.value = !motion?.matches && phase >= 3.25 && phase < 3.5 ? (phase - 3.25) * 4 : -1;
+      twinkle.value = motion?.matches ? -1 : Number.isFinite(t) ? Math.max(0, Math.floor(t * 12) / 12) : 0;
     },
   };
 }

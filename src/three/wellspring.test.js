@@ -67,10 +67,13 @@ test('Rough Cut bypasses smooth lighting and the canonical board masks its anima
         const shader = { vertexShader: '#include <begin_vertex>', fragmentShader: '#include <opaque_fragment>' };
         spec.onBeforeCompile(shader);
         expect(shader.fragmentShader).toContain('outgoingLight = diffuseColor.rgb;');
-        spec.animate(null, 3.375);
-        expect(shader.uniforms.uWellTwinkle.value).toBe(.5);
+        expect(spec.map.image.width).toBe(80);
+        expect(spec.map.image.height).toBe(10);
+        expect(spec.map.generateMipmaps).toBe(false);
+        spec.animate(null, 3.5);
+        expect(shader.uniforms.uWellTwinkle.value).toBe(3.5);
         spec.animate(null, 1);
-        expect(shader.uniforms.uWellTwinkle.value).toBe(-1);
+        expect(shader.uniforms.uWellTwinkle.value).toBe(1);
       }
     for (const variant of ['classic', 'blitz']) {
       const spec = wellBoard(layoutFor(variant));
@@ -93,15 +96,25 @@ test('Rough Cut bypasses smooth lighting and the canonical board masks its anima
 test('Rough Cut freezes its surface animation for reduced motion', () => {
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(new Proxy({}, { get: () => () => {} }));
   const old = window.matchMedia;
-  window.matchMedia = () => ({ matches: true });
+  const motion = { matches: true };
+  window.matchMedia = () => motion;
   try {
     const spec = wellMarble(SEAT_COLORS[0]);
-    spec.animate(null, 3.375);
+    expect(spec.userData.wellTwinkle.value).toBe(-1);
+    for (const t of [0, 1, 2, 4]) {
+      spec.animate(null, t);
+      expect(spec.userData.wellTwinkle.value).toBe(-1);
+    }
+    motion.matches = false;
+    spec.animate(null, 1);
+    expect(spec.userData.wellTwinkle.value).toBe(1);
+    motion.matches = true;
+    spec.animate(null, 2);
     expect(spec.userData.wellTwinkle.value).toBe(-1);
   } finally { getContext.mockRestore(); window.matchMedia = old; }
 });
 
-test('Rough Cut rests clean and shows a tiny camera-aligned plus for only two of 32 frames', () => {
+test('Rough Cut uses four stepped seat-color inks and only two static cream tip pixels', () => {
   const frames = [];
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
     const rectangles = [];
@@ -109,20 +122,53 @@ test('Rough Cut rests clean and shows a tiny camera-aligned plus for only two of
     return { fillStyle: '', fillRect(x, y, width, height) { rectangles.push({ color: this.fillStyle, x, y, width, height }); } };
   });
   try {
-    const spec = wellMarble(SEAT_COLORS[0]);
-    expect(frames).toHaveLength(1);
-    expect(frames[0]).toHaveLength(8);
-    expect(frames[0].some(({ color }) => color === '#f4efe6')).toBe(false);
-    expect(spec.userData.wellTwinkle.value).toBe(-1);
-    let active = 0;
-    for (let frame = 0; frame < 32; frame++) {
-      spec.animate(null, frame / 8);
-      if (spec.userData.wellTwinkle.value >= 0) active++;
+    const keys = [];
+    for (const color of SEAT_COLORS) {
+      const spec = wellMarble(color);
+      keys.push(spec.customProgramCacheKey());
+      const rectangles = frames.at(-1);
+      expect(rectangles.every(({ width, height }) => width === 1 && height === 1)).toBe(true);
+      const pixels = new Map(rectangles.map(({ x, y, color }) => [`${x},${y}`, color]));
+      expect(pixels.size).toBe(800);
+      const cream = [...pixels].filter(([, color]) => color === '#f4efe6');
+      expect(cream.map(([point]) => point)).toEqual(['78,1', '77,2']);
+      const inks = new Set([...pixels.values()].filter(color => color !== '#f4efe6'));
+      expect(inks.size).toBe(4);
+      expect(pixels.get('76,2')).toBe(pixels.get('77,3'));
+      expect(pixels.get('77,3')).toBe(pixels.get('76,3'));
+      expect(pixels.get('76,3')).toBe(pixels.get('75,4'));
+      expect(pixels.get('0,0')).not.toBe(pixels.get('0,9'));
+      expect([...pixels.values()].filter(color => color !== '#f4efe6').length / pixels.size).toBeGreaterThan(.99);
+      const version = spec.map.version;
+      spec.animate(null, 2);
+      expect(spec.map.version).toBe(version);
     }
-    expect(active).toBe(2);
-    expect(3 * .045 / 2).toBeLessThan(.15);
+    expect(new Set(keys).size).toBe(SEAT_COLORS.length);
+  } finally { getContext.mockRestore(); }
+});
+
+test('Rough Cut keeps one or two small plus glints, spatial phases and a two-second ink sweep', () => {
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(new Proxy({}, { get: () => () => {} }));
+  try {
+    const spec = wellMarble(SEAT_COLORS[0]);
+    expect(spec.userData.wellTwinkle.value).toBe(0);
+    for (let frame = 0; frame < 48; frame++) {
+      spec.animate(null, frame / 12);
+      expect(spec.userData.wellTwinkle.value).toBe(frame / 12);
+    }
+    for (const t of [undefined, NaN, Infinity, -1]) {
+      spec.animate(null, t);
+      expect(spec.userData.wellTwinkle.value).toBe(0);
+    }
+    expect(3 * .04 / 2).toBeLessThan(.15);
     const shader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <opaque_fragment>' };
     spec.onBeforeCompile(shader);
+    expect(shader.vertexShader).toContain('vWellPhase = dot(modelMatrix[3].xz, vec2(0.173, 0.317))');
+    expect(shader.fragmentShader).toContain('for (int i = 0; i < 2; i++)');
+    expect(shader.fragmentShader).toContain('if (i == 1 && mod(time, 1.2) >= 0.6) continue;');
+    expect(shader.fragmentShader).toContain('mod(time - floor(vMapUv.x * 8.0) * 0.09, 2.0)');
+    expect(shader.fragmentShader).toContain('distance(diffuseColor.rgb');
+    expect(shader.fragmentShader).toContain('if (uWellTwinkle >= 0.0)');
     expect(shader.fragmentShader).toContain('abs(pixel.x) < 0.5 && abs(pixel.y) < 1.5');
     expect(shader.fragmentShader).toContain('abs(pixel.y) < 0.5 && abs(pixel.x) < 1.5');
   } finally { getContext.mockRestore(); }
