@@ -5,6 +5,7 @@ import { fx } from './fx';
 import { ARCADE_GLSL } from './skins';
 import { clipToBoard } from './boardClip';
 import { Holes, Warps } from './Gravity';
+import { WELL_GEM, WELL_FLAMES, WELL_MISSILE } from './wellspring';
 
 const T = 64;
 const FLOOR = 0.08;
@@ -12,7 +13,7 @@ const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
 
 const makeAtlas = () => {
   const c = document.createElement('canvas');
-  c.width = c.height = T * 4;
+  c.width = T * 4; c.height = T * 8;
   const g = c.getContext('2d');
   const tile = (i, fn) => {
     g.save();
@@ -186,6 +187,14 @@ const makeAtlas = () => {
     g.arc(0, 20, 6, 0, Math.PI * 2);
     g.fill();
   });
+  [WELL_GEM, WELL_FLAMES[0], WELL_MISSILE].forEach((rows, index) => tile(16 + index, () => {
+    const x0 = Math.floor((8 - rows[0].length) / 2), y0 = Math.floor((8 - rows.length) / 2);
+    rows.forEach((row, y) => [...row].forEach((ink, x) => {
+      if (ink === '.') return;
+      g.fillStyle = ink === '#' ? '#ffffff' : '#a5a5a5';
+      g.fillRect((x + x0) * 8 - T / 2, (y + y0) * 8 - T / 2, 8, 8);
+    }));
+  }));
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
@@ -244,7 +253,7 @@ void main() {
   float tile = floor(vT + 0.5);
   float row = floor((tile + 0.5) / 4.0);
   float col = tile - row * 4.0;
-  vec2 uv = vec2((col + p.x) / 4.0, 1.0 - (row + p.y) / 4.0);
+  vec2 uv = vec2((col + p.x) / 4.0, 1.0 - (row + p.y) / 8.0);
   vec4 t = ${pixel ? 'texture2DLodEXT(uMap, uv, 0.0)' : 'texture2D(uMap, uv)'};
   float a = t.a * vA;
   ${pixel ? 'a = step(arcadeBayer(gl_FragCoord.xy * 0.5) * 0.9 + 0.05, a);' : ''}

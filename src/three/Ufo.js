@@ -368,7 +368,7 @@ const POKES = [UFO.poke1, UFO.poke2, UFO.poke3];
 const jabAt = (t) => Math.max(0, ...POKES.map((p) => Math.sin(Math.PI * clamp01((t - p + 0.12) / 0.3))));
 
 // Examination room: curved hull, porthole with Earth drifting by, consoles, specimen jars and the pedestal with its field
-function LabSet({ stunt, board, clock, marbleMat }) {
+function LabSet({ stunt, board, clock, marbleMat, marbleGeometry }) {
   const root = useRef();
   const zorp = useRef(newRig());
   const klarg = useRef(newRig());
@@ -614,7 +614,7 @@ function LabSet({ stunt, board, clock, marbleMat }) {
           <meshBasicMaterial color="#ff5a6e" transparent opacity={0.55} depthWrite={false} toneMapped={false} />
         </mesh>
       </group>
-      <mesh ref={specimen} geometry={MARBLE_GEO} material={marbleMat} position-y={1.3} castShadow />
+      <mesh ref={specimen} geometry={marbleGeometry} material={marbleMat} position-y={1.3} castShadow />
       <group name="ufo-lab-zorp" position={[-1.1, 0, -0.35]}>
         <Grey rig={zorp} scale={0.92} tablet />
       </group>
@@ -1039,7 +1039,7 @@ export function UfoFx({ stunt, board, layout, skins, colors, warming = false, on
   const spot = useMemo(() => ufoSpot(stunt, layout), [stunt, layout]);
   const palette = colors || board.colors || SEAT_COLORS;
   const seatColor = palette[stunt.seat] || SEAT_COLORS[stunt.seat];
-  const marbleMat = useMemo(() => marbleSkin(skins?.[stunt.seat], stunt.seat, seatColor).material, [skins, stunt.seat, seatColor]);
+  const marble = useMemo(() => marbleSkin(skins?.[stunt.seat], stunt.seat, seatColor), [skins, stunt.seat, seatColor]);
   const clock = () => (warming || stunt.cut ? null : stuntClock(stunt));
   const onWarmRef = useRef(onWarm);
   onWarmRef.current = onWarm;
@@ -1104,7 +1104,7 @@ export function UfoFx({ stunt, board, layout, skins, colors, warming = false, on
       <UfoWarmer root={root} onDone={warmed} />
       <UfoTransition clock={clock} onWarm={warmed} />
       <Saucer stunt={stunt} board={board} clock={clock} spot={spot} />
-      <LabSet stunt={stunt} board={board} clock={clock} marbleMat={marbleMat} />
+      <LabSet stunt={stunt} board={board} clock={clock} marbleMat={marble.material} marbleGeometry={marble.geometry || MARBLE_GEO} />
       <KitchenSet stunt={stunt} board={board} clock={clock} />
     </group>
   );

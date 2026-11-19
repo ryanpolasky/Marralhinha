@@ -1,15 +1,70 @@
 import * as THREE from 'three';
-import { planMove } from './Marbles';
+import { planMove, hopPosition, MARBLE_R, worldOf } from './Marbles';
 import { marbleSkin, diceSkin, animateDiceSkin, boardSkin, animateBoardSkin, devTintAngle, devTintSat } from './skins';
 import { layoutFor } from '../game/geometry';
 import { ITEMS, rarityOf } from '../game/catalog';
 import { campsiteBlocks } from './MinecraftProps';
-import { KILL_FX, DEV_RED } from './killfx';
+import { KILL_FX, DEV_RED, WELL_STOMP } from './killfx';
 import { TRAILS } from './trails';
 import { diskFrame, holeEnvelope } from './Gravity';
+import { GEM_GEO } from './marbleGeometry';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
+
+test('Wellspring keeps seats opaque and animates its well and gem dice on both boards', () => {
+  const ctx = new Proxy({}, { get: () => () => {} });
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+  const originalMatchMedia = window.matchMedia;
+  const motion = { matches: false };
+  window.matchMedia = () => motion;
+  try {
+    const skins = [0, 1, 2, 3].map((seat) => marbleSkin('marble.wellspring', seat));
+    skins.forEach((skin) => {
+      expect(skin.geometry).toBe(GEM_GEO);
+      expect(skin.upright).toBe(true);
+    });
+    const marbles = skins.map((skin) => skin.material);
+    expect(new Set(marbles).size).toBe(4);
+    marbles.forEach((material) => {
+      expect(material.transparent).toBe(false);
+      expect(material.transmission).toBe(0);
+      expect(material.map.magFilter).toBe(THREE.NearestFilter);
+    });
+    for (const variant of ['classic', 'blitz']) {
+      const board = boardSkin('board.wellspring', layoutFor(variant));
+      const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+      board.board.onBeforeCompile(shader);
+      expect(shader.fragmentShader).toContain('uniform sampler2D uWellCenter;');
+      expect(shader.uniforms.uWellCenter.value.magFilter).toBe(THREE.NearestFilter);
+      expect(board.side).not.toBeNull();
+      expect(board.board.specularIntensity).toBe(.3);
+      animateBoardSkin(board, 5);
+      expect(shader.uniforms.uSkinTime.value).toBe(5);
+      motion.matches = true;
+      animateBoardSkin(board, 6);
+      expect(shader.uniforms.uSkinTime.value).toBe(0);
+      motion.matches = false;
+    }
+    const dice = diceSkin('dice.wellspring');
+    expect(dice).toHaveLength(6);
+    dice.forEach((material) => {
+      const shader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>' };
+      material.onBeforeCompile(shader);
+      expect(shader.fragmentShader).toContain('float sparkle');
+      expect(material.map.magFilter).toBe(THREE.NearestFilter);
+    });
+    animateDiceSkin(dice);
+    expect(dice[0].userData.skinTime.value).toBeGreaterThan(0);
+    motion.matches = true;
+    animateDiceSkin(dice);
+    expect(dice[0].userData.skinTime.value).toBe(0);
+  } finally {
+    getContext.mockRestore();
+    if (originalMatchMedia) window.matchMedia = originalMatchMedia;
+    else delete window.matchMedia;
+  }
+});
 
 test('Supporter materials animate their accents without animating pip colors under reduced motion', () => {
   const gradient = { addColorStop: () => {} };
@@ -364,4 +419,34 @@ test('landing on an opponent is a capture, not a tap', () => {
 
   expect(plans['0-0'].some((h) => h.tap)).toBe(false);
   expect(plans['1-0'][0].impact).toBeTruthy();
+});
+
+test.each(['classic', 'blitz'])('Wellspring taps the victim top before the pop and settles exactly on %s', (variant) => {
+  const board = { active: [0, 1], marbles: [[track(13)], [base]] };
+  const move = { seat: 0, marble: 0, from: track(12), to: track(13), path: [track(13)], capture: { seat: 1, marble: 0 } };
+  const normal = planMove(move, board);
+  const layout = layoutFor(variant);
+  const plans = planMove(move, board, layout, ['fx.wellspring']);
+  const [contact, rise, settle] = plans['0-0'];
+  const hole = worldOf(0, move.to, 0, layout);
+  expect(plans['0-0']).toHaveLength(normal['0-0'].length + 2);
+  expect(contact.tap).toBeTruthy();
+  expect(contact.final).toBe(false);
+  expect(contact.to.y - MARBLE_R).toBeCloseTo(hole.y + MARBLE_R, 12);
+  expect(hopPosition(worldOf(0, move.from, 0, layout), contact, 1).distanceTo(contact.to)).toBeLessThan(1e-12);
+  expect(plans['1-0'][0].contactSignal).toBe(contact.stomp);
+  expect(contact.stomp.hit).toBeUndefined();
+  expect(plans['1-0'][0].delay).toBeUndefined();
+  expect(plans['1-0'][0].vanish).toBe(true);
+  expect(hopPosition(contact.to, rise, 1).y - contact.to.y).toBeCloseTo(WELL_STOMP.height);
+  expect(settle.to.equals(hole)).toBe(true);
+  expect(hopPosition(rise.to, settle, 1).equals(hole)).toBe(true);
+  expect(rise.dur + settle.dur).toBeCloseTo(WELL_STOMP.dur);
+  expect(contact.dur + rise.dur + settle.dur).toBeLessThan(1);
+  expect(plans['1-0'][0].impact).toEqual({ by: 0, victim: 1 });
+  expect(WELL_STOMP.height).toBeGreaterThanOrEqual(MARBLE_R * 2);
+  expect(WELL_STOMP.dur).toBeLessThanOrEqual(0.6);
+  const noCapture = planMove({ ...move, capture: null }, board, layoutFor('classic'), ['fx.wellspring']);
+  expect(noCapture['0-0']).toHaveLength(1);
+  expect(planMove(null, board)).toEqual({});
 });

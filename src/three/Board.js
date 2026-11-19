@@ -543,7 +543,7 @@ export default function Board({ active, names, turn, showNames, skin, colors: se
         return (
           <group key={i}>
             <Ring at={layout.RING[i]} inner={HOLE_R + 0.03} outer={HOLE_R + 0.12} material={materials.brass} />
-            {[0.3, 0.5, 0.7].map((t) => (
+            {(skinKey(shownSkin).startsWith('wellspring') ? [] : [0.3, 0.5, 0.7]).map((t) => (
               <mesh key={t} position={[c * t, 0.01, r * t]} rotation-x={-Math.PI / 2} rotation-z={Math.PI / 4} material={materials.brass}>
                 <planeGeometry args={[0.14, 0.14]} />
               </mesh>

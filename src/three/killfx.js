@@ -6,13 +6,14 @@ import { ORES as MC_ORES } from './minecraft';
 import { ANVIL, BALL, TRAIN, MOP, mopDir } from './Props';
 
 const col = (s) => SEAT_COLORS[s];
+export const WELL_STOMP = { dur: 0.5, height: 0.72 };
 // Dev kit effects follow the dev's live seat color, and fall back to red anywhere there's no player
 export const DEV_RED = SEAT_COLORS[0];
 const rand = (a, b) => a + Math.random() * (b - a);
 const off = (at, dx = 0, dy = 0, dz = 0) => [at[0] + dx, at[1] + dy, at[2] + dz];
 const ground = (at, dx = 0, dz = 0) => [at[0] + dx, 0.1, at[2] + dz];
 const lerp3 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12, foot: 13, grass: 14, alert: 15 };
+export const TILE = { glow: 0, smoke: 1, star: 2, drop: 3, petal: 4, square: 5, flame: 6, bubble: 7, ghost: 8, bat: 9, flare: 10, streak: 11, ring: 12, foot: 13, grass: 14, alert: 15, wellGem: 16, wellSoul: 17, wellMissile: 18 };
 
 // Timers ride the bus clock so they pause with the frame loop and die with the scene
 const timeline = (bus) => {
@@ -27,6 +28,14 @@ const timeline = (bus) => {
 
 // One (emit, info) => {} per skin key; info = { at, by, victim, sfx, later, seq, track }
 const KILL_FX = {
+  wellspring: (emit, { at, by, victim, sfx }) => {
+    emit('spr', { position: at, n: 3, px: true, tile: TILE.smoke, c: ['#f4efe6', '#2b2a35'], speed: 0.3, up: 0.4, size: 0.8, size2: 1, life: 0.32, a: 0.35 });
+    emit('spr', { position: at, px: true, tile: TILE.square, c: ['#f4efe6'], rot: 0, size: 0.9, size2: 0, life: 0.12, jitter: 0, fadeIn: 0 });
+    emit('spr', { position: at, n: 9, px: true, tile: TILE.wellGem, c: [col(victim).main, '#f4efe6', col(by).main], rot: 0, speed: 2.6, up: 2.1, uj: 0, grav: 0.9, drag: 1.2, size: 0.48, size2: 0.32, life: 0.62, jitter: 0, fadeIn: 0 });
+    emit('spr', { position: off(at, 0, 0.2), px: true, tile: TILE.wellSoul, c: ['#f4efe6'], rot: 0, up: 1.8, uj: 0, size: 0.92, size2: 0.55, life: 0.8, jitter: 0, fadeIn: 0.02 });
+    emit('shake', { amount: 0.12 });
+    sfx('crunch');
+  },
   // The victim breaks like a block: chunks bounce, flat debris rains, then XP orbs hop out and get pulled up into a level-up
   minecraft: (emit, { at, by, victim, sfx, later, seq }) => {
     const ore = MC_ORES[victim % 4];

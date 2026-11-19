@@ -12,6 +12,7 @@ import Confetti from './Confetti';
 import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee, Dots, Close } from './Icons';
 import HudSheet from './HudSheet';
 import Marquee from './Marquee';
+import WellspringName from './WellspringName';
 import useMedia, { PHONE_QUERY, WIDE_RESULTS_QUERY } from './useMedia';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf, emotesOf, emoteFor } from '../game/catalog';
@@ -374,7 +375,9 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
       </span>
       <div className="chip-body">
         <div className="chip-name">
-          <Marquee className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</Marquee>
+          {skinKey(player?.cosmetics?.nameplate) === 'wellspring'
+            ? <span className="chip-name-text"><WellspringName name={seat === mySeat ? 'You' : player?.name} /></span>
+            : <Marquee className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</Marquee>}
           <TagBadges tags={player?.tags} badges={player?.badges} small />
           {player?.isBot && <span className="badge">bot</span>}
           {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
