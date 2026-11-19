@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { ITEMS, CURRENCY, TAGS, skinKey, rarityOf } from '../game/catalog';
 import { SEAT_COLORS } from '../game/geometry';
+import WellspringName from './WellspringName';
 
 const ItemPreview = lazy(() => import('../three/Preview'));
 
@@ -198,7 +199,7 @@ export function PreviewStage({ itemId, seat = 0, color = null, playerName, repla
           <span className="avatar" style={{ '--seat': c.main, '--seat-light': c.light }}>
             {(playerName || '?').slice(0, 1).toUpperCase()}
           </span>
-          <span>{playerName || 'Player'}</span>
+          {itemId === 'plate.wellspring' ? <WellspringName name={playerName} /> : <span>{playerName || 'Player'}</span>}
         </Nameplate>
       </div>
     );

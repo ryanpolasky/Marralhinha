@@ -5,6 +5,7 @@ import { hexToOklch } from '../game/colors';
 import { rainbowHue } from '../game/rainbow';
 import { makeCanvas, seeded, finish, makeWoodCanvas, makeFeltTexture, makeSwirlCanvas, finishMarble } from './textures';
 import { blockCanvas, oreBlockCanvases, firstNightCanvas, stumpCanvas, grassFieldCanvas, workbenchFace, workbenchPips } from './minecraft';
+import { wellMarble, wellBoard, wellPips } from './wellspring';
 
 const cache = new Map();
 const cached = (key, build) => {
@@ -250,6 +251,7 @@ function signalMarble(c, seat) {
 }
 
 const MARBLES = {
+  wellspring: (c) => wellMarble(c),
   // Each face of an invisible cube gets the 16px ore block, projected from object space so it rolls with the marble
   minecraft: (c, seat) => {
     const [base, glow] = oreBlockCanvases(seat, c !== SEAT_COLORS[seat] ? c : null);
@@ -1426,6 +1428,7 @@ const PIPS = {
 };
 
 const DICE = {
+  wellspring: { bg: '#07070a', pip: '#f4efe6', one: '#f0354b', roughness: 0.55, clearcoat: 0.2, extra: { specularIntensity: 0.3, clearcoatRoughness: 0.3 } },
   ivory: { bg: '#fbf4e4', pip: '#23160b', one: '#c62828', roughness: 0.32 },
   ebony: { bg: '#1d1a18', pip: '#f5efe3', one: '#ff4b3e', roughness: 0.25 },
   ruby: { bg: '#b8182a', pip: '#ffffff', one: '#ffffff', roughness: 0.14, clearcoat: 1 },
@@ -1461,8 +1464,8 @@ const DICE = {
 };
 
 const SCANNER_LEDS = [['#7a1010', 85, 0.19], ['#7a6a10', 170, 0.25], ['#1a6a20', 255, 0.31]];
-const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
-const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train'];
+const ANIMATED_DICE = ['dev', 'holo', 'lucky', 'supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train', 'wellspring'];
+const MOTION_SAFE_DICE = ['supporter', 'arcade', 'halloween', 'defuse', 'minecraft', 'wild', 'train', 'wellspring'];
 
 const gemPips = (ctx, value, size, color) => workbenchPips(ctx, PIPS[value], size, color === '#fff' ? color : { dark: mix(color, '#000000', 0.85), main: color, light: mix(color, '#ffffff', 0.7) });
 
@@ -1953,11 +1956,12 @@ export function diceSkin(itemId) {
       const size = 256;
       const [canvas, ctx] = makeCanvas(size, size);
       dieBackground(ctx, spec.bg, size, value);
-      ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips, unlucky: glassPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
+      if (key === 'wellspring') wellPips(ctx, value, size, PIPS[value]);
+      else ({ arcade: blockPips, defuse: keypadPips, minecraft: gemPips, sugar: sugarPips, fuzzy: fuzzyPips, train: visorPips, unlucky: glassPips }[key] || drawPips)(ctx, value, size, value === 1 ? spec.one : spec.pip);
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
-      if (key === 'arcade') crisp(map);
+      if (key === 'arcade' || key === 'wellspring') crisp(map);
       if (key === 'minecraft') pixelMips(map);
       const params = { map, roughness: spec.roughness, metalness: spec.metalness || 0, clearcoat: spec.clearcoat || 0, ...(spec.extra || {}) };
       if (spec.glow) {
@@ -1973,7 +1977,8 @@ export function diceSkin(itemId) {
         mctx.fillStyle = '#000';
         mctx.fillRect(0, 0, size, size);
         mctx.fillStyle = '#fff';
-        if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
+        if (key === 'wellspring') wellPips(mctx, value, size, PIPS[value]);
+        else if (key === 'arcade') blockPips(mctx, value, size, '#fff', false);
         else if (key === 'minecraft') gemPips(mctx, value, size, '#fff');
         else if (key === 'wild') scannerMask(mctx, value, size);
         else PIPS[value].forEach(([x, y]) => {
@@ -1999,7 +2004,19 @@ export function diceSkin(itemId) {
             .replace('#include <common>', `#include <common>\nuniform float uSkinTime;\nuniform float uFacePhase;${key === 'arcade' ? ARCADE_GLSL : key === 'halloween' ? SKIN_NOISE_GLSL : ''}`)
             .replace('#include <dithering_fragment>', key === 'arcade' ? ARCADE_POST : '#include <dithering_fragment>')
             .replace('#include <color_fragment>', '#include <color_fragment>')
-            .replace('#include <emissivemap_fragment>', key === 'train' ? `{
+            .replace('#include <emissivemap_fragment>', key === 'wellspring' ? `{
+              vec2 uv = floor(vMapUv * 64.0) / 64.0;
+              vec3 ink = texture2D(map, vMapUv).rgb;
+              float tick = floor(uSkinTime * 5.0 + uFacePhase);
+              float sparkle = step(0.96, fract(sin(dot(floor(uv * 32.0), vec2(12.9898,78.233)) + tick) * 43758.5453));
+              float pip = step(0.12, max(ink.r, max(ink.g, ink.b)));
+              float phase = mod(floor(uSkinTime * 2.0 + uFacePhase), 4.0);
+              vec3 hue = phase < 1.0 ? vec3(0.89,0.86,0.79) : phase < 2.0 ? vec3(0.87,0.035,0.07) : phase < 3.0 ? vec3(0.024,0.023,0.036) : vec3(0.002,0.002,0.003);
+              float sweep = step(abs(fract(uv.x + uv.y - uSkinTime * 0.35) - 0.5), 0.13);
+              float core = step(0.4, ink.g);
+              diffuseColor.rgb = mix(diffuseColor.rgb, hue, pip * sweep * (1.0 - core));
+              totalEmissiveRadiance = ink * pip * 0.18 + hue * pip * sweep * (0.3 + sparkle);
+            }` : key === 'train' ? `{
               vec2 uv = vEmissiveMapUv;
               float pip = texture2D(emissiveMap, uv).r;
               float wag = smoothstep(0.3, 0.7, 0.5 + 0.5 * sin(uSkinTime * 5.0 + uFacePhase));
@@ -5449,6 +5466,7 @@ const WATER_DAMAGE_SHADER = `{
 }`;
 
 const SPECIAL_BOARDS = {
+  wellspring: wellBoard,
   // An oak deck with a log rim, stump trays with bark sides, and a crafting table in the middle.
   // Outer walls get bark; hole walls carry the planks down into the divots
   minecraft: (layout) => {
@@ -5661,7 +5679,7 @@ const SPECIAL_BOARDS = {
   }),
 };
 
-const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'unlucky', 'wild', 'cardboard', 'glass']);
+const LAYOUT_BOARDS = new Set(['dev', 'beta', 'supporter', 'arcade', 'halloween', 'defuse', 'picnic', 'minecraft', 'lucky', 'unlucky', 'wild', 'cardboard', 'glass', 'wellspring']);
 
 function patchSkinShader(material, { body, common = '', uniforms = {}, key, post = false }) {
   const time = { value: 0 };

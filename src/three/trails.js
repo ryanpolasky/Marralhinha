@@ -19,6 +19,15 @@ const overBumps = (x, z, bumps) => bumps.reduce((y, [bx, bz]) => Math.max(y, 0.0
 
 // Called every ~0.34 units of hop travel with info = { by, prev, n }, so keep each call cheap
 const TRAILS = {
+  wellspring: (emit, p, { by = 0, n = 0, prev, bumps = [] }) => {
+    const from = prev || p, dx = p[0] - from[0], dz = p[2] - from[2];
+    for (let i = 0; i < 3; i++) {
+      const t = (i + 0.5) / 3, x = from[0] + dx * t, z = from[2] + dz * t;
+      const y = Math.max(from[1] + (p[1] - from[1]) * t, overBumps(x, z, bumps) + 0.12);
+      emit('spr', { position: [x, y, z], px: true, tile: TILE.wellMissile, c: [i === 1 ? '#f4efe6' : col(by).main], rot: Math.atan2(dz, dx) + Math.PI / 2, size: 0.34 - i * 0.04, size2: 0.08, life: 0.32, jitter: 0, fadeIn: 0, up: 0.18, uj: 0 });
+      emit('spr', { position: [x + (n % 2 ? 0.06 : -0.06), y + 0.04, z], px: true, tile: TILE.square, c: [col(by).main], rot: 0, size: 0.07, size2: 0, life: 0.46, jitter: 0, fadeIn: 0, up: 0.25, uj: 0 });
+    }
+  },
   // XP orbs that bob up and wink out, plus grass and dirt crumbs kicked up on every other hop
   minecraft: (emit, p, { n }) => {
     const at = [p[0], p[1] + 0.08, p[2]];

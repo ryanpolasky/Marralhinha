@@ -21,7 +21,8 @@ export const probeMaterials = () => {
   ];
   const marble = marbleSkin('marble.unlucky', 0);
   const board = boardSkin('board.unlucky');
-  return [...base, marble.material, ...board.surfaces, ...diceSkin('dice.unlucky'), TAPE_MATERIAL, SEEP_MATERIAL, ...warmBucket().materials, new THREE.MeshBasicMaterial({ toneMapped: false })];
+  const well = boardSkin('board.wellspring');
+  return [...base, marble.material, ...board.surfaces, ...diceSkin('dice.unlucky'), marbleSkin('marble.wellspring', 0).material, ...well.surfaces, ...diceSkin('dice.wellspring'), TAPE_MATERIAL, SEEP_MATERIAL, ...warmBucket().materials, new THREE.MeshBasicMaterial({ toneMapped: false })];
 };
 
 export const buildProbes = (materials) => {

@@ -11,7 +11,7 @@ import { TapeX, Seep } from './DuctTape';
 import { useWarmed } from './warm';
 import { useRainbow } from '../game/rainbow';
 import { fx } from './fx';
-import { playKillFx } from './killfx';
+import { playKillFx, WELL_STOMP } from './killfx';
 import { ANVIL, BALL, TRAIN, MOP, ballRock, mopDir } from './Props';
 import { skinKey } from '../game/catalog';
 import { playTrail } from './trails';
@@ -89,6 +89,7 @@ export function planMove(lastMove, board, layout = CLASSIC_LAYOUT, killFx = []) 
   if (lastMove.kind === 'enter') last.burst = { colors: [SEAT_COLORS[seat].light, '#ffffff'], count: 18, up: 2, speed: 2, size: 0.07 };
   plans[`${seat}-${marble}`] = hops;
   if (capture && skinKey(killFx[seat]) === 'wild') hops.push({ to: last.to.clone(), dur: BALL.pop, height: 0, quiet: true, rock: true });
+  if (capture && skinKey(killFx[seat]) === 'wellspring') hops.push({ to: last.to.clone(), ...WELL_STOMP, quiet: true });
   if (capture) {
     plans[`${capture.seat}-${capture.marble}`] = victimPlan(skinKey(killFx[seat]), last.to, worldOf(capture.seat, { zone: 'base' }, capture.marble, layout), { delay: total - 0.04, impact: { by: seat, victim: capture.seat } });
   }

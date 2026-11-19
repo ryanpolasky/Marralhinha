@@ -10,7 +10,7 @@ import Board, { hasBoardProps } from './Board';
 import KillFxLayer from './KillFxLayer';
 import Spectacle from './Spectacle';
 import { makeFxBus } from './fx';
-import { playKillFx, warmKillFx } from './killfx';
+import { playKillFx, warmKillFx, wellStompLift } from './killfx';
 import { playTrail } from './trails';
 import * as THREE from 'three';
 import { MARBLE_GEO, MARBLE_R, victimPlan } from './Marbles';
@@ -119,8 +119,9 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
   const bus = useMemo(() => makeFxBus(), [replay]); // eslint-disable-line react-hooks/exhaustive-deps
   const victim = (seat + 1) % 4;
   useMemo(() => warmKillFx(itemId), [itemId]);
-  const attackerSkin = marbleSkin('marble.classic', seat);
-  const victimSkin = marbleSkin('marble.classic', victim);
+  const wellspring = skinKey(itemId) === 'wellspring';
+  const attackerSkin = marbleSkin(wellspring ? 'marble.wellspring' : 'marble.classic', seat);
+  const victimSkin = marbleSkin(wellspring ? 'marble.wellspring' : 'marble.classic', victim);
   const attacker = useRef();
   const target = useRef();
   const fired = useRef(false);
@@ -141,6 +142,7 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
     const e = h >= HOPS ? 1 : h - i;
     const rock = fired.current && skinKey(itemId) === 'wild' ? ballRock(t - START - HOPS * HOP_TIME) : 0;
     attacker.current.position.set(0, 0.07 + (h > 0 && h < HOPS ? Math.sin(Math.PI * e) * 0.45 : 0), LANE - i - easeInOut(e) - rock);
+    if (wellspring) attacker.current.position.y += wellStompLift(t - START - HOPS * HOP_TIME);
     attacker.current.rotation.x = -rock / MARBLE_R;
     if (flight.current) {
       const at = flightAt(flight.current, t - flight.current.at);
@@ -171,7 +173,7 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
   return (
     <group rotation-y={-Math.PI / 2}>
       <group position={[-2, 0, -4]}>
-        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin="board.oak" table={false} />
+        <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={wellspring ? 'board.wellspring' : 'board.oak'} table={false} />
       </group>
       <mesh ref={target} geometry={MARBLE_GEO} material={victimSkin.material} position={[0, 0.07, 0]} castShadow />
       <mesh ref={attacker} geometry={MARBLE_GEO} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow />
