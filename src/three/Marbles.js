@@ -19,13 +19,13 @@ import { makeLabelTexture } from './textures';
 import { clamp01, downAmount, hitGeo, samePos } from '../game/hits';
 import { touchActive, touchClaimed, useTouchTarget } from './touchPick';
 import { CUT_HOLD, cutClock, flashSway, knockOffset, rockyKnocks, rockyPose, starOf, stuntClock, stuntLive, ufoSway } from '../game/stunts';
+import { MARBLE_R, MARBLE_GEO } from './marbleGeometry';
 
-export const MARBLE_R = 0.335;
+export { MARBLE_R, MARBLE_GEO } from './marbleGeometry';
 const REST_Y = 0.07;
 const STACKED_Y = REST_Y + MARBLE_R * 1.95;
 
 // One copy of each buffer on the GPU instead of one per marble, ghost and halo
-export const MARBLE_GEO = new THREE.SphereGeometry(MARBLE_R, 40, 24);
 const HIT_GEO = new THREE.SphereGeometry(0.5, 12, 8);
 const HALO_GEO = new THREE.RingGeometry(0.4, 0.5, 40);
 const GHOST_GEO = new THREE.SphereGeometry(MARBLE_R, 24, 16);
@@ -262,7 +262,7 @@ function poseLimbs(r, pose) {
   });
 }
 
-function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, tint, down, pickable, onPick, stunt, star, knock, seed, layout, keel }) {
+function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, material, geometry = MARBLE_GEO, upright, aura: skinAura, movable, selected, hovered, onClick, onHover, mySeat, killFx, trail, palette, tint, down, pickable, onPick, stunt, star, knock, seed, layout, keel }) {
   const group = useRef();
   const body = useRef();
   const halo = useRef();
@@ -406,10 +406,11 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
     const dz = a.pos.z - prev.z + a.off.z - prevOffZ;
     const dist = Math.hypot(dx, dz);
     // Up on its legs it runs, it doesn't roll
-    if (dist > 1e-5 && !pose && !knocked) {
+    if (dist > 1e-5 && !pose && !knocked && !upright) {
       axis.set(dz, 0, -dx).normalize();
       body.current.quaternion.premultiply(spin.setFromAxisAngle(axis, dist / MARBLE_R));
     }
+    if (upright && !pose && !knocked && !ufo) body.current.quaternion.identity();
     // Gotcha Ball keeps its seat-colored top half up: free to wobble, never flipped
     if (keel && !knocked?.tumble && !ufo?.spin) {
       _up.copy(UP).applyQuaternion(body.current.quaternion);
@@ -476,7 +477,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
   return (
     <>
       <group ref={group}>
-        <mesh ref={body} geometry={MARBLE_GEO} material={aura ? SHADOW_ONLY : material} castShadow>
+        <mesh ref={body} geometry={geometry} material={aura ? SHADOW_ONLY : material} castShadow>
           {taped && <TapeX size={MARBLE_R} />}
           {taped && <Seep size={MARBLE_R} seed={seed} />}
         </mesh>
@@ -484,7 +485,7 @@ function Marble({ seat, color = SEAT_COLORS[seat], target, plan, planKey, materi
         {corona && <SolCorona size={MARBLE_R} color={color} seed={seed} />}
         {rocky && <Limbs rig={rig} />}
         {down && (
-          <mesh ref={shade} geometry={SHADE_GEO} visible={false} renderOrder={1}>
+          <mesh ref={shade} geometry={upright ? geometry : SHADE_GEO} scale={upright ? 1.015 : 1} visible={false} renderOrder={1}>
             <meshBasicMaterial color="#050607" transparent opacity={0} depthWrite={false} />
           </mesh>
         )}
@@ -607,7 +608,7 @@ function skinProbes(list) {
   const probes = new THREE.Group();
   list.forEach((skin) => {
     if (!skin) return;
-    const body = new THREE.Mesh(MARBLE_GEO, skin.aura === 'singularity' ? SHADOW_ONLY : skin.material);
+    const body = new THREE.Mesh(skin.geometry || MARBLE_GEO, skin.aura === 'singularity' ? SHADOW_ONLY : skin.material);
     body.castShadow = true;
     probes.add(body);
     if (skin.aura === 'corona') probes.add(coronaProbe());
@@ -679,6 +680,8 @@ export default function Marbles({ board, skins = [], colors, killFx = [], trails
               plan={plans[key]}
               planKey={planKey}
               material={materials[seat].material}
+              geometry={materials[seat].geometry}
+              upright={materials[seat].upright}
               aura={materials[seat].aura}
               keel={['wild', 'unlucky'].includes(skinKey(skins[seat]))}
               movable={movable}

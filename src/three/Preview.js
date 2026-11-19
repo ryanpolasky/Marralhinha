@@ -42,8 +42,8 @@ function MarblePreview({ itemId, seat, color }) {
     <group>
       <group ref={anchor}>
         <Spinner>
-          <mesh material={skin.material}>
-            <sphereGeometry args={[1.35, 64, 40]} />
+          <mesh material={skin.material} geometry={skin.geometry} scale={skin.geometry ? 1.35 / MARBLE_R : 1}>
+            {!skin.geometry && <sphereGeometry args={[1.35, 64, 40]} />}
             {skin.aura === 'duct-tape' && <TapeX size={1.35} />}
                 </mesh>
         </Spinner>
@@ -181,8 +181,8 @@ function FxPreview({ itemId, seat, replay, timeScale }) {
       <group position={[-2, 0, -4]}>
         <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin={wellspring ? 'board.wellspring' : 'board.oak'} table={false} />
       </group>
-      <mesh ref={target} geometry={MARBLE_GEO} material={victimSkin.material} position={[0, 0.07, 0]} castShadow />
-      <mesh ref={attacker} geometry={MARBLE_GEO} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow />
+      <mesh ref={target} geometry={victimSkin.geometry || MARBLE_GEO} material={victimSkin.material} position={[0, 0.07, 0]} castShadow />
+      <mesh ref={attacker} geometry={attackerSkin.geometry || MARBLE_GEO} material={attackerSkin.material} position={[0, 0.07, LANE]} castShadow />
       <KillFxLayer key={replay} bus={bus} layout={CLASSIC} origin={BOARD_ORIGIN} timeScale={timeScale} />
     </group>
   );
@@ -245,8 +245,8 @@ function TrailPreview({ itemId, seat, replay, timeScale }) {
       <group position={[-2, 0, -4]}>
         <Board active={[0, 1, 2, 3]} names={[]} turn={null} skin="board.oak" table={false} />
       </group>
-      <mesh geometry={MARBLE_GEO} material={blockerSkin.material} position={[0, 0.07, 1]} castShadow />
-      <mesh ref={m} geometry={MARBLE_GEO} material={skin.material} position={[0, 0.07, RUN]} castShadow />
+      <mesh geometry={blockerSkin.geometry || MARBLE_GEO} material={blockerSkin.material} position={[0, 0.07, 1]} castShadow />
+      <mesh ref={m} geometry={skin.geometry || MARBLE_GEO} material={skin.material} position={[0, 0.07, RUN]} castShadow />
       <Spectacle key={replay} bus={bus} timeScale={timeScale} />
     </group>
   );

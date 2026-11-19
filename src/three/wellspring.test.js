@@ -46,12 +46,12 @@ test('only the canonical Wellspring marble remains in the six-piece set', () => 
     expect(ITEMS[`marble.wellspring_${variant}`]).toBeUndefined();
     expect(ITEMS[`board.wellspring_${variant}`]).toBeUndefined();
   }
-  expect(ITEMS['marble.wellspring'].name).toBe('Freefall');
+  expect(ITEMS['marble.wellspring'].name).toBe('Rough Cut');
   expect(DROPPABLE.some((item) => item.id === 'marble.wellspring')).toBe(true);
   expect(SETS.wellspring.items).toHaveLength(6);
 });
 
-test('Freefall bypasses smooth lighting and the canonical board masks its animated frame layer', () => {
+test('Rough Cut bypasses smooth lighting and the canonical board masks its animated frame layer', () => {
   const ctx = new Proxy({}, { get: () => () => {} });
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
   try {
@@ -61,6 +61,9 @@ test('Freefall bypasses smooth lighting and the canonical board masks its animat
         expect(spec.map.minFilter).toBe(THREE.NearestFilter);
         expect(spec.toneMapped).toBe(false);
         expect(spec.specularIntensity).toBe(0);
+        expect(spec.flatShading).toBe(true);
+        expect(spec.geometry.type).toBe('OctahedronGeometry');
+        expect(spec.upright).toBe(true);
         const shader = { vertexShader: '#include <begin_vertex>', fragmentShader: '#include <opaque_fragment>' };
         spec.onBeforeCompile(shader);
         expect(shader.fragmentShader).toContain('outgoingLight = diffuseColor.rgb;');
@@ -89,7 +92,7 @@ test('Freefall bypasses smooth lighting and the canonical board masks its animat
   }
 });
 
-test('Freefall freezes its surface animation for reduced motion', () => {
+test('Rough Cut freezes its surface animation for reduced motion', () => {
   const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(new Proxy({}, { get: () => () => {} }));
   const old = window.matchMedia;
   window.matchMedia = () => ({ matches: true });
@@ -98,6 +101,29 @@ test('Freefall freezes its surface animation for reduced motion', () => {
     spec.animate(null, 5);
     expect(spec.map.version).toBe(version);
   } finally { getContext.mockRestore(); window.matchMedia = old; }
+});
+
+test('Rough Cut uses isolated pixel crosses, never a connected white glint line', () => {
+  const frames = [];
+  const getContext = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+    const rectangles = [];
+    frames.push(rectangles);
+    return { fillStyle: '', fillRect(x, y, width, height) { rectangles.push({ color: this.fillStyle, x, y, width, height }); } };
+  });
+  try {
+    wellMarble(SEAT_COLORS[0]);
+    expect(frames).toHaveLength(32);
+    for (const rectangles of frames) {
+      expect(rectangles.filter(({ width, height }) => width === 16 && height === 16)).toHaveLength(8);
+      const cream = rectangles.filter(({ color }) => color === '#f4efe6');
+      expect(cream.length).toBeGreaterThan(0);
+      for (const { width, height } of cream) {
+        expect(Math.min(width, height)).toBe(1);
+        expect(Math.max(width, height)).toBeLessThanOrEqual(5);
+      }
+    }
+    expect(new Set(frames.map((frame) => JSON.stringify(frame))).size).toBe(32);
+  } finally { getContext.mockRestore(); }
 });
 
 test('Stomp is one short gem burst with one upward soul and no delayed echo', () => {

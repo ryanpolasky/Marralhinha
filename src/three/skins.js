@@ -1410,11 +1410,11 @@ export function marbleSkin(itemId, seat, color = null) {
   const c = color || SEAT_COLORS[seat] || SEAT_COLORS[0];
   const colorTag = c === SEAT_COLORS[seat] ? seat : `${seat}:${c.main}${c.rainbow ? ':rainbow' : ''}`;
   return cached(`marble:${key}:${colorTag}`, () => {
-    const { animate, ...params } = MARBLES[key](c, seat);
+    const { animate, geometry, upright, ...params } = MARBLES[key](c, seat);
     const material = new THREE.MeshPhysicalMaterial({ metalness: 0, envMapIntensity: 1.3, ...params });
     const spin = c.rainbow ? withHueShift(material, hexToOklch(c.main).h) : null;
     const run = animate ? (t) => animate(material, key === 'dev' ? performance.now() / 1000 : t) : null;
-    return { material, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'duct-tape' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
+    return { material, geometry, upright, aura: key === 'dev' ? 'singularity' : key === 'sol' ? 'corona' : key === 'unlucky' ? 'duct-tape' : null, animate: spin || run ? (t) => { run?.(t); spin?.(t); } : null };
   });
 }
 

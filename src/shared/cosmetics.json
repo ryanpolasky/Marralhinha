@@ -84,7 +84,7 @@
     { "id": "marble.lucky", "slot": "marble", "name": "Molten", "rarity": "exclusive", "tag": "lucky", "desc": "Rivers of molten gold flowing through your color of glass. Part of the Luckiest set." },
     { "id": "marble.unlucky", "slot": "marble", "name": "Duct Taped", "rarity": "exclusive", "tag": "unlucky", "desc": "Good as new. Part of the Unluckiest set." },
     {"id": "marble.train", "slot": "marble", "name": "Signal Lamp", "rarity": "mythic", "set": "train", "desc": "Your color, lit from inside and set in chrome. Proceed."},
-    {"id": "marble.wellspring", "slot": "marble", "name": "Freefall", "rarity": "mythic", "set": "wellspring", "desc": "No bottom in sight. Plenty of bricks on the way down."},
+    {"id": "marble.wellspring", "slot": "marble", "name": "Rough Cut", "rarity": "mythic", "set": "wellspring", "desc": "Fresh out of the well. Still catching the light."},
     {"id": "marble.wild", "slot": "marble", "name": "Gotcha Ball", "rarity": "mythic", "set": "wild", "desc": "Snap the button, hear the click. Fits in your pocket."},
 
     { "id": "board.oak", "slot": "board", "name": "Oak", "rarity": "default", "desc": "Honest carpentry from Terceira." },

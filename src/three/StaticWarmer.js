@@ -5,6 +5,7 @@ import { idle } from './Board';
 import { boardSkin, diceSkin, marbleSkin } from './skins';
 import { warmBucket } from './BucketModel';
 import { TAPE_MATERIAL, SEEP_MATERIAL } from './DuctTape';
+import { GEM_GEO } from './marbleGeometry';
 
 const PROBE_GEO = new THREE.PlaneGeometry(1, 1);
 const PROBE_MAP = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -34,7 +35,7 @@ export const buildProbes = (materials) => {
       probe = new THREE.InstancedMesh(PROBE_GEO, m, 1);
       probe.setColorAt(0, new THREE.Color(1, 1, 1));
     } else {
-      probe = new THREE.Mesh(PROBE_GEO, m);
+      probe = new THREE.Mesh(m.userData.marbleGeometry === 'gem' ? GEM_GEO : PROBE_GEO, m);
       probe.castShadow = true;
     }
     scratch.add(probe);

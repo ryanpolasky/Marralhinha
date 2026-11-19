@@ -7,6 +7,7 @@ import { campsiteBlocks } from './MinecraftProps';
 import { KILL_FX, DEV_RED, WELL_STOMP } from './killfx';
 import { TRAILS } from './trails';
 import { diskFrame, holeEnvelope } from './Gravity';
+import { GEM_GEO } from './marbleGeometry';
 
 const track = (idx) => ({ zone: 'track', idx });
 const base = { zone: 'base' };
@@ -18,7 +19,12 @@ test('Wellspring keeps seats opaque and animates its well and gem dice on both b
   const motion = { matches: false };
   window.matchMedia = () => motion;
   try {
-    const marbles = [0, 1, 2, 3].map((seat) => marbleSkin('marble.wellspring', seat).material);
+    const skins = [0, 1, 2, 3].map((seat) => marbleSkin('marble.wellspring', seat));
+    skins.forEach((skin) => {
+      expect(skin.geometry).toBe(GEM_GEO);
+      expect(skin.upright).toBe(true);
+    });
+    const marbles = skins.map((skin) => skin.material);
     expect(new Set(marbles).size).toBe(4);
     marbles.forEach((material) => {
       expect(material.transparent).toBe(false);

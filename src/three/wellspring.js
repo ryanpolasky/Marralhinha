@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GEM_GEO } from './marbleGeometry';
 
 // Wellspring src/art.ts: default palette and pickup/spell bitmap art.
 export const WELL = ['#07070a', '#f4efe6', '#f0354b', '#2b2a35'];
@@ -68,17 +69,20 @@ export function wellGem(ctx, x, y, scale = 1, accent = WELL[2]) {
 }
 
 export function wellMarble(c) {
-  const tones = [.28, .55, .83, 1].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
+  const tones = [.42, .65, .84, 1].map((v) => `#${new THREE.Color(c.main).multiplyScalar(v).getHexString()}`);
   const frames = Array.from({ length: 32 }, (_, frame) => {
-    const image = canvas(128, 64), g = image.getContext('2d');
-    for (let y = 0; y < 64; y++) for (let x = 0; x < 128; x++) {
-      let band = y < 12 || y > 56 ? 1 : y > 44 ? 2 : 3;
-      const sy = (y + frame * 2) % 64, row = Math.floor(sy / 8);
-      if (sy % 8 === 7 || (x + (row % 2) * 8) % 16 === 15) band = 0;
-      else if ((x + (row % 2) * 8) % 16 < 3) band = 2;
-      g.fillStyle = tones[band]; g.fillRect(x, y, 1, 1);
+    const image = canvas(128, 16), g = image.getContext('2d');
+    for (let face = 0; face < 8; face++) {
+      g.fillStyle = tones[[3, 2, 1, 2, 2, 1, 0, 1][face]];
+      g.fillRect(face * 16, 0, 16, 16);
+      const step = (frame + face * 4) % 32;
+      if (step >= 12) continue;
+      const x = face * 16 + 6 + Math.floor(step * 4 / 11), y = 5 + Math.floor(step * 2 / 11);
+      const r = step < 2 || step > 9 ? 1 : 2;
+      g.fillStyle = WELL[1];
+      g.fillRect(x - r, y, r * 2 + 1, 1);
+      g.fillRect(x, y - r, 1, r * 2 + 1);
     }
-    for (let i = 0; i < 4; i++) wellGem(g, i * 32 + 8, (i * 17 + frame * 2) % 64, 2, tones[1]);
     return image;
   });
   const map = new THREE.CanvasTexture(frames[0]);
@@ -88,11 +92,16 @@ export function wellMarble(c) {
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   let lastFrame = 0;
   return {
-    map, roughness: 1, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0, toneMapped: false,
+    geometry: GEM_GEO, upright: true, userData: { marbleGeometry: 'gem' },
+    map, flatShading: true, roughness: 1, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0, toneMapped: false,
     onBeforeCompile: (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight = diffuseColor.rgb;\n#include <opaque_fragment>');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `outgoingLight = diffuseColor.rgb;
+        if (abs(normal.z) < 0.4) {
+          outgoingLight = texture2D(map, vec2((floor(vMapUv.x * 8.0) + 0.5) / 8.0, 0.0625)).rgb;
+        }
+        #include <opaque_fragment>`);
     },
-    customProgramCacheKey: () => 'wellspring-freefall-ink',
+    customProgramCacheKey: () => 'wellspring-gem-ink',
     animate: (material, t) => {
       const frame = motion?.matches ? 0 : Math.floor(t * 8) % frames.length;
       if (frame === lastFrame) return;
