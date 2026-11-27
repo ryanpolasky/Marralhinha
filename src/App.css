@@ -4823,7 +4823,7 @@ img.emote-glyph {
   .locker-modal .locker-body .item-grid { overflow-y: auto; }
 }
 
-@media (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+@media (orientation: landscape) and (max-width: 1023px) and (max-height: 540px) and (pointer: coarse) {
   .modal-backdrop:has(> :is(.shop-modal, .locker-modal, .settings-modal)) {
     --modal-top: max(12px, env(safe-area-inset-top));
     --modal-bottom: max(12px, env(safe-area-inset-bottom));
@@ -10818,7 +10818,7 @@ body {
   font-size: 16px;
 }
 
-@media (min-width: 621px) and (max-width: 1200px) and (pointer: coarse) {
+@media (min-width: 621px) and (max-width: 1200px) and (orientation: portrait) and (pointer: coarse) {
   .hud:not(.phone-hud) .hud-top {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -10870,7 +10870,8 @@ body {
   aspect-ratio: 1;
 }
 
-@media (max-width: 1200px) and (pointer: coarse) {
+@media (orientation: portrait) and (max-width: 1200px) and (pointer: coarse),
+  (orientation: landscape) and (max-width: 1023px) and (max-height: 500px) and (pointer: coarse) {
   .hud .players-bar .team,
   .hud .players-bar .chip {
     min-width: 0;
