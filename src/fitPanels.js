@@ -15,8 +15,10 @@ export function startPanelFit() {
   const fit = (el, reset) => {
     if (reset || !mq.matches) clear(el);
     if (!mq.matches) return;
+    const style = getComputedStyle(el);
+    if (style.getPropertyValue('--panel-fit').trim() === 'scroll') return clear(el);
     const zoom = parseFloat(el.style.zoom) || 1;
-    if (!el.dataset.fitW) el.dataset.fitW = getComputedStyle(el).width;
+    if (!el.dataset.fitW) el.dataset.fitW = style.width;
     const modal = el.classList.contains('modal');
     const natural = (modal ? Math.max(el.scrollHeight, el.offsetHeight) : el.offsetHeight) || 1;
     const box = el.parentElement;

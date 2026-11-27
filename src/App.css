@@ -4823,6 +4823,31 @@ img.emote-glyph {
   .locker-modal .locker-body .item-grid { overflow-y: auto; }
 }
 
+@media (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  .modal-backdrop:has(> :is(.shop-modal, .locker-modal, .settings-modal)) {
+    --modal-top: max(12px, env(safe-area-inset-top));
+    --modal-bottom: max(12px, env(safe-area-inset-bottom));
+    --modal-height: calc(100dvh - var(--modal-top) - var(--modal-bottom));
+    padding: var(--modal-top) max(12px, env(safe-area-inset-right)) var(--modal-bottom) max(12px, env(safe-area-inset-left));
+  }
+
+  .modal:is(.shop-modal, .locker-modal, .settings-modal) {
+    --panel-fit: scroll;
+    max-width: 100%;
+    max-height: var(--modal-height);
+  }
+
+  .modal.locker-modal {
+    height: var(--modal-height);
+  }
+
+  .modal:is(.shop-modal, .locker-modal, .settings-modal) .icon-close {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .item-grid.featured {
   max-height: none;
   overflow: visible;
@@ -10246,6 +10271,17 @@ body {
     --screen-bottom: 64px;
   }
 
+  .screen:has(> .lobby:not(.activity-lobby) + .feed.lifted) {
+    --screen-bottom: 16px;
+  }
+
+  .screen > .lobby:not(.activity-lobby) + .feed.lifted {
+    position: static;
+    align-items: center;
+    flex-shrink: 0;
+    margin-top: 14px;
+  }
+
   .screen-foot {
     display: flex;
     flex-wrap: wrap;
@@ -10562,8 +10598,12 @@ body {
   gap: 6px;
 }
 
+.phone-hud {
+  --chip-name-max: 72px;
+}
+
 .phone-hud .chip-name {
-  max-width: 72px;
+  max-width: var(--chip-name-max);
 }
 
 .phone-hud .chip .tag-badge,
@@ -10657,6 +10697,16 @@ body {
 }
 
 @media (max-width: 380px) {
+  .shop-modal .pity {
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .favorite-color .setting-head {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
   .phone-hud .players-bar {
     gap: 4px;
   }
@@ -10665,8 +10715,8 @@ body {
     padding-right: 8px;
   }
 
-  .phone-hud .chip-name {
-    max-width: 58px;
+  .phone-hud {
+    --chip-name-max: 58px;
   }
 
   .phone-hud .chip:not(.mini) .pips {
@@ -10727,7 +10777,7 @@ body {
 
 .phone-hud.landscape .action-panel {
   flex: none;
-  width: 184px;
+  width: clamp(184px, 25vw, 220px);
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
@@ -10745,6 +10795,82 @@ body {
   flex-direction: row;
   gap: 8px;
   font-size: 16px;
+}
+
+@media (max-width: 1200px) and (pointer: coarse) {
+  .hud:not(.phone-hud) .players-bar {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip.me {
+    flex-shrink: 0;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) and (pointer: coarse) {
+  .hud:not(.phone-hud) .hud-top {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip {
+    gap: 6px;
+    padding-inline: 5px 9px;
+  }
+}
+
+.phone-hud.portrait .chip:not(.mini) {
+  flex-shrink: 1;
+}
+
+.phone-hud.portrait .chip.mini {
+  flex: none;
+}
+
+.phone-hud.portrait .chip:not(.mini) .pips {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.phone-hud.portrait .chip:not(.mini) .pips span {
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+@media (max-width: 1200px) and (pointer: coarse) {
+  .hud .players-bar .team,
+  .hud .players-bar .chip {
+    min-width: 0;
+  }
+
+  .hud .players-bar .avatar {
+    flex: none;
+  }
+
+  .hud .players-bar .chip-body {
+    max-width: var(--chip-name-max, 220px);
+  }
+
+  .hud .players-bar .chip-name {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip:not(.me) .chip-name-text {
+    min-width: min(2ch, 100%);
+  }
+
+  .hud .players-bar .chip-name-text.scrolling {
+    text-overflow: ellipsis;
+    mask-image: none;
+  }
+
+  .hud .players-bar .chip-name-text .marquee-inner {
+    display: inline;
+    animation: none;
+  }
 }
 
 .rotate-hint {
