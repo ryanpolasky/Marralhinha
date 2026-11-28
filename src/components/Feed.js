@@ -51,12 +51,12 @@ function ChatInput({ onSend, teams = false }) {
   );
 }
 
-export default function Feed({ entries, colors: seatPalette = SEAT_COLORS, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false }) {
+export default function Feed({ entries, colors: seatPalette = SEAT_COLORS, open, onToggle, showLogs, onToggleLogs, unread, isMine, teams, onSend, lifted = false, docked = false, compact = false }) {
   const colors = useRainbow(seatPalette);
   const shown = open || docked ? entries : entries.slice(0, 4);
-  const empty = !open && !entries.length;
+  const empty = !compact && !open && !entries.length;
   return (
-    <div className={`feed${open || docked ? ' open' : ''}${lifted ? ' lifted' : ''}${docked ? ' docked' : ''}`}>
+    <div className={`feed${open || docked ? ' open' : ''}${lifted ? ' lifted' : ''}${docked ? ' docked' : ''}${compact ? ' compact' : ''}`}>
       <div className="feed-tools">
         {docked ? (
           <span className="sheet-label">{onToggleLogs ? 'Chat & log' : 'Chat'}</span>

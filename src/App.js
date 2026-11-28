@@ -23,6 +23,7 @@ import { LocalRoom, loadLocal, savedGameExists, savedGameAt, discardSavedGame } 
 import { applyUpdate } from './serviceWorkerRegistration';
 import { useWakeLock } from './game/wakeLock';
 import Game, { FLOAT_MS } from './components/Game';
+import useMedia, { PHONE_QUERY } from './components/useMedia';
 import AccountBar from './components/AccountBar';
 import Shop from './components/Shop';
 import Locker from './components/Locker';
@@ -572,6 +573,8 @@ const App = () => {
     };
   }, [inRoom, view, mySeat, account?.equipped, account?.admin, held, startPending, viewOverride, boardRevealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const phoneScreen = useMedia(PHONE_QUERY);
+  const phonePlates = phoneScreen && !!view?.game && !view.table && !view.activity;
   const [resetKey, setResetKey] = useState(0);
   // True while the camera is panned/zoomed/orbited away from the default view (pulses the reset button)
   const [cameraOff, setCameraOff] = useState(false);
@@ -731,6 +734,7 @@ const App = () => {
           <Suspense fallback={<div className="scene-loading" aria-hidden="true" />}>
             <Scene
               {...sceneProps}
+              phonePlates={phonePlates}
               preview={preview}
               paused={(!!modal && sceneProps.mode !== 'game') || !boardRevealed}
               mySeat={inRoom ? mySeat : -1}

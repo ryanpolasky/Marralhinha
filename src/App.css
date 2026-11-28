@@ -10906,6 +10906,215 @@ body {
   }
 }
 
+.hud .players-bar.nameplate-grid {
+  --plate-gap: 8px;
+  max-width: none;
+  min-width: 0;
+  display: grid;
+  gap: var(--plate-gap);
+  justify-items: stretch;
+  align-items: center;
+  grid-area: 2 / 1 / auto / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 440px);
+  justify-self: center;
+}
+
+.hud .players-bar.nameplate-grid .chip {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn {
+  transform: none;
+  zoom: 1;
+  box-shadow: none;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn:not(.viewing, :focus-visible) {
+  outline: 2px solid var(--seat);
+  outline-offset: 1px;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn .avatar {
+  animation: none;
+}
+
+.hud .players-bar.nameplate-grid .avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.hud .players-bar.nameplate-grid .chip-body {
+  flex: 1;
+  align-items: stretch;
+  max-width: none;
+}
+
+.hud .players-bar.nameplate-grid .chip-name {
+  max-width: none;
+  justify-content: flex-start;
+  font-size: 15px;
+  line-height: 1.05;
+}
+
+.nameplate-detail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 12px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.nameplate-detail .pips {
+  flex: none;
+  gap: 3px;
+  margin: 0;
+  padding: 2px 3px;
+}
+
+.hud .nameplate-grid .nameplate-detail .pips span {
+  width: 5px;
+  height: 5px;
+}
+
+.hud .nameplate-grid .nameplate-detail :is(.tag-badge, .badge) {
+  display: inline-flex;
+  flex: none;
+  font-size: 9px;
+  line-height: 1;
+  padding: 1px 3px;
+}
+
+
+.hud .players-bar.nameplate-grid-3 > .chip:first-child {
+  grid-column: 1 / -1;
+}
+
+.hud:not(.phone-hud) .players-bar.nameplate-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 660px);
+}
+
+.hud:not(.phone-hud) .nameplate-grid-3 > .chip:first-child {
+  grid-column: auto;
+}
+
+.phone-hud.landscape .players-bar.nameplate-grid {
+  grid-area: auto;
+  position: absolute;
+  inset: max(8px, env(safe-area-inset-top)) 0 auto;
+  margin: 0 auto;
+  width: min(calc(100% - 200px), 412px);
+}
+
+@media (min-width: 700px) {
+  .phone-hud.landscape .players-bar.nameplate-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(calc(100% - 200px), 620px);
+  }
+
+  .phone-hud.landscape .nameplate-grid-3 > .chip:first-child {
+    grid-column: auto;
+  }
+}
+
+.phone-hud.portrait .players-bar.nameplate-grid {
+  --plate-gap: 7px;
+}
+
+.phone-hud .players-bar.nameplate-grid .chip-name {
+  font-size: 13px;
+}
+
+.phone-hud .players-bar.nameplate-grid .chip {
+  gap: 5px;
+  padding-inline: 4px;
+}
+
+.phone-hud .players-bar.nameplate-grid .avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.phone-hud:has(.nameplate-grid-3, .nameplate-grid-4) .rotate-hint {
+  top: calc(max(8px, env(safe-area-inset-top)) + 152px);
+}
+
+.tablet-hud .hud-bottom {
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+}
+
+.tablet-hud .hud-bottom > .action-panel {
+  box-sizing: border-box;
+  justify-self: center;
+  width: min(100%, 420px);
+  min-width: 0;
+}
+
+.tablet-hud .hud-bottom > .hud-right {
+  order: 0;
+  grid-column: 3;
+  align-self: stretch;
+  align-items: center;
+  gap: 6px;
+}
+
+.tablet-hud .hud-bottom > .hud-right .reactions {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) {
+  position: relative;
+  grid-column: 1;
+  order: 0;
+  align-self: stretch;
+  justify-content: center;
+}
+
+.tablet-hud .hud-bottom > .feed.compact {
+  width: auto;
+}
+
+.tablet-hud .feed.compact .feed-tools {
+  white-space: nowrap;
+}
+
+.tablet-hud .feed.compact:not(.open) :is(.feed-list, .chat-form) {
+  display: none;
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) :is(.feed-list, .chat-form) {
+  position: absolute;
+  left: 0;
+}
+
+.tablet-hud .feed.compact :is(.feed-list, .chat-form) {
+  width: min(320px, 45vw);
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) .chat-form {
+  bottom: calc(100% + 8px);
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) .feed-list {
+  bottom: calc(100% + 52px);
+}
+
+.tablet-hud .feed.compact .feed-list:empty {
+  display: none;
+}
+
 .rotate-hint {
   position: absolute;
   top: calc(max(8px, env(safe-area-inset-top)) + 104px);

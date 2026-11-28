@@ -13,7 +13,7 @@ import { Help, Camera, Exit, DieIcon, Chat, Smiley, Eye, BoardIcon, Coffee, Dots
 import HudSheet from './HudSheet';
 import Marquee from './Marquee';
 import WellspringName from './WellspringName';
-import useMedia, { PHONE_QUERY, WIDE_RESULTS_QUERY } from './useMedia';
+import useMedia, { PHONE_QUERY, TABLET_HUD_QUERY, TABLET_PLATES_QUERY, WIDE_RESULTS_QUERY } from './useMedia';
 import { REACTIONS, REACTION_BY_KEY, computeAwards } from '../game/fun';
 import { BOXES, ITEMS, skinKey, itemsForSlot, cosmeticsOf, emotesOf, emoteFor } from '../game/catalog';
 import { warmBoardSkin } from '../game/skinWarm';
@@ -322,7 +322,7 @@ function TurnClock({ deadline, total }) {
   );
 }
 
-export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats, mini = false }) {
+export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, clock, viewing, onView, onStats, mini = false, fullPlate = false, pixel }) {
   const color = useRainbowColor(player?.color || game?.colors?.[seat] || SEAT_COLORS[seat]);
   const home = homeCount(game.marbles[seat]);
   const isTurn = game.phase !== 'over' && activeSeat === seat;
@@ -331,6 +331,20 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
   const chipRef = useRef(null);
   const seatVars = { '--seat': color.main, '--seat-light': color.light, '--seat-dark': color.dark };
   const who = seat === mySeat ? 'your' : `${player?.name || color.name}'s`;
+  const cosmetic = skinKey(player?.cosmetics?.nameplate) || 'basic';
+  const name = fullPlate ? player?.name || color.name : seat === mySeat ? 'You' : player?.name;
+  const badges = (
+    <>
+      <TagBadges tags={player?.tags} badges={player?.badges} small />
+      {player?.isBot && <span className="badge">bot</span>}
+      {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
+    </>
+  );
+  const pips = (
+    <div className="pips" aria-label={`${home} of ${game.marbles[seat].length} marbles home`}>
+      {game.marbles[seat].map((_, i) => <span key={i} className={i < home ? 'on' : ''} />)}
+    </div>
+  );
   return (
     <div
       ref={chipRef}
@@ -349,7 +363,7 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
           : undefined
       }
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onView && (e.preventDefault(), e.stopPropagation(), onView())}
-      className={`chip plate plate-${skinKey(player?.cosmetics?.nameplate) || 'basic'}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}${mini ? ' mini' : ''}`}
+      className={`chip plate plate-${cosmetic}${isTurn ? ' turn' : ''}${seat === mySeat ? ' me' : ''}${isAway(player) ? ' away' : ''}${viewing ? ' viewing' : ''}${mini ? ' mini' : ''}`}
       style={seatVars}
     >
       {sticker && (
@@ -375,18 +389,12 @@ export function PlayerChip({ seat, player, game, activeSeat, mySeat, reaction, c
       </span>
       <div className="chip-body">
         <div className="chip-name">
-          {skinKey(player?.cosmetics?.nameplate) === 'wellspring'
-            ? <span className="chip-name-text"><WellspringName name={seat === mySeat ? 'You' : player?.name} /></span>
-            : <Marquee className="chip-name-text">{seat === mySeat ? 'You' : player?.name}</Marquee>}
-          <TagBadges tags={player?.tags} badges={player?.badges} small />
-          {player?.isBot && <span className="badge">bot</span>}
-          {isAway(player) && <span className="badge warn">{player.away ? 'brb' : 'away'}</span>}
+          {cosmetic === 'wellspring'
+            ? <span className="chip-name-text"><WellspringName name={name} pixel={pixel} /></span>
+            : fullPlate ? <span className="chip-name-text">{name}</span> : <Marquee className="chip-name-text">{name}</Marquee>}
+          {!fullPlate && badges}
         </div>
-        <div className="pips" aria-label={`${home} of ${game.marbles[seat].length} marbles home`}>
-          {game.marbles[seat].map((_, i) => (
-            <span key={i} className={i < home ? 'on' : ''} />
-          ))}
-        </div>
+        {fullPlate ? <div className="nameplate-detail">{pips}{badges}</div> : pips}
       </div>
     </div>
   );
@@ -1049,6 +1057,9 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
   // Round the table spins the HUD itself, so it keeps the regular layout
   const phone = useMedia(PHONE_QUERY) && !room.table;
   const portrait = useMedia(PORTRAIT_QUERY);
+  const tablet = useMedia(TABLET_HUD_QUERY) && !phone && !room.table && !room.activity;
+  const tabletPlates = useMedia(TABLET_PLATES_QUERY);
+  const fullPlates = !room.table && !room.activity && (phone || tabletPlates);
   const wideResults = useMedia(WIDE_RESULTS_QUERY) && !room.activity;
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
@@ -1189,7 +1200,9 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
         reaction={reactions.find((r) => r.seat === s)}
         clock={clock && !masked && game.turn === s ? clock : null}
         viewing={viewing}
-        mini={phone && portrait && s !== activeSeat && (local || s !== mySeat) && !viewing}
+        mini={!fullPlates && phone && portrait && s !== activeSeat && (local || s !== mySeat) && !viewing}
+        fullPlate={fullPlates}
+        pixel={fullPlates && phone ? 2 : undefined}
         onView={local ? undefined : () => onViewSeat?.(s)}
         onStats={!local && seats[s]?.userId && s !== mySeat ? () => onPlayerStats?.(seats[s]) : undefined}
       />
@@ -1249,15 +1262,15 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
     </div>
   );
   const playersBar = (
-    <div className="players-bar">
-      {teams ? (
+    <div className={`players-bar${fullPlates ? ` nameplate-grid nameplate-grid-${game.active.length}` : ''}`}>
+      {teams && !fullPlates ? (
         <>
           <div className="team">{[0, 2].map(chip)}</div>
           <span className="vs">VS</span>
           <div className="team">{[1, 3].map(chip)}</div>
         </>
       ) : (
-        game.active.map(chip)
+        (teams ? [0, 2, 1, 3] : game.active).map(chip)
       )}
     </div>
   );
@@ -1308,6 +1321,7 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
       onSend={(text, channel) => onAction('game:chat', { text, channel })}
       lifted={!docked && showOver}
       docked={docked}
+      compact={tablet && !docked && !showOver}
     />
   );
   const overlays = (
@@ -1470,7 +1484,7 @@ export default function Game({ room, playerId, reactions = [], floaters = [], te
   }
 
   return (
-    <div ref={hudRef} className={`hud${local ? ' local-hud' : ''}`}>
+    <div ref={hudRef} className={`hud${local ? ' local-hud' : ''}${tablet ? ' tablet-hud' : ''}`}>
       <div className="hud-top">
         {brandChip}
         {playersBar}
