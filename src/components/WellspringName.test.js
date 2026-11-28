@@ -17,6 +17,10 @@ test('long names truncate on whole pixels and retain their accessible full name'
   expect(bitmapName('LONG', 9).text).toBe('.');
 });
 
+test('fits the same bitmap into a narrow plate using intact smaller pixels', () => {
+  expect(bitmapName('Ana Margarida', 105, 2)).toMatchObject({ text: 'ANA MARGARIDA', width: 102 });
+});
+
 test('empty names get a bitmap default and unsupported names use native text', () => {
   expect(bitmapName('').text).toBe('PLAYER');
   expect(bitmapName('魔法 🪄')).toBeNull();

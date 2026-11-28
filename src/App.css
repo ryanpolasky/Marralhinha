@@ -4823,6 +4823,31 @@ img.emote-glyph {
   .locker-modal .locker-body .item-grid { overflow-y: auto; }
 }
 
+@media (orientation: landscape) and (max-width: 1023px) and (max-height: 540px) and (pointer: coarse) {
+  .modal-backdrop:has(> :is(.shop-modal, .locker-modal, .settings-modal)) {
+    --modal-top: max(12px, env(safe-area-inset-top));
+    --modal-bottom: max(12px, env(safe-area-inset-bottom));
+    --modal-height: calc(100dvh - var(--modal-top) - var(--modal-bottom));
+    padding: var(--modal-top) max(12px, env(safe-area-inset-right)) var(--modal-bottom) max(12px, env(safe-area-inset-left));
+  }
+
+  .modal:is(.shop-modal, .locker-modal, .settings-modal) {
+    --panel-fit: scroll;
+    max-width: 100%;
+    max-height: var(--modal-height);
+  }
+
+  .modal.locker-modal {
+    height: var(--modal-height);
+  }
+
+  .modal:is(.shop-modal, .locker-modal, .settings-modal) .icon-close {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .item-grid.featured {
   max-height: none;
   overflow: visible;
@@ -10246,6 +10271,17 @@ body {
     --screen-bottom: 64px;
   }
 
+  .screen:has(> .lobby:not(.activity-lobby) + .feed.lifted) {
+    --screen-bottom: 16px;
+  }
+
+  .screen > .lobby:not(.activity-lobby) + .feed.lifted {
+    position: static;
+    align-items: center;
+    flex-shrink: 0;
+    margin-top: 14px;
+  }
+
   .screen-foot {
     display: flex;
     flex-wrap: wrap;
@@ -10416,6 +10452,26 @@ body {
   }
 }
 
+@media (max-width: 620px) and (orientation: portrait) {
+  .lobby .seat-name {
+    font-size: 16px;
+  }
+
+  .lobby .seat-name > :not(.seat-name-text) {
+    flex: none;
+  }
+
+  .lobby .seat-name-text.scrolling {
+    text-overflow: ellipsis;
+    mask-image: none;
+  }
+
+  .lobby .seat-name-text .marquee-inner {
+    display: inline;
+    animation: none;
+  }
+}
+
 @media (max-width: 560px) {
   .seat {
     display: grid;
@@ -10562,8 +10618,12 @@ body {
   gap: 6px;
 }
 
+.phone-hud {
+  --chip-name-max: 72px;
+}
+
 .phone-hud .chip-name {
-  max-width: 72px;
+  max-width: var(--chip-name-max);
 }
 
 .phone-hud .chip .tag-badge,
@@ -10657,6 +10717,16 @@ body {
 }
 
 @media (max-width: 380px) {
+  .shop-modal .pity {
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .favorite-color .setting-head {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
   .phone-hud .players-bar {
     gap: 4px;
   }
@@ -10665,8 +10735,8 @@ body {
     padding-right: 8px;
   }
 
-  .phone-hud .chip-name {
-    max-width: 58px;
+  .phone-hud {
+    --chip-name-max: 58px;
   }
 
   .phone-hud .chip:not(.mini) .pips {
@@ -10680,6 +10750,7 @@ body {
 }
 
 .phone-hud.landscape {
+  --chip-name-max: clamp(100px, 21vw, 180px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -10727,7 +10798,7 @@ body {
 
 .phone-hud.landscape .action-panel {
   flex: none;
-  width: 184px;
+  width: clamp(184px, 25vw, 220px);
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
@@ -10745,6 +10816,303 @@ body {
   flex-direction: row;
   gap: 8px;
   font-size: 16px;
+}
+
+@media (min-width: 621px) and (max-width: 1200px) and (orientation: portrait) and (pointer: coarse) {
+  .hud:not(.phone-hud) .hud-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hud:not(.phone-hud) .players-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .hud:not(.phone-hud) .players-bar .team,
+  .hud:not(.phone-hud) .players-bar .chip {
+    flex-grow: 1;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip {
+    justify-content: center;
+    gap: 6px;
+    padding-inline: 5px 8px;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip-name {
+    font-size: 14px;
+  }
+
+  .hud:not(.phone-hud) .players-bar .tag-badge {
+    display: none;
+  }
+}
+
+.phone-hud.portrait .chip:not(.mini) {
+  flex-shrink: 1;
+}
+
+.phone-hud.portrait .chip.mini {
+  flex: none;
+}
+
+.phone-hud.portrait .chip:not(.mini) .pips {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.phone-hud.portrait .chip:not(.mini) .pips span {
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+@media (orientation: portrait) and (max-width: 1200px) and (pointer: coarse),
+  (orientation: landscape) and (max-width: 1023px) and (max-height: 500px) and (pointer: coarse) {
+  .hud .players-bar .team,
+  .hud .players-bar .chip {
+    min-width: 0;
+  }
+
+  .hud .players-bar .avatar {
+    flex: none;
+  }
+
+  .hud .players-bar .chip-body {
+    max-width: var(--chip-name-max, 220px);
+  }
+
+  .hud .players-bar .chip-name {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .hud:not(.phone-hud) .players-bar .chip:not(.me) .chip-name-text {
+    min-width: min(2ch, 100%);
+  }
+
+  .hud .players-bar .chip-name-text.scrolling {
+    text-overflow: ellipsis;
+    mask-image: none;
+  }
+
+  .hud .players-bar .chip-name-text .marquee-inner {
+    display: inline;
+    animation: none;
+  }
+}
+
+.hud .players-bar.nameplate-grid {
+  --plate-gap: 8px;
+  max-width: none;
+  min-width: 0;
+  display: grid;
+  gap: var(--plate-gap);
+  justify-items: stretch;
+  align-items: center;
+  grid-area: 2 / 1 / auto / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 440px);
+  justify-self: center;
+}
+
+.hud .players-bar.nameplate-grid .chip {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn {
+  transform: none;
+  zoom: 1;
+  box-shadow: none;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn:not(.viewing, :focus-visible) {
+  outline: 2px solid var(--seat);
+  outline-offset: 1px;
+}
+
+.hud .players-bar.nameplate-grid .chip.turn .avatar {
+  animation: none;
+}
+
+.hud .players-bar.nameplate-grid .avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.hud .players-bar.nameplate-grid .chip-body {
+  flex: 1;
+  align-items: stretch;
+  max-width: none;
+}
+
+.hud .players-bar.nameplate-grid .chip-name {
+  max-width: none;
+  justify-content: flex-start;
+  font-size: 15px;
+  line-height: 1.05;
+}
+
+.nameplate-detail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 12px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.nameplate-detail .pips {
+  flex: none;
+  gap: 3px;
+  margin: 0;
+  padding: 2px 3px;
+}
+
+.hud .nameplate-grid .nameplate-detail .pips span {
+  width: 5px;
+  height: 5px;
+}
+
+.hud .nameplate-grid .nameplate-detail :is(.tag-badge, .badge) {
+  display: inline-flex;
+  flex: none;
+  font-size: 9px;
+  line-height: 1;
+  padding: 1px 3px;
+}
+
+
+.hud .players-bar.nameplate-grid-3 > .chip:first-child {
+  grid-column: 1 / -1;
+}
+
+.hud:not(.phone-hud) .players-bar.nameplate-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 660px);
+}
+
+.hud:not(.phone-hud) .nameplate-grid-3 > .chip:first-child {
+  grid-column: auto;
+}
+
+.phone-hud.landscape .players-bar.nameplate-grid {
+  grid-area: auto;
+  position: absolute;
+  inset: max(8px, env(safe-area-inset-top)) 0 auto;
+  margin: 0 auto;
+  width: min(calc(100% - 200px), 412px);
+}
+
+@media (min-width: 700px) {
+  .phone-hud.landscape .players-bar.nameplate-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(calc(100% - 200px), 620px);
+  }
+
+  .phone-hud.landscape .nameplate-grid-3 > .chip:first-child {
+    grid-column: auto;
+  }
+}
+
+.phone-hud.portrait .players-bar.nameplate-grid {
+  --plate-gap: 7px;
+}
+
+.phone-hud .players-bar.nameplate-grid .chip-name {
+  font-size: 13px;
+}
+
+.phone-hud .players-bar.nameplate-grid .chip {
+  gap: 5px;
+  padding-inline: 4px;
+}
+
+.phone-hud .players-bar.nameplate-grid .avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.phone-hud:has(.nameplate-grid-3, .nameplate-grid-4) .rotate-hint {
+  top: calc(max(8px, env(safe-area-inset-top)) + 152px);
+}
+
+.tablet-hud .hud-bottom {
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+}
+
+.tablet-hud .hud-bottom > .action-panel {
+  box-sizing: border-box;
+  justify-self: center;
+  width: min(100%, 420px);
+  min-width: 0;
+}
+
+.tablet-hud .hud-bottom > .hud-right {
+  order: 0;
+  grid-column: 3;
+  align-self: stretch;
+  align-items: center;
+  gap: 6px;
+}
+
+.tablet-hud .hud-bottom > .hud-right .reactions {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) {
+  position: relative;
+  grid-column: 1;
+  order: 0;
+  align-self: stretch;
+  justify-content: center;
+}
+
+.tablet-hud .hud-bottom > .feed.compact {
+  width: auto;
+}
+
+.tablet-hud .feed.compact .feed-tools {
+  white-space: nowrap;
+}
+
+.tablet-hud .feed.compact:not(.open) :is(.feed-list, .chat-form) {
+  display: none;
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) :is(.feed-list, .chat-form) {
+  position: absolute;
+  left: 0;
+}
+
+.tablet-hud .feed.compact :is(.feed-list, .chat-form) {
+  width: min(320px, 45vw);
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) .chat-form {
+  bottom: calc(100% + 8px);
+}
+
+.tablet-hud .hud-bottom > .feed:not(.lifted) .feed-list {
+  bottom: calc(100% + 52px);
+}
+
+.tablet-hud .feed.compact .feed-list:empty {
+  display: none;
 }
 
 .rotate-hint {
